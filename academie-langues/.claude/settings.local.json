@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r essai /c/Users/zidane/PROJETS/academie-langues/app --include=*.tsx --include=*.ts)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -c '\"\"A1\"\"' \"c:\\\\Users\\\\zidane\\\\PROJETS\\\\academie-langues\\\\app\\\\data\\\\comprehension_ecrite.ts\")",
+      "Bash(grep -c '\"\"A2\"\"' \"c:\\\\Users\\\\zidane\\\\PROJETS\\\\academie-langues\\\\app\\\\data\\\\comprehension_ecrite.ts\")",
+      "Bash(grep -c '\"\"B1\"\"' \"c:\\\\Users\\\\zidane\\\\PROJETS\\\\academie-langues\\\\app\\\\data\\\\comprehension_ecrite.ts\")",
+      "Bash(grep -c '\"\"B2\"\"' \"c:\\\\Users\\\\zidane\\\\PROJETS\\\\academie-langues\\\\app\\\\data\\\\comprehension_ecrite.ts\")",
+      "Bash(grep -c '\"\"C1\"\"' \"c:\\\\Users\\\\zidane\\\\PROJETS\\\\academie-langues\\\\app\\\\data\\\\comprehension_ecrite.ts\")"
+    ]
+  }
+}

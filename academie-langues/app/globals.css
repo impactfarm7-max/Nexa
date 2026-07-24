@@ -1,0 +1,376 @@
+@import "tailwindcss";
+
+/* =========================
+   Reset explicite (Tailwind v4)
+   ========================= */
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Champs numériques : saisie libre, sans flèches +/- */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+}
+
+/* =========================
+   Design tokens (NEXA)
+   Blanc + Orange + Noir
+   ========================= */
+:root {
+  /* Base */
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text: #111111;
+  --muted: #6b7280;
+  --border: #f1f1f1;
+
+  /* Orange premium */
+  --primary: #f97316;
+  --primary-pressed: #ea580c;
+  --primary-soft: #fff4ed;
+
+  /* Radius & shadow */
+  --radius: 18px;
+  --shadow: 0 10px 30px rgba(17, 17, 17, 0.06);
+
+  /* Layout */
+  --maxw: 520px;
+  --pad: 16px;
+  --bottomnav-space: 96px;
+}
+
+/* =========================
+   App shell (propre)
+   ========================= */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* ✅ AJOUT DU FILIGRANE CAURI SUR LE BODY */
+body {
+  background-color: var(--bg);
+  /* Pattern Cauri (Opacité douce à 0.03, couleur orange premium) */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' width='80' height='80' opacity='0.03' fill='%23ea580c'%3E%3Cpath d='M50 10 C30 10 20 30 20 50 C20 75 35 90 50 90 C65 90 80 75 80 50 C80 30 70 10 50 10 Z M50 80 C40 80 35 65 35 50 C35 35 45 20 50 20 C55 20 65 35 65 50 C65 65 60 80 50 80 Z'/%3E%3Cpath d='M50 25 C48 35 52 45 48 55 C52 65 48 75 50 75' stroke='%23ea580c' stroke-width='5' fill='none' stroke-linecap='round'/%3E%3Cpath d='M44 35 L48 37 M44 45 L49 45 M44 55 L48 53 M56 35 L52 37 M56 45 L51 45 M56 55 L52 53' stroke='%23ea580c' stroke-width='4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Inter", "Segoe UI", Roboto, Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.app {
+  background-color: transparent; /* Permet au body de s'afficher */
+  color: var(--text);
+}
+
+.app-shell {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.app-main {
+  padding: var(--pad);
+  padding-bottom: var(--bottomnav-space);
+}
+
+/* =========================
+   UI helpers (classe utilitaires)
+   ========================= */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.btn {
+  height: 48px;
+  padding: 0 16px;
+  border-radius: 14px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  transition: transform 0.08s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.btn:active {
+  transform: scale(0.98);
+}
+
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--primary-pressed);
+}
+
+.btn-secondary {
+  background: #fff;
+  color: var(--primary);
+  border: 1px solid rgba(249, 115, 22, 0.35);
+}
+
+.badge-primary {
+  background: var(--primary-soft);
+  color: var(--primary-pressed);
+  border: 1px solid rgba(249, 115, 22, 0.25);
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* =========================
+   Animations personnalisées
+   ========================= */
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.animate-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 15s linear infinite;
+}
+
+/* Animation Splash Screen (Cercle infini) */
+.infinity-orbit {
+  position: absolute;
+  inset: -12px;
+  border-radius: 999px;
+  border: 3px solid rgba(249,115,22,0.20);
+  border-top-color: rgba(249,115,22,1);
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+:root {
+  --sidebar-width: 16rem;
+  --nexa-sidebar-w: 16rem;
+  --nexa-sidebar-collapsed-w: 5rem;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --sidebar-width: 0rem;
+    --nexa-sidebar-w: 0px;
+  }
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --sidebar-width: 18rem;
+    --nexa-sidebar-collapsed-w: 5.5rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  :root {
+    --sidebar-width: 20rem;
+    --nexa-sidebar-collapsed-w: 6rem;
+  }
+}
+
+/* Conteneur étudiant — largeur fluide jusqu'aux grands écrans (~32") */
+.nexa-student-shell {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 768px) {
+  .nexa-student-shell {
+    max-width: 72rem; /* 1152px */
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .nexa-student-shell {
+    max-width: 80rem; /* 1280px */
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .nexa-student-shell {
+    max-width: 100rem; /* 1600px */
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  .nexa-student-shell {
+    max-width: 112.5rem; /* 1800px — confortable sur 32" QHD/4K */
+    padding-left: 3.5rem;
+    padding-right: 3.5rem;
+  }
+}
+
+/* Conteneur espace centre — même logique fluide que l'étudiant */
+.nexa-center-shell {
+  width: 100%;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 768px) {
+  .nexa-center-shell {
+    max-width: 80rem;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .nexa-center-shell {
+    max-width: 90rem; /* 1440px */
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+@media (min-width: 1536px) {
+  .nexa-center-shell {
+    max-width: 105rem; /* 1680px */
+    padding-left: 2.5rem;
+    padding-right: 2.5rem;
+  }
+}
+
+@media (min-width: 1920px) {
+  .nexa-center-shell {
+    max-width: 112.5rem; /* 1800px */
+    padding-left: 3rem;
+    padding-right: 3rem;
+  }
+}
+
+/* Landing / marketing — aligné grands écrans */
+.nexa-marketing-shell {
+  width: 100%;
+  max-width: 72rem; /* 6xl */
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .nexa-marketing-shell {
+    padding-left: 1.25rem;
+    padding-right: 1.25rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .nexa-marketing-shell {
+    max-width: 80rem; /* 7xl */
+  }
+}
+
+@media (min-width: 1536px) {
+  .nexa-marketing-shell {
+    max-width: 105rem; /* 1680px */
+  }
+}
+
+@media (min-width: 1920px) {
+  .nexa-marketing-shell {
+    max-width: 112.5rem; /* 1800px */
+  }
+}
+
+/* Titres de section landing — alignés sur PersonaTabs */
+.nexa-marketing-title {
+  font-size: 1.5rem;
+  line-height: 1.1;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+}
+
+@media (min-width: 640px) {
+  .nexa-marketing-title {
+    font-size: 2.25rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .nexa-marketing-title {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .nexa-marketing-title {
+    font-size: 3.25rem;
+  }
+}
+
+body {
+  font-family: Inter, Roboto, system-ui, sans-serif;
+}
+
+@theme {
+  --font-display: "Google Sans", Inter, Roboto, system-ui, sans-serif;
+}
+
+/* Centre list pages — animations (style Programmes) */
+@keyframes center-toolbar-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes center-row-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.center-toolbar-in {
+  animation: center-toolbar-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.center-row-in {
+  animation: center-row-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.center-table-wrap {
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.center-table-wrap:hover {
+  box-shadow: 0 4px 24px -8px rgba(17, 34, 78, 0.12);
+}
+
+.font-heading,
+.font-display {
+  font-family: var(--font-display);
+}

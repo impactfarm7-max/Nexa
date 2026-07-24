@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(python -c ':*)",
+      "Bash(node -e ':*)",
+      "Bash(printf 'import { readFileSync, writeFileSync } from \"fs\";\\\\nlet c = readFileSync\\(\"academie-langues/app/data/comprehension_orale.ts\", \"utf8\"\\);\\\\nconst idx = c.indexOf\\(\"12: buildPlaceholders\\(12\\)\"\\);\\\\nconsole.log\\(\"Found at:\", idx\\);\\\\n')",
+      "Bash(node /tmp/test_find.mjs)",
+      "Bash(node -e \"const fs=require\\('fs'\\); let c=fs.readFileSync\\('academie-langues/app/data/comprehension_orale.ts','utf8'\\); console.log\\(JSON.stringify\\(c.substring\\(173450,173490\\)\\)\\);\")",
+      "Bash(node ../migrate_co.mjs)"
+    ]
+  }
+}

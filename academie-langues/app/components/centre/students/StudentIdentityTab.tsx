@@ -1,0 +1,721 @@
+"use client";
+
+import { useState, useEffect, useCallback, useRef } from "react";
+import {
+  Camera, Globe, CreditCard, Users, FileText,
+  Edit3, Save, Loader2, Phone, BookOpen,
+} from "lucide-react";
+import { supabase } from "@/app/utils/supabase";
+import FicheInscriptionModal from "@/app/components/centre/students/FicheInscriptionModal";
+import {
+  buildCountryFormPatch,
+  getRegionsForCountry,
+  getStudentCountryOptions,
+  resolveStudentCountryCode,
+  type StudentCountryRef,
+} from "@/app/data/studentLocalisation";
+import { passageDecisionLabelFr } from "@/app/utils/cursus-passage";
+
+const BLUE = "#11224E";
+const ORANGE = "#eb670e";
+const SURFACE = "#F7F7F6";
+const COUNTRY_OPTIONS: StudentCountryRef[] = getStudentCountryOptions();
+
+const FIELD_LABEL = "text-sm font-semibold text-neutral-600 block mb-1.5";
+const FIELD_INPUT =
+  "w-full h-12 px-4 rounded-lg border border-black/[0.08] bg-white font-semibold text-base outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10";
+
+function DossierSection({
+  icon: Icon,
+  title,
+  description,
+  children,
+  actions,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <section className="grid grid-cols-1 lg:grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-5 sm:gap-8 py-8 border-b border-black/[0.06] first:pt-2 last:border-b-0">
+      <div className="lg:sticky lg:top-4 self-start min-w-0">
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-black/[0.06]"
+            style={{ backgroundColor: SURFACE }}
+          >
+            <Icon size={18} style={{ color: BLUE }} />
+          </div>
+          <h2 className="text-lg sm:text-xl font-extrabold tracking-tight leading-tight" style={{ color: BLUE }}>
+            {title}
+          </h2>
+        </div>
+        <p className="text-sm text-neutral-500 mt-3 leading-relaxed font-medium">{description}</p>
+        {actions && <div className="mt-4">{actions}</div>}
+      </div>
+      <div className="space-y-5 w-full min-w-0 rounded-xl border border-black/[0.06] p-5 sm:p-6" style={{ backgroundColor: SURFACE }}>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+type Props = {
+  studentId: string;
+  enrollmentId?: string | null;
+  studentName: string;
+  studentEmail: string;
+  studentPhone: string | null;
+  avatarUrl: string | null;
+  enrollmentInfo: {
+    filiere_id?: string;
+    filiere_name: string;
+    niveau_id?: string | null;
+    niveau_annee: number | null;
+    duration_label?: string | null;
+    academic_year?: string | null;
+    passage_decision?: string | null;
+    passage_reason?: string | null;
+    groupe_id?: string | null;
+    groupe_nom: string | null;
+    enrolled_at: string | null;
+    status: string;
+  } | null;
+  centerId: string;
+  onAvatarUpdated: (url: string) => void;
+  onEnrollmentUpdated?: () => void;
+  /** Incrémenté depuis la barre sticky pour ouvrir le mode édition dossier */
+  editTrigger?: number;
+};
+
+type StudentDetails = {
+  country: string | null;
+  country_code: string | null;
+  region: string | null;
+  id_type: string | null;
+  id_number: string | null;
+  guardian_name: string | null;
+  guardian_relation: string | null;
+  guardian_phone: string | null;
+  notes: string | null;
+};
+
+const ID_TYPE_LABELS: Record<string, string> = {
+  cni: "Carte nationale d'identité",
+  passeport: "Passeport",
+  carte_sejour: "Carte de séjour",
+  autre: "Autre document",
+};
+
+const RELATION_OPTIONS = ["Père", "Mère", "Tuteur", "Oncle", "Tante", "Frère", "Sœur", "Autre"];
+
+export default function StudentIdentityTab({
+  studentId,
+  enrollmentId,
+  studentName,
+  studentEmail,
+  studentPhone,
+  avatarUrl,
+  enrollmentInfo,
+  centerId,
+  onAvatarUpdated,
+  onEnrollmentUpdated,
+  editTrigger = 0,
+}: Props) {
+  const [details, setDetails] = useState<StudentDetails>({
+    country: null, country_code: null, region: null,
+    id_type: null, id_number: null,
+    guardian_name: null, guardian_relation: null, guardian_phone: null,
+    notes: null,
+  });
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showFiche, setShowFiche] = useState(false);
+  const lastEditTrigger = useRef(0);
+
+  // Formulaire identité
+  const [form, setForm] = useState<StudentDetails>(details);
+  const [selectedCountryCode, setSelectedCountryCode] = useState("");
+
+  // Édition filière / niveau / classe
+  const [editingPlacement, setEditingPlacement] = useState(false);
+  const [placementSaving, setPlacementSaving] = useState(false);
+  const [placementError, setPlacementError] = useState("");
+  const [filieres, setFilieres] = useState<{ id: string; name: string; type: string | null }[]>([]);
+  const [niveaux, setNiveaux] = useState<{ id: string; annee: number | null }[]>([]);
+  const [groupes, setGroupes] = useState<{ id: string; nom: string }[]>([]);
+  const [placeFiliereId, setPlaceFiliereId] = useState("");
+  const [placeNiveauId, setPlaceNiveauId] = useState("");
+  const [placeGroupeId, setPlaceGroupeId] = useState("");
+  const [placeLoadingOpts, setPlaceLoadingOpts] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data: detailRow } = await supabase
+      .from("student_details")
+      .select("*")
+      .eq("student_id", studentId)
+      .maybeSingle();
+
+    const parsed: StudentDetails = detailRow || {
+      country: null, country_code: null, region: null,
+      id_type: null, id_number: null,
+      guardian_name: null, guardian_relation: null, guardian_phone: null,
+      notes: null,
+    };
+    setDetails(parsed);
+    setForm(parsed);
+    setSelectedCountryCode(
+      resolveStudentCountryCode(COUNTRY_OPTIONS, {
+        country: parsed.country,
+        country_code: parsed.country_code,
+      }),
+    );
+
+    setLoading(false);
+  }, [studentId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Upload photo
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { alert("Image trop lourde (max 2 Mo)."); return; }
+    if (!file.type.startsWith("image/")) { alert("Fichier non supporté."); return; }
+
+    setAvatarUploading(true);
+    try {
+      const ext = file.name.split(".").pop();
+      const filePath = `${studentId}/avatar.${ext}`;
+      const { error: uploadErr } = await supabase.storage.from("avatars").upload(filePath, file, { upsert: true });
+      if (uploadErr) throw uploadErr;
+
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      await supabase.from("profiles").update({ avatar_url: urlData.publicUrl }).eq("id", studentId);
+      onAvatarUpdated(`${urlData.publicUrl}?t=${Date.now()}`);
+    } catch (err: any) {
+      alert("Erreur upload : " + err.message);
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // Changement de pays dans le formulaire
+  const handleFormCountryChange = (code: string) => {
+    setSelectedCountryCode(code);
+    const patch = buildCountryFormPatch(COUNTRY_OPTIONS, code);
+    if (patch) {
+      setForm((f) => ({ ...f, ...patch }));
+    } else {
+      setForm((f) => ({ ...f, country: null, country_code: null, region: null }));
+    }
+  };
+
+  // Sauvegarde
+  const handleSave = async () => {
+    setSaving(true);
+    const { error } = await supabase.from("student_details").upsert({
+      student_id: studentId,
+      ...form,
+      updated_at: new Date().toISOString(),
+    });
+    if (error) {
+      alert("Erreur : " + error.message);
+    } else {
+      setDetails(form);
+      setEditing(false);
+    }
+    setSaving(false);
+  };
+
+  // Démarrer l'édition
+  const startEdit = () => {
+    setForm(details);
+    setSelectedCountryCode(
+      resolveStudentCountryCode(COUNTRY_OPTIONS, {
+        country: details.country,
+        country_code: details.country_code,
+      }),
+    );
+    setEditing(true);
+  };
+
+  useEffect(() => {
+    if (!editTrigger || editTrigger === lastEditTrigger.current) return;
+    lastEditTrigger.current = editTrigger;
+    startEdit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- startEdit lit details au clic
+  }, [editTrigger]);
+
+  const selectedPlaceFiliere = filieres.find((f) => f.id === placeFiliereId);
+  const needsNiveau = selectedPlaceFiliere?.type === "cursus";
+
+  const loadPlacementOptions = useCallback(async (filiereId: string, niveauId: string | null) => {
+    setPlaceLoadingOpts(true);
+    try {
+      const { data: filRows } = await supabase
+        .from("filieres")
+        .select("id, name, type")
+        .eq("center_id", centerId)
+        .eq("status", "published")
+        .order("name");
+      setFilieres((filRows || []).map((f) => ({ id: f.id, name: f.name, type: f.type })));
+
+      if (!filiereId) {
+        setNiveaux([]);
+        setGroupes([]);
+        return;
+      }
+
+      const { data: nivRows } = await supabase
+        .from("niveaux")
+        .select("id, annee")
+        .eq("filiere_id", filiereId)
+        .order("annee");
+      setNiveaux((nivRows || []).map((n) => ({ id: n.id, annee: n.annee })));
+
+      let grpQuery = supabase.from("groupes").select("id, nom");
+      if (niveauId) {
+        grpQuery = grpQuery.or(`filiere_id.eq.${filiereId},niveau_id.eq.${niveauId}`);
+      } else {
+        grpQuery = grpQuery.eq("filiere_id", filiereId);
+      }
+      const { data: grpRows } = await grpQuery.order("nom");
+      setGroupes((grpRows || []).map((g) => ({ id: g.id, nom: g.nom })));
+    } finally {
+      setPlaceLoadingOpts(false);
+    }
+  }, [centerId]);
+
+  const startPlacementEdit = async () => {
+    if (!enrollmentId || !enrollmentInfo) return;
+    setPlacementError("");
+    const fId = enrollmentInfo.filiere_id || "";
+    const nId = enrollmentInfo.niveau_id || "";
+    const gId = enrollmentInfo.groupe_id || "";
+    setPlaceFiliereId(fId);
+    setPlaceNiveauId(nId);
+    setPlaceGroupeId(gId);
+    setEditingPlacement(true);
+    await loadPlacementOptions(fId, nId || null);
+  };
+
+  useEffect(() => {
+    if (!editingPlacement || !placeFiliereId) return;
+    let cancelled = false;
+    (async () => {
+      setPlaceLoadingOpts(true);
+      try {
+        const { data: nivRows } = await supabase
+          .from("niveaux")
+          .select("id, annee")
+          .eq("filiere_id", placeFiliereId)
+          .order("annee");
+        if (cancelled) return;
+        setNiveaux((nivRows || []).map((n) => ({ id: n.id, annee: n.annee })));
+
+        const niveauId = placeNiveauId || null;
+        let grpQuery = supabase.from("groupes").select("id, nom");
+        if (niveauId) {
+          grpQuery = grpQuery.or(`filiere_id.eq.${placeFiliereId},niveau_id.eq.${niveauId}`);
+        } else {
+          grpQuery = grpQuery.eq("filiere_id", placeFiliereId);
+        }
+        const { data: grpRows } = await grpQuery.order("nom");
+        if (cancelled) return;
+        const nextGroupes = (grpRows || []).map((g) => ({ id: g.id, nom: g.nom }));
+        setGroupes(nextGroupes);
+        if (placeGroupeId && !nextGroupes.some((g) => g.id === placeGroupeId)) {
+          setPlaceGroupeId("");
+        }
+      } finally {
+        if (!cancelled) setPlaceLoadingOpts(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload options when filiere/niveau change
+  }, [editingPlacement, placeFiliereId, placeNiveauId]);
+
+  const savePlacement = async () => {
+    if (!enrollmentId) return;
+    if (!placeFiliereId) {
+      setPlacementError("Choisissez un programme.");
+      return;
+    }
+    if (needsNiveau && !placeNiveauId) {
+      setPlacementError("Choisissez un niveau.");
+      return;
+    }
+    setPlacementSaving(true);
+    setPlacementError("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Session expirée.");
+      const res = await fetch("/api/center/enrollment-placement", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          enrollment_id: enrollmentId,
+          filiere_id: placeFiliereId,
+          niveau_id: placeNiveauId || null,
+          groupe_id: placeGroupeId || null,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Modification impossible.");
+      setEditingPlacement(false);
+      onEnrollmentUpdated?.();
+    } catch (e: unknown) {
+      setPlacementError(e instanceof Error ? e.message : "Erreur.");
+    } finally {
+      setPlacementSaving(false);
+    }
+  };
+
+  const regions = getRegionsForCountry(COUNTRY_OPTIONS, selectedCountryCode);
+
+  if (loading) return <p className="text-sm text-neutral-400 p-8">Chargement du dossier...</p>;
+
+  return (
+    <div className="w-full">
+      <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+
+      {editing && (
+        <div className="flex flex-wrap items-center justify-end gap-1.5 mb-4">
+          <button type="button" onClick={() => setEditing(false)} className="px-3 h-9 rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 hover:bg-neutral-200 transition-colors">Annuler</button>
+          <button type="button" onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: ORANGE }}>
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Enregistrer
+          </button>
+        </div>
+      )}
+
+      <DossierSection
+        icon={BookOpen}
+        title="Informations générales"
+        description="Photo, coordonnées et parcours d'inscription."
+        actions={enrollmentId ? (
+          <button
+            type="button"
+            onClick={() => setShowFiche(true)}
+            className="inline-flex items-center gap-2 px-3 h-9 rounded-lg text-xs font-semibold text-white"
+            style={{ backgroundColor: BLUE }}
+          >
+            <FileText size={14} /> Fiche d&apos;inscription
+          </button>
+        ) : undefined}
+      >
+        <div className="flex items-start gap-4">
+          <div className="relative shrink-0">
+            <div className="w-20 h-20 rounded-xl overflow-hidden bg-orange-50 border border-orange-100 flex items-center justify-center">
+              {avatarUploading ? (
+                <Loader2 size={24} className="text-orange-500 animate-spin" />
+              ) : avatarUrl ? (
+                <img src={avatarUrl} alt="Photo" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-2xl font-black" style={{ color: ORANGE }}>
+                  {studentName.split(" ").map((w) => w[0]).join("").substring(0, 2)}
+                </span>
+              )}
+            </div>
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute -bottom-1 -right-1 w-7 h-7 bg-white border border-neutral-200 rounded-lg flex items-center justify-center shadow-sm hover:bg-orange-50 transition-colors" aria-label="Changer la photo">
+              <Camera size={13} style={{ color: ORANGE }} />
+            </button>
+          </div>
+          <div className="min-w-0 flex-1 space-y-1">
+            <p className="font-extrabold text-lg truncate" style={{ color: BLUE }}>{studentName}</p>
+            <p className="text-sm text-neutral-500 font-medium truncate">{studentEmail}</p>
+            {studentPhone && <p className="text-sm text-neutral-500 font-medium">{studentPhone}</p>}
+            {details.country && (
+              <p className="text-sm text-neutral-500 font-medium flex items-center gap-1.5 pt-1">
+                <Globe size={14} className="text-neutral-400" />
+                {details.country}{details.region ? `, ${details.region}` : ""}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {enrollmentInfo && (
+          <div className="pt-2 border-t border-black/[0.06]">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <p className="text-sm font-semibold text-neutral-600">Parcours</p>
+              {enrollmentId && !editingPlacement && (
+                <button
+                  type="button"
+                  onClick={startPlacementEdit}
+                  className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-black/[0.08] text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors"
+                >
+                  <Edit3 size={12} /> Modifier parcours
+                </button>
+              )}
+            </div>
+
+            {editingPlacement ? (
+              <div className="space-y-3">
+                <div>
+                  <label className={FIELD_LABEL}>Programme / Filière</label>
+                  <select
+                    value={placeFiliereId}
+                    onChange={(e) => {
+                      setPlaceFiliereId(e.target.value);
+                      setPlaceNiveauId("");
+                      setPlaceGroupeId("");
+                    }}
+                    className={FIELD_INPUT}
+                  >
+                    <option value="">Choisir…</option>
+                    {filieres.map((f) => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                </div>
+                {(needsNiveau || niveaux.length > 0) && (
+                  <div>
+                    <label className={FIELD_LABEL}>Niveau</label>
+                    <select
+                      value={placeNiveauId}
+                      onChange={(e) => {
+                        setPlaceNiveauId(e.target.value);
+                        setPlaceGroupeId("");
+                      }}
+                      className={FIELD_INPUT}
+                    >
+                      <option value="">Choisir…</option>
+                      {niveaux.map((n) => (
+                        <option key={n.id} value={n.id}>
+                          {n.annee != null ? `Niveau ${n.annee}` : "Niveau"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className={FIELD_LABEL}>Classe</label>
+                  <select
+                    value={placeGroupeId}
+                    onChange={(e) => setPlaceGroupeId(e.target.value)}
+                    disabled={placeLoadingOpts}
+                    className={`${FIELD_INPUT} disabled:opacity-50`}
+                  >
+                    <option value="">Aucune / à définir</option>
+                    {groupes.map((g) => (
+                      <option key={g.id} value={g.id}>{g.nom}</option>
+                    ))}
+                  </select>
+                </div>
+                {placementError && (
+                  <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                    {placementError}
+                  </p>
+                )}
+                <div className="flex gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => { setEditingPlacement(false); setPlacementError(""); }}
+                    className="px-3 h-10 rounded-lg bg-neutral-100 text-sm font-semibold text-neutral-600 hover:bg-neutral-200"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={savePlacement}
+                    disabled={placementSaving || placeLoadingOpts}
+                    className="flex items-center gap-1.5 px-4 h-10 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
+                    style={{ backgroundColor: ORANGE }}
+                  >
+                    {placementSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+                    Enregistrer
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
+                  <p className="text-xs font-semibold text-neutral-400">Programme</p>
+                  <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.filiere_name}</p>
+                </div>
+                {enrollmentInfo.niveau_annee != null && (
+                  <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
+                    <p className="text-xs font-semibold text-neutral-400">Niveau</p>
+                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>Année {enrollmentInfo.niveau_annee}</p>
+                  </div>
+                )}
+                {!enrollmentInfo.niveau_annee && enrollmentInfo.duration_label && (
+                  <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
+                    <p className="text-xs font-semibold text-neutral-400">Durée</p>
+                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.duration_label}</p>
+                  </div>
+                )}
+                {enrollmentInfo.academic_year && (
+                  <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
+                    <p className="text-xs font-semibold text-neutral-400">Année scolaire</p>
+                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.academic_year}</p>
+                  </div>
+                )}
+                {enrollmentInfo.passage_decision && (
+                  <div className="bg-white rounded-lg p-3 border border-black/[0.06] col-span-2">
+                    <p className="text-xs font-semibold text-neutral-400">Décision de passage</p>
+                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>
+                      {passageDecisionLabelFr(enrollmentInfo.passage_decision)}
+                    </p>
+                    {enrollmentInfo.passage_reason && (
+                      <p className="text-sm font-medium text-neutral-600 mt-1">
+                        Motif : {enrollmentInfo.passage_reason}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
+                  <p className="text-xs font-semibold text-neutral-400">Salle de classe</p>
+                  <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.groupe_nom || "—"}</p>
+                </div>
+                <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
+                  <p className="text-xs font-semibold text-neutral-400">Statut</p>
+                  <p className="font-semibold mt-0.5" style={{ color: BLUE }}>
+                    {enrollmentInfo.status === "draft" ? "Brouillon" : enrollmentInfo.status === "active" ? "Actif" : enrollmentInfo.status}
+                  </p>
+                </div>
+                {enrollmentInfo.enrolled_at && (
+                  <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
+                    <p className="text-xs font-semibold text-neutral-400">Inscrit le</p>
+                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{new Date(enrollmentInfo.enrolled_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </DossierSection>
+
+      <DossierSection
+        icon={CreditCard}
+        title="Identité"
+        description="Pièce d'identité et localisation."
+      >
+        <div>
+          <p className="text-sm font-semibold text-neutral-600 mb-3">Pièce d&apos;identité</p>
+          {editing ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={FIELD_LABEL}>Type</label>
+                <select value={form.id_type || ""} onChange={(e) => setForm((f) => ({ ...f, id_type: e.target.value || null }))} className={FIELD_INPUT}>
+                  <option value="">Sélectionner...</option>
+                  {Object.entries(ID_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={FIELD_LABEL}>Numéro</label>
+                <input value={form.id_number || ""} onChange={(e) => setForm((f) => ({ ...f, id_number: e.target.value || null }))} placeholder="Numéro du document" className={FIELD_INPUT} />
+              </div>
+            </div>
+          ) : details.id_type ? (
+            <div className="flex flex-wrap gap-4 text-sm">
+              <div><span className="text-neutral-400 font-medium">Type :</span> <span className="font-semibold" style={{ color: BLUE }}>{ID_TYPE_LABELS[details.id_type] || details.id_type}</span></div>
+              <div><span className="text-neutral-400 font-medium">N° :</span> <span className="font-semibold font-mono" style={{ color: BLUE }}>{details.id_number || "—"}</span></div>
+            </div>
+          ) : (
+            <p className="text-sm text-neutral-400 italic">Non renseigné — cliquez sur Modifier.</p>
+          )}
+        </div>
+
+        <div className="pt-2 border-t border-black/[0.06]">
+          <p className="text-sm font-semibold text-neutral-600 mb-3 flex items-center gap-1.5"><Globe size={14} /> Localisation</p>
+          {editing ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={FIELD_LABEL}>Pays</label>
+                <select value={selectedCountryCode} onChange={(e) => handleFormCountryChange(e.target.value)} className={FIELD_INPUT}>
+                  <option value="">Sélectionner...</option>
+                  {COUNTRY_OPTIONS.map((c) => <option key={c.code} value={c.code}>{c.name} ({c.phone_code})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={FIELD_LABEL}>Région</label>
+                {regions.length > 0 ? (
+                  <select value={form.region || ""} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value || null }))} className={FIELD_INPUT}>
+                    <option value="">Sélectionner...</option>
+                    {regions.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                ) : (
+                  <input value={form.region || ""} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value || null }))} placeholder="Saisir la région" className={FIELD_INPUT} />
+                )}
+              </div>
+            </div>
+          ) : details.country ? (
+            <p className="text-sm font-semibold" style={{ color: BLUE }}>
+              {details.country}{details.region ? ` · ${details.region}` : ""}
+            </p>
+          ) : (
+            <p className="text-sm text-neutral-400 italic">Non renseigné — cliquez sur Modifier.</p>
+          )}
+        </div>
+      </DossierSection>
+
+      <DossierSection
+        icon={Users}
+        title="Personne responsable"
+        description="Responsable légal ou tuteur de l'apprenant."
+      >
+        {editing ? (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className={FIELD_LABEL}>Nom complet</label>
+                <input value={form.guardian_name || ""} onChange={(e) => setForm((f) => ({ ...f, guardian_name: e.target.value || null }))} placeholder="Nom du responsable" className={FIELD_INPUT} />
+              </div>
+              <div>
+                <label className={FIELD_LABEL}>Lien</label>
+                <select value={form.guardian_relation || ""} onChange={(e) => setForm((f) => ({ ...f, guardian_relation: e.target.value || null }))} className={FIELD_INPUT}>
+                  <option value="">Sélectionner...</option>
+                  {RELATION_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className={`${FIELD_LABEL} flex items-center gap-1.5`}><Phone size={14} /> Téléphone du responsable</label>
+              <input type="tel" value={form.guardian_phone || ""} onChange={(e) => setForm((f) => ({ ...f, guardian_phone: e.target.value || null }))} placeholder="+237 6XX XXX XXX" className={FIELD_INPUT} />
+            </div>
+          </div>
+        ) : details.guardian_name ? (
+          <div className="text-sm space-y-1">
+            <div><span className="text-neutral-400 font-medium">Nom :</span> <span className="font-semibold" style={{ color: BLUE }}>{details.guardian_name}</span>{details.guardian_relation && <span className="text-neutral-400"> ({details.guardian_relation})</span>}</div>
+            {details.guardian_phone && <div><span className="text-neutral-400 font-medium">Tél :</span> <span className="font-semibold" style={{ color: BLUE }}>{details.guardian_phone}</span></div>}
+          </div>
+        ) : (
+          <p className="text-sm text-neutral-400 italic">Non renseigné — cliquez sur Modifier.</p>
+        )}
+      </DossierSection>
+
+      <DossierSection
+        icon={FileText}
+        title="Notes"
+        description="Remarques internes visibles uniquement par le staff."
+      >
+        {editing ? (
+          <textarea rows={4} value={form.notes || ""} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value || null }))} placeholder="Remarques visibles uniquement par le staff..." className="w-full p-3.5 rounded-lg border border-black/[0.08] bg-white text-base font-semibold outline-none resize-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10" />
+        ) : details.notes ? (
+          <p className="text-sm text-neutral-700 whitespace-pre-wrap font-medium">{details.notes}</p>
+        ) : (
+          <p className="text-sm text-neutral-400 italic">Aucune note.</p>
+        )}
+      </DossierSection>
+
+      {showFiche && enrollmentId && (
+        <FicheInscriptionModal
+          studentId={studentId}
+          enrollmentId={enrollmentId}
+          onClose={() => setShowFiche(false)}
+        />
+      )}
+    </div>
+  );
+}

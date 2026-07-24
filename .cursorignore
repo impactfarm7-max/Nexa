@@ -1,0 +1,37 @@
+# Dépendances
+node_modules/
+
+# Build & cache
+.next/
+dist/
+out/
+.turbo/
+
+# Fichiers lourds inutiles pour l'IA
+*.lock
+package-lock.json
+yarn.lock
+
+# Assets statiques
+public/sw.js
+public/icons/
+public/images/
+public/*.png
+public/*.ico
+public/*.svg
+
+# Environnement & config
+.env
+.env.local
+.env.production
+.git/
+
+# Logs
+*.log
+.next/dev/
+
+# Migrations déjà exécutées (garde les récentes si tu veux)
+# supabase/migrations/
+
+# Types auto-générés
+# supabase/types.ts
