@@ -59,27 +59,30 @@ export async function GET(req: Request) {
     genre?: string | null;
   };
 
-  let profilesRes = await supabaseAdmin
+  const profilesRes = await supabaseAdmin
     .from("profiles")
     .select("id, prenom, nom, email, phone, avatar_url, center_status, birth_date, genre")
     .eq("center_id", ctx!.centerId)
     .eq("role", "student")
     .order("nom");
 
+  let profileRows: ProfileRow[];
   if (profilesRes.error && /birth_date|genre/i.test(profilesRes.error.message)) {
-    profilesRes = await supabaseAdmin
+    const fallback = await supabaseAdmin
       .from("profiles")
       .select("id, prenom, nom, email, phone, avatar_url, center_status")
       .eq("center_id", ctx!.centerId)
       .eq("role", "student")
       .order("nom");
-  }
-
-  if (profilesRes.error) {
+    if (fallback.error) {
+      return NextResponse.json({ error: fallback.error.message }, { status: 500 });
+    }
+    profileRows = (fallback.data || []) as ProfileRow[];
+  } else if (profilesRes.error) {
     return NextResponse.json({ error: profilesRes.error.message }, { status: 500 });
+  } else {
+    profileRows = (profilesRes.data || []) as ProfileRow[];
   }
-
-  const profileRows = (profilesRes.data || []) as ProfileRow[];
   const studentIds = profileRows.map((p) => p.id);
 
   let enrollRows: EnrollRow[] = [];

@@ -391,7 +391,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "enrollment_id requis." }, { status: 400 });
   }
 
-  let source: {
+  type PassageSource = {
     id: string;
     filiere_id: string;
     niveau_id: string | null;
@@ -401,7 +401,9 @@ export async function GET(req: NextRequest) {
     passage_reason?: string | null;
     filieres: unknown;
     niveaux: unknown;
-  } | null = null;
+  };
+
+  let source: PassageSource | null = null;
 
   {
     const withReason = await supabaseAdmin
@@ -424,9 +426,9 @@ export async function GET(req: NextRequest) {
         `)
         .eq("id", enrollmentId)
         .maybeSingle();
-      source = fallback.data as typeof source;
+      source = fallback.data as PassageSource | null;
     } else {
-      source = withReason.data as typeof source;
+      source = withReason.data as PassageSource | null;
     }
   }
 
