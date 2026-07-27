@@ -166,6 +166,14 @@ export async function POST(req: Request) {
     const newStart = String(body.new_start_time || "");
     const newEnd = String(body.new_end_time || "");
     const reason = String(body.reason || "Report placé sur plage libre").trim();
+    const newRoomName =
+      body.new_room_name == null || body.new_room_name === ""
+        ? null
+        : String(body.new_room_name).trim();
+    const newFormateurId =
+      body.new_formateur_id == null || body.new_formateur_id === ""
+        ? null
+        : String(body.new_formateur_id);
 
     if (!exceptionId || !newDate || !newStart || !newEnd) {
       return NextResponse.json({ error: "exception_id, date et horaires requis." }, { status: 400 });
@@ -180,19 +188,20 @@ export async function POST(req: Request) {
 
     const { data: slot } = await supabaseAdmin
       .from("schedule_slots")
-      .select("id, center_id, formateur_id")
+      .select("id, center_id, formateur_id, room_name")
       .eq("id", ex.slot_id)
       .maybeSingle();
     if (!slot || slot.center_id !== ctx!.centerId) {
       return NextResponse.json({ error: "Créneau hors centre." }, { status: 403 });
     }
 
-    if (slot.formateur_id) {
+    const formateurForCheck = newFormateurId || slot.formateur_id;
+    if (formateurForCheck) {
       const dow = new Date(`${newDate}T12:00:00`);
       const isoDow = dow.getDay() === 0 ? 7 : dow.getDay();
       const { data: overlap } = await supabaseAdmin.rpc("check_formateur_overlap", {
         p_center_id: ctx!.centerId,
-        p_formateur_id: slot.formateur_id,
+        p_formateur_id: formateurForCheck,
         p_day_of_week: isoDow,
         p_start_time: newStart,
         p_end_time: newEnd,
@@ -204,6 +213,8 @@ export async function POST(req: Request) {
       }
     }
 
+    const roomToStore = newRoomName ?? slot.room_name ?? null;
+
     const { error: uErr } = await supabaseAdmin
       .from("schedule_exceptions")
       .update({
@@ -211,11 +222,27 @@ export async function POST(req: Request) {
         new_date: newDate,
         new_start_time: newStart,
         new_end_time: newEnd,
-        new_room_name: body.new_room_name || null,
-        reason,
+        new_room_name: roomToStore,
+        reason: newFormateurId
+          ? `${reason} · formateur réassigné pour cette occurrence`
+          : reason,
       })
       .eq("id", exceptionId);
     if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 });
+
+    // Ne touche pas au créneau récurrent (salle/formateur de fond) —
+    // la salle du report est portée par l'exception (new_room_name).
+    // Si un nouveau formateur est choisi, on met à jour uniquement le slot
+    // pour que le contrôle d'overlap et l'affichage restent cohérents.
+    if (newFormateurId && newFormateurId !== slot.formateur_id) {
+      const { error: sErr } = await supabaseAdmin
+        .from("schedule_slots")
+        .update({ formateur_id: newFormateurId })
+        .eq("id", slot.id)
+        .eq("center_id", ctx!.centerId);
+      if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 });
+    }
+
     return NextResponse.json({ ok: true });
   }
 

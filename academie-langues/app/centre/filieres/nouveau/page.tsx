@@ -1869,7 +1869,7 @@ function NouveauProgrammeForm() {
     }));
 
     return {
-      name: name.trim() || "Programme",
+      name: (name.trim() || "Programme").toLocaleUpperCase("fr-FR"),
       description: description.trim(),
       typeLabel: isCursus ? "Cursus pluriannuel" : "Formation courte",
       modeLabel: modeLabels[mode],
@@ -1918,8 +1918,10 @@ function NouveauProgrammeForm() {
       <div className={`${centerNotoSans.className} min-h-[100dvh] flex items-center justify-center p-6`} style={{ backgroundColor: PAGE_BG }}>
           <div className="max-w-xl w-full p-8 sm:p-10 rounded-2xl border border-black/[0.06] text-center" style={{ backgroundColor: SURFACE }}>
             <div className="flex justify-center mb-6"><CheckCircle2 size={52} className="text-emerald-500" /></div>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2" style={{ color: BLUE }}>
-              {created.updated ? `"${created.name}" a été mis à jour` : `"${created.name}" a été créé`}
+            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2 uppercase" style={{ color: BLUE }}>
+              {created.updated
+                ? `"${(created.name || "").toLocaleUpperCase("fr-FR")}" a été mis à jour`
+                : `"${(created.name || "").toLocaleUpperCase("fr-FR")}" a été créé`}
             </h2>
             <p className="text-sm font-medium text-neutral-500 mb-8 leading-relaxed">
               {created.updated

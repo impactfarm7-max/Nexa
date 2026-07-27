@@ -16,6 +16,7 @@ import { filterModulePermissions, ensureTcfCommunautePermission } from "@/app/da
 import { normalizeCenterType, type CenterTypeCode } from "@/app/data/center-types";
 import { getCenterMeCache, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import { BRAND } from "@/app/utils/brand";
+import { CenterBrandMark } from "@/app/centre/center-page-ui";
 
 /* ─── Constantes ────────────────────────────────────────────────────────── */
 const SIDEBAR_W_VAR  = "--nexa-center-sidebar-w";
@@ -550,17 +551,16 @@ function CenterSidebarInner() {
         {/* Logo + nom */}
         {!isCollapsed && (
           <div className="flex items-center gap-2.5 flex-1 min-w-0">
-            {/* Logo */}
-            <div className="relative w-9 h-9 shrink-0">
-              {logoUrl ? (
-                <img src={logoUrl} alt="" className="w-9 h-9 rounded-xl object-cover" />
-              ) : (
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: `${BLUE}14` }}>
-                  <Building2 size={17} style={{ color: BLUE }} />
-                </div>
-              )}
+            {/* Logo carré bordure bleue */}
+            <div className="relative shrink-0">
+              <CenterBrandMark
+                src={logoUrl}
+                alt={centerName}
+                icon={Building2}
+                size={36}
+              />
               {canManage && (
-                <label className="absolute -bottom-1 -right-1 w-4.5 h-4.5 w-[18px] h-[18px] rounded-full flex items-center justify-center cursor-pointer border-2 border-white shadow-sm" style={{ backgroundColor: ORANGE }}>
+                <label className="absolute -bottom-1 -right-1 w-[18px] h-[18px] rounded-full flex items-center justify-center cursor-pointer border-2 border-white shadow-sm" style={{ backgroundColor: ORANGE }}>
                   <Camera size={9} className="text-white" />
                   <input type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && uploadLogo(e.target.files[0])} />
                 </label>
@@ -585,11 +585,12 @@ function CenterSidebarInner() {
 
         {/* Logo centré quand collapsed */}
         {isCollapsed && (
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${BLUE}14` }}>
-            {logoUrl
-              ? <img src={logoUrl} alt="" className="w-8 h-8 rounded-xl object-cover" />
-              : <Building2 size={15} style={{ color: BLUE }} />}
-          </div>
+          <CenterBrandMark
+            src={logoUrl}
+            alt={centerName}
+            icon={Building2}
+            size={32}
+          />
         )}
 
         {/* Bouton réduction — intégré dans le header (comme Claude/Gemini) */}

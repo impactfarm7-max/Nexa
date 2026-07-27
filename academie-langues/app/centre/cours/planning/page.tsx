@@ -5,7 +5,7 @@ import {
   Calendar as CalendarIcon, Plus, X, Loader2, Trash2,
   ChevronLeft, ChevronRight, Clock, User, Users, MapPin, Video,
   AlertTriangle, Check, Ban, RefreshCw, UserCheck, Monitor,
-  Printer, Filter, CalendarDays, SlidersHorizontal,
+  Printer, Filter, CalendarDays, SlidersHorizontal, Sparkles, ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
@@ -13,6 +13,14 @@ import TcfPlanningBoard, { type TcfPlanningKind } from "@/app/components/centre/
 import EstablishmentPlanningBoard from "@/app/components/centre/EstablishmentPlanningBoard";
 import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
 import { isPastCalendarDay, localDateIso } from "@/app/utils/planning-calendar";
+import {
+  CenterPageLayout,
+  BackButton,
+  OutlineHeaderButton,
+  AgentIaComingSoonButton,
+  PAGE_BG,
+  centerNotoSans,
+} from "@/app/centre/center-page-ui";
 
 // ─── palette ─────────────────────────────────────────────────────────────────
 const BLUE   = "#11224E";
@@ -115,6 +123,10 @@ export default function CenterPlanningPage() {
   const [sidePanel,    setSidePanel]    = useState<SidePanel>(null);
   const [showPrint,    setShowPrint]    = useState(false);
   const [tcfPlanningMode, setTcfPlanningMode] = useState<TcfPlanningKind | null>(null);
+  /** Filtres Formateur/Salle : repliés une fois la classe choisie (évite le bruit à chaque clic). */
+  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [smartClassFilter, setSmartClassFilter] = useState<"all" | "free_rooms" | "no_formateur" | "cancelled">("all");
+  const [centerRooms, setCenterRooms] = useState<string[]>([]);
 
   // ── init ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -135,6 +147,17 @@ export default function CenterPlanningPage() {
         setFilieres(filData ?? []);
         setTrainers(trainData ?? []);
         setCenterType(centerRow?.center_type || "generic");
+        const { data: roomRows } = await supabase
+          .from("schedule_slots")
+          .select("room_name")
+          .eq("center_id", cId)
+          .not("room_name", "is", null);
+        const rooms = new Set<string>();
+        for (const r of roomRows ?? []) {
+          const name = (r.room_name || "").trim();
+          if (name) rooms.add(name);
+        }
+        setCenterRooms(Array.from(rooms).sort((a, b) => a.localeCompare(b, "fr")));
       }
       setLoading(false);
     })();
@@ -187,6 +210,8 @@ export default function CenterPlanningPage() {
       }
       setDisciplines(Array.from(discMap.entries()).map(([id, name]) => ({ id, name })));
       setSelectedNiveauId(""); setSelectedGroupeId(""); setSelectedTrainerId(""); setSelectedRoom("");
+      setFiltersExpanded(true);
+      setSmartClassFilter("all");
     })();
   }, [selectedFiliereId]);
 
@@ -354,18 +379,28 @@ export default function CenterPlanningPage() {
 
   // ── rooms from loaded slots ───────────────────────────────────────────────
   const roomOptions = useMemo(() => {
-    const rooms = new Set<string>();
+    const rooms = new Set<string>(centerRooms);
     weekSlots.forEach((s) => { if (s.room_name) rooms.add(s.room_name); });
-    return Array.from(rooms).sort();
-  }, [weekSlots]);
+    return Array.from(rooms).sort((a, b) => a.localeCompare(b, "fr"));
+  }, [weekSlots, centerRooms]);
+
+  const freeRoomsThisWeek = useMemo(() => {
+    const used = new Set(
+      weekSlots.filter((s) => s.status !== "cancelled" && s.room_name).map((s) => s.room_name as string),
+    );
+    return roomOptions.filter((r) => !used.has(r));
+  }, [weekSlots, roomOptions]);
 
   // ── filtered slots ────────────────────────────────────────────────────────
   const filteredSlots = useMemo(() => {
     return weekSlots.filter((s) => {
       if (selectedRoom && s.room_name !== selectedRoom) return false;
+      if (smartClassFilter === "cancelled" && s.status !== "cancelled") return false;
+      if (smartClassFilter === "no_formateur" && (s.status === "cancelled" || s.formateur_prenom)) return false;
+      // free_rooms = insight only (liste), ne masque pas le calendrier
       return true;
     });
-  }, [weekSlots, selectedRoom]);
+  }, [weekSlots, selectedRoom, smartClassFilter]);
 
   // ── group by day ─────────────────────────────────────────────────────────
   const slotsByDay: Record<number, WeekSlot[]> = {};
@@ -382,6 +417,11 @@ export default function CenterPlanningPage() {
   );
   const selectedGroupe = groupes.find((g) => g.id === selectedGroupeId) || allFiliereGroupes.find((g) => g.id === selectedGroupeId);
 
+  // Une fois la classe prête, replier Formateur/Salle (réouvrable via « Modifier filtres »)
+  useEffect(() => {
+    if (!isTcfCenter && libreReady) setFiltersExpanded(false);
+  }, [libreReady, selectedGroupeId, isTcfCenter]);
+
   const openTcfPlanning = (mode: TcfPlanningKind) => {
     if (!tcfFiliere) return;
     setSelectedFiliereId(tcfFiliere.id);
@@ -391,15 +431,28 @@ export default function CenterPlanningPage() {
 
   if (loading) return <CenterPageLoading />;
 
+  const pageTitle = !isTcfCenter && planningView === "etablissement"
+    ? "Établissement"
+    : selectedFiliere
+      ? selectedFiliere.name
+      : "Emploi du temps";
+
+  const showBack =
+    Boolean(selectedFiliereId) || (!isTcfCenter && planningView === "etablissement");
+
   // ── render ────────────────────────────────────────────────────────────────
   return (
-    <div className="h-[100dvh] bg-white flex flex-col overflow-hidden">
-        {/* HEADER */}
-        <header className="shrink-0 border-b border-black/[0.06] bg-white z-20">
+    <CenterPageLayout
+      className={centerNotoSans.className}
+      header={
+        <header
+          className="shrink-0 border-b border-black/[0.06] z-20"
+          style={{ backgroundColor: PAGE_BG }}
+        >
           <div className="nexa-center-shell py-3 flex items-center justify-between gap-4 min-h-[68px]">
             <div className="flex items-center gap-3 min-w-0">
-              {(selectedFiliereId || (!isTcfCenter && planningView === "etablissement")) && (
-                <button
+              {showBack && (
+                <BackButton
                   onClick={() => {
                     setSelectedFiliereId("");
                     setWeekSlots([]);
@@ -409,40 +462,37 @@ export default function CenterPlanningPage() {
                     setSelectedGroupeId("");
                     setSelectedTrainerId("");
                     setSelectedRoom("");
+                    setFiltersExpanded(true);
+                    setSmartClassFilter("all");
                   }}
-                  className="p-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-500 transition-colors"
-                >
-                  <ChevronLeft size={16} />
-                </button>
+                />
               )}
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight truncate" style={{ color: BLUE }}>
-                {!isTcfCenter && planningView === "etablissement"
-                  ? "Établissement"
-                  : selectedFiliere
-                    ? selectedFiliere.name
-                    : "Emploi du temps"}
-              </h1>
-              {selectedFiliere && planningView === "classe" && (
-                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
-                  {isTcfCenter && tcfPlanningMode === "collective"
-                    ? "Coaching de groupe"
-                    : isTcfCenter && tcfPlanningMode === "individual"
-                      ? "Séances individuelles"
-                      : selectedGroupe
-                        ? selectedGroupe.nom
-                        : "Planning hebdomadaire"}
-                </span>
-              )}
+              <div className="min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight truncate" style={{ color: BLUE }}>
+                  {pageTitle}
+                </h1>
+                {selectedFiliere && planningView === "classe" && (
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 truncate mt-0.5">
+                    {isTcfCenter && tcfPlanningMode === "collective"
+                      ? "Coaching de groupe"
+                      : isTcfCenter && tcfPlanningMode === "individual"
+                        ? "Séances individuelles"
+                        : selectedGroupe
+                          ? selectedGroupe.nom
+                          : "Planning hebdomadaire"}
+                  </p>
+                )}
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               {!isTcfCenter && centerId && (
-                <div className="flex items-center gap-1 bg-neutral-100 rounded-full p-1">
+                <div className="flex items-center gap-1 rounded-lg p-1 border border-black/[0.08]" style={{ backgroundColor: "rgba(0,0,0,0.03)" }}>
                   <button
                     type="button"
                     onClick={() => setPlanningView("classe")}
-                    className={`h-8 px-3.5 rounded-full text-sm transition-colors ${
-                      planningView === "classe" ? "bg-white text-neutral-900 font-medium shadow-sm" : "text-neutral-500"
+                    className={`h-8 px-3.5 rounded-md text-sm transition-colors ${
+                      planningView === "classe" ? "bg-white text-[#11224E] font-semibold shadow-sm" : "text-neutral-500"
                     }`}
                   >
                     Classe
@@ -450,33 +500,26 @@ export default function CenterPlanningPage() {
                   <button
                     type="button"
                     onClick={() => { setPlanningView("etablissement"); setSidePanel(null); }}
-                    className={`h-8 px-3.5 rounded-full text-sm transition-colors ${
-                      planningView === "etablissement" ? "bg-white text-neutral-900 font-medium shadow-sm" : "text-neutral-500"
+                    className={`h-8 px-3.5 rounded-md text-sm transition-colors ${
+                      planningView === "etablissement" ? "bg-white text-[#11224E] font-semibold shadow-sm" : "text-neutral-500"
                     }`}
                   >
                     Établissement
                   </button>
                 </div>
               )}
+              <AgentIaComingSoonButton title="Agent IA NEXA — filtres intelligents avancés à venir" />
               {selectedFiliereId && planningView === "classe" && (
                 <>
                   {!isTcfCenter && (
-                    <button
-                      onClick={() => setShowPrint(true)}
-                      disabled={!libreReady}
-                      className="flex h-9 items-center gap-1.5 rounded-full border border-neutral-200 px-3.5 text-sm text-neutral-700 hover:bg-neutral-50 transition-colors disabled:opacity-40"
-                    >
+                    <OutlineHeaderButton onClick={() => setShowPrint(true)} disabled={!libreReady}>
                       <Printer size={14} /> Imprimer
-                    </button>
+                    </OutlineHeaderButton>
                   )}
                   {(isTcfCenter ? tcfPlanningMode === "collective" : libreReady) && (
-                    <button
-                      onClick={() => setSidePanel({ type: "add_slot" })}
-                      className="flex h-9 items-center gap-1.5 rounded-full px-4 text-sm text-white hover:opacity-90 transition-opacity"
-                      style={{ backgroundColor: BLUE }}
-                    >
+                    <OutlineHeaderButton onClick={() => setSidePanel({ type: "add_slot" })}>
                       <Plus size={14} /> {isTcfCenter ? "Nouveau coaching" : "Nouveau créneau"}
-                    </button>
+                    </OutlineHeaderButton>
                   )}
                 </>
               )}
@@ -518,83 +561,174 @@ export default function CenterPlanningPage() {
                 </>
               ) : !isTcfCenter ? (
                 <>
-                  {/* Parcours obligatoire : Niveau → Classe */}
-                  {niveaux.length > 0 && (
-                    <div className="flex gap-1.5 flex-wrap items-center">
-                      <span className="text-xs text-neutral-500">Niveau</span>
-                      {niveaux.map((n) => (
-                        <FilterPill
-                          key={n.id}
-                          active={selectedNiveauId === n.id}
-                          onClick={() => {
-                            setSelectedNiveauId(n.id);
-                            setSelectedGroupeId("");
-                          }}
-                        >
-                          Niv. {n.annee ?? `${n.mois}m`}
-                        </FilterPill>
-                      ))}
-                    </div>
-                  )}
-
-                  {(selectedNiveauId || niveaux.length === 0) && (
-                    <>
-                      {niveaux.length > 0 && <span className="w-px h-5 bg-neutral-200 shrink-0" />}
-                      <div className="flex gap-1.5 flex-wrap items-center">
-                        <span className="text-xs text-neutral-500">Classe</span>
-                        {groupes.length === 0 ? (
-                          <span className="text-[10px] text-neutral-400 italic">Aucune classe pour ce niveau</span>
-                        ) : (
-                          groupes.map((g) => (
-                            <FilterPill
-                              key={g.id}
-                              active={selectedGroupeId === g.id}
-                              onClick={() => setSelectedGroupeId(g.id)}
-                            >
-                              {g.nom}
-                            </FilterPill>
-                          ))
+                  {/* Compact summary once ready — Formateur/Salle masqués par défaut */}
+                  {libreReady && !filtersExpanded ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold border border-black/[0.08] bg-white/70 text-[#11224E]">
+                        {selectedNiveauId
+                          ? `Niv. ${niveaux.find((n) => n.id === selectedNiveauId)?.annee ?? niveaux.find((n) => n.id === selectedNiveauId)?.mois ?? "—"}`
+                          : "Niveau"}
+                        <span className="text-neutral-300">·</span>
+                        {selectedGroupe?.nom || "Classe"}
+                        {selectedTrainerId && (
+                          <>
+                            <span className="text-neutral-300">·</span>
+                            {trainers.find((t) => t.id === selectedTrainerId)?.prenom}
+                          </>
                         )}
-                      </div>
+                        {selectedRoom && (
+                          <>
+                            <span className="text-neutral-300">·</span>
+                            {selectedRoom}
+                          </>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setFiltersExpanded(true)}
+                        className="h-8 px-3 rounded-lg text-xs font-semibold border border-black/[0.08] bg-white/70 text-neutral-600 hover:bg-white inline-flex items-center gap-1"
+                      >
+                        <Filter size={12} /> Modifier filtres
+                      </button>
+                      {(selectedTrainerId || selectedRoom || smartClassFilter !== "all") && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedTrainerId("");
+                            setSelectedRoom("");
+                            setSmartClassFilter("all");
+                          }}
+                          className="h-8 px-3 rounded-lg text-xs text-neutral-500 hover:text-neutral-800"
+                        >
+                          Réinitialiser
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {niveaux.length > 0 && (
+                        <div className="flex gap-1.5 flex-wrap items-center">
+                          <span className="text-xs text-neutral-500">Niveau</span>
+                          {niveaux.map((n) => (
+                            <FilterPill
+                              key={n.id}
+                              active={selectedNiveauId === n.id}
+                              onClick={() => {
+                                setSelectedNiveauId(n.id);
+                                setSelectedGroupeId("");
+                                setFiltersExpanded(true);
+                              }}
+                            >
+                              Niv. {n.annee ?? `${n.mois}m`}
+                            </FilterPill>
+                          ))}
+                        </div>
+                      )}
+
+                      {(selectedNiveauId || niveaux.length === 0) && (
+                        <>
+                          {niveaux.length > 0 && <span className="w-px h-5 bg-neutral-200 shrink-0" />}
+                          <div className="flex gap-1.5 flex-wrap items-center">
+                            <span className="text-xs text-neutral-500">Classe</span>
+                            {groupes.length === 0 ? (
+                              <span className="text-[10px] text-neutral-400 italic">Aucune classe pour ce niveau</span>
+                            ) : (
+                              groupes.map((g) => (
+                                <FilterPill
+                                  key={g.id}
+                                  active={selectedGroupeId === g.id}
+                                  onClick={() => setSelectedGroupeId(g.id)}
+                                >
+                                  {g.nom}
+                                </FilterPill>
+                              ))
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {libreReady && (
+                        <>
+                          {(trainers.length > 0 || roomOptions.length > 0) && (
+                            <span className="w-px h-5 bg-neutral-200 shrink-0" />
+                          )}
+                          {trainers.length > 0 && (
+                            <div className="flex gap-1.5 flex-wrap items-center">
+                              <span className="text-xs text-neutral-500">Formateur</span>
+                              {trainers.slice(0, 8).map((t) => (
+                                <FilterPill
+                                  key={t.id}
+                                  active={selectedTrainerId === t.id}
+                                  color="blue"
+                                  onClick={() => setSelectedTrainerId(selectedTrainerId === t.id ? "" : t.id)}
+                                >
+                                  {t.prenom}
+                                </FilterPill>
+                              ))}
+                            </div>
+                          )}
+                          {roomOptions.length > 0 && (
+                            <div className="flex gap-1.5 flex-wrap items-center">
+                              <span className="text-xs text-neutral-500">Salle</span>
+                              {roomOptions.map((r) => (
+                                <FilterPill
+                                  key={r}
+                                  active={selectedRoom === r}
+                                  color="purple"
+                                  onClick={() => setSelectedRoom(selectedRoom === r ? "" : r)}
+                                >
+                                  <MapPin size={10} className="inline mr-0.5" />{r}
+                                </FilterPill>
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setFiltersExpanded(false)}
+                            className="h-8 px-3 rounded-lg text-xs text-neutral-500 hover:text-neutral-800 inline-flex items-center gap-1"
+                          >
+                            <ChevronDown size={12} className="rotate-180" /> Réduire
+                          </button>
+                        </>
+                      )}
                     </>
                   )}
 
+                  {/* Smart filters — toujours accessibles une fois la classe prête */}
                   {libreReady && (
-                    <>
-                      {(trainers.length > 0 || roomOptions.length > 0) && (
-                        <span className="w-px h-5 bg-neutral-200 shrink-0" />
+                    <div className="w-full flex flex-wrap items-center gap-1.5 pt-1">
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400 mr-1">
+                        <Sparkles size={11} style={{ color: ORANGE }} /> Intelligent
+                      </span>
+                      {(
+                        [
+                          { id: "all" as const, label: "Tout" },
+                          { id: "free_rooms" as const, label: `Salles libres (${freeRoomsThisWeek.length})` },
+                          { id: "no_formateur" as const, label: "Sans formateur" },
+                          { id: "cancelled" as const, label: "Annulés" },
+                        ]
+                      ).map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => setSmartClassFilter(f.id)}
+                          className={`h-7 px-2.5 rounded-md text-[11px] border transition-colors ${
+                            smartClassFilter === f.id
+                              ? "bg-[#11224E] border-[#11224E] text-white font-semibold"
+                              : "bg-white/70 border-black/[0.08] text-neutral-600 hover:bg-white"
+                          }`}
+                        >
+                          {f.label}
+                        </button>
+                      ))}
+                      {smartClassFilter === "free_rooms" && (
+                        <span className="text-[11px] text-neutral-500">
+                          {freeRoomsThisWeek.length === 0
+                            ? "Toutes les salles connues ont au moins un cours cette semaine."
+                            : <>Sans cours : <span className="font-semibold text-[#11224E]">{freeRoomsThisWeek.join(" · ")}</span></>}
+                        </span>
                       )}
-                      {trainers.length > 0 && (
-                        <div className="flex gap-1.5 flex-wrap items-center">
-                          <span className="text-xs text-neutral-500">Formateur</span>
-                          {trainers.slice(0, 6).map((t) => (
-                            <FilterPill
-                              key={t.id}
-                              active={selectedTrainerId === t.id}
-                              color="blue"
-                              onClick={() => setSelectedTrainerId(selectedTrainerId === t.id ? "" : t.id)}
-                            >
-                              {t.prenom}
-                            </FilterPill>
-                          ))}
-                        </div>
-                      )}
-                      {roomOptions.length > 0 && (
-                        <div className="flex gap-1.5 flex-wrap items-center">
-                          <span className="text-xs text-neutral-500">Salle</span>
-                          {roomOptions.map((r) => (
-                            <FilterPill
-                              key={r}
-                              active={selectedRoom === r}
-                              color="purple"
-                              onClick={() => setSelectedRoom(selectedRoom === r ? "" : r)}
-                            >
-                              <MapPin size={10} className="inline mr-0.5" />{r}
-                            </FilterPill>
-                          ))}
-                        </div>
-                      )}
-                    </>
+                    </div>
                   )}
                 </>
               ) : (
@@ -655,14 +789,14 @@ export default function CenterPlanningPage() {
                 <button
                   type="button"
                   onClick={() => navigateWeek("prev")}
-                  className="h-8 px-3 rounded-full border border-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 inline-flex items-center gap-1.5"
+                  className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white/70 text-xs font-medium text-neutral-700 hover:bg-white inline-flex items-center gap-1.5"
                 >
                   <ChevronLeft size={14} /> Semaine précédente
                 </button>
                 <button
                   type="button"
                   onClick={() => setWeekStart(getMonday(new Date()))}
-                  className="h-8 px-2.5 rounded-full text-[10px] font-black uppercase tracking-wider text-neutral-400 hover:text-orange-600"
+                  className="h-8 px-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-neutral-400 hover:text-orange-600"
                   title="Revenir à cette semaine"
                 >
                   {weekStart.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
@@ -670,7 +804,7 @@ export default function CenterPlanningPage() {
                 <button
                   type="button"
                   onClick={() => navigateWeek("next")}
-                  className="h-8 px-3 rounded-full border border-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 inline-flex items-center gap-1.5"
+                  className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white/70 text-xs font-medium text-neutral-700 hover:bg-white inline-flex items-center gap-1.5"
                 >
                   Semaine suivante <ChevronRight size={14} />
                 </button>
@@ -679,11 +813,12 @@ export default function CenterPlanningPage() {
             </div>
           )}
         </header>
-
+      }
+    >
         {/* ── CONTENT ── */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="nexa-center-shell pt-4 sm:pt-5 pb-8">
           {!isTcfCenter && planningView === "etablissement" && centerId ? (
-            <EstablishmentPlanningBoard centerId={centerId} />
+            <EstablishmentPlanningBoard centerId={centerId} trainers={trainers} />
           ) : !selectedFiliereId ? (
             <div className="max-w-4xl mx-auto space-y-8 pt-2">
               {isTcfCenter ? (
@@ -939,7 +1074,7 @@ export default function CenterPlanningPage() {
           onClose={() => setShowPrint(false)}
         />
       )}
-    </div>
+    </CenterPageLayout>
   );
 }
 

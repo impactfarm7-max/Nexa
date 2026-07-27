@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Clock, BookOpen, Trash2, X, Loader2, AlertTriangle, Layers, Tag,
-  MapPin, CheckCircle2, PartyPopper, Share2, FileText, Download,
+  MapPin, CheckCircle2, PartyPopper, Share2, FileText, Download, Filter, ChevronDown, Check,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
@@ -18,7 +18,6 @@ import {
   CenterToolbar,
   StatSep,
   ToolbarSearch,
-  ToolbarSelect,
   CenterDataTable,
   CenterTableRow,
   TableBtnPreview,
@@ -30,6 +29,11 @@ import {
 } from "../center-page-ui";
 
 const fcfa = (n: number | null | undefined) => (Number(n) || 0).toLocaleString("fr-FR") + " FCFA";
+
+/** Affichage seul (UI / PDF / CSV) — la valeur en base reste inchangée. */
+function displayProgrammeName(name: string | null | undefined) {
+  return (name || "").toLocaleUpperCase("fr-FR");
+}
 
 type ProgrammeCard = {
   id: string;
@@ -88,7 +92,7 @@ function priceLabelExport(p: ProgrammeCard) {
 
 function toExportRows(list: ProgrammeCard[]): ExportRow[] {
   return list.map((p) => ({
-    nom: p.name,
+    nom: displayProgrammeName(p.name),
     type: p.type === "cursus" ? "Cursus" : "Formation courte",
     statut: p.status === "published" ? "Publié" : "Brouillon",
     prix: priceLabelExport(p),
@@ -381,27 +385,12 @@ export default function CenterFilieresPage() {
             }
           >
             <ToolbarSearch value={query} onChange={setQuery} />
-            <ToolbarSelect
-              label="Filtrer par statut"
-              value={statusFilter}
-              onChange={(v) => setStatusFilter(v as StatusFilter)}
-              minWidth="7.5rem"
-              options={[
-                { value: "all", label: "Tous statuts" },
-                { value: "published", label: "Publiés" },
-                { value: "draft", label: "Brouillons" },
-              ]}
-            />
-            <ToolbarSelect
-              label="Filtrer par type"
-              value={typeFilter}
-              onChange={(v) => setTypeFilter(v as TypeFilter)}
-              minWidth="8.5rem"
-              options={[
-                { value: "all", label: "Tous types" },
-                { value: "cursus", label: "Cursus" },
-                { value: "formation_courte", label: "Formations courtes" },
-              ]}
+            <ProgrammesFilterMenu
+              statusFilter={statusFilter}
+              typeFilter={typeFilter}
+              onStatusChange={setStatusFilter}
+              onTypeChange={setTypeFilter}
+              onReset={() => { setStatusFilter("all"); setTypeFilter("all"); }}
             />
           </CenterToolbar>
         )}
@@ -434,8 +423,8 @@ export default function CenterFilieresPage() {
             {filtered.map((prog, i) => (
               <CenterTableRow key={prog.id} index={i}>
                 <td className="px-4 py-3.5 min-w-0 print:break-inside-avoid">
-                  <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: BLUE }}>
-                    {prog.name}
+                  <p className="text-[13px] font-semibold leading-snug truncate uppercase" style={{ color: BLUE }}>
+                    {displayProgrammeName(prog.name)}
                   </p>
                   <p className="text-[11px] text-neutral-400 font-medium mt-0.5 truncate">
                     {structureLabel(prog)}
@@ -535,6 +524,165 @@ export default function CenterFilieresPage() {
         </div>
       )}
     </CenterPageLayout>
+  );
+}
+
+function ProgrammesFilterMenu({
+  statusFilter,
+  typeFilter,
+  onStatusChange,
+  onTypeChange,
+  onReset,
+}: {
+  statusFilter: StatusFilter;
+  typeFilter: TypeFilter;
+  onStatusChange: (v: StatusFilter) => void;
+  onTypeChange: (v: TypeFilter) => void;
+  onReset: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const activeCount =
+    (statusFilter !== "all" ? 1 : 0) + (typeFilter !== "all" ? 1 : 0);
+
+  const summary =
+    activeCount === 0
+      ? "Filtres"
+      : [
+          statusFilter === "published" ? "Publiés" : statusFilter === "draft" ? "Brouillons" : null,
+          typeFilter === "cursus" ? "Cursus" : typeFilter === "formation_courte" ? "Form. courtes" : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const statusOpts: { value: StatusFilter; label: string }[] = [
+    { value: "all", label: "Tous statuts" },
+    { value: "published", label: "Publiés" },
+    { value: "draft", label: "Brouillons" },
+  ];
+  const typeOpts: { value: TypeFilter; label: string }[] = [
+    { value: "all", label: "Tous types" },
+    { value: "cursus", label: "Cursus" },
+    { value: "formation_courte", label: "Formations courtes" },
+  ];
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        aria-label="Filtrer les programmes"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((v) => !v)}
+        className="h-9 px-3 rounded-lg border border-black/[0.08] text-[12px] font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 inline-flex items-center gap-1.5 transition-colors duration-200 max-w-[14rem]"
+        style={{
+          backgroundColor: SURFACE,
+          color: activeCount > 0 ? BLUE : undefined,
+          borderColor: activeCount > 0 ? `${BLUE}55` : undefined,
+        }}
+      >
+        <Filter size={14} className="shrink-0 text-neutral-400" style={activeCount > 0 ? { color: BLUE } : undefined} />
+        <span className="truncate text-neutral-700" style={activeCount > 0 ? { color: BLUE } : undefined}>
+          {summary}
+        </span>
+        {activeCount > 0 && (
+          <span
+            className="shrink-0 h-4 min-w-[1rem] px-1 rounded-md text-[10px] font-bold text-white inline-flex items-center justify-center"
+            style={{ backgroundColor: BLUE }}
+          >
+            {activeCount}
+          </span>
+        )}
+        <ChevronDown size={14} className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute right-0 top-full mt-1.5 z-40 w-[16.5rem] rounded-lg border border-black/[0.08] bg-white shadow-lg overflow-hidden"
+          role="menu"
+        >
+          <div className="px-3 pt-2.5 pb-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Statut</p>
+          </div>
+          {statusOpts.map((o) => {
+            const active = statusFilter === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={active}
+                onClick={() => onStatusChange(o.value)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold hover:bg-black/[0.03] ${
+                  active ? "text-[#11224E]" : "text-neutral-700"
+                }`}
+              >
+                <span className="w-4 shrink-0 flex justify-center">
+                  {active ? <Check size={13} strokeWidth={2.5} /> : null}
+                </span>
+                {o.label}
+              </button>
+            );
+          })}
+
+          <div className="mx-3 border-t border-black/[0.06]" />
+
+          <div className="px-3 pt-2.5 pb-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Type</p>
+          </div>
+          {typeOpts.map((o) => {
+            const active = typeFilter === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={active}
+                onClick={() => onTypeChange(o.value)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold hover:bg-black/[0.03] ${
+                  active ? "text-[#11224E]" : "text-neutral-700"
+                }`}
+              >
+                <span className="w-4 shrink-0 flex justify-center">
+                  {active ? <Check size={13} strokeWidth={2.5} /> : null}
+                </span>
+                {o.label}
+              </button>
+            );
+          })}
+
+          {activeCount > 0 && (
+            <>
+              <div className="mx-3 border-t border-black/[0.06]" />
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => { onReset(); setOpen(false); }}
+                className="w-full px-3 py-2.5 text-left text-[12px] font-semibold text-neutral-500 hover:bg-black/[0.03] hover:text-neutral-800"
+              >
+                Réinitialiser les filtres
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -705,7 +853,7 @@ function ViewModal({ prog, onClose }: { prog: ProgrammeCard; onClose: () => void
           )}
         </div>
         <div>
-          <h3 className="text-2xl font-black tracking-tight" style={{ color: BLUE }}>{prog.name}</h3>
+          <h3 className="text-2xl font-black tracking-tight uppercase" style={{ color: BLUE }}>{displayProgrammeName(prog.name)}</h3>
           <p className="text-sm text-neutral-500 mt-1.5 leading-relaxed">{prog.description || "Aucune description."}</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
@@ -797,7 +945,7 @@ function PublishSuccessModal({ prog, onClose }: { prog: ProgrammeCard; onClose: 
         <h3 className="text-xl font-black tracking-tight mb-2" style={{ color: BLUE }}>
           Votre programme a été publié
         </h3>
-        <p className="text-sm font-bold text-neutral-700 mb-1">« {prog.name} »</p>
+        <p className="text-sm font-bold text-neutral-700 mb-1">« {displayProgrammeName(prog.name)} »</p>
         <p className="text-[12px] text-neutral-500 font-medium leading-relaxed mb-6">
           Il peut désormais accueillir des inscriptions. Vous pouvez le repasser en brouillon à tout moment via le statut.
         </p>
@@ -858,7 +1006,7 @@ function DeleteModal({ prog, onClose, onDeleted }: { prog: ProgrammeCard; onClos
           <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
             <AlertTriangle size={20} className="text-amber-500 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-800">
-              Supprimer <b>« {prog.name} »</b> et ses niveaux, classes et matières. Action définitive.
+              Supprimer <b>« {displayProgrammeName(prog.name)} »</b> et ses niveaux, classes et matières. Action définitive.
             </p>
           </div>
           {error && <p className="text-xs font-bold text-red-500">{error}</p>}

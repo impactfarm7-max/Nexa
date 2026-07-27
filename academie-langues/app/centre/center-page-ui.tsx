@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ElementType, ReactNode } from "react";
 import { Noto_Sans } from "next/font/google";
 import { Search } from "lucide-react";
 import { BRAND } from "@/app/utils/brand";
@@ -18,6 +18,62 @@ export const ORANGE = "#eb670e";
 export const PAGE_BG = BRAND.bg;
 /** Surfaces secondaires (inputs, pastilles) — léger contraste sur PAGE_BG */
 export const SURFACE = "#F7F7F6";
+
+/**
+ * Logo / pictogramme carré bordure bleue — motif partagé sidebar + headers pages.
+ * Carré (pas pill) : rounded-lg + filet bleu NEXA.
+ */
+export function CenterBrandMark({
+  src,
+  alt = "",
+  icon: Icon,
+  size = 36,
+  className = "",
+}: {
+  src?: string | null;
+  alt?: string;
+  icon?: ElementType;
+  size?: number;
+  className?: string;
+}) {
+  const dim = `${size}px`;
+  return (
+    <div
+      className={`shrink-0 overflow-hidden rounded-lg flex items-center justify-center bg-white ${className}`}
+      style={{
+        width: dim,
+        height: dim,
+        border: `1.5px solid ${BLUE}`,
+      }}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt={alt} className="w-full h-full object-cover" />
+      ) : Icon ? (
+        <Icon size={Math.round(size * 0.45)} style={{ color: BLUE }} strokeWidth={1.75} />
+      ) : (
+        <span className="text-[11px] font-extrabold" style={{ color: BLUE }}>N</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Échelle typo centre (convention dashboard) — tailles en px :
+ * H0 16 · H1 14 · label gris 12 · chiffres = KPIs Finances (16 / 18)
+ */
+export const CENTER_TYPE = {
+  /** Titre principal de page (ex. « Bonjour, Marie ») */
+  h0: "text-[16px] font-extrabold tracking-tight leading-tight",
+  /** Nom de rubrique (ex. « Finances », « Cours · cette semaine ») */
+  h1: "text-[14px] font-extrabold tracking-tight leading-tight",
+  /** Libellé gris (ex. « C.A. attendu ») */
+  label: "text-[12px] font-medium leading-snug text-neutral-500",
+  /** Chiffre / KPI — aligné FinanceKpiCard (text-base → sm:text-lg) */
+  figure: "text-base sm:text-lg font-extrabold tracking-tight tabular-nums leading-none",
+  /** Texte secondaire / sous-libellé */
+  muted: "text-[12px] font-medium leading-snug text-neutral-400",
+} as const;
 
 const outlineBtn =
   "flex h-9 sm:h-10 items-center justify-center gap-2 rounded-lg bg-transparent px-3.5 sm:px-4 text-xs font-semibold tracking-wide shrink-0 transition-all duration-200 hover:bg-[#11224E]/[0.04] active:scale-[0.98]";

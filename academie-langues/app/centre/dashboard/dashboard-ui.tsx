@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { CENTER_TYPE } from "@/app/centre/center-page-ui";
 
 const B = "#11224E";
 const O = "#eb670e";
@@ -50,37 +51,31 @@ export function QuietKpi({
   icon: React.ElementType;
   alert?: boolean;
 }) {
-  const displayLen = value.length + (suffix?.length ?? 0);
-  const sizeClass =
-    displayLen > 10
-      ? "text-lg sm:text-xl"
-      : displayLen > 6
-        ? "text-xl sm:text-2xl"
-        : "text-2xl sm:text-3xl";
-
   return (
     <div
-      className={`rounded-2xl border p-5 min-w-0 ${
-        alert ? "border-red-200/70 bg-red-50/70" : "border-neutral-200 bg-white"
+      className={`rounded-lg border p-4 sm:p-5 min-w-0 ${
+        alert ? "border-red-200/70 bg-red-50/70" : "border-black/[0.08] bg-white"
       }`}
     >
-      <div className="flex items-center justify-between gap-2 mb-3">
-        <p className={`text-xs leading-snug min-w-0 ${alert ? "text-red-600/80" : "text-neutral-500"}`}>{label}</p>
-        <Icon size={18} className="shrink-0" style={{ color: alert ? "#DC2626" : O }} strokeWidth={1.75} />
+      <div className="flex items-center justify-between gap-2 mb-2.5">
+        <p className={`${CENTER_TYPE.label} min-w-0 ${alert ? "!text-red-600/80" : ""}`}>
+          {label}
+        </p>
+        <Icon size={16} className="shrink-0" style={{ color: alert ? "#DC2626" : O }} strokeWidth={1.75} />
       </div>
       <div
-        className={`${sizeClass} font-normal tracking-tight tabular-nums leading-none flex flex-wrap items-baseline gap-x-1.5 min-w-0 ${
+        className={`${CENTER_TYPE.figure} flex flex-wrap items-baseline gap-x-1.5 min-w-0 truncate ${
           alert ? "text-red-600" : ""
         }`}
         style={!alert ? { color: B } : undefined}
       >
-        <span className="min-w-0">{value}</span>
+        <span className="min-w-0 truncate">{value}</span>
         {suffix && (
-          <span className="text-[0.55em] font-medium text-neutral-400 whitespace-nowrap">{suffix}</span>
+          <span className="text-[12px] font-medium text-neutral-400 whitespace-nowrap">{suffix}</span>
         )}
       </div>
       {sub && (
-        <p className={`text-[12px] mt-2 leading-snug line-clamp-2 ${alert ? "text-red-500/90" : "text-neutral-400"}`}>
+        <p className={`${CENTER_TYPE.muted} mt-2 line-clamp-2 ${alert ? "!text-red-500/90" : ""}`}>
           {sub}
         </p>
       )}

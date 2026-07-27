@@ -1,10 +1,20 @@
 "use client";
 
-import { Clock, LayoutDashboard } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Building2, Clock, LayoutDashboard } from "lucide-react";
 import CenterNotifications from "@/app/components/CenterNotifications";
 import { buildCenterSignupUrl } from "@/app/utils/center-signup-link";
+import { supabase } from "@/app/utils/supabase";
+import {
+  BLUE,
+  ORANGE,
+  PAGE_BG,
+  CENTER_TYPE,
+  CenterBrandMark,
+  centerNotoSans,
+} from "@/app/centre/center-page-ui";
 import type { CenterInfo } from "../types";
-import { PendingBanner, BLUE, ORANGE } from "../dashboard-ui";
+import { PendingBanner } from "../dashboard-ui";
 import { greeting, todayLabel } from "../utils";
 import ShareSignupLinkMenu from "./ShareSignupLinkMenu";
 
@@ -25,15 +35,38 @@ export default function DashboardShell({
   onCopyLink,
   children,
 }: Props) {
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!center?.id) {
+      setLogoUrl(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from("center_branding")
+        .select("logo_url")
+        .eq("center_id", center.id)
+        .maybeSingle();
+      if (!cancelled) setLogoUrl((data?.logo_url as string | null) || null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [center?.id]);
+
   const signupUrl =
     typeof window !== "undefined"
       ? buildCenterSignupUrl(window.location.origin, center)
       : null;
 
-  // ── TCF : shell existant (inchangé) ──────────────────────────────────────
+  // ── TCF : shell existant (structure inchangée) + police Noto ─────────────
   if (isTCF) {
     return (
-      <div className="min-h-[100dvh] overflow-x-hidden pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] md:pb-8 bg-[linear-gradient(180deg,#F7F7F6_0%,#eef1f8_100%)]">
+      <div
+        className={`${centerNotoSans.className} min-h-[100dvh] overflow-x-hidden pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] md:pb-8 bg-[linear-gradient(180deg,#F7F7F6_0%,#eef1f8_100%)]`}
+      >
         <header className="relative overflow-hidden border-b border-[#11224E]/10">
           <div className="absolute inset-0 bg-[linear-gradient(135deg,#11224E_0%,#1a3568_55%,#11224E_100%)]" />
           <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-[#eb670e]/10 blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
@@ -42,15 +75,16 @@ export default function DashboardShell({
           <div className="relative nexa-center-shell py-2.5 sm:py-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-md shadow-black/15"
-                  style={{ background: `linear-gradient(135deg, ${ORANGE} 0%, #c95508 100%)` }}
-                >
-                  <LayoutDashboard size={14} className="text-white" />
-                </div>
+                <CenterBrandMark
+                  src={logoUrl}
+                  alt={center?.name || "Centre"}
+                  icon={LayoutDashboard}
+                  size={36}
+                  className="!bg-white/95 shadow-md shadow-black/15"
+                />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-[9px] font-black uppercase tracking-wider text-white/40 truncate">
+                    <p className="text-[9px] font-extrabold uppercase tracking-wider text-white/40 truncate">
                       {center?.name}
                       <span className="ml-1">🇨🇦 TCF</span>
                     </p>
@@ -59,7 +93,7 @@ export default function DashboardShell({
                       {todayLabel()}
                     </span>
                   </div>
-                  <h1 className="text-base sm:text-lg font-black tracking-tight leading-snug text-white truncate">
+                  <h1 className="text-base sm:text-lg font-extrabold tracking-tight leading-snug text-white truncate">
                     {greeting()}, {staffPrenom} 👋
                   </h1>
                 </div>
@@ -101,31 +135,43 @@ export default function DashboardShell({
     );
   }
 
-  // ── Générique : shell SaaS clair (Google / Staff Paie) ───────────────────
-  // Header fixe aligné sur le trait bas du header sidebar (h-[68px] · Plan …)
-  // Contenu seul scrollable — overflow-x-hidden du shell parent casse sticky.
+  // ── Générique : aligné Programmes / Finances (Noto + header 68px) ────────
   return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden" style={{ backgroundColor: "#FFFBF7" }}>
-      <header className="shrink-0 h-[68px] border-b border-black/[0.06] z-30" style={{ backgroundColor: "#FFFBF7" }}>
+    <div
+      className={`${centerNotoSans.className} h-[100dvh] flex flex-col overflow-hidden text-[#11224E]`}
+      style={{ backgroundColor: PAGE_BG }}
+    >
+      <header
+        className="shrink-0 h-[68px] border-b border-black/[0.06] z-30"
+        style={{ backgroundColor: PAGE_BG }}
+      >
         <div className="nexa-center-shell h-full flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-[11px] font-medium text-neutral-500 truncate leading-tight">
-              {center?.name || "Centre"}
-              <span className="text-neutral-300 mx-1.5">·</span>
-              <span className="capitalize">{todayLabel()}</span>
-            </p>
-            <h1
-              className="font-display text-lg sm:text-xl font-black tracking-tight truncate leading-tight mt-0.5"
-              style={{ color: BLUE }}
-            >
-              {greeting()}, {staffPrenom}
-            </h1>
+          <div className="flex items-center gap-3 min-w-0">
+            <CenterBrandMark
+              src={logoUrl}
+              alt={center?.name || "Centre"}
+              icon={Building2}
+              size={40}
+            />
+            <div className="min-w-0">
+              <p className="text-[11px] font-medium text-neutral-500 truncate leading-tight">
+                {center?.name || "Centre"}
+                <span className="text-neutral-300 mx-1.5">·</span>
+                <span className="capitalize">{todayLabel()}</span>
+              </p>
+              <h1 className={CENTER_TYPE.h0} style={{ color: BLUE }}>
+                {greeting()}, {staffPrenom}
+              </h1>
+            </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
             <CenterNotifications />
             {center?.code && (
-              <span className="hidden md:inline text-[11px] font-mono font-medium text-neutral-500 border border-neutral-200 bg-white px-2.5 py-1.5 rounded-lg">
+              <span
+                className="hidden md:inline text-[11px] font-mono font-semibold text-neutral-600 bg-white px-2.5 py-1.5 rounded-lg"
+                style={{ border: `1.5px solid ${BLUE}` }}
+              >
                 {center.code}
               </span>
             )}
@@ -145,9 +191,9 @@ export default function DashboardShell({
       <div className="flex-1 min-h-0 overflow-y-auto pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] md:pb-8">
         <div className="nexa-center-shell py-5 sm:py-6 space-y-5 sm:space-y-6">
           {center?.status === "pending" && (
-            <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3 flex items-start gap-3">
+            <div className="rounded-lg border border-neutral-200 bg-white px-4 py-3 flex items-start gap-3">
               <Clock size={16} className="shrink-0 mt-0.5" style={{ color: ORANGE }} />
-              <p className="text-sm text-neutral-600 leading-relaxed">
+              <p className="text-sm text-neutral-600 leading-relaxed font-medium">
                 En attente d&apos;activation par Nexa — vous pouvez configurer votre espace librement.
               </p>
             </div>

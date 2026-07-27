@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import type { Campus, GenericDashboardStats } from "../types";
 import { BLUE, ORANGE, QuietKpi } from "../dashboard-ui";
+import { CENTER_TYPE } from "@/app/centre/center-page-ui";
 import { fmtXAF } from "../utils";
 
 type Props = {
@@ -19,7 +20,7 @@ type Props = {
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-sm font-medium text-neutral-900 tracking-tight">
+    <h2 className={CENTER_TYPE.h1} style={{ color: BLUE }}>
       {children}
     </h2>
   );
@@ -41,14 +42,17 @@ function QuietAction({
   return (
     <Link
       href={href}
-      className="group relative rounded-2xl border border-neutral-200 bg-white p-4 flex items-center gap-3 hover:border-neutral-300 hover:bg-neutral-50/80 transition-colors"
+      className="group relative rounded-lg border border-black/[0.08] bg-white p-4 flex items-center gap-3 hover:border-[#11224E]/25 hover:bg-[#11224E]/[0.02] transition-colors"
     >
-      <span className="w-10 h-10 rounded-xl border border-neutral-100 bg-neutral-50 flex items-center justify-center shrink-0">
-        <Icon size={18} style={{ color: ORANGE }} strokeWidth={1.75} />
+      <span
+        className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-white"
+        style={{ border: `1.5px solid ${BLUE}` }}
+      >
+        <Icon size={18} style={{ color: BLUE }} strokeWidth={1.75} />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium truncate" style={{ color: BLUE }}>{label}</p>
-        <p className="text-[12px] text-neutral-500 mt-0.5 truncate">{subtitle}</p>
+        <p className={`${CENTER_TYPE.h1} truncate`} style={{ color: BLUE }}>{label}</p>
+        <p className={`${CENTER_TYPE.muted} mt-0.5 truncate`}>{subtitle}</p>
       </div>
       {badge !== undefined && badge > 0 && (
         <span
@@ -155,7 +159,7 @@ export default function GenericManagerDashboard({
       {showPanels && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
           {showCourses && (
-            <div className="rounded-2xl border border-neutral-200 bg-white p-5">
+            <div className="rounded-lg border border-black/[0.08] bg-white p-5">
               <div className="flex items-center justify-between mb-4">
                 <SectionTitle>Cours · cette semaine</SectionTitle>
                 <Link href="/centre/cours/planning" className="text-[12px] font-medium text-neutral-500 hover:text-neutral-800 inline-flex items-center gap-0.5">
@@ -164,12 +168,12 @@ export default function GenericManagerDashboard({
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-neutral-600">Programmés</span>
-                  <span className="text-lg font-medium tabular-nums" style={{ color: BLUE }}>{coursesCount}</span>
+                  <span className={CENTER_TYPE.label}>Programmés</span>
+                  <span className={CENTER_TYPE.figure} style={{ color: BLUE }}>{coursesCount}</span>
                 </div>
                 <div className="flex items-center justify-between border-t border-neutral-100 pt-3">
-                  <span className="text-sm text-neutral-600">Annulés</span>
-                  <span className={`text-lg font-medium tabular-nums ${cancelledCount > 0 ? "text-red-600" : "text-neutral-300"}`}>
+                  <span className={CENTER_TYPE.label}>Annulés</span>
+                  <span className={`${CENTER_TYPE.figure} ${cancelledCount > 0 ? "text-red-600" : "text-neutral-300"}`}>
                     {cancelledCount}
                   </span>
                 </div>
@@ -178,7 +182,7 @@ export default function GenericManagerDashboard({
           )}
 
           {showExams && (
-            <div className="rounded-2xl border border-neutral-200 bg-white p-5">
+            <div className="rounded-lg border border-black/[0.08] bg-white p-5">
               <div className="flex items-center justify-between mb-4">
                 <SectionTitle>Prochains événements</SectionTitle>
                 <Link href="/centre/examens/examensuniversels" className="text-[12px] font-medium text-neutral-500 hover:text-neutral-800 inline-flex items-center gap-0.5">
@@ -193,8 +197,8 @@ export default function GenericManagerDashboard({
                     <li key={e.id} className="flex items-start gap-3">
                       <ClipboardList size={16} className="shrink-0 mt-0.5" style={{ color: ORANGE }} strokeWidth={1.75} />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate" style={{ color: BLUE }}>{e.title}</p>
-                        <p className="text-[12px] text-neutral-500 mt-0.5">
+                        <p className={`${CENTER_TYPE.h1} truncate`} style={{ color: BLUE }}>{e.title}</p>
+                        <p className={`${CENTER_TYPE.muted} mt-0.5`}>
                           {new Date(e.actual_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
                           {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
                         </p>
@@ -207,7 +211,7 @@ export default function GenericManagerDashboard({
           )}
 
           {showStudents && (
-            <div className="rounded-2xl border border-neutral-200 bg-white p-5">
+            <div className="rounded-lg border border-black/[0.08] bg-white p-5">
               <div className="flex items-center justify-between mb-4">
                 <SectionTitle>Apprenants</SectionTitle>
                 <Link href="/centre/etudiants" className="text-[12px] font-medium text-neutral-500 hover:text-neutral-800 inline-flex items-center gap-0.5">
@@ -215,24 +219,24 @@ export default function GenericManagerDashboard({
                 </Link>
               </div>
               <div className="flex items-baseline gap-2 mb-4">
-                <span className="text-3xl font-normal tracking-tight tabular-nums" style={{ color: BLUE }}>
+                <span className={CENTER_TYPE.figure} style={{ color: BLUE }}>
                   {activeStudents}
                 </span>
-                <span className="text-[13px] text-neutral-500">inscrits actifs</span>
+                <span className={CENTER_TYPE.label}>inscrits actifs</span>
               </div>
               {absent.length > 0 ? (
                 <div className="border-t border-neutral-100 pt-3">
-                  <p className="text-[12px] font-medium text-neutral-700 mb-2">
+                  <p className={`${CENTER_TYPE.h1} mb-2`} style={{ color: BLUE }}>
                     Absents +5 jours · {absent.length}
                   </p>
                   <ul className="space-y-1">
                     {absent.slice(0, 4).map((s) => (
-                      <li key={s.id} className="text-[13px] text-neutral-600 truncate">
+                      <li key={s.id} className={`${CENTER_TYPE.label} truncate`}>
                         {s.prenom} {s.nom}
                       </li>
                     ))}
                     {absent.length > 4 && (
-                      <li className="text-[12px] text-neutral-400">+ {absent.length - 4} autres</li>
+                      <li className={CENTER_TYPE.muted}>+ {absent.length - 4} autres</li>
                     )}
                   </ul>
                 </div>

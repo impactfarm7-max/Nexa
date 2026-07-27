@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Copy, Mail, MessageCircle, Share2 } from "lucide-react";
-import { BLUE, ORANGE } from "../dashboard-ui";
+import { BLUE, ORANGE } from "@/app/centre/center-page-ui";
 
 type Props = {
   signupUrl: string;
@@ -58,25 +58,28 @@ export default function ShareSignupLinkMenu({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1.5 font-medium transition-opacity hover:opacity-90 ${
+        className={`inline-flex items-center gap-1.5 font-semibold tracking-wide transition-all duration-200 hover:opacity-90 active:scale-[0.98] ${
           isDark
             ? "h-8 px-2.5 rounded-lg border border-white/22 bg-white/10 text-[10px] font-bold text-white"
-            : "h-9 px-3.5 rounded-full text-sm text-white"
+            : "h-9 sm:h-10 px-3.5 sm:px-4 rounded-lg text-xs bg-transparent hover:bg-[#11224E]/[0.04]"
         }`}
-        style={isDark ? undefined : { backgroundColor: BLUE }}
+        style={isDark ? undefined : { color: BLUE, border: `1.5px solid ${BLUE}` }}
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <Share2 size={isDark ? 11 : 14} />
+        <Share2 size={isDark ? 11 : 14} strokeWidth={2.25} />
         <span className="hidden sm:inline">Partager le lien</span>
         <span className="sm:hidden">Partager</span>
-        <ChevronDown size={isDark ? 11 : 14} className={`opacity-70 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          size={isDark ? 11 : 14}
+          className={`opacity-70 transition-transform ${open ? "rotate-180" : ""}`}
+        />
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1.5 min-w-[11.5rem] rounded-xl border border-neutral-200 bg-white py-1 shadow-lg"
+          className="absolute right-0 top-full z-50 mt-1.5 min-w-[11.5rem] rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg overflow-hidden"
         >
           <button
             type="button"
@@ -85,7 +88,7 @@ export default function ShareSignupLinkMenu({
               onCopy();
               setOpen(false);
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[12px] font-semibold text-neutral-700 hover:bg-black/[0.03]"
           >
             {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} style={{ color: BLUE }} />}
             {copied ? "Lien copié !" : "Copier le lien"}
@@ -97,7 +100,7 @@ export default function ShareSignupLinkMenu({
               openWhatsApp(message);
               setOpen(false);
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[12px] font-semibold text-neutral-700 hover:bg-black/[0.03]"
           >
             <MessageCircle size={15} className="text-emerald-600" />
             WhatsApp
@@ -109,7 +112,7 @@ export default function ShareSignupLinkMenu({
               openEmail(subject, message);
               setOpen(false);
             }}
-            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[12px] font-semibold text-neutral-700 hover:bg-black/[0.03]"
           >
             <Mail size={15} style={{ color: ORANGE }} />
             Email

@@ -8,6 +8,7 @@ import {
   Smartphone, ShieldCheck, Sparkles,
   TrendingDown, TrendingUp, Award,
   Headphones, ScrollText, PenTool, Mic, BrainCircuit,
+  Mail, Globe, Phone, CreditCard,
 } from "lucide-react";
 import DemoSection from "./components/DemoSection";
 import IPhone17ProMaxMock from "./components/IPhone17ProMaxMock";
@@ -26,6 +27,9 @@ import { BRAND } from "@/app/utils/brand";
 const BLUE = BRAND.blue;
 const ORANGE = BRAND.orange;
 const WHATSAPP = "237621105640";
+const CONTACT_EMAIL = "contact@nexa-edu.com";
+const SITE_URL = "https://nexa-edu.com";
+const PHONE_DISPLAY = "621 10 56 40";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 const heroStagger = {
@@ -62,8 +66,9 @@ const NAV_SECTIONS = [
   { id: "cours", label: "Cours" },
   { id: "tuteur", label: "IA" },
   { id: "bibliotheque", label: "Bibliothèque" },
-  { id: "tcf-canada", label: "TCF Canada" },
-  { id: "pourquoi", label: "Pourquoi NEXA" },
+  { id: "tcf-canada", label: "Preuve" },
+  { id: "pourquoi", label: "Pourquoi" },
+  { id: "tarifs", label: "Tarifs" },
 ];
 
 const WHY_NEXA = [
@@ -220,28 +225,21 @@ export default function PresentationPage() {
       </motion.header>
 
       {/* Hero */}
-      <section className="relative z-10 nexa-marketing-shell pb-12 pt-14 md:pb-16 md:pt-16">
-        <motion.div variants={heroStagger} initial="hidden" animate="show" className="max-w-2xl">
-          <motion.div
+      <section className="relative z-10 nexa-marketing-shell pb-14 pt-12 md:pb-20 md:pt-16">
+        <motion.div variants={heroStagger} initial="hidden" animate="show" className="max-w-3xl">
+          <motion.p
             variants={heroItem}
-            className="mb-5 inline-flex items-center gap-2 rounded-full border border-black/8 bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-widest"
+            className="mb-4 text-[11px] font-black uppercase tracking-[0.28em]"
             style={{ color: ORANGE }}
-            whileHover={{ scale: 1.05 }}
           >
-            <motion.span
-              animate={{ rotate: [0, 12, -12, 0] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-            >
-              <Sparkles size={12} />
-            </motion.span>
-            Plateforme B2B
-          </motion.div>
+            NEXA · L&apos;éducation de demain
+          </motion.p>
           <motion.h1
             variants={heroItem}
-            className="mb-4 text-[1.9rem] font-black leading-[1.1] tracking-tight sm:text-4xl md:text-[2.6rem]"
+            className="mb-5 text-[2.15rem] font-black leading-[1.05] tracking-tight sm:text-5xl md:text-[3.25rem]"
             style={{ color: BLUE }}
           >
-            Automatisez et{" "}
+            Formez 10 fois plus,{" "}
             <motion.span
               className="inline-block bg-clip-text text-transparent"
               style={{
@@ -251,33 +249,46 @@ export default function PresentationPage() {
               animate={{ backgroundPosition: ["0% center", "200% center", "0% center"] }}
               transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
             >
-              multipliez
-            </motion.span>{" "}
-            vos capacités de formation.
+              sans recruter 10 fois plus.
+            </motion.span>
           </motion.h1>
-          <motion.p variants={heroItem} className="mb-8 max-w-xl text-base font-medium leading-relaxed text-neutral-500 sm:text-lg">
-            NEXA gère le suivi, la correction et la scalabilité pour vous. Formez 10 ou 10 000 apprenants sans recruter davantage.
+          <motion.p variants={heroItem} className="mb-3 max-w-2xl text-base font-semibold leading-relaxed text-neutral-700 sm:text-lg">
+            La plateforme qui automatise et démultiplie vos capacités de formation.
           </motion.p>
-          <motion.div variants={heroItem} className="flex flex-row flex-nowrap items-center gap-2 sm:gap-3">
+          <motion.p variants={heroItem} className="mb-8 max-w-xl text-[15px] font-medium leading-relaxed text-neutral-500 sm:text-base">
+            Pilotez, formez, évaluez et accompagnez à grande échelle — gestion, pédagogie et IA dans un seul espace, pensé pour les centres, écoles et universités.
+          </motion.p>
+          <motion.div variants={heroItem} className="flex flex-row flex-wrap items-center gap-2 sm:gap-3">
             <motion.a
               href="#centre"
-              className="inline-flex h-10 shrink-0 items-center justify-center gap-1 rounded-2xl px-2.5 text-[11px] font-black text-white sm:h-12 sm:gap-2 sm:px-6 sm:text-sm"
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-2xl px-4 text-[12px] font-black text-white sm:h-12 sm:px-6 sm:text-sm"
               style={{ backgroundColor: BLUE }}
               whileHover={{ scale: 1.04, boxShadow: `0 12px 32px ${BLUE}33` }}
               whileTap={{ scale: 0.97 }}
             >
-              Voir les modules <ArrowRight size={13} className="shrink-0 sm:h-4 sm:w-4" />
+              Voir la plateforme <ArrowRight size={14} className="shrink-0" />
             </motion.a>
             <motion.button
               type="button"
               onClick={talkToAgent}
-              className="inline-flex h-10 shrink-0 items-center justify-center rounded-2xl border-2 bg-white px-2.5 text-[11px] font-bold sm:h-12 sm:px-6 sm:text-sm"
+              className="inline-flex h-11 shrink-0 items-center justify-center rounded-2xl border-2 bg-white px-4 text-[12px] font-bold sm:h-12 sm:px-6 sm:text-sm"
               style={{ borderColor: ORANGE, color: ORANGE }}
               whileHover={{ scale: 1.04, backgroundColor: "#fff7f2" }}
               whileTap={{ scale: 0.97 }}
             >
               Demander une démo
             </motion.button>
+          </motion.div>
+          <motion.div
+            variants={heroItem}
+            className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-bold text-neutral-400"
+          >
+            <span className="inline-flex items-center gap-1.5">
+              <Sparkles size={12} style={{ color: ORANGE }} /> Gestion · Formation · IA
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Smartphone size={12} style={{ color: BLUE }} /> App installable · réseau faible
+            </span>
           </motion.div>
         </motion.div>
       </section>
@@ -635,7 +646,7 @@ export default function PresentationPage() {
             transition={{ delay: 0.1 }}
             className="mx-auto mb-10 max-w-2xl text-center text-[13px] font-medium leading-relaxed text-neutral-500 sm:text-sm"
           >
-            Divisez par 10 le temps de gestion pédagogique et garantissez un standard de réussite d&apos;élite à vos équipes.
+            Moins de temps perdu sur l&apos;administratif. Plus de capacité pour former — avec un standard d&apos;exigence constant, de 10 à plusieurs milliers d&apos;apprenants.
           </motion.p>
           <div className="grid gap-4 md:grid-cols-3">
             {WHY_NEXA.map((item, i) => (
@@ -675,13 +686,13 @@ export default function PresentationPage() {
             transition={{ duration: 0.6, ease: EASE }}
           >
             <p className="mb-3 text-[11px] font-black uppercase tracking-[0.25em]" style={{ color: ORANGE }}>
-              Mobile et sécurité
+              Mobile et terrain
             </p>
             <h2 className="mb-4 text-2xl font-black tracking-tight md:text-3xl" style={{ color: BLUE }}>
-              Pensé pour vos apprenants sur le terrain
+              Une app qui s&apos;installe. Même en réseau faible.
             </h2>
             <p className="mb-6 font-medium leading-relaxed text-neutral-500">
-              Application installable sur téléphone, navigation simple et code PIN de sécurité. Même avec une connexion instable, les rappels et l&apos;accès hors ligne restent disponibles.
+              Application installable sur téléphone, code PIN de sécurité, notifications et accès pensés pour le terrain. Vos apprenants avancent sans dépendre d&apos;une connexion parfaite.
             </p>
             <div className="flex flex-row flex-nowrap items-center gap-1.5 sm:gap-2">
               {[Smartphone, ShieldCheck].map((Icon, i) => (
@@ -695,7 +706,7 @@ export default function PresentationPage() {
                   className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-black/6 bg-neutral-50 px-2 py-1.5 text-[10px] font-bold whitespace-nowrap sm:gap-2 sm:px-3 sm:py-2 sm:text-[11px]"
                 >
                   <Icon size={13} className="shrink-0 sm:h-3.5 sm:w-3.5" style={{ color: i ? BLUE : ORANGE }} />
-                  {i === 0 ? "Sur mobile et ordinateur" : "Sécurisé par code PIN"}
+                  {i === 0 ? "PWA installable" : "Sécurisé par code PIN"}
                 </motion.span>
               ))}
             </div>
@@ -718,6 +729,84 @@ export default function PresentationPage() {
         </div>
       </section>
 
+      {/* Tarifs — rubrique réservée */}
+      <section id="tarifs" className="relative z-10 scroll-mt-24 py-16 md:py-20">
+        <div className="nexa-marketing-shell">
+          <motion.p
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="mb-3 text-center text-[11px] font-black uppercase tracking-[0.3em]"
+            style={{ color: ORANGE }}
+          >
+            Tarification
+          </motion.p>
+          <motion.h2
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.08 }}
+            className="mb-4 text-center text-2xl font-black tracking-tight md:text-3xl"
+            style={{ color: BLUE }}
+          >
+            Des offres adaptées à votre structure
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.12 }}
+            className="mx-auto mb-10 max-w-xl text-center text-[13px] font-medium leading-relaxed text-neutral-500"
+          >
+            La grille tarifaire est en cours de finalisation. Contactez-nous pour une proposition sur mesure selon votre taille et vos programmes.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ delay: 0.15, duration: 0.55, ease: EASE }}
+            className="mx-auto max-w-2xl overflow-hidden rounded-3xl border border-dashed border-black/15 bg-white p-8 text-center sm:p-12"
+          >
+            <motion.span
+              className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl"
+              style={{ backgroundColor: `${ORANGE}12` }}
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <CreditCard size={26} style={{ color: ORANGE }} />
+            </motion.span>
+            <p className="mb-2 text-lg font-black" style={{ color: BLUE }}>
+              Bientôt disponible
+            </p>
+            <p className="mb-6 text-[13px] font-medium leading-relaxed text-neutral-500">
+              Centres · Écoles · Universités · Formateurs indépendants — une offre claire arrivera ici. En attendant, une démo et un devis personnalisé sur simple demande.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <motion.a
+                href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Demande de tarification NEXA")}`}
+                className="inline-flex h-11 items-center gap-2 rounded-2xl px-5 text-[12px] font-black text-white"
+                style={{ backgroundColor: BLUE }}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                <Mail size={14} /> {CONTACT_EMAIL}
+              </motion.a>
+              <motion.button
+                type="button"
+                onClick={talkToAgent}
+                className="inline-flex h-11 items-center rounded-2xl border-2 bg-white px-5 text-[12px] font-bold"
+                style={{ borderColor: ORANGE, color: ORANGE }}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                WhatsApp
+              </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className="relative z-10 w-full py-16 md:py-20">
         <div className="mx-auto max-w-3xl px-5">
@@ -735,13 +824,27 @@ export default function PresentationPage() {
               transition={{ duration: 5, repeat: Infinity, repeatDelay: 4, ease: "easeInOut" }}
             />
             <div className="relative mx-auto flex w-full max-w-xl flex-col items-center">
+              <p className="mb-2 text-[11px] font-black uppercase tracking-[0.25em]" style={{ color: ORANGE }}>
+                NEXA · L&apos;éducation de demain
+              </p>
               <h2 className="mb-3 text-xl font-black leading-snug tracking-tight sm:mb-4 sm:text-2xl md:text-3xl" style={{ color: BLUE }}>
-                Prêt à équiper votre centre
-                <span className="mt-1 block" style={{ color: ORANGE }}>de formation ?</span>
+                Prêt à démultiplier
+                <span className="mt-1 block" style={{ color: ORANGE }}>votre capacité de formation ?</span>
               </h2>
               <p className="mb-6 max-w-md text-sm font-medium leading-relaxed text-neutral-500 sm:mb-8 sm:text-base">
-                Partagez cette page, demandez une démo ou ouvrez votre espace centre dès aujourd&apos;hui.
+                Demandez une démonstration personnalisée. Yaoundé · Cameroun.
               </p>
+              <div className="mb-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[12px] font-bold text-neutral-500">
+                <a href={`mailto:${CONTACT_EMAIL}`} className="inline-flex items-center gap-1.5 transition hover:opacity-80" style={{ color: BLUE }}>
+                  <Mail size={13} /> {CONTACT_EMAIL}
+                </a>
+                <a href={`tel:+237${PHONE_DISPLAY.replace(/\s/g, "")}`} className="inline-flex items-center gap-1.5 transition hover:opacity-80">
+                  <Phone size={13} style={{ color: ORANGE }} /> {PHONE_DISPLAY}
+                </a>
+                <a href={SITE_URL} className="inline-flex items-center gap-1.5 transition hover:opacity-80" target="_blank" rel="noreferrer">
+                  <Globe size={13} style={{ color: BLUE }} /> nexa-edu.com
+                </a>
+              </div>
               <div className="flex w-full flex-row flex-wrap items-center justify-center gap-3">
                 <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
                   <Link
@@ -777,17 +880,20 @@ export default function PresentationPage() {
         className="relative z-10 border-t border-black/6 bg-white py-8 sm:py-10"
       >
         <div className="nexa-marketing-shell flex flex-col items-center gap-5 sm:gap-6 md:flex-row md:justify-between">
-          <Link href="/" className="flex shrink-0 items-center gap-2">
-            <Image src={BRAND.logo} alt="" width={28} height={28} className="rounded-lg object-cover" aria-hidden />
-            <span className="text-sm font-black" style={{ color: BLUE }}>NEXA</span>
-            <span className="hidden text-[10px] font-bold text-neutral-400 sm:inline">Africa speaks. The world listens.</span>
+          <Link href="/" className="flex shrink-0 flex-col items-center gap-0.5 sm:items-start">
+            <span className="flex items-center gap-2">
+              <Image src={BRAND.logo} alt="" width={28} height={28} className="rounded-lg object-cover" aria-hidden />
+              <span className="text-sm font-black" style={{ color: BLUE }}>NEXA</span>
+            </span>
+            <span className="text-[10px] font-bold text-neutral-400">L&apos;éducation de demain</span>
           </Link>
           <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] font-bold text-neutral-400">
-            <Link href="/" className="transition hover:text-neutral-700">Accueil</Link>
+            <a href={`mailto:${CONTACT_EMAIL}`} className="transition hover:text-neutral-700">{CONTACT_EMAIL}</a>
+            <a href={SITE_URL} className="transition hover:text-neutral-700" target="_blank" rel="noreferrer">nexa-edu.com</a>
             <Link href="/ouvrir-centre" className="transition hover:text-neutral-700">Ouvrir un centre</Link>
-            <Link href="/demo/cours" className="transition hover:text-neutral-700">Voir un cours démo</Link>
+            <a href="#tarifs" className="transition hover:text-neutral-700">Tarifs</a>
           </nav>
-          <p className="shrink-0 text-[10px] font-bold text-neutral-300">© {new Date().getFullYear()} NEXA</p>
+          <p className="shrink-0 text-[10px] font-bold text-neutral-300">© {new Date().getFullYear()} NEXA · Yaoundé</p>
         </div>
       </motion.footer>
     </div>
