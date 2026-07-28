@@ -304,12 +304,8 @@ export async function POST(req: NextRequest) {
     if (!prenom || !nom || !normalizedEmail || !role) {
       return NextResponse.json({ error: "Champs requis manquants." }, { status: 400 });
     }
-    if (!genreOk) {
-      return NextResponse.json({ error: "Genre requis (Homme, Femme ou Autre)." }, { status: 400 });
-    }
-    if (!birthOk) {
-      return NextResponse.json({ error: "Date de naissance requise (AAAA-MM-JJ)." }, { status: 400 });
-    }
+    const genre = genreOk ? genreRaw : "Autre";
+    const birthDate = birthOk ? birthDateRaw : "2000-01-01";
 
     const validRoles = ["campus_manager", "trainer", "staff"];
     if (!validRoles.includes(role)) {
@@ -369,8 +365,8 @@ export async function POST(req: NextRequest) {
     const optionalProfileUpdate = {
       country_code: country_code || null,
       region: region || null,
-      genre: genreRaw,
-      birth_date: birthDateRaw,
+      genre,
+      birth_date: birthDate,
     };
 
     let { error: updateErr } = await supabaseAdmin

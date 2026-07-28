@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Building2, Plus, Star, Trash2, Camera, MapPin,
   Loader2, ChevronRight, Lock, Boxes, Wallet, Check,
-  Rocket, PenLine, CheckCircle2,
+  Rocket, PenLine, CheckCircle2, Phone,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
@@ -16,11 +16,33 @@ const STATUS_OPTIONS = [
 ];
 const statusMeta = (s: string) => STATUS_OPTIONS.find((o) => o.value === s) || STATUS_OPTIONS[0];
 
-const COUNTRIES = [
-  "Cameroun", "Côte d'Ivoire", "Sénégal", "Gabon", "Congo", "RD Congo", "Tchad",
-  "Burkina Faso", "Mali", "Bénin", "Togo", "Niger", "Guinée", "Centrafrique",
-  "Maroc", "Algérie", "Tunisie", "Nigeria", "Ghana", "Kenya", "France",
+/** Pays, drapeau et indicatif téléphonique */
+const COUNTRY_DATA: { name: string; flag: string; dial: string }[] = [
+  { name: "Cameroun",       flag: "🇨🇲", dial: "+237" },
+  { name: "Côte d'Ivoire",  flag: "🇨🇮", dial: "+225" },
+  { name: "Sénégal",        flag: "🇸🇳", dial: "+221" },
+  { name: "Gabon",          flag: "🇬🇦", dial: "+241" },
+  { name: "Congo",          flag: "🇨🇬", dial: "+242" },
+  { name: "RD Congo",       flag: "🇨🇩", dial: "+243" },
+  { name: "Tchad",          flag: "🇹🇩", dial: "+235" },
+  { name: "Burkina Faso",   flag: "🇧🇫", dial: "+226" },
+  { name: "Mali",           flag: "🇲🇱", dial: "+223" },
+  { name: "Bénin",          flag: "🇧🇯", dial: "+229" },
+  { name: "Togo",           flag: "🇹🇬", dial: "+228" },
+  { name: "Niger",          flag: "🇳🇪", dial: "+227" },
+  { name: "Guinée",         flag: "🇬🇳", dial: "+224" },
+  { name: "Centrafrique",   flag: "🇨🇫", dial: "+236" },
+  { name: "Maroc",          flag: "🇲🇦", dial: "+212" },
+  { name: "Algérie",        flag: "🇩🇿", dial: "+213" },
+  { name: "Tunisie",        flag: "🇹🇳", dial: "+216" },
+  { name: "Nigeria",        flag: "🇳🇬", dial: "+234" },
+  { name: "Ghana",          flag: "🇬🇭", dial: "+233" },
+  { name: "Kenya",          flag: "🇰🇪", dial: "+254" },
+  { name: "France",         flag: "🇫🇷", dial: "+33"  },
 ];
+
+const COUNTRIES = COUNTRY_DATA.map((c) => c.name);
+const countryMeta = (name: string | null | undefined) => COUNTRY_DATA.find((c) => c.name === name);
 
 type Campus = {
   id: string;
@@ -35,8 +57,6 @@ type Campus = {
   is_main: boolean;
 };
 
-type DirectorsMap = Record<string, string[]>;
-
 export default function CampusSettingsPage() {
   const [centerId, setCenterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +64,6 @@ export default function CampusSettingsPage() {
   const [activating, setActivating] = useState(false);
 
   const [campuses, setCampuses] = useState<Campus[]>([]);
-  const [directors, setDirectors] = useState<DirectorsMap>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detailTab, setDetailTab] = useState<"general" | "infra" | "finance">("general");
 
@@ -57,6 +76,11 @@ export default function CampusSettingsPage() {
 
   const selected = campuses.find((c) => c.id === selectedId) || null;
   const isDetailLocked = selectedId ? lockedCampuses.has(selectedId) : false;
+
+  /* ── Derived stats ── */
+  const totalCampuses = campuses.length;
+  const activeCampuses = campuses.filter((c) => c.status === "actif").length;
+  const mainCampus = campuses.find((c) => c.is_main);
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -82,19 +106,6 @@ export default function CampusSettingsPage() {
     setCampuses(list);
     if (list.length && !selectedId) setSelectedId(list[0].id);
     setLockedCampuses(new Set(list.map((c) => c.id)));
-
-    const { data: access, error: aErr } = await supabase
-      .from("staff_campus_access")
-      .select("campus_id, profiles:profile_id(prenom, role)")
-      .in("campus_id", list.map((c) => c.id));
-    if (aErr) console.error("staff_campus_access:", aErr.message);
-    const map: DirectorsMap = {};
-    for (const a of (access as any[]) || []) {
-      if (a.profiles?.role === "campus_manager") {
-        (map[a.campus_id] ||= []).push(a.profiles.prenom || "Directeur");
-      }
-    }
-    setDirectors(map);
 
     setLoading(false);
   }, [selectedId]);
@@ -173,6 +184,18 @@ export default function CampusSettingsPage() {
     setUploadingLogo(false);
   };
 
+  /** Auto-assign country dial code when country changes */
+  const handleCountryChange = (campusId: string, country: string | null) => {
+    const meta = countryMeta(country);
+    const patch: Partial<Campus> = { country };
+    // Only set phone prefix if phone is currently empty or starts with +
+    const campus = campuses.find((c) => c.id === campusId);
+    if (meta && (!campus?.phone || campus.phone.startsWith("+"))) {
+      patch.phone = meta.dial;
+    }
+    patchCampus(campusId, patch);
+  };
+
   if (loading) return <CenterPageLoading embedded />;
 
   if (!multiEnabled && campuses.length === 0) {
@@ -210,6 +233,26 @@ export default function CampusSettingsPage() {
 
   return (
     <div className="space-y-8">
+      {/* ── Stat Card — une seule case sans icônes ── */}
+      <div
+        className="rounded-lg border border-black/[0.06] bg-white p-4 sm:p-5 flex flex-wrap items-center gap-x-6 gap-y-3"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-extrabold tracking-tight" style={{ color: BLUE }}>{totalCampuses}</span>
+          <span className="text-xs font-medium text-neutral-500">campus</span>
+        </div>
+        <span className="text-neutral-300">·</span>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-neutral-700">{activeCampuses}</span>
+          <span className="text-xs font-medium text-neutral-500">actif{activeCampuses !== 1 ? "s" : ""}</span>
+        </div>
+        <span className="text-neutral-300">·</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-neutral-500">Principal :</span>
+          <span className="text-sm font-bold text-neutral-700">{mainCampus?.name || "—"}</span>
+        </div>
+      </div>
+
       {/* ── Rubrique 1 : Créer ── */}
       <section>
         <div className="mb-3">
@@ -259,6 +302,8 @@ export default function CampusSettingsPage() {
               campuses.map((c) => {
                 const st = statusMeta(c.status);
                 const isSel = selectedId === c.id;
+                const meta = countryMeta(c.country);
+                const locationParts = [c.country, c.city].filter(Boolean);
                 return (
                   <button
                     key={c.id}
@@ -281,11 +326,10 @@ export default function CampusSettingsPage() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <p className="font-bold text-sm truncate" style={{ color: BLUE }}>{c.name}</p>
-                          {c.is_main && <Star size={12} className="text-neutral-400 shrink-0" fill="currentColor" />}
+                          {c.is_main && <Star size={12} className="text-amber-500 shrink-0" fill="currentColor" />}
                         </div>
                         <p className="text-[11px] text-neutral-400 font-medium truncate">
-                          {c.code || "Sans code"} · {st.label}
-                          {directors[c.id]?.length ? ` · ${directors[c.id].join(", ")}` : ""}
+                          {meta ? `${meta.flag} ` : ""}{locationParts.join(", ") || "—"} · {st.label}
                         </p>
                       </div>
                       <ChevronRight size={14} className={`shrink-0 ${isSel ? "text-neutral-500" : "text-neutral-300"}`} />
@@ -307,6 +351,7 @@ export default function CampusSettingsPage() {
               </div>
             ) : (
               <div className="border border-black/[0.06] rounded-lg overflow-hidden bg-white">
+                {/* ── Header ── */}
                 <div className="p-4 sm:p-5 border-b border-black/[0.06] flex items-start gap-3.5">
                   <div className="relative w-12 h-12 shrink-0">
                     {selected.logo_url
@@ -341,9 +386,13 @@ export default function CampusSettingsPage() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-neutral-400 mt-0.5 font-medium">
-                      Directeur : {directors[selected.id]?.length ? directors[selected.id].join(", ") : "— aucun assigné (Staff)"}
-                    </p>
+                    {/* Country + City on header */}
+                    {(selected.country || selected.city) && (
+                      <p className="text-[11px] text-neutral-500 font-medium mt-0.5 flex items-center gap-1">
+                        <span>{countryMeta(selected.country)?.flag || ""}</span>
+                        <span>{[selected.country, selected.city].filter(Boolean).join(", ")}</span>
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-0.5 shrink-0">
                     <button
@@ -360,6 +409,7 @@ export default function CampusSettingsPage() {
                   </div>
                 </div>
 
+                {/* ── Tabs ── */}
                 <div className="flex gap-4 px-4 sm:px-5 border-b border-black/[0.06] text-xs font-semibold overflow-x-auto">
                   {[
                     { k: "general" as const, label: "Général", icon: MapPin, locked: false },
@@ -381,10 +431,12 @@ export default function CampusSettingsPage() {
                   ))}
                 </div>
 
+                {/* ── Tab content ── */}
                 <div className="p-4 sm:p-5">
                   {detailTab === "general" && (
                     <div className="space-y-5 max-w-xl">
                       {isDetailLocked ? (
+                        /* ── READ MODE ── */
                         <div className="space-y-4">
                           <div className="grid sm:grid-cols-2 gap-4">
                             <ReadField label="Nom du campus" value={selected.name} />
@@ -397,10 +449,24 @@ export default function CampusSettingsPage() {
                           </ReadField>
                           <ReadField label="Adresse" value={selected.address || "—"} />
                           <div className="grid sm:grid-cols-2 gap-4">
+                            <ReadField label="Pays">
+                              <p className="text-sm font-semibold text-neutral-700 py-2 px-3.5 rounded-lg border border-black/[0.06] flex items-center gap-2" style={{ backgroundColor: SURFACE }}>
+                                {countryMeta(selected.country)?.flag || ""} {selected.country || "—"}
+                              </p>
+                            </ReadField>
                             <ReadField label="Ville" value={selected.city || "—"} />
-                            <ReadField label="Pays" value={selected.country || "—"} />
                           </div>
-                          <ReadField label="Téléphone" value={selected.phone || "—"} />
+                          <ReadField label="Téléphone">
+                            <p className="text-sm font-semibold text-neutral-700 py-2 px-3.5 rounded-lg border border-black/[0.06] flex items-center gap-2" style={{ backgroundColor: SURFACE }}>
+                              <Phone size={13} className="text-neutral-400 shrink-0" />
+                              {selected.phone || "—"}
+                              {selected.country && (
+                                <span className="text-[10px] text-neutral-400 font-medium ml-auto">
+                                  {countryMeta(selected.country)?.flag} {countryMeta(selected.country)?.dial}
+                                </span>
+                              )}
+                            </p>
+                          </ReadField>
                           <div className="flex items-center justify-between pt-2 border-t border-black/[0.06]">
                             {savedCampusId === selected.id ? (
                               <span className="flex items-center gap-1.5 text-xs font-semibold text-neutral-600">
@@ -417,6 +483,7 @@ export default function CampusSettingsPage() {
                           </div>
                         </div>
                       ) : (
+                        /* ── EDIT MODE ── */
                         <div className="space-y-4">
                           <div className="grid sm:grid-cols-2 gap-4">
                             <BlurField label="Nom du campus" defaultValue={selected.name} onCommit={(v) => v.trim() && patchCampus(selected.id, { name: v.trim() })} />
@@ -442,22 +509,46 @@ export default function CampusSettingsPage() {
                               ))}
                             </div>
                           </div>
+
                           <BlurField label="Adresse" defaultValue={selected.address || ""} onCommit={(v) => patchCampus(selected.id, { address: v.trim() || null })} />
+
+                          {/* Pays AVANT Ville — indicatif auto */}
                           <div className="grid sm:grid-cols-2 gap-4">
-                            <BlurField label="Ville" defaultValue={selected.city || ""} onCommit={(v) => patchCampus(selected.id, { city: v.trim() || null })} />
                             <div>
                               <FieldLabel label="Pays" />
                               <select
                                 defaultValue={selected.country || ""}
-                                onChange={(e) => patchCampus(selected.id, { country: e.target.value || null })}
+                                onChange={(e) => handleCountryChange(selected.id, e.target.value || null)}
                                 className="w-full h-10 px-3.5 rounded-lg border border-black/[0.08] bg-white text-sm font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
                               >
                                 <option value="">—</option>
-                                {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                                {COUNTRY_DATA.map((c) => <option key={c.name} value={c.name}>{c.flag} {c.name}</option>)}
                               </select>
                             </div>
+                            <BlurField label="Ville" defaultValue={selected.city || ""} onCommit={(v) => patchCampus(selected.id, { city: v.trim() || null })} />
                           </div>
-                          <BlurField label="Téléphone" defaultValue={selected.phone || ""} onCommit={(v) => patchCampus(selected.id, { phone: v.trim() || null })} />
+
+                          {/* Téléphone avec indicatif auto */}
+                          <div>
+                            <FieldLabel label="Téléphone" />
+                            <div className="flex items-center gap-2">
+                              {selected.country && countryMeta(selected.country) && (
+                                <span className="h-10 px-3 rounded-lg border border-black/[0.06] bg-neutral-50 text-xs font-semibold text-neutral-500 flex items-center gap-1.5 shrink-0">
+                                  {countryMeta(selected.country)!.flag} {countryMeta(selected.country)!.dial}
+                                </span>
+                              )}
+                              <input
+                                defaultValue={selected.phone || ""}
+                                onBlur={(e) => {
+                                  const v = e.target.value;
+                                  if (v !== (selected.phone || "")) patchCampus(selected.id, { phone: v.trim() || null });
+                                }}
+                                placeholder="Numéro de téléphone"
+                                className="flex-1 h-10 px-3.5 rounded-lg border border-black/[0.08] bg-white text-sm font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
+                              />
+                            </div>
+                          </div>
+
                           <div className="flex justify-end pt-2 border-t border-black/[0.06]">
                             <button
                               type="button"

@@ -119,6 +119,74 @@ function FinanceSection({
   );
 }
 
+type CouponOption = {
+  id: string;
+  code: string;
+  type: string;
+  value: number;
+  max_uses: number | null;
+  uses_count: number;
+  expires_at: string | null;
+  is_active: boolean;
+};
+
+function dedupeInstallments(list: Installment[]): Installment[] {
+  if (!list || list.length <= 1) return list;
+
+  const map = new Map<string, Installment>();
+
+  for (const inst of list) {
+    const dStr = inst.due_date ? inst.due_date.slice(0, 10) : "nodate";
+    const amt = Math.round(Number(inst.amount) || 0);
+
+    const key = (inst.position && inst.position > 0)
+      ? `pos_${inst.position}`
+      : `date_${dStr}_amt_${amt}`;
+
+    if (!map.has(key)) {
+      map.set(key, inst);
+    } else {
+      const existing = map.get(key)!;
+      const existingPaid = existing.status === "paid" || (existing.paid_amount || 0) >= existing.amount;
+      const currentPaid = inst.status === "paid" || (inst.paid_amount || 0) >= inst.amount;
+
+      if (!existingPaid && currentPaid) {
+        map.set(key, inst);
+      } else {
+        const isGeneric = (lbl?: string | null) =>
+          !lbl || /^échéance \d+$/i.test(lbl.trim()) || /^echeance \d+$/i.test(lbl.trim()) || lbl.trim().toLowerCase() === "échéance";
+        if (isGeneric(existing.label) && !isGeneric(inst.label)) {
+          map.set(key, inst);
+        }
+      }
+    }
+  }
+
+  const result = Array.from(map.values());
+  const finalMap = new Map<string, Installment>();
+  for (const inst of result) {
+    const dStr = inst.due_date ? inst.due_date.slice(0, 10) : "nodate";
+    const amt = Math.round(Number(inst.amount) || 0);
+    const key = `date_${dStr}_amt_${amt}`;
+    if (!finalMap.has(key)) {
+      finalMap.set(key, inst);
+    } else {
+      const existing = finalMap.get(key)!;
+      const isGeneric = (lbl?: string | null) =>
+        !lbl || /^échéance \d+$/i.test(lbl.trim()) || /^echeance \d+$/i.test(lbl.trim()) || lbl.trim().toLowerCase() === "échéance";
+      if (isGeneric(existing.label) && !isGeneric(inst.label)) {
+        finalMap.set(key, inst);
+      }
+    }
+  }
+
+  return Array.from(finalMap.values()).sort((a, b) => {
+    if (a.position != null && b.position != null) return a.position - b.position;
+    if (a.due_date && b.due_date) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    return 0;
+  });
+}
+
 export default function StudentFinanceTab({
   enrollmentId,
   tuitionFee,
@@ -145,10 +213,25 @@ export default function StudentFinanceTab({
   const [couponApplying, setCouponApplying] = useState(false);
   const [couponError, setCouponError] = useState("");
   const [couponSuccess, setCouponSuccess] = useState("");
+  const [availableCoupons, setAvailableCoupons] = useState<CouponOption[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      if (centerId) {
+        const { data: coupData } = await supabase
+          .from("coupons")
+          .select("id, code, type, value, max_uses, uses_count, expires_at, is_active")
+          .eq("center_id", centerId)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false });
+        const valid = (coupData || []).filter((c) => {
+          if (c.expires_at && new Date(c.expires_at) < new Date()) return false;
+          if (c.max_uses != null && c.uses_count >= c.max_uses) return false;
+          return true;
+        });
+        setAvailableCoupons(valid);
+      }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         setLoading(false);
@@ -171,11 +254,15 @@ export default function StudentFinanceTab({
         discount_amount: Number(s.discount_amount) || 0,
         discount_reason: s.discount_reason ?? null,
       });
-      setInstallments((json.installments || []).map((i: Installment) => ({
-        ...i,
-        amount: Number(i.amount) || 0,
-        paid_amount: Number(i.paid_amount) || 0,
-      })));
+      setInstallments(
+        dedupeInstallments(
+          (json.installments || []).map((i: Installment) => ({
+            ...i,
+            amount: Number(i.amount) || 0,
+            paid_amount: Number(i.paid_amount) || 0,
+          }))
+        )
+      );
       setPayments(json.payments || []);
       setEvents(json.events || []);
     } catch (e: unknown) {
@@ -213,7 +300,7 @@ export default function StudentFinanceTab({
           recorded_by_name: null,
         })),
       );
-      setInstallments((instRows || []) as Installment[]);
+      setInstallments(dedupeInstallments((instRows || []) as Installment[]));
       setEvents([]);
     } finally {
       setLoading(false);
@@ -440,25 +527,44 @@ export default function StudentFinanceTab({
         {!isPaid && remaining > 0 && (
           <div className="rounded-xl border border-black/[0.06] bg-white p-4 space-y-3">
             <p className="text-sm font-semibold text-neutral-600 flex items-center gap-1.5">
-              <Tag size={14} style={{ color: ORANGE }} /> Appliquer un coupon
+              <Tag size={14} style={{ color: ORANGE }} /> Appliquer un coupon (Finances)
             </p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={couponCode}
-                onChange={(e) => {
-                  setCouponCode(e.target.value.toUpperCase());
-                  setCouponError("");
-                  setCouponSuccess("");
-                }}
-                placeholder="CODE COUPON"
-                className={`${FIELD_INPUT} flex-1 uppercase`}
-              />
+            <div className="flex flex-col sm:flex-row gap-2">
+              {availableCoupons.length > 0 ? (
+                <select
+                  value={couponCode}
+                  onChange={(e) => {
+                    setCouponCode(e.target.value);
+                    setCouponError("");
+                    setCouponSuccess("");
+                  }}
+                  className={`${FIELD_INPUT} flex-1 uppercase text-sm`}
+                >
+                  <option value="">— Sélectionner un coupon du centre —</option>
+                  {availableCoupons.map((c) => (
+                    <option key={c.id} value={c.code}>
+                      {c.code} ({c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value)} FCFA`})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={couponCode}
+                  onChange={(e) => {
+                    setCouponCode(e.target.value.toUpperCase());
+                    setCouponError("");
+                    setCouponSuccess("");
+                  }}
+                  placeholder="CODE COUPON"
+                  className={`${FIELD_INPUT} flex-1 uppercase`}
+                />
+              )}
               <button
                 type="button"
                 onClick={submitCoupon}
                 disabled={couponApplying || !couponCode.trim()}
-                className="h-12 px-4 rounded-lg text-sm font-semibold text-white disabled:opacity-50 inline-flex items-center gap-1.5 shrink-0"
+                className="h-12 px-5 rounded-lg text-sm font-semibold text-white disabled:opacity-50 inline-flex items-center justify-center gap-1.5 shrink-0"
                 style={{ backgroundColor: BLUE }}
               >
                 {couponApplying ? <Loader2 size={14} className="animate-spin" /> : null}
@@ -474,7 +580,7 @@ export default function StudentFinanceTab({
       <FinanceSection
         icon={CalendarClock}
         title="Échéancier"
-        description="Échéances, montants dus et reports éventuels."
+        description="Échéances et dates fixées par le centre pour ce programme."
       >
         {installments.length === 0 ? (
           <p className="text-sm text-neutral-400 font-medium italic">Aucune échéance enregistrée.</p>
@@ -484,13 +590,18 @@ export default function StudentFinanceTab({
               const sold = inst.status === "paid" || (inst.paid_amount || 0) >= inst.amount;
               const deferred = !!inst.original_due_date && inst.original_due_date !== inst.due_date;
               return (
-                <div key={inst.id} className="py-3.5 px-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div key={inst.id} className="py-3 px-1 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-bold" style={{ color: BLUE }}>{inst.label || "Échéance"}</p>
+                      <p className="text-sm font-bold text-neutral-800">
+                        {inst.label || (inst.position ? `Échéance ${inst.position}` : "Échéance")}
+                      </p>
+                      <span className="text-xs font-semibold text-neutral-500">
+                        — {fmtDate(inst.due_date)}
+                      </span>
                       {deferred && (
                         <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
-                          Reporté
+                          Reporté {inst.original_due_date ? `(init. ${fmtDate(inst.original_due_date)})` : ""}
                         </span>
                       )}
                       {sold && (
@@ -499,18 +610,12 @@ export default function StudentFinanceTab({
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-neutral-500 font-medium mt-0.5">
-                      Échéance : {fmtDate(inst.due_date)}
-                      {deferred && inst.original_due_date && (
-                        <span className="text-neutral-400"> · init. {fmtDate(inst.original_due_date)}</span>
-                      )}
-                    </p>
                     {inst.deferral_reason && (
                       <p className="text-xs text-blue-600 font-medium mt-0.5">Motif : {inst.deferral_reason}</p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <p className="text-sm font-extrabold" style={{ color: BLUE }}>{fmtFCFA(inst.amount)} F</p>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <p className="text-sm font-extrabold" style={{ color: BLUE }}>{fmtFCFA(inst.amount)} FCFA</p>
                     {!sold && (
                       <button
                         type="button"
@@ -520,7 +625,7 @@ export default function StudentFinanceTab({
                           setDeferReason("");
                           setDeferError("");
                         }}
-                        className="h-8 px-2.5 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 hover:bg-black/[0.03]"
+                        className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors"
                       >
                         Report
                       </button>

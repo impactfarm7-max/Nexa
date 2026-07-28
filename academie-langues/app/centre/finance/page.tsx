@@ -515,7 +515,7 @@ export default function CenterFinancePage() {
       payment_date: p.payment_date,
       notes: p.notes,
       student_name: `${p.enrollments?.profiles?.prenom || ""} ${p.enrollments?.profiles?.nom || ""}`.trim(),
-      filiere_name: p.enrollments?.filieres?.name || "—",
+      filiere_name: (p.enrollments?.filieres?.name || "—").toUpperCase(),
     })));
     setJournalLoading(false);
   }, [centerId, dateFrom, dateTo, methodFilter]);
@@ -1072,7 +1072,7 @@ export default function CenterFinancePage() {
                       {r.phone && <p className="text-[11px] text-neutral-400 font-medium mt-1 truncate">{r.phone}</p>}
                     </td>
                     <td className="px-4 py-4 min-w-0 align-top">
-                      <p className="text-[12px] font-medium text-neutral-600 leading-snug truncate">{r.filiere_name}</p>
+                      <p className="text-[12px] font-medium text-neutral-600 leading-snug truncate uppercase">{r.filiere_name}</p>
                     </td>
                     <td className="px-4 py-4 min-w-0 align-top">
                       <span className={`text-[12px] font-semibold ${isLate || (!isPaid && r.reste_a_payer > 0) ? "text-red-600" : "text-neutral-500"}`}>
@@ -1133,7 +1133,7 @@ export default function CenterFinancePage() {
                           <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: BLUE }}>{r.prenom} {r.nom}</p>
                         </td>
                         <td className="px-4 py-4 min-w-0 align-top">
-                          <p className="text-[12px] text-neutral-600 leading-snug truncate">{r.filiere_name}</p>
+                          <p className="text-[12px] text-neutral-600 leading-snug truncate uppercase">{r.filiere_name}</p>
                         </td>
                         <td className="px-4 py-4 text-[12px] text-neutral-600 tabular-nums align-top">
                           {r.next_due_date ? fmtDate(r.next_due_date) : "—"}
@@ -1283,7 +1283,7 @@ export default function CenterFinancePage() {
                         <td className="p-4 font-mono font-bold text-[11px]" style={{ color: BLUE }}>{p.receipt_number || "—"}</td>
                         <td className="p-4">
                           <p className="font-bold" style={{ color: BLUE }}>{p.student_name}</p>
-                          <p className="text-[10px] text-neutral-400">{p.filiere_name}</p>
+                          <p className="text-[10px] text-neutral-400 uppercase">{p.filiere_name}</p>
                         </td>
                         <td className="p-4 text-neutral-500 font-medium">{p.payment_method}</td>
                         <td className="p-4 text-right font-medium tabular-nums text-neutral-900 finance-col-amount">+{fmtFCFA(p.amount)} F</td>
@@ -1561,7 +1561,7 @@ export default function CenterFinancePage() {
               <div className="min-w-0">
                 <p className="font-bold uppercase tracking-wider text-neutral-400" style={{ fontSize: printFormat === "ticket" ? "7px" : "9px" }}>Apprenant</p>
                 <p className="font-extrabold tracking-tight" style={{ color: BLUE, fontSize: printFormat === "ticket" ? "10px" : "13px" }}>{invoiceModal.prenom} {invoiceModal.nom}</p>
-                <p className="text-neutral-500 font-medium" style={{ fontSize: printFormat === "ticket" ? "8px" : "11px" }}>{invoiceModal.filiere_name}</p>
+                <p className="text-neutral-500 font-medium uppercase" style={{ fontSize: printFormat === "ticket" ? "8px" : "11px" }}>{invoiceModal.filiere_name}</p>
               </div>
               <div className="text-right shrink-0">
                 <p className="font-bold uppercase tracking-wider text-neutral-400" style={{ fontSize: printFormat === "ticket" ? "7px" : "9px" }}>Solde</p>

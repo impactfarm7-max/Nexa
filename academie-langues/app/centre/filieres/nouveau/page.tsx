@@ -74,9 +74,9 @@ type MatiereDraft = {
   initialFormateurIds?: string[];
   existingByNiveau?: Record<number, { fm_id: string; initialFormateurIds: string[] }>;
   /** Poids dans la moyenne générale */
-  coefficient: number;
+  coefficient: number | string;
   /** Barème de notation (ex. 20, 100) */
-  max_score: number;
+  max_score: number | string;
 };
 type NiveauDraft = {
   id?: string | null;
@@ -755,7 +755,7 @@ function NouveauProgrammeForm() {
   const [qtError, setQtError] = useState("");
   const [qtResult, setQtResult] = useState<{ emailSent: boolean; temporaryPassword?: string } | null>(null);
 
-  // --- Succès ---
+  const [existingFilieres, setExistingFilieres] = useState<{ id: string; name: string }[]>([]);
   const [created, setCreated] = useState<{ id: string; name: string; updated?: boolean } | null>(null);
 
   // --- Mode édition (réconciliation) ---
@@ -986,7 +986,7 @@ function NouveauProgrammeForm() {
         .from("exam_disciplines")
         .select("id, name, code, is_builtin, center_id")
         .or(`is_builtin.eq.true,center_id.eq.${cId || "00000000-0000-0000-0000-000000000000"}`),
-      supabase.from("filieres").select("id").eq("center_id", cId || ""),
+      supabase.from("filieres").select("id, name").eq("center_id", cId || ""),
       cId ? supabase.from("centers").select("plan_type, center_type").eq("id", cId).single() : Promise.resolve({ data: null }),
       supabase.from("campuses").select("id, name, city, is_main").eq("center_id", cId || "").eq("status", "actif").order("is_main", { ascending: false }),
       supabase.from("profiles").select("id, prenom, nom, role").eq("center_id", cId || "").in("role", ["trainer", "center_manager", "staff"]),
@@ -1000,6 +1000,7 @@ function NouveauProgrammeForm() {
       })),
     );
     setProgrammeCount((filiereRows || []).length);
+    setExistingFilieres((filiereRows || []) as { id: string; name: string }[]);
     setCampuses(campusRows || []);
     setStaffMembers(allStaff || []);
 
@@ -1024,6 +1025,13 @@ function NouveauProgrammeForm() {
 
   const isQuotaReached =
     !isEditMode && includedProgrammes !== null && programmeCount >= includedProgrammes;
+
+  const isDuplicateProgramName = !!(
+    name.trim() &&
+    existingFilieres.some(
+      (f) => f.name.trim().toLowerCase() === name.trim().toLowerCase() && f.id !== editFiliereId
+    )
+  );
 
   // ===================== GESTION NIVEAUX =====================
   const updateNiveau = (numero: number, patch: Partial<NiveauDraft>) =>
@@ -1187,7 +1195,32 @@ function NouveauProgrammeForm() {
   };
 
   const validateDraftMatiere = (m: MatiereDraft, forCursus: boolean): string | null => {
-    if (!m.discipline_id && !m.newDisciplineName.trim()) return "Choisissez ou saisissez une matière.";
+    const rawName = m.newDisciplineName.trim();
+    if (!m.discipline_id && !rawName) return "Choisissez ou saisissez une matière.";
+
+    const existingDisc = !m.discipline_id && rawName
+      ? disciplines.find((d) => d.name.trim().toLowerCase() === rawName.toLowerCase())
+      : null;
+    const effectiveDiscId = m.discipline_id || existingDisc?.id;
+    const currentList = forCursus ? matieresProgram : matieresCourtes;
+
+    const isAlreadyInProgram = currentList.some((other) => {
+      if (other.key === m.key) return false;
+      if (effectiveDiscId && other.discipline_id === effectiveDiscId) return true;
+      if (rawName && (
+        (other.discipline_id && disciplines.find((d) => d.id === other.discipline_id)?.name.trim().toLowerCase() === rawName.toLowerCase()) ||
+        other.newDisciplineName.trim().toLowerCase() === rawName.toLowerCase()
+      )) return true;
+      return false;
+    });
+
+    if (isAlreadyInProgram) {
+      const discName = m.discipline_id
+        ? disciplines.find((d) => d.id === m.discipline_id)?.name
+        : existingDisc?.name || rawName;
+      return `La matière « ${discName} » est déjà présente dans ce programme.`;
+    }
+
     if (forCursus && !(m.niveauNumeros || []).length) return "Sélectionnez au moins un niveau.";
     return null;
   };
@@ -1197,7 +1230,19 @@ function NouveauProgrammeForm() {
     const err = validateDraftMatiere(draftMatiereProgram, true);
     if (err) { setMatiereDraftError(err); return; }
     setMatiereDraftError("");
-    setMatieresProgram((prev) => [...prev, draftMatiereProgram]);
+
+    let finalDraft = { ...draftMatiereProgram };
+    if (!finalDraft.discipline_id && finalDraft.newDisciplineName.trim()) {
+      const match = disciplines.find(
+        (d) => d.name.trim().toLowerCase() === finalDraft.newDisciplineName.trim().toLowerCase()
+      );
+      if (match) {
+        finalDraft.discipline_id = match.id;
+        finalDraft.newDisciplineName = "";
+      }
+    }
+
+    setMatieresProgram((prev) => [...prev, finalDraft]);
     setDraftMatiereProgram(null);
     setDraftProgramIsEdit(false);
   };
@@ -1225,7 +1270,19 @@ function NouveauProgrammeForm() {
     const err = validateDraftMatiere(draftMatiereCourte, false);
     if (err) { setMatiereDraftError(err); return; }
     setMatiereDraftError("");
-    setMatieresCourtes((prev) => [...prev, draftMatiereCourte]);
+
+    let finalDraft = { ...draftMatiereCourte };
+    if (!finalDraft.discipline_id && finalDraft.newDisciplineName.trim()) {
+      const match = disciplines.find(
+        (d) => d.name.trim().toLowerCase() === finalDraft.newDisciplineName.trim().toLowerCase()
+      );
+      if (match) {
+        finalDraft.discipline_id = match.id;
+        finalDraft.newDisciplineName = "";
+      }
+    }
+
+    setMatieresCourtes((prev) => [...prev, finalDraft]);
     setDraftMatiereCourte(null);
     setDraftCourteIsEdit(false);
   };
@@ -1338,6 +1395,8 @@ function NouveauProgrammeForm() {
           phone: qtPhone.trim() || null,
           role: "trainer",
           job_title: "Formateur",
+          genre: "Autre",
+          birth_date: "2000-01-01",
           campus_ids: [],
           permissions: [],
         }),
@@ -1371,6 +1430,9 @@ function NouveauProgrammeForm() {
   // ===================== VALIDATION =====================
   function validate(): string | null {
     if (!name.trim()) return "Le nom du programme est requis.";
+    if (isDuplicateProgramName) {
+      return `Un programme nommé « ${name.trim()} » existe déjà dans votre centre. Veuillez choisir un autre nom.`;
+    }
     if (campuses.length > 0 && selectedCampusIds.length === 0) return "Sélectionnez au moins un campus pour ce programme.";
     if (type === "cursus") {
       if (!nbNiveaux || nbNiveaux < 1) return "Indique le nombre de niveaux.";
@@ -1451,6 +1513,20 @@ function NouveauProgrammeForm() {
       if (!m.newDisciplineName.trim()) return null;
       const key = m.newDisciplineName.trim().toLowerCase();
       if (createdDisciplines[key]) return createdDisciplines[key];
+
+      const { data: existingDisc } = await supabase
+        .from("exam_disciplines")
+        .select("id")
+        .or(`is_builtin.eq.true,center_id.eq.${centerId || "00000000-0000-0000-0000-000000000000"}`)
+        .ilike("name", m.newDisciplineName.trim())
+        .limit(1)
+        .maybeSingle();
+
+      if (existingDisc?.id) {
+        createdDisciplines[key] = existingDisc.id;
+        return existingDisc.id;
+      }
+
       const code = `${slugify(m.newDisciplineName)}_${Math.random().toString(36).slice(2, 6)}`;
       const { data: disc, error: discErr } = await supabase
         .from("exam_disciplines")
@@ -1682,6 +1758,20 @@ function NouveauProgrammeForm() {
         if (!m.newDisciplineName.trim()) return null;
         const key = m.newDisciplineName.trim().toLowerCase();
         if (createdDisciplines[key]) return createdDisciplines[key];
+
+        const { data: existingDisc } = await supabase
+          .from("exam_disciplines")
+          .select("id")
+          .or(`is_builtin.eq.true,center_id.eq.${centerId || "00000000-0000-0000-0000-000000000000"}`)
+          .ilike("name", m.newDisciplineName.trim())
+          .limit(1)
+          .maybeSingle();
+
+        if (existingDisc?.id) {
+          createdDisciplines[key] = existingDisc.id;
+          return existingDisc.id;
+        }
+
         const code = `${slugify(m.newDisciplineName)}_${Math.random().toString(36).slice(2, 6)}`;
         const { data: disc, error: discErr } = await supabase
           .from("exam_disciplines")
@@ -1697,9 +1787,11 @@ function NouveauProgrammeForm() {
         niveauId: string | null,
         annee: number,
         formateurIds: string[],
-        coefficient = 1,
-        maxScore = 20,
+        rawCoeff: number | string = 1,
+        rawMaxScore: number | string = 20,
       ) {
+        const coeff = Number(rawCoeff) > 0 ? Number(rawCoeff) : 1;
+        const maxScore = Number(rawMaxScore) > 0 ? Number(rawMaxScore) : 20;
         const { data: fm, error: fmErr } = await supabase
           .from("filiere_matieres")
           .insert({
@@ -1708,8 +1800,8 @@ function NouveauProgrammeForm() {
             niveau_id: niveauId,
             annee,
             obligatoire: true,
-            coefficient: coefficient > 0 ? coefficient : 1,
-            max_score: maxScore > 0 ? maxScore : 20,
+            coefficient: coeff,
+            max_score: maxScore,
           })
           .select("id").single();
         if (fmErr || !fm) throw new Error(`Matière non enregistrée : ${fmErr?.message || "insertion refusée"}`);
@@ -2095,8 +2187,13 @@ function NouveauProgrammeForm() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex : Baccalauréat Scientifique"
-              className={FIELD_INPUT}
+              className={`${FIELD_INPUT} ${isDuplicateProgramName ? "border-red-400 focus:border-red-500 ring-2 ring-red-100" : ""}`}
             />
+            {isDuplicateProgramName && (
+              <p className="text-xs font-bold text-red-500 mt-1.5 flex items-center gap-1">
+                ⚠️ Un programme nommé « {name.trim()} » existe déjà dans votre centre. Veuillez choisir un autre nom.
+              </p>
+            )}
           </div>
           <div>
             <label className={FIELD_LABEL}>ID programme</label>
@@ -2536,7 +2633,32 @@ function NouveauProgrammeForm() {
                     <Plus size={14} /> Créer une nouvelle matière
                   </button>
                   {!draftMatiereProgram.discipline_id && (
-                    <input value={draftMatiereProgram.newDisciplineName} onChange={(e) => updateMatiereProgram(draftMatiereProgram.key!, { newDisciplineName: e.target.value })} placeholder="Intitulé de la matière..." className={FIELD_INPUT} />
+                    <div>
+                      <input
+                        value={draftMatiereProgram.newDisciplineName}
+                        onChange={(e) => updateMatiereProgram(draftMatiereProgram.key!, { newDisciplineName: e.target.value })}
+                        placeholder="Intitulé de la matière..."
+                        className={FIELD_INPUT}
+                      />
+                      {(() => {
+                        const raw = draftMatiereProgram.newDisciplineName.trim().toLowerCase();
+                        if (!raw) return null;
+                        const match = disciplines.find((d) => d.name.trim().toLowerCase() === raw);
+                        if (match) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => updateMatiereProgram(draftMatiereProgram.key!, { discipline_id: match.id, newDisciplineName: "" })}
+                              className="mt-1.5 w-full text-left text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 p-2.5 rounded-lg border border-blue-200 flex items-center justify-between transition-colors"
+                            >
+                              <span>💡 La matière « <b>{match.name}</b> » existe déjà.</span>
+                              <span className="underline shrink-0">Sélectionner</span>
+                            </button>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
                   )}
                   <div>
                     <p className="text-[9px] font-black uppercase text-neutral-400 mb-2">Niveaux concernés</p>
@@ -2561,22 +2683,28 @@ function NouveauProgrammeForm() {
                     <div>
                       <p className={FIELD_LABEL}>Barème (sur)</p>
                       <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={draftMatiereProgram.max_score}
-                        onChange={(e) => updateMatiereProgram(draftMatiereProgram.key!, { max_score: Number(e.target.value) || 20 })}
+                        type="text"
+                        inputMode="numeric"
+                        value={draftMatiereProgram.max_score === 0 ? "" : (draftMatiereProgram.max_score ?? "")}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, "");
+                          updateMatiereProgram(draftMatiereProgram.key!, { max_score: raw === "" ? "" : Number(raw) });
+                        }}
+                        placeholder="20"
                         className={FIELD_INPUT}
                       />
                     </div>
                     <div>
                       <p className={FIELD_LABEL}>Coefficient</p>
                       <input
-                        type="number"
-                        min={0.25}
-                        step={0.25}
-                        value={draftMatiereProgram.coefficient}
-                        onChange={(e) => updateMatiereProgram(draftMatiereProgram.key!, { coefficient: Number(e.target.value) || 1 })}
+                        type="text"
+                        inputMode="decimal"
+                        value={draftMatiereProgram.coefficient === 0 ? "" : (draftMatiereProgram.coefficient ?? "")}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
+                          updateMatiereProgram(draftMatiereProgram.key!, { coefficient: raw === "" ? "" : (parseFloat(raw) || (raw as any)) });
+                        }}
+                        placeholder="1"
                         className={FIELD_INPUT}
                       />
                     </div>
@@ -2649,28 +2777,59 @@ function NouveauProgrammeForm() {
                     <Plus size={14} /> Créer une nouvelle matière
                   </button>
                   {!draftMatiereCourte.discipline_id && (
-                    <input value={draftMatiereCourte.newDisciplineName} onChange={(e) => updateMatiereCourteDraft({ newDisciplineName: e.target.value })} placeholder="Intitulé de la matière..." className={FIELD_INPUT} />
+                    <div>
+                      <input
+                        value={draftMatiereCourte.newDisciplineName}
+                        onChange={(e) => updateMatiereCourteDraft({ newDisciplineName: e.target.value })}
+                        placeholder="Intitulé de la matière..."
+                        className={FIELD_INPUT}
+                      />
+                      {(() => {
+                        const raw = draftMatiereCourte.newDisciplineName.trim().toLowerCase();
+                        if (!raw) return null;
+                        const match = disciplines.find((d) => d.name.trim().toLowerCase() === raw);
+                        if (match) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => updateMatiereCourteDraft({ discipline_id: match.id, newDisciplineName: "" })}
+                              className="mt-1.5 w-full text-left text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 p-2.5 rounded-lg border border-blue-200 flex items-center justify-between transition-colors"
+                            >
+                              <span>💡 La matière « <b>{match.name}</b> » existe déjà.</span>
+                              <span className="underline shrink-0">Sélectionner</span>
+                            </button>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
                   )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <p className={FIELD_LABEL}>Barème (sur)</p>
                       <input
-                        type="number"
-                        min={1}
-                        step={1}
-                        value={draftMatiereCourte.max_score}
-                        onChange={(e) => updateMatiereCourteDraft({ max_score: Number(e.target.value) || 20 })}
+                        type="text"
+                        inputMode="numeric"
+                        value={draftMatiereCourte.max_score === 0 ? "" : (draftMatiereCourte.max_score ?? "")}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, "");
+                          updateMatiereCourteDraft({ max_score: raw === "" ? "" : Number(raw) });
+                        }}
+                        placeholder="20"
                         className={FIELD_INPUT}
                       />
                     </div>
                     <div>
                       <p className={FIELD_LABEL}>Coefficient</p>
                       <input
-                        type="number"
-                        min={0.25}
-                        step={0.25}
-                        value={draftMatiereCourte.coefficient}
-                        onChange={(e) => updateMatiereCourteDraft({ coefficient: Number(e.target.value) || 1 })}
+                        type="text"
+                        inputMode="decimal"
+                        value={draftMatiereCourte.coefficient === 0 ? "" : (draftMatiereCourte.coefficient ?? "")}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
+                          updateMatiereCourteDraft({ coefficient: raw === "" ? "" : (parseFloat(raw) || (raw as any)) });
+                        }}
+                        placeholder="1"
                         className={FIELD_INPUT}
                       />
                     </div>

@@ -96,13 +96,14 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ emailSent: boolean; temporaryPassword?: string } | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<{ id: string; code: string; type: string; value: number }[]>([]);
 
   // ============================================================
   // CHARGEMENT INITIAL
   // ============================================================
   useEffect(() => {
     (async () => {
-      const [{ data: countryRows }, { data: filiereRows }, { data: centerRow }] = await Promise.all([
+      const [{ data: countryRows }, { data: filiereRows }, { data: centerRow }, { data: coupRows }] = await Promise.all([
         supabase.from("countries_ref").select("code, name, phone_code, regions").order("name"),
         supabase
           .from("filieres")
@@ -110,8 +111,22 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
           .eq("center_id", centerId)
           .eq("status", "published"),
         supabase.from("centers").select("center_type").eq("id", centerId).maybeSingle(),
+        supabase
+          .from("coupons")
+          .select("id, code, type, value, expires_at, max_uses, uses_count, is_active")
+          .eq("center_id", centerId)
+          .eq("is_active", true)
+          .order("created_at", { ascending: false }),
       ]);
       setIsLibreCenter(isPluriannualCenter(centerRow?.center_type));
+      if (coupRows?.length) {
+        const valid = coupRows.filter((c: any) => {
+          if (c.expires_at && new Date(c.expires_at) < new Date()) return false;
+          if (c.max_uses != null && c.uses_count >= c.max_uses) return false;
+          return true;
+        });
+        setAvailableCoupons(valid);
+      }
       if (countryRows?.length) {
         const parsed = countryRows.map((c: any) => ({
           ...c,
@@ -666,14 +681,29 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             {filiereId && (
               <div>
-                <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1">Code coupon (optionnel)</label>
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                  placeholder="RENTRÉE25"
-                  className="w-full h-11 px-3 bg-neutral-50 rounded-xl border text-xs font-black uppercase outline-none focus:border-blue-500 transition-colors"
-                />
+                <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1">Code coupon (optionnel — Finances)</label>
+                {availableCoupons.length > 0 ? (
+                  <select
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    className="w-full h-11 px-3 bg-neutral-50 rounded-xl border text-xs font-black uppercase outline-none focus:border-blue-500 transition-colors"
+                  >
+                    <option value="">— Aucun coupon —</option>
+                    {availableCoupons.map((c) => (
+                      <option key={c.id} value={c.code}>
+                        {c.code} ({c.type === "percentage" ? `${c.value}%` : `${c.value.toLocaleString("fr-FR")} FCFA`})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                    placeholder="RENTRÉE25"
+                    className="w-full h-11 px-3 bg-neutral-50 rounded-xl border text-xs font-black uppercase outline-none focus:border-blue-500 transition-colors"
+                  />
+                )}
               </div>
             )}
 
