@@ -285,15 +285,20 @@ export function CenterDataTable({
   columns,
   children,
   columnWidths,
+  minWidth = "700px",
+  className = "",
 }: {
   columns: string[];
   children: ReactNode;
   /** Largeurs fixes optionnelles (ex. `"14%"`, `"10.5rem"`). Colonnes sans valeur prennent l'espace restant. */
   columnWidths?: (string | undefined)[];
+  /** Largeur minimale de la table pour activer le scroll horizontal */
+  minWidth?: string;
+  className?: string;
 }) {
   return (
-    <div className="center-table-wrap w-full min-w-0 overflow-hidden border border-black/[0.08] rounded-lg bg-white">
-      <table className="w-full table-fixed text-left border-collapse">
+    <div className={`center-table-wrap w-full min-w-0 overflow-x-auto border border-black/[0.08] rounded-lg bg-white ${className}`}>
+      <table className="w-full table-fixed text-left border-collapse" style={{ minWidth }}>
         {columnWidths && columnWidths.length > 0 && (
           <colgroup>
             {columns.map((col, i) => (

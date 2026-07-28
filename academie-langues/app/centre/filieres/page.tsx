@@ -27,6 +27,7 @@ import {
   OutlineHeaderButton,
   AgentIaComingSoonButton,
 } from "../center-page-ui";
+import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 
 const fcfa = (n: number | null | undefined) => (Number(n) || 0).toLocaleString("fr-FR") + " FCFA";
 
@@ -149,37 +150,109 @@ function downloadProgrammesCsv(rows: ExportRow[]) {
   URL.revokeObjectURL(url);
 }
 
+async function loadImageDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const reader = new FileReader();
+    return await new Promise<string>((resolve, reject) => {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 async function buildProgrammesPdfDoc(rows: ExportRow[], filterCaption: string) {
   const { default: jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const blue: [number, number, number] = [17, 34, 78];
 
-  doc.setTextColor(...blue);
+  let cfg: DocumentExportConfig | undefined;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("center_id")
+        .eq("id", session.user.id)
+        .single();
+      if (profile?.center_id) {
+        cfg = await fetchDocumentExportConfig(supabase, profile.center_id, { documentType: "filieres" });
+      }
+    }
+  } catch (e) {
+    console.warn("[buildProgrammesPdfDoc] fetchDocumentExportConfig error:", e);
+  }
+
+  const blueRgb: [number, number, number] = cfg?.blueRgb || [17, 34, 78];
+  const accentRgb: [number, number, number] = cfg?.accentRgb || [235, 103, 14];
+
+  let headerX = 14;
+  if (cfg?.showLogo && cfg?.logoUrl) {
+    const dataUrl = await loadImageDataUrl(cfg.logoUrl);
+    if (dataUrl) {
+      const format = dataUrl.includes("image/png") ? "PNG" : "JPEG";
+      doc.addImage(dataUrl, format, 14, 12, 14, 14);
+      headerX = 32;
+    }
+  }
+
+  doc.setTextColor(...blueRgb);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text("Programmes", 14, 18);
+  doc.setFontSize(13);
+  doc.text(cfg?.legalName || "CENTRE D'ENSEIGNEMENT", headerX, 18);
 
-  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...accentRgb);
   doc.setFontSize(9);
-  doc.setTextColor(80, 80, 80);
-  doc.text(`Filtre: ${filterCaption}`, 14, 25, { maxWidth: pageWidth - 28 });
-  doc.text(`Genere le ${new Date().toLocaleString("fr-FR")}`, 14, 31);
+  doc.text((cfg?.title || "LISTE DES PROGRAMMES").toUpperCase(), headerX, 24);
 
-  doc.setDrawColor(...blue);
-  doc.setLineWidth(0.4);
-  doc.line(14, 35, pageWidth - 14, 35);
+  const metaLines: string[] = [];
+  if (cfg?.showAddress && cfg?.address) metaLines.push(cfg.address);
+  if (cfg?.showPhone && cfg?.phone) metaLines.push(`Tél : ${cfg.phone}`);
+  if (cfg?.showRccm && cfg?.rccmNumber) metaLines.push(`RCCM : ${cfg.rccmNumber}`);
+  if (cfg?.showNiu && cfg?.niuNumber) metaLines.push(`NIU : ${cfg.niuNumber}`);
+  metaLines.push(`Généré le ${new Date().toLocaleString("fr-FR")}`);
+
+  let metaY = 14;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  for (const line of metaLines) {
+    doc.text(line, pageWidth - 14, metaY, { align: "right" });
+    metaY += 4;
+  }
+
+  const ruleY = Math.max(30, metaY + 2);
+  doc.setDrawColor(...accentRgb);
+  doc.setLineWidth(0.6);
+  doc.line(14, ruleY, pageWidth - 14, ruleY);
+
+  doc.setTextColor(80, 80, 80);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.text(`Filtres : ${filterCaption}`, 14, ruleY + 6, { maxWidth: pageWidth - 28 });
 
   autoTable(doc, {
-    startY: 40,
+    startY: ruleY + 10,
     head: [["Nom", "Type", "Statut", "Prix", "Structure"]],
     body: rows.map((r) => [r.nom, r.type, r.statut, r.prix, r.structure]),
-    styles: { font: "helvetica", fontSize: 8, cellPadding: 2, overflow: "linebreak", textColor: [40, 40, 40] },
-    headStyles: { fillColor: blue, textColor: 255, fontStyle: "bold" },
+    styles: { font: "helvetica", fontSize: 8, cellPadding: 2.5, overflow: "linebreak", textColor: [40, 40, 40] },
+    headStyles: { fillColor: blueRgb, textColor: 255, fontStyle: "bold" },
     alternateRowStyles: { fillColor: [250, 250, 248] },
     margin: { left: 14, right: 14 },
   });
+
+  if (cfg?.footerText) {
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text(cfg.footerText, 14, pageHeight - 10, { maxWidth: 180 });
+  }
 
   return doc;
 }
@@ -418,7 +491,8 @@ export default function CenterFilieresPage() {
         ) : (
           <CenterDataTable
             columns={["Nom", "Type", "Statut", "Prix", "Actions"]}
-            columnWidths={[undefined, "16%", "12%", "18%", "10.75rem"]}
+            columnWidths={[undefined, "15%", "14%", "16%", "15rem"]}
+            minWidth="750px"
           >
             {filtered.map((prog, i) => (
               <CenterTableRow key={prog.id} index={i}>
@@ -434,28 +508,23 @@ export default function CenterFilieresPage() {
                   {prog.type === "cursus" ? "Cursus" : "Formation courte"}
                 </td>
                 <td className="px-4 py-3.5">
-                  <button
-                    type="button"
-                    onClick={() => togglePublish(prog)}
-                    title={prog.status === "published" ? "Repasser en brouillon" : "Publier"}
-                    className={`text-[12px] font-semibold print:pointer-events-none ${
-                      prog.status === "published" ? "text-neutral-600" : "text-red-600"
-                    }`}
-                  >
-                    {prog.status === "published" ? "Publié" : "Brouillon"}
-                  </button>
+                  <StatusBadge status={prog.status} />
                 </td>
                 <td className="px-4 py-3.5 text-[12px] font-medium text-neutral-700 tabular-nums">
                   {priceLabel(prog)}
                 </td>
                 <TableActions>
-                  <span className="print:hidden inline-flex items-center gap-1">
+                  <span className="print:hidden inline-flex items-center justify-end gap-2 shrink-0">
+                    <PublishToggleSwitch
+                      published={prog.status === "published"}
+                      onChange={() => togglePublish(prog)}
+                    />
                     <TableBtnPreview onClick={() => setViewing(prog)} />
                     <TableBtnModify onClick={() => router.push(`/centre/filieres/nouveau?edit=${prog.id}`)} />
                     <button
                       type="button"
                       onClick={() => setDeleting(prog)}
-                      className="h-7 w-7 rounded-md border border-black/[0.08] text-neutral-400 flex items-center justify-center hover:text-red-600 hover:border-red-200 transition-colors"
+                      className="h-7 w-7 rounded-md border border-black/[0.08] text-neutral-400 flex items-center justify-center hover:text-red-600 hover:border-red-200 transition-colors shrink-0"
                       aria-label="Supprimer"
                     >
                       <Trash2 size={13} />
@@ -468,7 +537,19 @@ export default function CenterFilieresPage() {
         )}
       </CenterPageBody>
 
-      {viewing && <ViewModal prog={viewing} onClose={() => setViewing(null)} />}
+      {viewing && (
+        <ViewModal
+          prog={viewing}
+          onClose={() => setViewing(null)}
+          onTogglePublish={() => {
+            const target = viewing;
+            togglePublish(target);
+            setViewing((prev) =>
+              prev ? { ...prev, status: prev.status === "published" ? "draft" : "published" } : null
+            );
+          }}
+        />
+      )}
       {deleting && <DeleteModal prog={deleting} onClose={() => setDeleting(null)} onDeleted={() => { setDeleting(null); loadProgrammes(); }} />}
       {publishSuccess && (
         <PublishSuccessModal
@@ -583,14 +664,14 @@ function ProgrammesFilterMenu({
   ];
 
   return (
-    <div ref={rootRef} className="relative shrink-0">
+    <div ref={rootRef} className="relative shrink-0 z-30">
       <button
         type="button"
         aria-label="Filtrer les programmes"
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
-        className="h-9 px-3 rounded-lg border border-black/[0.08] text-[12px] font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 inline-flex items-center gap-1.5 transition-colors duration-200 max-w-[14rem]"
+        className="h-9 px-3 rounded-lg border border-black/[0.08] text-[12px] font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 inline-flex items-center gap-1.5 transition-colors duration-200 max-w-[14rem] cursor-pointer"
         style={{
           backgroundColor: SURFACE,
           color: activeCount > 0 ? BLUE : undefined,
@@ -614,7 +695,7 @@ function ProgrammesFilterMenu({
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-1.5 z-40 w-[16.5rem] rounded-lg border border-black/[0.08] bg-white shadow-lg overflow-hidden"
+          className="absolute right-0 top-full mt-1.5 z-50 w-[16.5rem] rounded-lg border border-black/[0.08] bg-white shadow-xl overflow-hidden"
           role="menu"
         >
           <div className="px-3 pt-2.5 pb-1">
@@ -628,9 +709,13 @@ function ProgrammesFilterMenu({
                 type="button"
                 role="menuitemradio"
                 aria-checked={active}
-                onClick={() => onStatusChange(o.value)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold hover:bg-black/[0.03] ${
-                  active ? "text-[#11224E]" : "text-neutral-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStatusChange(o.value);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-[12px] font-semibold hover:bg-black/[0.04] transition-colors cursor-pointer ${
+                  active ? "text-[#11224E] bg-blue-50/50" : "text-neutral-700"
                 }`}
               >
                 <span className="w-4 shrink-0 flex justify-center">
@@ -654,9 +739,13 @@ function ProgrammesFilterMenu({
                 type="button"
                 role="menuitemradio"
                 aria-checked={active}
-                onClick={() => onTypeChange(o.value)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold hover:bg-black/[0.03] ${
-                  active ? "text-[#11224E]" : "text-neutral-700"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTypeChange(o.value);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-[12px] font-semibold hover:bg-black/[0.04] transition-colors cursor-pointer ${
+                  active ? "text-[#11224E] bg-blue-50/50" : "text-neutral-700"
                 }`}
               >
                 <span className="w-4 shrink-0 flex justify-center">
@@ -673,8 +762,12 @@ function ProgrammesFilterMenu({
               <button
                 type="button"
                 role="menuitem"
-                onClick={() => { onReset(); setOpen(false); }}
-                className="w-full px-3 py-2.5 text-left text-[12px] font-semibold text-neutral-500 hover:bg-black/[0.03] hover:text-neutral-800"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onReset();
+                  setOpen(false);
+                }}
+                className="w-full px-3 py-2.5 text-left text-[12px] font-semibold text-neutral-500 hover:bg-black/[0.04] hover:text-neutral-800 transition-colors cursor-pointer"
               >
                 Réinitialiser les filtres
               </button>
@@ -824,10 +917,47 @@ function StatusBadge({ status }: { status: "draft" | "published" }) {
   );
 }
 
+function PublishToggleSwitch({
+  published,
+  onChange,
+  disabled,
+}: {
+  published: boolean;
+  onChange: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={published}
+      onClick={onChange}
+      disabled={disabled}
+      title={published ? "Programme publié — cliquer pour dépublier (brouillon)" : "Programme en brouillon — cliquer pour publier"}
+      className="inline-flex items-center gap-1.5 group outline-none cursor-pointer disabled:opacity-50 select-none shrink-0 w-[6.5rem] text-left"
+    >
+      <div
+        className={`w-9 h-5 shrink-0 rounded-full p-0.5 transition-colors duration-200 ease-in-out flex items-center ${
+          published ? "bg-[#11224E]" : "bg-neutral-300 group-hover:bg-neutral-400"
+        }`}
+      >
+        <div
+          className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${
+            published ? "translate-x-4" : "translate-x-0"
+          }`}
+        />
+      </div>
+      <span className={`text-[11.5px] font-bold inline-block w-[3.6rem] truncate ${published ? "text-[#11224E]" : "text-red-600"}`}>
+        {published ? "Publié" : "Brouillon"}
+      </span>
+    </button>
+  );
+}
+
 // ===========================================================================
 type NiveauRow = { id: string; annee: number; nom: string | null; tuition_fee: number | null };
 
-function ViewModal({ prog, onClose }: { prog: ProgrammeCard; onClose: () => void }) {
+function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; onClose: () => void; onTogglePublish?: () => void }) {
   const [niveaux, setNiveaux] = useState<NiveauRow[]>([]);
   useEffect(() => {
     if (prog.type !== "cursus") return;
@@ -840,16 +970,24 @@ function ViewModal({ prog, onClose }: { prog: ProgrammeCard; onClose: () => void
   return (
     <Shell onClose={onClose} title="Aperçu du programme" wide>
       <div className="space-y-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge status={prog.status} />
-          <TypeBadge type={prog.type} />
-          {prog.type === "formation_courte" && prog.pricing_mode && (
-            <span className="text-[10px] font-bold uppercase text-neutral-400">
-              {prog.pricing_mode === "mensuel" ? "Tarif mensuel" : "Tarif forfaitaire"}
-            </span>
-          )}
-          {prog.mode && MODE_LABEL[prog.mode] && (
-            <span className="text-[10px] font-bold uppercase text-neutral-400">{MODE_LABEL[prog.mode]}</span>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={prog.status} />
+            <TypeBadge type={prog.type} />
+            {prog.type === "formation_courte" && prog.pricing_mode && (
+              <span className="text-[10px] font-bold uppercase text-neutral-400">
+                {prog.pricing_mode === "mensuel" ? "Tarif mensuel" : "Tarif forfaitaire"}
+              </span>
+            )}
+            {prog.mode && MODE_LABEL[prog.mode] && (
+              <span className="text-[10px] font-bold uppercase text-neutral-400">{MODE_LABEL[prog.mode]}</span>
+            )}
+          </div>
+          {onTogglePublish && (
+            <PublishToggleSwitch
+              published={prog.status === "published"}
+              onChange={onTogglePublish}
+            />
           )}
         </div>
         <div>

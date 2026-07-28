@@ -72,6 +72,13 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   const [countryCode, setCountryCode] = useState("CM");
   const [phoneCode, setPhoneCode] = useState("+237");
 
+  // --- Responsable légal ---
+  const [guardianName, setGuardianName] = useState("");
+  const [guardianRelation, setGuardianRelation] = useState("");
+  const [guardianCountryCode, setGuardianCountryCode] = useState("CM");
+  const [guardianPhoneCode, setGuardianPhoneCode] = useState("+237");
+  const [guardianPhone, setGuardianPhone] = useState("");
+
   // --- Étape 2 : Inscription ---
   const [filieres, setFilieres] = useState<FiliereOption[]>([]);
   const [filiereId, setFiliereId] = useState("");
@@ -156,6 +163,12 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
     setCountryCode(code);
     const country = countries.find((c) => c.code === code);
     if (country?.phone_code) setPhoneCode(country.phone_code);
+  };
+
+  const handleGuardianCountryChange = (code: string) => {
+    setGuardianCountryCode(code);
+    const country = countries.find((c) => c.code === code);
+    if (country?.phone_code) setGuardianPhoneCode(country.phone_code);
   };
 
   // ============================================================
@@ -396,12 +409,16 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Erreur lors de la création.");
 
-      // Créer les détails complémentaires (pays, indicatif)
+      // Créer les détails complémentaires (pays, indicatif, responsable)
       if (data.studentId) {
+        const fullGuardianPhone = guardianPhone.trim() ? `${guardianPhoneCode} ${guardianPhone.trim()}` : null;
         await supabase.from("student_details").upsert({
           student_id: data.studentId,
           country: countries.find((c) => c.code === countryCode)?.name || null,
           country_code: phoneCode,
+          guardian_name: guardianName.trim() || null,
+          guardian_relation: guardianRelation.trim() || null,
+          guardian_phone: fullGuardianPhone,
         });
       }
 
@@ -448,54 +465,47 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         {/* Header */}
         <div className="mb-6">
           <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>Créer un apprenant</h3>
-          <p className="text-sm text-neutral-500 mt-1">Étape {step} sur 2 · {step === 1 ? "Identité" : "Programme"}</p>
-          <div className="flex items-center gap-2 mt-3">
-            <div className={`flex items-center gap-1.5 text-sm font-semibold ${step === 1 ? "text-[#eb670e]" : "text-emerald-600"}`}>
-              <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-semibold ${step === 1 ? "bg-[#eb670e]" : "bg-emerald-500"}`}>
-                {step > 1 ? "✓" : "1"}
-              </span>
-              Identité
-            </div>
-            <ChevronRight size={14} className="text-neutral-300" />
-            <div className={`flex items-center gap-1.5 text-sm font-semibold ${step === 2 ? "text-[#eb670e]" : "text-neutral-300"}`}>
-              <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-semibold ${step === 2 ? "bg-[#eb670e]" : "bg-neutral-200"}`}>2</span>
-              Programme
-            </div>
-          </div>
+          <p className="text-sm text-neutral-500 mt-1">Étape {step} sur 2 — {step === 1 ? "Informations personnelles" : "Programme & Scolarité"}</p>
         </div>
+
+        {error && (
+          <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700 font-medium">
+            {error}
+          </div>
+        )}
 
         {/* ══════════ ÉTAPE 1 : IDENTITÉ ══════════ */}
         {step === 1 && (
           <div className="space-y-3.5">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={FIELD_LABEL}>Prénom *</label>
-                <input placeholder="Prénom" value={prenom} onChange={(e) => setPrenom(e.target.value)} className={FIELD_INPUT} />
+                <input type="text" placeholder="ex. Jean" value={prenom} onChange={(e) => setPrenom(e.target.value)} className={FIELD_INPUT} />
               </div>
               <div>
                 <label className={FIELD_LABEL}>Nom *</label>
-                <input placeholder="Nom" value={nom} onChange={(e) => setNom(e.target.value)} className={FIELD_INPUT} />
+                <input type="text" placeholder="ex. Dupont" value={nom} onChange={(e) => setNom(e.target.value)} className={FIELD_INPUT} />
               </div>
             </div>
 
             <div>
               <label className={FIELD_LABEL}>Email *</label>
-              <input type="email" placeholder="email@exemple.com" value={email} onChange={(e) => setEmail(e.target.value)} className={FIELD_INPUT} />
+              <input type="email" placeholder="jean.dupont@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className={FIELD_INPUT} />
             </div>
 
             {isLibreCenter && (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className={FIELD_LABEL}>Genre *</label>
+                  <label className={FIELD_LABEL}>Genre</label>
                   <select value={genre} onChange={(e) => setGenre(e.target.value)} className={FIELD_INPUT}>
-                    <option value="">Choisir…</option>
-                    <option value="Homme">Garçon / Homme</option>
-                    <option value="Femme">Fille / Femme</option>
+                    <option value="">Sélectionner...</option>
+                    <option value="M">Masculin (M)</option>
+                    <option value="F">Féminin (F)</option>
                     <option value="Autre">Autre</option>
                   </select>
                 </div>
                 <div>
-                  <label className={FIELD_LABEL}>Date de naissance *</label>
+                  <label className={FIELD_LABEL}>Date de naissance</label>
                   <input
                     type="date"
                     value={birthDate}
@@ -523,6 +533,45 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                   <span className="text-sm font-semibold" style={{ color: BLUE }}>{phoneCode}</span>
                 </div>
                 <input type="tel" placeholder="6XX XXX XXX" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^\d\s]/g, ""))} className={`flex-1 ${FIELD_INPUT}`} />
+              </div>
+            </div>
+
+            {/* Responsable légal / Tuteur */}
+            <div className="pt-3 border-t border-black/[0.06] space-y-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">Responsable légal / Tuteur (Optionnel)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className={FIELD_LABEL}>Nom du responsable</label>
+                  <input type="text" placeholder="ex. Jean Dupont" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} className={FIELD_INPUT} />
+                </div>
+                <div>
+                  <label className={FIELD_LABEL}>Lien</label>
+                  <select value={guardianRelation} onChange={(e) => setGuardianRelation(e.target.value)} className={FIELD_INPUT}>
+                    <option value="">Sélectionner...</option>
+                    {["Père", "Mère", "Tuteur", "Oncle", "Tante", "Frère", "Sœur", "Autre"].map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className={FIELD_LABEL_INLINE}><Globe size={14} /> Pays du responsable</label>
+                  <select value={guardianCountryCode} onChange={(e) => handleGuardianCountryChange(e.target.value)} className={FIELD_INPUT}>
+                    {countries.map((c) => (
+                      <option key={c.code} value={c.code}>{c.name} ({c.phone_code})</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={FIELD_LABEL_INLINE}><Phone size={14} /> Téléphone du responsable</label>
+                  <div className="flex gap-2">
+                    <div className="h-12 px-3 rounded-lg border border-black/[0.08] bg-[#FFF5EE] flex items-center shrink-0">
+                      <span className="text-sm font-semibold" style={{ color: BLUE }}>{guardianPhoneCode}</span>
+                    </div>
+                    <input type="tel" placeholder="6XX XXX XXX" value={guardianPhone} onChange={(e) => setGuardianPhone(e.target.value.replace(/[^\d\s]/g, ""))} className={`flex-1 ${FIELD_INPUT}`} />
+                  </div>
+                </div>
               </div>
             </div>
 

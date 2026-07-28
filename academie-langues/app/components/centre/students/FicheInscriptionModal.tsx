@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Download, Loader2, ArrowLeft } from "lucide-react";
+import { Download, Loader2, ArrowLeft, Printer } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHeader";
@@ -41,6 +41,8 @@ type FicheData = {
   enrolled_at: string | null;
   enrollment_status: string;
 
+  modalitesLines: string[];
+
   center_name: string;
   center_address: string | null;
   center_phone: string | null;
@@ -56,10 +58,339 @@ const ID_TYPE_LABELS: Record<string, string> = {
   autre: "Autre Document",
 };
 
+type InstallmentItem = {
+  id?: string;
+  label?: string | null;
+  amount: number;
+  due_date?: string | null;
+  status?: string | null;
+  paid_amount?: number | null;
+  position?: number | null;
+};
+
+function dedupeInstallments(list: InstallmentItem[]): InstallmentItem[] {
+  if (!list || list.length <= 1) return list;
+
+  const map = new Map<string, InstallmentItem>();
+  for (const inst of list) {
+    const dStr = inst.due_date ? inst.due_date.slice(0, 10) : "nodate";
+    const amt = Math.round(Number(inst.amount) || 0);
+
+    const key = (inst.position && inst.position > 0)
+      ? `pos_${inst.position}`
+      : `date_${dStr}_amt_${amt}`;
+
+    if (!map.has(key)) {
+      map.set(key, inst);
+    } else {
+      const existing = map.get(key)!;
+      const existingPaid = existing.status === "paid" || (existing.paid_amount || 0) >= existing.amount;
+      const currentPaid = inst.status === "paid" || (inst.paid_amount || 0) >= inst.amount;
+
+      if (!existingPaid && currentPaid) {
+        map.set(key, inst);
+      } else {
+        const isGeneric = (lbl?: string | null) =>
+          !lbl || /^échéance \d+$/i.test(lbl.trim()) || /^echeance \d+$/i.test(lbl.trim()) || lbl.trim().toLowerCase() === "échéance";
+        if (isGeneric(existing.label) && !isGeneric(inst.label)) {
+          map.set(key, inst);
+        }
+      }
+    }
+  }
+
+  const result = Array.from(map.values());
+  const finalMap = new Map<string, InstallmentItem>();
+  for (const inst of result) {
+    const dStr = inst.due_date ? inst.due_date.slice(0, 10) : "nodate";
+    const amt = Math.round(Number(inst.amount) || 0);
+    const key = `date_${dStr}_amt_${amt}`;
+    if (!finalMap.has(key)) {
+      finalMap.set(key, inst);
+    } else {
+      const existing = finalMap.get(key)!;
+      const isGeneric = (lbl?: string | null) =>
+        !lbl || /^échéance \d+$/i.test(lbl.trim()) || /^echeance \d+$/i.test(lbl.trim()) || lbl.trim().toLowerCase() === "échéance";
+      if (isGeneric(existing.label) && !isGeneric(inst.label)) {
+        finalMap.set(key, inst);
+      }
+    }
+  }
+
+  return Array.from(finalMap.values()).sort((a, b) => {
+    if (a.position != null && b.position != null) return a.position - b.position;
+    if (a.due_date && b.due_date) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    return 0;
+  });
+}
+
+function fmtPdfFCFA(n: number | null | undefined): string {
+  const v = Math.round(Number(n) || 0);
+  const formatted = v.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+  return `${formatted} FCFA`;
+}
+
+function formatFicheModalitesLines(enr: any, instRows: any[] | null): string[] {
+  const deduped = dedupeInstallments(
+    (instRows || []).map((r) => ({
+      ...r,
+      amount: Number(r.amount) || 0,
+    }))
+  );
+
+  if (deduped && deduped.length > 0) {
+    return deduped.map((inst, idx) => {
+      const posName = inst.position ? `Échéance ${inst.position}` : `Échéance ${idx + 1}`;
+      const label = inst.label && inst.label.trim() && !/^échéance \d+$/i.test(inst.label.trim())
+        ? inst.label.trim()
+        : posName;
+      const amtStr = fmtPdfFCFA(inst.amount);
+      const dateStr = inst.due_date
+        ? new Date(inst.due_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
+        : "";
+      if (dateStr && amtStr) return `${label} : ${amtStr} (${dateStr})`;
+      if (amtStr) return `${label} : ${amtStr}`;
+      return label;
+    });
+  }
+
+  const plan = enr?.niveaux?.payment_plan || enr?.filieres?.payment_plan;
+  if (plan) {
+    if (typeof plan === "string" && plan.trim().length > 0) {
+      return [plan.trim()];
+    }
+    if (typeof plan === "object") {
+      const obj = plan as any;
+      if (Array.isArray(obj.installments) && obj.installments.length > 0) {
+        return obj.installments.map((item: any, idx: number) => {
+          const lbl = item.label || (idx === 0 ? "Échéance 1 (Acompte)" : `Échéance ${idx + 1}`);
+          const amt = Number(item.montant || item.amount) || 0;
+          const amtFormatted = amt > 0 ? fmtPdfFCFA(amt) : "";
+          const jours = Number(item.jours) || 0;
+          const delayStr = jours > 0 ? `+${jours} jours` : "À l'inscription";
+          return `${lbl}${amtFormatted ? ` : ${amtFormatted}` : ""}${delayStr ? ` (${delayStr})` : ""}`;
+        });
+      }
+      if (obj.description) return [String(obj.description)];
+    }
+  }
+
+  const fee = Number(enr?.tuition_fee) || 0;
+  if (fee > 0) {
+    return [`Frais de formation : ${fmtPdfFCFA(fee)} (Échéances selon programme)`];
+  }
+
+  return ["Paiement en tranches selon le programme"];
+}
+
+async function loadImageDataUrl(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const reader = new FileReader();
+    return await new Promise<string>((resolve, reject) => {
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
+async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExportConfig | null) {
+  const { default: jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  const blueRgb: [number, number, number] = config?.blueRgb || [17, 34, 78];
+  const accentRgb: [number, number, number] = config?.accentRgb || [235, 103, 14];
+
+  let headerX = 14;
+  if (config?.showLogo && config?.logoUrl) {
+    const dataUrl = await loadImageDataUrl(config.logoUrl);
+    if (dataUrl) {
+      const format = dataUrl.includes("image/png") ? "PNG" : "JPEG";
+      doc.addImage(dataUrl, format, 14, 12, 14, 14);
+      headerX = 32;
+    }
+  }
+
+  doc.setTextColor(...blueRgb);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text(config?.legalName || data.center_name || "ÉTABLISSEMENT", headerX, 18);
+
+  doc.setTextColor(...accentRgb);
+  doc.setFontSize(9);
+  doc.text("FICHE D'INSCRIPTION ACADÉMIQUE", headerX, 24);
+
+  const metaLines: string[] = [];
+  if (config?.showAddress && config?.address) metaLines.push(config.address);
+  if (config?.showPhone && config?.phone) metaLines.push(`Tél : ${config.phone}`);
+  if (config?.showRccm && config?.rccmNumber) metaLines.push(`RCCM : ${config.rccmNumber}`);
+  if (config?.showNiu && config?.niuNumber) metaLines.push(`NIU : ${config.niuNumber}`);
+  metaLines.push(`Édité le ${new Date().toLocaleDateString("fr-FR")}`);
+
+  let metaY = 14;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  for (const line of metaLines) {
+    doc.text(line, pageWidth - 14, metaY, { align: "right" });
+    metaY += 4;
+  }
+
+  const ruleY = Math.max(30, metaY + 2);
+  doc.setDrawColor(...accentRgb);
+  doc.setLineWidth(0.6);
+  doc.line(14, ruleY, pageWidth - 14, ruleY);
+
+  let currentY = ruleY + 8;
+
+  // 1. Identité
+  doc.setTextColor(...blueRgb);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("1. IDENTITÉ DE L'APPRENANT", 14, currentY);
+  currentY += 4;
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [],
+    body: [
+      ["Nom :", (data.nom || "").toUpperCase(), "Prénom :", (data.prenom || "").toUpperCase()],
+      ["Email :", data.email || "", "Téléphone :", data.phone ? `${data.country_code ?? ""} ${data.phone}` : "—"],
+      ["Pays :", data.country || "—", "Région :", data.region || "—"],
+    ],
+    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2 },
+    columnStyles: {
+      0: { fontStyle: "bold", textColor: [100, 100, 100], cellWidth: 25 },
+      1: { textColor: [20, 20, 20], cellWidth: 65 },
+      2: { fontStyle: "bold", textColor: [100, 100, 100], cellWidth: 25 },
+      3: { textColor: [20, 20, 20], cellWidth: 65 },
+    },
+    theme: "plain",
+    margin: { left: 14, right: 14 },
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 6;
+
+  // 2. Pièce d'identité & Tuteur
+  doc.setTextColor(...blueRgb);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("2. PIÈCE D'IDENTITÉ & TUTEUR", 14, currentY);
+  currentY += 4;
+
+  const idTypeLabel = data.id_type === "cni" ? "Carte Nationale d'Identité" : data.id_type === "passeport" ? "Passeport" : data.id_type || "Non renseigné";
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [],
+    body: [
+      ["Type pièce :", idTypeLabel, "N° Pièce :", data.id_number || "Non renseigné"],
+      ["Tuteur :", data.guardian_name || "—", "Lien / Tél :", `${data.guardian_relation || "—"} (${data.guardian_phone || "—"})`],
+    ],
+    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2 },
+    columnStyles: {
+      0: { fontStyle: "bold", textColor: [100, 100, 100], cellWidth: 25 },
+      1: { textColor: [20, 20, 20], cellWidth: 65 },
+      2: { fontStyle: "bold", textColor: [100, 100, 100], cellWidth: 25 },
+      3: { textColor: [20, 20, 20], cellWidth: 65 },
+    },
+    theme: "plain",
+    margin: { left: 14, right: 14 },
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 6;
+
+  // 3. Inscription & Finances
+  doc.setTextColor(...blueRgb);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("3. INSCRIPTION ACADÉMIQUE & ENGAGEMENT FINANCIER", 14, currentY);
+  currentY += 4;
+
+  const statusLabel = data.enrollment_status === "active" ? "Actif" : data.enrollment_status === "draft" ? "En attente" : data.enrollment_status;
+  const niveauOrDuree = data.niveau_annee ? `Année ${data.niveau_annee}` : (data.duration_label || "—");
+
+  const modalitesFormatted = data.modalitesLines.join("\n");
+
+  autoTable(doc, {
+    startY: currentY,
+    head: [],
+    body: [
+      ["Programme :", data.filiere_name.toUpperCase(), "Niveau/Durée :", niveauOrDuree],
+      ["Campus :", data.campus_name || "—", "Classe :", data.groupe_nom || "—"],
+      ["Montant Total :", fmtPdfFCFA(data.tuition_fee), "Statut Inscription :", statusLabel],
+      ["Modalités :", modalitesFormatted, "", ""],
+    ],
+    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2, textColor: [20, 20, 20] },
+    columnStyles: {
+      0: { fontStyle: "bold", textColor: [100, 100, 100], cellWidth: 25 },
+      1: { textColor: [20, 20, 20], cellWidth: 65 },
+      2: { fontStyle: "bold", textColor: [100, 100, 100], cellWidth: 25 },
+      3: { textColor: [20, 20, 20], cellWidth: 65 },
+    },
+    theme: "plain",
+    margin: { left: 14, right: 14 },
+  });
+
+  currentY = (doc as any).lastAutoTable.finalY + 8;
+
+  // Clause
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(100, 100, 100);
+  const clause = `Je soussigné(e), ${(data.prenom || "").toUpperCase()} ${(data.nom || "").toUpperCase()}, déclare avoir pris connaissance du règlement intérieur de l'établissement et m'engage à respecter les conditions d'inscription, de scolarité et de paiement définies par ${data.center_name}. Les informations fournies ci-dessus sont exactes et complètes.`;
+  doc.text(clause, 14, currentY, { maxWidth: pageWidth - 28 });
+
+  currentY += 12;
+
+  // Signatures
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...blueRgb);
+
+  doc.text("L'Apprenant", 25, currentY);
+  if (data.guardian_name) doc.text("Le Tuteur", 95, currentY);
+  doc.text("Le Directeur", 160, currentY);
+
+  currentY += 18;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(150, 150, 150);
+  doc.text("Signature", 25, currentY);
+  if (data.guardian_name) doc.text("Signature", 95, currentY);
+  doc.text("Cachet & Signature", 160, currentY);
+
+  currentY += 10;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(100, 100, 100);
+  const todayStr = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+  doc.text(`Fait à __________________, le ${todayStr}`, pageWidth - 14, currentY, { align: "right" });
+
+  if (config?.footerText) {
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text(config.footerText, 14, pageHeight - 10, { maxWidth: 180 });
+  }
+
+  const safeNom = (data.nom || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+  const safePrenom = (data.prenom || "").replace(/[^a-zA-Z0-9_-]/g, "_");
+  doc.save(`fiche-inscription-${safeNom}-${safePrenom}.pdf`);
+}
+
 export default function FicheInscriptionModal({ studentId, enrollmentId, onClose }: Props) {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<FicheData | null>(null);
   const [docConfig, setDocConfig] = useState<DocumentExportConfig | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -80,15 +411,22 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
       const { data: enrollment } = await supabase
         .from("enrollments")
         .select(`
-          tuition_fee, enrolled_at, status,
+          tuition_fee, enrolled_at, status, filiere_id, niveau_id,
           duration_value, duration_unit, duration_months,
-          filieres(name, type, duree_valeur, duree_unite),
-          niveaux(annee, mois, semaines, jours),
+          filieres(name, type, duree_valeur, duree_unite, payment_plan),
+          niveaux(annee, mois, semaines, jours, payment_plan),
           groupes(nom),
           campuses(name)
         `)
         .eq("id", enrollmentId)
         .single();
+
+      const { data: instRows } = await supabase
+        .from("enrollment_installments")
+        .select("label, amount, due_date, position")
+        .eq("enrollment_id", enrollmentId)
+        .order("position", { ascending: true })
+        .order("due_date", { ascending: true });
 
       const [exportConfig, { data: center }] = await Promise.all([
         fetchDocumentExportConfig(supabase, profile.center_id),
@@ -109,6 +447,8 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
           durationLabel = `${enr.filieres.duree_valeur} ${u === "mois" ? "mois" : u === "semaines" ? "sem." : "j"}`;
         } else if (enr?.niveaux?.mois) durationLabel = `${enr.niveaux.mois} mois`;
       }
+
+      const modalitesLines = formatFicheModalitesLines(enr, instRows || []);
 
       setData({
         prenom: profile.prenom,
@@ -136,6 +476,8 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
         enrolled_at: enr?.enrolled_at ?? null,
         enrollment_status: enr?.status ?? "—",
 
+        modalitesLines: modalitesLines,
+
         center_name: exportConfig.legalName ?? center?.name ?? "Établissement",
         center_address: exportConfig.address ?? null,
         center_phone: exportConfig.phone ?? null,
@@ -147,6 +489,18 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
       setLoading(false);
     })();
   }, [studentId, enrollmentId]);
+
+  const handleDownloadPdf = async () => {
+    if (!data) return;
+    setDownloadingPdf(true);
+    try {
+      await downloadFicheInscriptionPdf(data, docConfig);
+    } catch (err) {
+      console.error("PDF download error:", err);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -178,15 +532,28 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
         <p className="text-[11px] font-black uppercase tracking-wider text-neutral-400 truncate min-w-0">
           Aperçu — Fiche d&apos;inscription
         </p>
-        <button
-          type="button"
-          onClick={() => window.print()}
-          className="flex items-center gap-2 h-9 px-3 sm:px-4 rounded-xl text-[11px] font-black uppercase text-white shrink-0"
-          style={{ backgroundColor: ORANGE }}
-        >
-          <Download size={14} />
-          <span>Télécharger</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-neutral-200 text-[11px] font-bold text-neutral-700 hover:bg-neutral-50 transition-colors"
+            title="Imprimer le document"
+          >
+            <Printer size={14} />
+            <span className="hidden sm:inline">Imprimer</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleDownloadPdf()}
+            disabled={downloadingPdf}
+            className="flex items-center gap-2 h-9 px-3 sm:px-4 rounded-xl text-[11px] font-black uppercase text-white shrink-0 disabled:opacity-50 cursor-pointer"
+            style={{ backgroundColor: ORANGE }}
+            title="Télécharger la fiche en fichier PDF"
+          >
+            {downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            <span>Télécharger (PDF)</span>
+          </button>
+        </div>
       </div>
 
       {/* Zone scrollable — reste dans le viewport */}
@@ -220,8 +587,8 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
             <div className="flex-1 min-w-0">
               <SectionTitle title="Identité de l'Apprenant" />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-2 mt-2">
-                <Field label="Nom" value={data.nom} />
-                <Field label="Prénom" value={data.prenom} />
+                <Field label="Nom" value={(data.nom || "").toUpperCase()} />
+                <Field label="Prénom" value={(data.prenom || "").toUpperCase()} />
                 <Field label="Email" value={data.email} />
                 <Field label="Téléphone" value={data.phone ? `${data.country_code ?? ""} ${data.phone}` : "—"} />
                 <Field label="Pays" value={data.country ?? "—"} />
@@ -279,16 +646,25 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
           {/* FINANCES */}
           <div className="mb-6 sm:mb-8">
             <SectionTitle title="Engagement Financier" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-2">
-              <Field label="Montant de la formation" value={`${data.tuition_fee.toLocaleString("fr-FR")} FCFA`} bold />
-              <Field label="Modalité" value="Selon échéancier du programme" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 mt-2">
+              <Field label="Montant de la formation" value={fmtPdfFCFA(data.tuition_fee)} bold />
+              <div className="min-w-0">
+                <p className="text-[9px] font-bold uppercase text-neutral-400 tracking-wider">Modalités de paiement</p>
+                <div className="space-y-1 mt-1">
+                  {data.modalitesLines.map((line, idx) => (
+                    <p key={idx} className="text-xs font-bold leading-snug" style={{ color: BLUE }}>
+                      {line}
+                    </p>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* CLAUSE */}
           <div className="border-t-2 pt-4 sm:pt-5 mb-6 sm:mb-8" style={{ borderColor: BLUE }}>
             <p className="text-[10px] text-neutral-600 leading-relaxed">
-              Je soussigné(e), <span className="font-bold">{data.prenom} {data.nom}</span>, déclare avoir pris
+              Je soussigné(e), <span className="font-bold">{(data.prenom || "").toUpperCase()} {(data.nom || "").toUpperCase()}</span>, déclare avoir pris
               connaissance du règlement intérieur de l&apos;établissement et m&apos;engage à respecter les conditions
               d&apos;inscription, de scolarité et de paiement définies par{" "}
               <span className="font-bold">{data.center_name}</span>. Les informations fournies ci-dessus sont

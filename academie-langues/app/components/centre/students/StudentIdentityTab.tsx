@@ -111,6 +111,17 @@ const ID_TYPE_LABELS: Record<string, string> = {
 
 const RELATION_OPTIONS = ["Père", "Mère", "Tuteur", "Oncle", "Tante", "Frère", "Sœur", "Autre"];
 
+function parseGuardianPhone(fullPhone: string | null, countries: StudentCountryRef[]) {
+  if (!fullPhone) return { phoneCode: "+237", localPhone: "", countryCode: "CM" };
+  const trimmed = fullPhone.trim();
+  const match = countries.find((c) => trimmed.startsWith(c.phone_code));
+  if (match) {
+    const local = trimmed.slice(match.phone_code.length).trim();
+    return { phoneCode: match.phone_code, localPhone: local, countryCode: match.code };
+  }
+  return { phoneCode: "+237", localPhone: trimmed, countryCode: "CM" };
+}
+
 export default function StudentIdentityTab({
   studentId,
   enrollmentId,
@@ -141,6 +152,11 @@ export default function StudentIdentityTab({
   // Formulaire identité
   const [form, setForm] = useState<StudentDetails>(details);
   const [selectedCountryCode, setSelectedCountryCode] = useState("");
+
+  // Guardian country & phone
+  const [guardianCountryCode, setGuardianCountryCode] = useState("CM");
+  const [guardianPhoneCode, setGuardianPhoneCode] = useState("+237");
+  const [guardianPhoneNum, setGuardianPhoneNum] = useState("");
 
   // Édition filière / niveau / classe
   const [editingPlacement, setEditingPlacement] = useState(false);
@@ -176,6 +192,11 @@ export default function StudentIdentityTab({
         country_code: parsed.country_code,
       }),
     );
+
+    const parsedG = parseGuardianPhone(parsed.guardian_phone, COUNTRY_OPTIONS);
+    setGuardianCountryCode(parsedG.countryCode);
+    setGuardianPhoneCode(parsedG.phoneCode);
+    setGuardianPhoneNum(parsedG.localPhone);
 
     setLoading(false);
   }, [studentId]);
@@ -218,6 +239,26 @@ export default function StudentIdentityTab({
     }
   };
 
+  const handleGuardianCountryChange = (code: string) => {
+    setGuardianCountryCode(code);
+    const found = COUNTRY_OPTIONS.find((c) => c.code === code);
+    const pCode = found?.phone_code || "+237";
+    setGuardianPhoneCode(pCode);
+    setForm((f) => ({
+      ...f,
+      guardian_phone: guardianPhoneNum.trim() ? `${pCode} ${guardianPhoneNum.trim()}` : null,
+    }));
+  };
+
+  const handleGuardianPhoneNumChange = (num: string) => {
+    const clean = num.replace(/[^\d\s]/g, "");
+    setGuardianPhoneNum(clean);
+    setForm((f) => ({
+      ...f,
+      guardian_phone: clean.trim() ? `${guardianPhoneCode} ${clean.trim()}` : null,
+    }));
+  };
+
   // Sauvegarde
   const handleSave = async () => {
     setSaving(true);
@@ -244,6 +285,10 @@ export default function StudentIdentityTab({
         country_code: details.country_code,
       }),
     );
+    const parsedG = parseGuardianPhone(details.guardian_phone, COUNTRY_OPTIONS);
+    setGuardianCountryCode(parsedG.countryCode);
+    setGuardianPhoneCode(parsedG.phoneCode);
+    setGuardianPhoneNum(parsedG.localPhone);
     setEditing(true);
   };
 
@@ -667,7 +712,7 @@ export default function StudentIdentityTab({
       >
         {editing ? (
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={FIELD_LABEL}>Nom complet</label>
                 <input value={form.guardian_name || ""} onChange={(e) => setForm((f) => ({ ...f, guardian_name: e.target.value || null }))} placeholder="Nom du responsable" className={FIELD_INPUT} />
@@ -680,14 +725,37 @@ export default function StudentIdentityTab({
                 </select>
               </div>
             </div>
-            <div>
-              <label className={`${FIELD_LABEL} flex items-center gap-1.5`}><Phone size={14} /> Téléphone du responsable</label>
-              <input type="tel" value={form.guardian_phone || ""} onChange={(e) => setForm((f) => ({ ...f, guardian_phone: e.target.value || null }))} placeholder="+237 6XX XXX XXX" className={FIELD_INPUT} />
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={`${FIELD_LABEL} flex items-center gap-1.5`}><Globe size={14} /> Pays du responsable</label>
+                <select value={guardianCountryCode} onChange={(e) => handleGuardianCountryChange(e.target.value)} className={FIELD_INPUT}>
+                  {COUNTRY_OPTIONS.map((c) => (
+                    <option key={c.code} value={c.code}>{c.name} ({c.phone_code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className={`${FIELD_LABEL} flex items-center gap-1.5`}><Phone size={14} /> Téléphone du responsable</label>
+                <div className="flex gap-2">
+                  <div className="h-12 px-3 rounded-lg border border-black/[0.08] bg-[#FFF5EE] flex items-center shrink-0">
+                    <span className="text-sm font-semibold" style={{ color: BLUE }}>{guardianPhoneCode}</span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={guardianPhoneNum}
+                    onChange={(e) => handleGuardianPhoneNumChange(e.target.value)}
+                    placeholder="6XX XXX XXX"
+                    className={`flex-1 ${FIELD_INPUT}`}
+                  />
+                </div>
+              </div>
             </div>
           </div>
-        ) : details.guardian_name ? (
+        ) : details.guardian_name || details.guardian_phone ? (
           <div className="text-sm space-y-1">
-            <div><span className="text-neutral-400 font-medium">Nom :</span> <span className="font-semibold" style={{ color: BLUE }}>{details.guardian_name}</span>{details.guardian_relation && <span className="text-neutral-400"> ({details.guardian_relation})</span>}</div>
+            <div><span className="text-neutral-400 font-medium">Nom :</span> <span className="font-semibold" style={{ color: BLUE }}>{details.guardian_name || "—"}</span>{details.guardian_relation && <span className="text-neutral-400"> ({details.guardian_relation})</span>}</div>
             {details.guardian_phone && <div><span className="text-neutral-400 font-medium">Tél :</span> <span className="font-semibold" style={{ color: BLUE }}>{details.guardian_phone}</span></div>}
           </div>
         ) : (

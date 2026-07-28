@@ -108,11 +108,11 @@ function statusLabelFr(st: StudentRow["center_status"]) {
 
 function toStudentExportRows(list: StudentRow[]): ExportStudentRow[] {
   return list.map((s) => ({
-    nom: s.nom,
+    nom: (s.nom || "").toUpperCase(),
     prenom: s.prenom,
     email: s.email || "",
     telephone: s.phone || "",
-    filiere: s.enrollments[0]?.filiere_name_raw || "",
+    filiere: (s.enrollments[0]?.filiere_name_raw || "").toUpperCase(),
     statut: statusLabelFr(s.center_status),
   }));
 }
@@ -439,7 +439,7 @@ export default function CenterStudentsPage() {
                     className="text-xl sm:text-2xl font-extrabold tracking-tight leading-tight truncate"
                     style={{ color: BLUE }}
                   >
-                    {selectedStudent.prenom} {selectedStudent.nom}
+                    {selectedStudent.prenom} {(selectedStudent.nom || "").toUpperCase()}
                   </h1>
                 </div>
               </div>
@@ -619,12 +619,12 @@ export default function CenterStudentsPage() {
                       <CenterTableRow key={s.id} index={i}>
                         <td className="px-4 py-3.5 min-w-0 print:break-inside-avoid">
                           <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: BLUE }}>
-                            {s.prenom} {s.nom}
+                            {s.prenom} {(s.nom || "").toUpperCase()}
                           </p>
                           <p className="text-[11px] text-neutral-400 font-medium mt-0.5 truncate">{s.email || "—"}</p>
                         </td>
-                        <td className="px-4 py-3.5 text-[12px] font-medium text-neutral-600">
-                          {primaryEnr?.filiere_name_raw || "—"}
+                        <td className="px-4 py-3.5 text-[12px] font-medium text-neutral-600 uppercase">
+                          {primaryEnr?.filiere_name_raw ? primaryEnr.filiere_name_raw.toUpperCase() : "—"}
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
                           <span className={`text-[12px] font-semibold ${
@@ -667,7 +667,7 @@ export default function CenterStudentsPage() {
                           }`}
                           style={selectedEnrollmentId === e.id ? { backgroundColor: BLUE } : undefined}
                         >
-                          {e.filiere_name_raw}{e.status === "draft" ? " (Brouillon)" : ""}
+                          {e.filiere_name_raw ? e.filiere_name_raw.toUpperCase() : ""}{e.status === "draft" ? " (Brouillon)" : ""}
                         </button>
                       ))}
                     </div>
@@ -701,7 +701,7 @@ export default function CenterStudentsPage() {
                   <StudentIdentityTab
                     studentId={selectedStudent.id}
                     enrollmentId={selectedEnrollment?.id}
-                    studentName={`${selectedStudent.prenom} ${selectedStudent.nom}`}
+                    studentName={`${selectedStudent.prenom} ${(selectedStudent.nom || "").toUpperCase()}`}
                     studentEmail={selectedStudent.email}
                     studentPhone={selectedStudent.phone}
                     avatarUrl={selectedStudent.avatar_url}
@@ -730,8 +730,8 @@ export default function CenterStudentsPage() {
                     enrollmentId={selectedEnrollment.id}
                     tuitionFee={selectedEnrollment.tuition_fee}
                     centerId={centerId!}
-                    studentName={`${selectedStudent.prenom} ${selectedStudent.nom}`}
-                    filiereName={selectedEnrollment.filiere_name_raw || selectedEnrollment.filiere_name}
+                    studentName={`${selectedStudent.prenom} ${(selectedStudent.nom || "").toUpperCase()}`}
+                    filiereName={(selectedEnrollment.filiere_name_raw || selectedEnrollment.filiere_name || "").toUpperCase()}
                     onPaid={() => loadStudents(centerId!)}
                   />
                 )}
@@ -866,7 +866,7 @@ function StudentViewModal({
             </div>
             <div className="min-w-0 text-center sm:text-left">
               <h4 className="text-2xl font-black tracking-tight" style={{ color: BLUE }}>
-                {student.prenom} {student.nom}
+                {student.prenom} {(student.nom || "").toUpperCase()}
               </h4>
               <p className="text-sm text-neutral-500 mt-1 font-medium">{statusLabel}</p>
               <p className="text-sm text-neutral-500 mt-2 font-medium truncate">{student.email || "—"}</p>
@@ -905,7 +905,7 @@ function StudentViewModal({
                 <BookOpen size={12} /> Programme
               </p>
               <div className="rounded-2xl border border-neutral-200 p-4 space-y-2">
-                <p className="text-sm font-bold text-neutral-800">{primary.filiere_name_raw}</p>
+                <p className="text-sm font-bold text-neutral-800 uppercase">{primary.filiere_name_raw ? primary.filiere_name_raw.toUpperCase() : ""}</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500 font-medium">
                   {primary.niveau_annee != null && <span>Niveau {primary.niveau_annee}</span>}
                   {primary.duration_label && <span>{primary.duration_label}</span>}
