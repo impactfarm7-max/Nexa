@@ -515,7 +515,8 @@ function LoginPageContent() {
 
     localStorage.setItem("session_token", result.token);
 
-    await supabase
+    // ✅ Mise à jour non-bloquante de la date de connexion en arrière-plan
+    void supabase
       .from("profiles")
       .update({ last_sign_in_at: new Date().toISOString() })
       .eq("id", user.id);
@@ -525,19 +526,23 @@ function LoginPageContent() {
       localStorage.setItem("last_active_date", new Date().toISOString());
     }
 
+    sessionStorage.setItem("is_unlocked", "true");
+
+    const destination = resolvePostLoginPath(profile);
+
     // Vérifier si le PIN a été défini — si non, forcer la création
     if (!isPrivilegedRole(profile) && profile?.tag_status === "revoque") {
-      router.replace("/revoque");
+      window.location.assign("/revoque");
       return;
     }
 
     if (!isPrivilegedRole(profile) && profile?.tag_status === "termine") {
-      router.replace("/termine");
+      window.location.assign("/termine");
       return;
     }
 
     if (!profile?.pin_hash && !isCenterStaff(profile) && !isSuperAdmin(profile)) {
-      router.replace("/pin/setup");
+      window.location.assign("/pin/setup");
       return;
     }
 
@@ -545,8 +550,8 @@ function LoginPageContent() {
       void logSuperadminLoginAudit();
     }
 
-    sessionStorage.setItem("is_unlocked", "true");
-    router.replace(resolvePostLoginPath(profile));
+    // 🚀 Redirection directe et instantanée par le navigateur vers le tableau de bord
+    window.location.assign(destination);
   };
 
   /** Journalise la connexion superadmin côté serveur (non bloquant). */
@@ -683,7 +688,7 @@ function LoginPageContent() {
       }
 
       setRemovingId(null);
-      router.replace(resolvePostLoginPath(profile));
+      window.location.assign(resolvePostLoginPath(profile));
     } catch (error) {
       console.error("Force login error:", error);
       setRemovingId(null);
@@ -726,15 +731,15 @@ function LoginPageContent() {
         .single();
 
       if (!isPrivilegedRole(profile) && profile?.tag_status === "revoque") {
-        router.replace("/revoque");
+        window.location.assign("/revoque");
         return;
       }
       if (!isPrivilegedRole(profile) && profile?.tag_status === "termine") {
-        router.replace("/termine");
+        window.location.assign("/termine");
         return;
       }
       if (!profile?.pin_hash && !isCenterStaff(profile) && !isSuperAdmin(profile)) {
-        router.replace("/pin/setup");
+        window.location.assign("/pin/setup");
         return;
       }
 
@@ -747,7 +752,7 @@ function LoginPageContent() {
         }
       }
 
-      router.replace(resolvePostLoginPath(profile));
+      window.location.assign(resolvePostLoginPath(profile));
     } catch {
       showError("Impossible d'acceder a l'academie. Reessayez.");
     } finally {

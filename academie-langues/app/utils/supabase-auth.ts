@@ -44,8 +44,7 @@ export async function clearStaleAuthSession(): Promise<void> {
   }
 }
 
-/** Avant une nouvelle connexion : évite le conflit avec un ancien refresh token. */
+/** Avant une nouvelle connexion : nettoie les jetons locaux sans émettre d'événement de déconnexion global. */
 export async function prepareForLogin(): Promise<void> {
-  await supabase.auth.signOut({ scope: "local" }).catch(() => {});
   clearLocalAuthArtifacts();
 }
