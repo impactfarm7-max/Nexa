@@ -239,11 +239,15 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         const feeMode = isCursusFeeMode(selectedFiliere.cursus_fee_mode)
           ? selectedFiliere.cursus_fee_mode
           : "par_niveau";
+        const initialExtras =
+          feeMode === "uniforme"
+            ? sumPaymentPlanFees(selectedFiliere.payment_plan)
+            : 0;
         setTuitionFee(String(resolveCursusTuition({
           feeMode,
           filiereDefault: selectedFiliere.default_tuition_fee,
           niveauTuition: null,
-          extraFees: 0,
+          extraFees: initialExtras,
         })));
       } else {
         // Formation courte : salles via filiere_id (et niveau fantôme si présent)
@@ -317,13 +321,15 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
       );
     })();
 
-    // Prix : formation + frais d'inscription du niveau
+    // Prix : formation + frais d'inscription du niveau / filière
     const niveau = niveaux.find((n) => n.id === niveauId);
     const feeMode = isCursusFeeMode(selectedFiliere?.cursus_fee_mode)
       ? selectedFiliere!.cursus_fee_mode!
       : "par_niveau";
     const extras =
-      feeMode === "par_niveau" ? sumPaymentPlanFees(niveau?.payment_plan) : 0;
+      feeMode === "par_niveau"
+        ? sumPaymentPlanFees(niveau?.payment_plan)
+        : sumPaymentPlanFees(selectedFiliere?.payment_plan);
     setTuitionFee(String(resolveCursusTuition({
       feeMode,
       filiereDefault: selectedFiliere?.default_tuition_fee ?? null,

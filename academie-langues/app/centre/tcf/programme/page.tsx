@@ -442,20 +442,28 @@ export default function TCFProgrammePage() {
                   </div>
                 )}
 
-                {priceOk && (
-                  <div className="mt-4 bg-neutral-50 rounded-xl p-4 border">
-                    <p className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-2">Aperçu tarifs</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {[1, 2, 3, 6].map(m => (
-                        <div key={m} className="bg-white rounded-lg p-3 border text-center">
-                          <p className="text-xs font-bold text-neutral-500">{m} mois</p>
-                          <p className="text-sm font-black mt-0.5" style={{ color: BLUE }}>{fmtFCFA(Number(monthlyPrice) * m)}</p>
-                          <p className="text-[9px] text-neutral-400">FCFA</p>
-                        </div>
-                      ))}
+                {priceOk && (() => {
+                  const extraFeesTotal = extraFees.reduce((acc, f) => acc + (Number(f.amount) || 0), 0);
+                  return (
+                    <div className="mt-4 bg-neutral-50 rounded-xl p-4 border">
+                      <p className="text-[9px] font-black text-neutral-400 uppercase tracking-widest mb-2">Aperçu tarifs</p>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[1, 2, 3, 6].map(m => {
+                          const tot = (Number(monthlyPrice) * m) + extraFeesTotal;
+                          return (
+                            <div key={m} className="bg-white rounded-lg p-3 border text-center">
+                              <p className="text-xs font-bold text-neutral-500">{m} mois</p>
+                              <p className="text-sm font-black mt-0.5" style={{ color: BLUE }}>{fmtFCFA(tot)}</p>
+                              <p className="text-[9px] text-neutral-400">
+                                FCFA{extraFeesTotal > 0 ? ` (dont ${fmtFCFA(extraFeesTotal)} F annexes)` : ""}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </AccordionSection>
 
               {/* ── ACCORDION: TARIFS SUPPLÉMENTAIRES ── */}

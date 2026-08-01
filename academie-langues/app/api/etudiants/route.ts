@@ -171,9 +171,11 @@ export async function POST(req: NextRequest) {
         .eq("id", niveau_id)
         .maybeSingle();
       cursusPaymentPlan = nivRow?.payment_plan ?? null;
-      // Frais configurés par niveau (UI « Frais supplémentaires ») — pas en mode uniforme
+      // Frais configurés par niveau ou par filière (UI « Frais supplémentaires »)
       const extras =
-        feeMode === "par_niveau" ? sumPaymentPlanFees(cursusPaymentPlan) : 0;
+        feeMode === "par_niveau"
+          ? sumPaymentPlanFees(cursusPaymentPlan)
+          : sumPaymentPlanFees(filiere.payment_plan);
       resolvedTuition = resolveCursusTuition({
         feeMode,
         filiereDefault: filiere.default_tuition_fee,

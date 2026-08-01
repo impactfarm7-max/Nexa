@@ -25,6 +25,7 @@ import {
 import { downloadTcfDossierPdf } from "@/app/utils/centerPdfExport";
 import { AmountInWords } from "@/app/components/AmountInWords";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
+import { sumNamedExtraFees } from "@/app/utils/short-pricing";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -245,14 +246,17 @@ function formatTcfActivationError(message: string): string {
   return message;
 }
 
-async function loadTcfMonthlyPrice(centerId: string): Promise<number> {
+async function loadTcfPricingDetails(centerId: string): Promise<{ monthlyPrice: number; extraFees: number }> {
   const { data: filiere } = await supabase
     .from("filieres")
-    .select("default_tuition_fee")
+    .select("default_tuition_fee, extra_fees")
     .eq("center_id", centerId)
     .eq("name", "TCF Canada")
     .maybeSingle();
-  return Number(filiere?.default_tuition_fee) || 0;
+  return {
+    monthlyPrice: Number(filiere?.default_tuition_fee) || 0,
+    extraFees: sumNamedExtraFees((filiere as any)?.extra_fees),
+  };
 }
 
 export default function CenterTCFStudentsPage() {
@@ -950,6 +954,7 @@ function ActivateModal({ student, centerId, onClose, onActivated }: {
   onActivated: (result?: { enrollmentId?: string }) => void;
 }) {
   const [monthlyPrice, setMonthlyPrice] = useState(0);
+  const [extraFees, setExtraFees] = useState(0);
   const [priceLoading, setPriceLoading] = useState(true);
   const [presetKey, setPresetKey] = useState("3m");
   const [customMode, setCustomMode] = useState(false);
@@ -974,7 +979,7 @@ function ActivateModal({ student, centerId, onClose, onActivated }: {
   const durationValue = customMode ? Math.max(1, Number(customValue) || 1) : activePreset.value;
   const durationUnit: TcfDurationUnit = customMode ? customUnit : activePreset.unit;
   const days = durationToDays(durationValue, durationUnit);
-  const catalogTotal = catalogTotalFromMonthly(monthlyPrice, days);
+  const catalogTotal = catalogTotalFromMonthly(monthlyPrice, days) + extraFees;
   const parsedAgreed = useAgreedPrice && agreedPrice.trim() ? Number(agreedPrice.replace(/\s/g, "")) : null;
   const baseTotal =
     parsedAgreed != null && !Number.isNaN(parsedAgreed) && parsedAgreed >= 0
@@ -1005,8 +1010,9 @@ function ActivateModal({ student, centerId, onClose, onActivated }: {
     (async () => {
       setPriceLoading(true);
       setError("");
-      const price = await loadTcfMonthlyPrice(centerId);
-      setMonthlyPrice(price);
+      const details = await loadTcfPricingDetails(centerId);
+      setMonthlyPrice(details.monthlyPrice);
+      setExtraFees(details.extraFees);
 
       const { data: filiere } = await supabase
         .from("filieres")
