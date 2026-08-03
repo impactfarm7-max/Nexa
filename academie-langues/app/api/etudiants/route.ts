@@ -38,6 +38,92 @@ function generatePassword(): string {
   return `Nexa${digits}`;
 }
 
+type CallerAuth = {
+  userId: string;
+  centerId: string | null;
+  isGlobalAdmin: boolean;
+  canCreateStudents: boolean;
+  canHardDeleteStudents: boolean;
+};
+
+/** Managers + staff/trainer avec permission `etudiants`. Hard-delete = managers seulement. */
+async function authorizeStudentManagement(token: string | undefined): Promise<
+  | { auth: CallerAuth; error: null }
+  | { auth: null; error: NextResponse }
+> {
+  if (!token) {
+    return { auth: null, error: NextResponse.json({ error: "Non authentifié." }, { status: 401 }) };
+  }
+
+  const { data: callerData, error: callerErr } = await supabaseAdmin.auth.getUser(token);
+  if (callerErr || !callerData.user) {
+    return { auth: null, error: NextResponse.json({ error: "Session invalide." }, { status: 401 }) };
+  }
+
+  const userId = callerData.user.id;
+  const { data: callerProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("role, center_id")
+    .eq("id", userId)
+    .single();
+
+  const { data: centerMembership } = await supabaseAdmin
+    .from("center_users")
+    .select("center_id, role, permissions")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  const centerId = (centerMembership?.center_id || callerProfile?.center_id) as string | null;
+  const role = callerProfile?.role || "";
+  const isGlobalAdmin = role === "admin";
+  const isManager = role === "center_manager" || role === "campus_manager";
+
+  let hasEtudiantsPerm = false;
+  if (!isGlobalAdmin && !isManager && (role === "staff" || role === "trainer") && centerId) {
+    const membershipPerms = Array.isArray(centerMembership?.permissions)
+      ? (centerMembership!.permissions as string[])
+      : [];
+    if (membershipPerms.includes("etudiants")) {
+      hasEtudiantsPerm = true;
+    } else {
+      const { data: permRow } = await supabaseAdmin
+        .from("staff_permissions")
+        .select("permission")
+        .eq("profile_id", userId)
+        .eq("permission", "etudiants")
+        .maybeSingle();
+      hasEtudiantsPerm = Boolean(permRow);
+    }
+  }
+
+  const canCreateStudents = isGlobalAdmin || isManager || hasEtudiantsPerm;
+  const canHardDeleteStudents = isGlobalAdmin || isManager;
+
+  if (!canCreateStudents && !canHardDeleteStudents) {
+    return {
+      auth: null,
+      error: NextResponse.json({ error: "Action non autorisée." }, { status: 403 }),
+    };
+  }
+  if (!centerId && !isGlobalAdmin) {
+    return {
+      auth: null,
+      error: NextResponse.json({ error: "Centre introuvable pour ce compte." }, { status: 403 }),
+    };
+  }
+
+  return {
+    auth: {
+      userId,
+      centerId,
+      isGlobalAdmin,
+      canCreateStudents,
+      canHardDeleteStudents,
+    },
+    error: null,
+  };
+}
+
 function shortDureeToNiveauFields(valeur: number, unite: string | null) {
   const v = Math.max(0, Math.floor(Number(valeur) || 0));
   return {
@@ -49,36 +135,16 @@ function shortDureeToNiveauFields(valeur: number, unite: string | null) {
 
 export async function POST(req: NextRequest) {
   try {
-    // ---- 1. Authentifier l'appelant ----
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     const token = authHeader?.replace("Bearer ", "");
-    if (!token) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
-
-    const { data: callerData, error: callerErr } = await supabaseAdmin.auth.getUser(token);
-    if (callerErr || !callerData.user) return NextResponse.json({ error: "Session invalide." }, { status: 401 });
-
-    const { data: callerProfile } = await supabaseAdmin
-      .from("profiles").select("role, center_id").eq("id", callerData.user.id).single();
-
-    const { data: centerMembership } = await supabaseAdmin
-      .from("center_users")
-      .select("center_id, role")
-      .eq("user_id", callerData.user.id)
-      .maybeSingle();
-
-    const callerCenterId = (centerMembership?.center_id || callerProfile?.center_id) as string | null;
-    const isGlobalAdmin = callerProfile?.role === "admin";
-    const isCenterStaff = Boolean(
-      centerMembership?.center_id ||
-      (callerProfile?.center_id && ["center_manager", "campus_manager"].includes(callerProfile?.role || ""))
-    );
-
-    if (!isGlobalAdmin && !isCenterStaff) {
+    const { auth, error: authError } = await authorizeStudentManagement(token);
+    if (authError || !auth) return authError!;
+    if (!auth.canCreateStudents) {
       return NextResponse.json({ error: "Action non autorisée." }, { status: 403 });
     }
-    if (!callerCenterId && !isGlobalAdmin) {
-      return NextResponse.json({ error: "Centre introuvable pour ce compte." }, { status: 403 });
-    }
+
+    const isGlobalAdmin = auth.isGlobalAdmin;
+    const callerCenterId = auth.centerId;
 
     // ---- 2. Lire et valider le corps ----
     const body = await req.json();
@@ -159,7 +225,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Cursus : prix formation + frais du niveau (payment_plan.fees)
+    // Cursus : prix formation + frais du niveau (payment_plan.fees) ou de la filière (uniforme)
     let cursusPaymentPlan: unknown = null;
     if (isCursusFiliere && niveau_id) {
       const feeMode = isCursusFeeMode(filiere.cursus_fee_mode)
@@ -170,11 +236,13 @@ export async function POST(req: NextRequest) {
         .select("tuition_fee, payment_plan")
         .eq("id", niveau_id)
         .maybeSingle();
-      cursusPaymentPlan = nivRow?.payment_plan ?? null;
+      // Uniforme → échéancier filière ; par_niveau → échéancier du niveau
+      cursusPaymentPlan =
+        feeMode === "uniforme" ? filiere.payment_plan : (nivRow?.payment_plan ?? null);
       // Frais configurés par niveau ou par filière (UI « Frais supplémentaires »)
       const extras =
         feeMode === "par_niveau"
-          ? sumPaymentPlanFees(cursusPaymentPlan)
+          ? sumPaymentPlanFees(nivRow?.payment_plan)
           : sumPaymentPlanFees(filiere.payment_plan);
       resolvedTuition = resolveCursusTuition({
         feeMode,
@@ -469,7 +537,7 @@ export async function POST(req: NextRequest) {
       p_niveau_id: resolvedNiveauId,
       p_groupe_id: resolvedGroupeId,
       p_tuition_fee: resolvedTuition,
-      p_creator: callerData.user.id,
+      p_creator: auth.userId,
       p_campus_id: resolvedCampusId,
     });
 
@@ -530,7 +598,7 @@ export async function POST(req: NextRequest) {
         p_enrollment_id: enrollmentId,
         p_amount: couponDiscount,
         p_reason: `Coupon ${couponCode.toUpperCase()}`,
-        p_actor: callerData.user.id,
+        p_actor: auth.userId,
       });
       if (discErr) {
         console.warn("[etudiants] apply_enrollment_discount:", discErr.message);
@@ -577,33 +645,17 @@ export async function DELETE(req: NextRequest) {
   try {
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     const token = authHeader?.replace("Bearer ", "");
-    if (!token) return NextResponse.json({ error: "Non authentifié." }, { status: 401 });
-
-    const { data: callerData, error: callerErr } = await supabaseAdmin.auth.getUser(token);
-    if (callerErr || !callerData.user) return NextResponse.json({ error: "Session invalide." }, { status: 401 });
-
-    const { data: callerProfile } = await supabaseAdmin
-      .from("profiles")
-      .select("role, center_id")
-      .eq("id", callerData.user.id)
-      .single();
-
-    const { data: centerMembership } = await supabaseAdmin
-      .from("center_users")
-      .select("center_id, role")
-      .eq("user_id", callerData.user.id)
-      .maybeSingle();
-
-    const callerCenterId = (centerMembership?.center_id || callerProfile?.center_id) as string | null;
-    const isGlobalAdmin = callerProfile?.role === "admin";
-    const isCenterStaff = Boolean(
-      centerMembership?.center_id ||
-      (callerProfile?.center_id && ["center_manager", "campus_manager"].includes(callerProfile?.role || ""))
-    );
-
-    if (!isGlobalAdmin && !isCenterStaff) {
-      return NextResponse.json({ error: "Action non autorisée." }, { status: 403 });
+    const { auth, error: authError } = await authorizeStudentManagement(token);
+    if (authError || !auth) return authError!;
+    if (!auth.canHardDeleteStudents) {
+      return NextResponse.json(
+        { error: "Seul un directeur peut supprimer définitivement un étudiant." },
+        { status: 403 }
+      );
     }
+
+    const isGlobalAdmin = auth.isGlobalAdmin;
+    const callerCenterId = auth.centerId;
 
     const studentId = new URL(req.url).searchParams.get("id");
     if (!studentId) return NextResponse.json({ error: "ID manquant." }, { status: 400 });

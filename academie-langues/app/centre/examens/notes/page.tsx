@@ -1199,12 +1199,12 @@ export default function GradeBookPage() {
           {contextReady && (
             <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
               {saveSuccess && (
-                <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-600">
-                  <CheckCircle2 size={12} /> Sauvegardé
+                <span className="flex items-center gap-1 text-[10px] font-semibold text-neutral-600">
+                  <CheckCircle2 size={12} /> Enregistré · notes verrouillées
                 </span>
               )}
-              {dirtyCount > 0 && (
-                <span className="text-[10px] font-semibold text-amber-600">{dirtyCount} modifié{dirtyCount > 1 ? "s" : ""}</span>
+              {dirtyCount > 0 && !notesLocked && (
+                <span className="text-[10px] font-semibold text-neutral-500">{dirtyCount} modifié{dirtyCount > 1 ? "s" : ""}</span>
               )}
               <button
                 type="button"
@@ -1498,10 +1498,10 @@ export default function GradeBookPage() {
                     onClick={() => { setNotesLocked(false); setSaveSuccess(false); }}
                     className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-700 hover:bg-black/[0.03] flex items-center gap-1.5"
                   >
-                    <Pencil size={11} /> Modifier
+                    <Lock size={11} /> Modifier
                   </button>
                 ) : (
-                  <span className="h-8 px-3 rounded-lg border border-amber-200 bg-amber-50 text-[10px] font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1.5">
+                  <span className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-600 flex items-center gap-1.5">
                     <Pencil size={11} /> Édition
                   </span>
                 )}
@@ -1688,18 +1688,39 @@ export default function GradeBookPage() {
               <div className="flex flex-col items-center justify-center py-20 text-neutral-400">
                 <Users size={36} className="mb-3 opacity-40" />
                 <p className="text-xs font-semibold uppercase tracking-wider">
-                  {studentRows.length === 0 ? "Aucun étudiant dans cette classe" : "Aucun résultat"}
+                  {studentRows.length === 0
+                    ? "Aucun étudiant dans cette classe"
+                    : "Aucun résultat pour cette recherche"}
                 </p>
+                {studentRows.length === 0 && (
+                  <p className="text-[11px] text-neutral-400 mt-2 max-w-sm text-center">
+                    Vérifiez que des élèves actifs sont inscrits dans la classe sélectionnée.
+                  </p>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
+                {notesLocked && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-black/[0.06] bg-white px-4 py-2.5">
+                    <p className="text-xs font-medium text-neutral-500 inline-flex items-center gap-1.5">
+                      <Lock size={13} className="text-neutral-400" />
+                      Notes verrouillées — cliquez sur Modifier pour éditer la grille.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setNotesLocked(false); setSaveSuccess(false); }}
+                      className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-700 hover:bg-black/[0.03] flex items-center gap-1.5"
+                    >
+                      <Pencil size={11} /> Modifier
+                    </button>
+                  </div>
+                )}
                 <div className="flex justify-end">
                   <button
                     type="button"
                     onClick={addSuplColumn}
                     disabled={notesLocked}
-                    className="h-8 px-3 rounded-lg border border-dashed border-orange-200 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 hover:bg-orange-50 bg-white disabled:opacity-40 disabled:pointer-events-none"
-                    style={{ color: ORANGE }}
+                    className="h-8 px-3 rounded-lg border border-dashed border-black/[0.12] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 hover:bg-black/[0.02] bg-white disabled:opacity-40 disabled:pointer-events-none text-neutral-600"
                   >
                     <Plus size={13} /> Ajouter note supl.
                   </button>

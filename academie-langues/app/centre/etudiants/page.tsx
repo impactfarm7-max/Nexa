@@ -109,7 +109,7 @@ function statusLabelFr(st: StudentRow["center_status"]) {
 function toStudentExportRows(list: StudentRow[]): ExportStudentRow[] {
   return list.map((s) => ({
     nom: (s.nom || "").toUpperCase(),
-    prenom: s.prenom,
+    prenom: (s.prenom || "").toUpperCase(),
     email: s.email || "",
     telephone: s.phone || "",
     filiere: (s.enrollments[0]?.filiere_name_raw || "").toUpperCase(),
@@ -249,7 +249,6 @@ export default function CenterStudentsPage() {
   const [shareBusy,          setShareBusy]          = useState(false);
   const [waPhoneOpen,        setWaPhoneOpen]        = useState(false);
   const [waPhone,            setWaPhone]            = useState("");
-  const [identityEditTrigger, setIdentityEditTrigger] = useState(0);
 
   const selectedStudent   = students.find((s) => s.id === selectedStudentId) ?? null;
   const selectedEnrollment = selectedStudent?.enrollments.find((e) => e.id === selectedEnrollmentId) ?? null;
@@ -436,10 +435,10 @@ export default function CenterStudentsPage() {
                     Modifier le dossier
                   </p>
                   <h1
-                    className="text-xl sm:text-2xl font-extrabold tracking-tight leading-tight truncate"
+                    className="text-xl sm:text-2xl font-extrabold tracking-tight leading-tight truncate uppercase"
                     style={{ color: BLUE }}
                   >
-                    {selectedStudent.prenom} {(selectedStudent.nom || "").toUpperCase()}
+                    {selectedStudent.prenom} {selectedStudent.nom}
                   </h1>
                 </div>
               </div>
@@ -467,26 +466,6 @@ export default function CenterStudentsPage() {
                   </button>
                 ))}
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab("identity");
-                    setIdentityEditTrigger((n) => n + 1);
-                  }}
-                  className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors"
-                >
-                  <Edit3 size={12} /> Modifier
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleStatus(
-                    selectedStudent.id,
-                    selectedStudent.center_status === "active" ? "paused" : "active",
-                  )}
-                  className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 hover:bg-black/[0.03] transition-colors"
-                >
-                  {selectedStudent.center_status === "active" ? "Suspendre" : "Réactiver"}
-                </button>
                 {selectedStudent.center_status !== "revoked" && (
                   <button
                     type="button"
@@ -619,7 +598,7 @@ export default function CenterStudentsPage() {
                       <CenterTableRow key={s.id} index={i}>
                         <td className="px-4 py-3.5 min-w-0 print:break-inside-avoid">
                           <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: BLUE }}>
-                            {s.prenom} {(s.nom || "").toUpperCase()}
+                            {`${s.prenom || ""} ${s.nom || ""}`.trim().toUpperCase()}
                           </p>
                           <p className="text-[11px] text-neutral-400 font-medium mt-0.5 truncate">{s.email || "—"}</p>
                         </td>
@@ -701,7 +680,7 @@ export default function CenterStudentsPage() {
                   <StudentIdentityTab
                     studentId={selectedStudent.id}
                     enrollmentId={selectedEnrollment?.id}
-                    studentName={`${selectedStudent.prenom} ${(selectedStudent.nom || "").toUpperCase()}`}
+                    studentName={`${selectedStudent.prenom || ""} ${selectedStudent.nom || ""}`.trim().toUpperCase()}
                     studentEmail={selectedStudent.email}
                     studentPhone={selectedStudent.phone}
                     avatarUrl={selectedStudent.avatar_url}
@@ -722,7 +701,6 @@ export default function CenterStudentsPage() {
                     centerId={centerId!}
                     onAvatarUpdated={handleAvatarUpdated}
                     onEnrollmentUpdated={() => loadStudents(centerId!, { force: true })}
-                    editTrigger={identityEditTrigger}
                   />
                 )}
                 {activeTab === "finance" && selectedEnrollment && (
@@ -730,7 +708,7 @@ export default function CenterStudentsPage() {
                     enrollmentId={selectedEnrollment.id}
                     tuitionFee={selectedEnrollment.tuition_fee}
                     centerId={centerId!}
-                    studentName={`${selectedStudent.prenom} ${(selectedStudent.nom || "").toUpperCase()}`}
+                    studentName={`${selectedStudent.prenom || ""} ${selectedStudent.nom || ""}`.trim().toUpperCase()}
                     filiereName={(selectedEnrollment.filiere_name_raw || selectedEnrollment.filiere_name || "").toUpperCase()}
                     onPaid={() => loadStudents(centerId!)}
                   />
@@ -865,8 +843,8 @@ function StudentViewModal({
               )}
             </div>
             <div className="min-w-0 text-center sm:text-left">
-              <h4 className="text-2xl font-black tracking-tight" style={{ color: BLUE }}>
-                {student.prenom} {(student.nom || "").toUpperCase()}
+              <h4 className="text-2xl font-black tracking-tight uppercase" style={{ color: BLUE }}>
+                {student.prenom} {student.nom}
               </h4>
               <p className="text-sm text-neutral-500 mt-1 font-medium">{statusLabel}</p>
               <p className="text-sm text-neutral-500 mt-2 font-medium truncate">{student.email || "—"}</p>

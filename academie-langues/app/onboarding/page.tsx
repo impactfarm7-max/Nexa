@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../utils/supabase"; 
 import { ShieldCheck, UserCheck, CheckCircle, Lock } from "lucide-react";
+import { BRAND } from "@/app/utils/brand";
 
 export default function Onboarding() {
   const router = useRouter();
@@ -127,9 +128,11 @@ export default function Onboarding() {
         <div className="absolute inset-0 bg-gradient-to-br from-orange-600/20 to-transparent opacity-50" />
         
         <div className="relative z-10 max-w-md">
-          <div className="w-16 h-16 bg-orange-500 rounded-2xl flex items-center justify-center mb-10 shadow-xl">
-             <img src="/icon.png" alt="NEXA Logo" className="w-10 h-10 rounded-xl" />
-          </div>
+          <img
+            src={BRAND.logo}
+            alt="NEXA"
+            className="w-16 h-16 rounded-2xl mb-10 shadow-xl object-cover"
+          />
           
           <h2 className="text-4xl font-black text-white leading-tight mb-8">
             Dernière étape pour sécuriser votre <span className="text-orange-500">Espace Étudiant.</span>

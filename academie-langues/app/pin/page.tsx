@@ -82,13 +82,16 @@ export default function PinPage() {
       window.localStorage.removeItem("iag_pin_next");
 
       const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session: pinSession } } = await supabase.auth.getSession();
 
-      if (user) {
+      if (user && pinSession?.access_token) {
         const res = await fetch("/api/sessions/check", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${pinSession.access_token}`,
+          },
           body: JSON.stringify({
-            userId: user.id,
             device: navigator.userAgent,
             ip: "",
           }),

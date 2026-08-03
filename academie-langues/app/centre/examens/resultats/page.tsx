@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  ArrowLeft, Loader2, Trophy, Mail, FileText, UserX, CheckSquare, Square
+  ArrowLeft, Loader2, Trophy, Mail, FileText, UserX, CheckSquare, Square, Calendar,
 } from "lucide-react";
+import Link from "next/link";
 import { supabase } from "@/app/utils/supabase";
 import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
-const BLUE = "#11224E";
-const ORANGE = "#eb670e";
+import { BLUE, PAGE_BG } from "@/app/centre/center-page-ui";
 
 type ResultRow = {
   exam_session_id: string;
@@ -25,6 +25,7 @@ type ResultRow = {
   certificate_id: string | null;
   pdf_url: string | null;
   emailed_at: string | null;
+  session_title?: string | null;
 };
 
 type LeaderRow = { user_id: string; name: string; composite_score: number; rank: number | null };
@@ -48,6 +49,8 @@ export default function TcfExamResultsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
   const [message, setMessage] = useState("");
+  const [sessionFilter, setSessionFilter] = useState("all");
+  const [search, setSearch] = useState("");
 
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -76,6 +79,37 @@ export default function TcfExamResultsPage() {
     })();
   }, [load]);
 
+  const sessionOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of results) {
+      const key = `ex-${r.examen_id}`;
+      if (!map.has(key)) map.set(key, `Officiel ${String(r.examen_id).padStart(2, "0")}`);
+    }
+    for (const n of notSubmitted) {
+      const key = `title:${n.session_title}`;
+      if (!map.has(key)) map.set(key, n.session_title);
+    }
+    return [...map.entries()].map(([id, label]) => ({ id, label }));
+  }, [results, notSubmitted]);
+
+  const filteredResults = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return results.filter((r) => {
+      if (sessionFilter.startsWith("ex-") && sessionFilter !== `ex-${r.examen_id}`) return false;
+      if (!q) return true;
+      return `${r.student_name} ${r.email || ""}`.toLowerCase().includes(q);
+    });
+  }, [results, sessionFilter, search]);
+
+  const filteredNotSubmitted = useMemo(() => {
+    if (sessionFilter === "all") return notSubmitted;
+    if (sessionFilter.startsWith("title:")) {
+      const title = sessionFilter.slice("title:".length);
+      return notSubmitted.filter((n) => n.session_title === title);
+    }
+    return notSubmitted;
+  }, [notSubmitted, sessionFilter]);
+
   const toggleSelect = (id: string) => {
     setSelected(prev => {
       const n = new Set(prev);
@@ -85,7 +119,7 @@ export default function TcfExamResultsPage() {
   };
 
   const toggleAll = () => {
-    const withCert = results.filter(r => r.certificate_id);
+    const withCert = filteredResults.filter(r => r.certificate_id);
     if (selected.size === withCert.length) setSelected(new Set());
     else setSelected(new Set(withCert.map(r => r.exam_session_id)));
   };
@@ -117,130 +151,179 @@ export default function TcfExamResultsPage() {
     if (res.ok) await load();
   };
 
-  if (loading) return <CenterPageLoading />;
+  if (loading) return <CenterPageLoading className="bg-[#FFFBF7]" />;
 
   if (!isTcfCanadaCenter(centerType)) {
     return (
-      <div className="min-h-[100dvh] bg-white p-12 text-center">
-          <p className="text-sm font-bold text-neutral-500">Résultats examens réservés aux centres TCF Canada.</p>
+      <div className="min-h-[100dvh] p-12 text-center" style={{ backgroundColor: PAGE_BG }}>
+        <p className="text-sm font-semibold text-neutral-500">Résultats examens réservés aux centres TCF Canada.</p>
+        <Link href="/centre/examens/examensuniversels" className="mt-4 inline-block text-xs font-bold uppercase tracking-wider hover:underline" style={{ color: BLUE }}>
+          Retour
+        </Link>
       </div>
     );
   }
 
+  const empty = filteredResults.length === 0 && filteredNotSubmitted.length === 0;
+
   return (
-    <div className="min-h-[100dvh] bg-white text-[#11224E] flex flex-col h-screen overflow-hidden">
-        <header className="shrink-0 border-b bg-white/80 px-6 py-5 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <a href="/centre/examens/examensuniversels" className="p-1 rounded-lg hover:bg-neutral-100"><ArrowLeft size={14} /></a>
-              <Trophy size={16} style={{ color: ORANGE }} />
-              <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Examens TCF</span>
-            </div>
-            <h1 className="text-2xl font-black">Résultats & certificats</h1>
+    <div className="min-h-[100dvh] flex flex-col h-screen overflow-hidden text-[#11224E]" style={{ backgroundColor: PAGE_BG }}>
+      <header className="shrink-0 border-b border-black/[0.06] px-6 py-5 flex items-center justify-between gap-3" style={{ backgroundColor: PAGE_BG }}>
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <Link href="/centre/examens/examensuniversels" className="p-1 rounded-lg hover:bg-black/[0.03]"><ArrowLeft size={14} /></Link>
+            <Trophy size={16} className="text-neutral-400" />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Examens TCF</span>
           </div>
+          <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: BLUE }}>Résultats & certificats</h1>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Link
+            href="/centre/examens/planning"
+            className="h-9 px-3 rounded-xl border border-black/[0.08] bg-white text-xs font-semibold flex items-center gap-1.5 hover:bg-black/[0.03]"
+          >
+            <Calendar size={14} /> Planning
+          </Link>
           <button onClick={sendCertificates} disabled={sending || selected.size === 0}
-            className="h-9 px-4 rounded-xl text-white text-xs font-black uppercase flex items-center gap-1.5 disabled:opacity-40"
-            style={{ backgroundColor: ORANGE }}>
+            className="h-9 px-4 rounded-xl text-white text-xs font-semibold flex items-center gap-1.5 disabled:opacity-40"
+            style={{ backgroundColor: BLUE }}>
             {sending ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
             Envoyer ({selected.size})
           </button>
-        </header>
-
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
-          {message && <p className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2">{message}</p>}
-
-          {leaderboard.length > 0 && (
-            <div className="bg-white border rounded-2xl p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3">Classement du mois</p>
-              <div className="flex flex-wrap gap-2">
-                {leaderboard.slice(0, 10).map(l => (
-                  <div key={l.user_id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl border bg-neutral-50">
-                    <span className="text-xs font-black" style={{ color: ORANGE }}>#{l.rank}</span>
-                    <span className="text-[10px] font-bold">{l.name}</span>
-                    <span className="text-[9px] text-neutral-400">{l.composite_score} pts</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {notSubmitted.length > 0 && (
-            <div className="bg-white border rounded-2xl p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3">Non passés</p>
-              <div className="space-y-2">
-                {notSubmitted.map(n => (
-                  <div key={n.assignment_id} className="flex items-center justify-between border rounded-xl px-3 py-2">
-                    <div>
-                      <p className="text-xs font-black">{n.name}</p>
-                      <p className="text-[10px] text-neutral-400">{n.session_title} · {new Date(n.scheduled_at).toLocaleDateString("fr-FR")}</p>
-                    </div>
-                    <button onClick={() => markNoShow(n.assignment_id)} className="text-[10px] font-black uppercase flex items-center gap-1 text-red-600 hover:bg-red-50 px-2 py-1 rounded-lg">
-                      <UserX size={12} /> Absent
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="bg-white border rounded-2xl overflow-hidden">
-            <div className="px-5 py-3 border-b flex items-center gap-2">
-              <button onClick={toggleAll} className="p-1"><CheckSquare size={14} className="text-neutral-400" /></button>
-              <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{results.length} résultat(s)</p>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-[9px] font-black uppercase text-neutral-400 border-b">
-                    <th className="p-3 w-8" />
-                    <th className="p-3">Élève</th>
-                    <th className="p-3">Examen</th>
-                    <th className="p-3">Date</th>
-                    <th className="p-3">CE</th>
-                    <th className="p-3">CO</th>
-                    <th className="p-3">EE</th>
-                    <th className="p-3">EO</th>
-                    <th className="p-3">Score</th>
-                    <th className="p-3">Cert.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {results.map(r => (
-                    <tr key={r.exam_session_id} className="border-b border-neutral-50 hover:bg-neutral-50/50">
-                      <td className="p-3">
-                        {r.certificate_id && (
-                          <button onClick={() => toggleSelect(r.exam_session_id)}>
-                            {selected.has(r.exam_session_id) ? <CheckSquare size={14} style={{ color: ORANGE }} /> : <Square size={14} className="text-neutral-300" />}
-                          </button>
-                        )}
-                      </td>
-                      <td className="p-3 text-xs font-bold">{r.student_name}</td>
-                      <td className="p-3 text-[10px] font-bold">Officiel {String(r.examen_id).padStart(2, "0")}</td>
-                      <td className="p-3 text-[10px] text-neutral-500">{r.finished_at ? new Date(r.finished_at).toLocaleDateString("fr-FR") : "—"}</td>
-                      <td className="p-3 text-[10px]">{extractScore(r.ce)}</td>
-                      <td className="p-3 text-[10px]">{extractScore(r.co)}</td>
-                      <td className="p-3 text-[10px]">{extractScore(r.ee)}</td>
-                      <td className="p-3 text-[10px]">{extractScore(r.eo)}</td>
-                      <td className="p-3 text-[10px] font-black" style={{ color: BLUE }}>{r.composite_score}</td>
-                      <td className="p-3">
-                        {r.pdf_url ? (
-                          <a href={r.pdf_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600">
-                            <FileText size={12} /> PDF{r.emailed_at ? " ✓" : ""}
-                          </a>
-                        ) : (
-                          <span className="text-[10px] text-neutral-300">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                  {results.length === 0 && (
-                    <tr><td colSpan={10} className="p-8 text-center text-xs text-neutral-400 italic">Aucun résultat pour le moment.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-6 space-y-5">
+        {message && (
+          <p className="text-xs font-semibold text-neutral-700 bg-white border border-black/[0.06] rounded-xl px-4 py-2">
+            {message}
+          </p>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={sessionFilter}
+            onChange={(e) => setSessionFilter(e.target.value)}
+            className="h-9 px-3 rounded-xl border border-black/[0.08] bg-white text-xs font-semibold outline-none"
+          >
+            <option value="all">Toutes les séances</option>
+            {sessionOptions.map((o) => (
+              <option key={o.id} value={o.id}>{o.label}</option>
+            ))}
+          </select>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Rechercher un élève…"
+            className="h-9 px-3 rounded-xl border border-black/[0.08] bg-white text-xs font-medium outline-none min-w-[12rem]"
+          />
+        </div>
+
+        {empty ? (
+          <div className="rounded-2xl border border-dashed border-black/[0.08] bg-white px-6 py-16 text-center">
+            <p className="text-sm font-semibold text-neutral-500">Aucun résultat pour le moment.</p>
+            <p className="text-xs text-neutral-400 mt-2">Créez une séance et assignez plusieurs élèves pour commencer.</p>
+            <Link
+              href="/centre/examens/planning"
+              className="mt-5 inline-flex h-9 px-4 rounded-xl text-xs font-semibold text-white items-center gap-1.5"
+              style={{ backgroundColor: BLUE }}
+            >
+              <Calendar size={14} /> Créer une séance
+            </Link>
+          </div>
+        ) : (
+          <>
+            {leaderboard.length > 0 && (
+              <div className="bg-white border border-black/[0.06] rounded-2xl p-5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-3">Classement du mois</p>
+                <div className="flex flex-wrap gap-2">
+                  {leaderboard.slice(0, 10).map(l => (
+                    <div key={l.user_id} className="flex items-center gap-2 px-3 py-1.5 rounded-xl border border-black/[0.06] bg-neutral-50">
+                      <span className="text-xs font-bold text-neutral-500">#{l.rank}</span>
+                      <span className="text-[10px] font-semibold">{l.name}</span>
+                      <span className="text-[9px] text-neutral-400">{l.composite_score} pts</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {filteredNotSubmitted.length > 0 && (
+              <div className="bg-white border border-black/[0.06] rounded-2xl p-5">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400 mb-3">Non passés</p>
+                <div className="space-y-2">
+                  {filteredNotSubmitted.map(n => (
+                    <div key={n.assignment_id} className="flex items-center justify-between border border-black/[0.06] rounded-xl px-3 py-2">
+                      <div>
+                        <p className="text-xs font-semibold">{n.name}</p>
+                        <p className="text-[10px] text-neutral-400">{n.session_title} · {new Date(n.scheduled_at).toLocaleDateString("fr-FR")}</p>
+                      </div>
+                      <button onClick={() => markNoShow(n.assignment_id)} className="text-[10px] font-bold uppercase flex items-center gap-1 text-neutral-600 hover:bg-neutral-50 px-2 py-1 rounded-lg">
+                        <UserX size={12} /> Absent
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white border border-black/[0.06] rounded-2xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-black/[0.06] flex items-center gap-2">
+                <button type="button" onClick={toggleAll} className="p-1"><CheckSquare size={14} className="text-neutral-400" /></button>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">{filteredResults.length} résultat(s)</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="text-[9px] font-bold uppercase text-neutral-400 border-b border-black/[0.06]">
+                      <th className="p-3 w-8" />
+                      <th className="p-3">Élève</th>
+                      <th className="p-3">Examen</th>
+                      <th className="p-3">Date</th>
+                      <th className="p-3">CE</th>
+                      <th className="p-3">CO</th>
+                      <th className="p-3">EE</th>
+                      <th className="p-3">EO</th>
+                      <th className="p-3">Score</th>
+                      <th className="p-3">Cert.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredResults.map(r => (
+                      <tr key={r.exam_session_id} className="border-b border-neutral-50 hover:bg-neutral-50/50">
+                        <td className="p-3">
+                          {r.certificate_id && (
+                            <button type="button" onClick={() => toggleSelect(r.exam_session_id)}>
+                              {selected.has(r.exam_session_id) ? <CheckSquare size={14} style={{ color: BLUE }} /> : <Square size={14} className="text-neutral-300" />}
+                            </button>
+                          )}
+                        </td>
+                        <td className="p-3 text-xs font-semibold uppercase">{r.student_name}</td>
+                        <td className="p-3 text-[10px] font-semibold">Officiel {String(r.examen_id).padStart(2, "0")}</td>
+                        <td className="p-3 text-[10px] text-neutral-500">{r.finished_at ? new Date(r.finished_at).toLocaleDateString("fr-FR") : "—"}</td>
+                        <td className="p-3 text-[10px]">{extractScore(r.ce)}</td>
+                        <td className="p-3 text-[10px]">{extractScore(r.co)}</td>
+                        <td className="p-3 text-[10px]">{extractScore(r.ee)}</td>
+                        <td className="p-3 text-[10px]">{extractScore(r.eo)}</td>
+                        <td className="p-3 text-[10px] font-bold" style={{ color: BLUE }}>{r.composite_score}</td>
+                        <td className="p-3">
+                          {r.pdf_url ? (
+                            <a href={r.pdf_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-[10px] font-semibold text-neutral-600">
+                              <FileText size={12} /> PDF{r.emailed_at ? " ✓" : ""}
+                            </a>
+                          ) : (
+                            <span className="text-[10px] text-neutral-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

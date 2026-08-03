@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { STAFF_PERMISSION_ROUTES } from "@/app/utils/student-routes";
-import { filterModulePermissions, ensureTcfCommunautePermission } from "@/app/data/tcf-teaching-subjects";
+import { filterModulePermissions, ensureTcfCommunautePermission, ensureDefaultLivesPermission, TRAINER_DEFAULT_MODULE_PERMISSIONS } from "@/app/data/tcf-teaching-subjects";
 import { normalizeCenterType, type CenterTypeCode } from "@/app/data/center-types";
 import { getCenterMeCache, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import { BRAND } from "@/app/utils/brand";
@@ -50,7 +50,7 @@ const MANAGER_NAV: NavItem[] = [
   { label: "Étudiants",        icon: Users,           path: "/centre/etudiants",                  permKey: "etudiants" },
   { label: "Finance",          icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
   { label: "Planning horaire", icon: Calendar,        path: "/centre/cours/planning",             permKey: "planning" },
-  { label: "Sessions Live",    icon: Video,           path: "/centre/lives",                      permKey: "planning" },
+  { label: "Sessions Live",    icon: Video,           path: "/centre/lives",                      permKey: "lives" },
   { label: "Examens / Notes",  icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
   { label: "Rapports",         icon: BarChart3,       path: "/centre/rapports",                   permKey: "rapports" },
   { label: "Communauté",       icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
@@ -70,7 +70,7 @@ const TRAINER_DEFAULT_NAV: NavItem[] = [
     ],
   },
   { label: "Planning",       icon: Calendar,      path: "/centre/cours/planning",             permKey: "planning" },
-  { label: "Sessions Live",  icon: Video,         path: "/centre/lives",                      permKey: null },
+  { label: "Sessions Live",  icon: Video,         path: "/centre/lives",                      permKey: "lives" },
   { label: "Examens / Notes", icon: ClipboardList, path: "/centre/examens/examensuniversels",  permKey: "examens" },
   { label: "Communauté",     icon: MessageSquare, path: "/centre/communaute",                 permKey: "communaute" },
 ];
@@ -105,7 +105,7 @@ const TCF_MANAGER_NAV: NavItem[] = [
   { label: "Examens / Notes", icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
   { label: "Finance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
   { label: "Communauté",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
-  { label: "Sessions Live", icon: Video,           path: "/centre/lives",                      permKey: "planning" },
+  { label: "Sessions Live", icon: Video,           path: "/centre/lives",                      permKey: "lives" },
   { label: "Paramètres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
@@ -113,7 +113,7 @@ const TCF_TRAINER_NAV: NavItem[] = [
   { label: "Mon Tableau de bord", icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
   TCF_FORMATION_ITEM,
   { label: "Examens / Notes",     icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
-  { label: "Sessions Live",       icon: Video,           path: "/centre/lives",                      permKey: null },
+  { label: "Sessions Live",       icon: Video,           path: "/centre/lives",                      permKey: "lives" },
   { label: "Communauté",          icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
 ];
 
@@ -136,7 +136,7 @@ const SHORT_MANAGER_NAV: NavItem[] = [
   { label: "Examens / Notes", icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
   { label: "Finance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
   { label: "Communauté",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
-  { label: "Sessions Live", icon: Video,           path: "/centre/lives",                      permKey: "planning" },
+  { label: "Sessions Live", icon: Video,           path: "/centre/lives",                      permKey: "lives" },
   { label: "Paramètres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
@@ -186,7 +186,7 @@ function readSidebarCache() {
   const staffPermissions =
     FULL_ACCESS_ROLES.includes(role)
       ? ["finance", "etudiants", "filieres", "staff", "communaute", "parametres", "cours", "planning", "examens", "rapports", "activities", "lives"]
-      : ensureTcfCommunautePermission(permissions, centerType === "tcf_canada" ? "tcf_canada" : null);
+      : ensureDefaultLivesPermission(ensureTcfCommunautePermission(permissions, centerType === "tcf_canada" ? "tcf_canada" : null));
 
   return {
     centerId: center.id,
@@ -324,9 +324,9 @@ function CenterSidebarInner() {
         perms = ensureTcfCommunautePermission(perms, center?.center_type);
       }
       if (profile.role === "trainer" && perms.length === 0) {
-        perms = ["etudiants", "filieres", "communaute"];
+        perms = [...TRAINER_DEFAULT_MODULE_PERMISSIONS];
       }
-      setStaffPermissions(perms);
+      setStaffPermissions(ensureDefaultLivesPermission(perms));
     } else if (FULL_ACCESS_ROLES.includes(profile.role)) {
       setStaffPermissions(["finance","etudiants","filieres","staff","communaute",
         "parametres","cours","planning","examens","rapports","activities","lives"]);

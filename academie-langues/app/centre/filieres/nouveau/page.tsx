@@ -187,10 +187,10 @@ function formatPaymentPlan(fees: FeeDraft[], installments: PaymentInstallment[])
   return {
     fees: fees
       .filter((f) => f.label.trim() && parseAmount(f.montant) > 0)
-      .map((f) => ({ label: f.label.trim(), montant: Number(f.montant) })),
+      .map((f) => ({ label: f.label.trim(), montant: parseAmount(f.montant) })),
     installments: installments
       .filter((i) => i.montant.trim() !== "")
-      .map((i) => ({ montant: Number(i.montant), jours: Number(i.jours || 0) })),
+      .map((i) => ({ montant: parseAmount(i.montant), jours: Number(i.jours || 0) })),
   };
 }
 
@@ -803,6 +803,12 @@ function NouveauProgrammeForm() {
     if (f.type === "cursus") {
       setNbNiveauxStr(String(f.nb_niveaux || 1));
       setCursusFeeMode(isCursusFeeMode(f.cursus_fee_mode) ? f.cursus_fee_mode : "par_niveau");
+      // Mode uniforme : frais + échéancier au niveau filière
+      const parsed = parsePaymentPlan(f.payment_plan);
+      setShortFees(parsed.fees);
+      setShortFeesLocked(parsed.fees.length > 0);
+      setShortInstallments(parsed.installments);
+      if (parsed.installments.length > 0) setShortInstallmentsLocked(true);
     } else {
       setPricingMode(isShortPricingMode(f.pricing_mode) ? f.pricing_mode : "forfaitaire");
       setDureeValeurStr(String(f.duree_valeur || 1));
@@ -1479,8 +1485,9 @@ function NouveauProgrammeForm() {
   }
 
   async function saveExistingProgram(filiereId: string) {
+    // Formation courte + cursus uniforme : frais/échéancier sur filieres.payment_plan
     const filierePaymentPlan =
-      type === "formation_courte"
+      type === "formation_courte" || (type === "cursus" && cursusFeeMode === "uniforme")
         ? formatPaymentPlan(shortFees, shortInstallments)
         : formatPaymentPlan([], []);
 
@@ -1708,7 +1715,7 @@ function NouveauProgrammeForm() {
         setCreated({ id: editFiliereId, name: name.trim(), updated: true });
       } else {
       const filierePaymentPlan =
-        type === "formation_courte"
+        type === "formation_courte" || (type === "cursus" && cursusFeeMode === "uniforme")
           ? formatPaymentPlan(shortFees, shortInstallments)
           : formatPaymentPlan([], []);
 
@@ -1920,25 +1927,40 @@ function NouveauProgrammeForm() {
         .join(", ");
 
     const isCursus = type === "cursus";
+    const isUniforme = isCursus && cursusFeeMode === "uniforme";
     const globalTuition = parseAmount(tuitionFee);
-    const globalFees = isCursus ? [] : feeRows(shortFees);
-    const globalTotal = isCursus ? globalTuition : parseAmount(computeTotal(tuitionFee, shortFees));
+    const globalFees = (!isCursus || isUniforme) ? feeRows(shortFees) : [];
+    const globalTotal = (!isCursus || isUniforme)
+      ? parseAmount(computeTotal(tuitionFee, shortFees))
+      : globalTuition;
 
     const niveauxPdf = isCursus
-      ? niveaux.map((n) => {
-          const tuition = parseAmount(n.tuition_fee.trim() ? n.tuition_fee : tuitionFee);
-          const fees = feeRows(n.fees);
-          const total = tuition + fees.reduce((a, f) => a + f.montant, 0);
-          return {
-            label: `Niveau ${n.numero}${n.nom ? ` — ${n.nom}` : ""}`,
-            tuition,
-            fees,
-            total,
-            totalWords: amountInWordsFr(total),
-            installments: instRows(n.installments),
-            classes: n.classes.map((c) => c.nom.trim()).filter(Boolean),
-          };
-        })
+      ? (isUniforme
+          ? [
+              {
+                label: "Programme (tarif uniforme)",
+                tuition: globalTuition,
+                fees: globalFees,
+                total: globalTotal,
+                totalWords: amountInWordsFr(globalTotal),
+                installments: instRows(shortInstallments),
+                classes: niveaux.flatMap((n) => n.classes.map((c) => c.nom.trim()).filter(Boolean)),
+              },
+            ]
+          : niveaux.map((n) => {
+              const tuition = parseAmount(n.tuition_fee.trim() ? n.tuition_fee : tuitionFee);
+              const fees = feeRows(n.fees);
+              const total = tuition + fees.reduce((a, f) => a + f.montant, 0);
+              return {
+                label: `Niveau ${n.numero}${n.nom ? ` — ${n.nom}` : ""}`,
+                tuition,
+                fees,
+                total,
+                totalWords: amountInWordsFr(total),
+                installments: instRows(n.installments),
+                classes: n.classes.map((c) => c.nom.trim()).filter(Boolean),
+              };
+            }))
       : [
           {
             label: "Programme",
@@ -1975,13 +1997,13 @@ function NouveauProgrammeForm() {
       globalFees,
       globalTotal,
       globalTotalWords: amountInWordsFr(globalTotal),
-      globalInstallments: isCursus ? [] : instRows(shortInstallments),
+      globalInstallments: (!isCursus || isUniforme) ? instRows(shortInstallments) : [],
       niveaux: niveauxPdf,
       matieres,
       isCursus,
     };
   }, [
-    campuses, selectedCampusIds, staffMembers, headTrainerId, type, tuitionFee, shortFees,
+    campuses, selectedCampusIds, staffMembers, headTrainerId, type, cursusFeeMode, tuitionFee, shortFees,
     shortInstallments, niveaux, classesCourtes, matieresProgram, matieresCourtes, trainers,
     disciplines, name, description, mode, nbNiveaux, dureeValeur, dureeUnite, editFiliereId, created,
   ]);
@@ -2480,15 +2502,47 @@ function NouveauProgrammeForm() {
               </div>
               <PriceBlock
                 value={tuitionFee}
-                onChange={setTuitionFee}
+                onChange={(v) => {
+                  setTuitionFee(v);
+                  if (cursusFeeMode === "uniforme" && shortInstallmentsLocked && sumInstallments(shortInstallments) > parseAmount(computeTotal(v, shortFees))) {
+                    setShortInstallmentsLocked(false);
+                  }
+                }}
                 locked={priceLocked}
                 onLock={() => setPriceLocked(true)}
                 onUnlock={() => setPriceLocked(false)}
                 label={cursusFeeMode === "uniforme" ? "Prix uniforme du programme" : "Prix de référence global (indicatif)"}
               />
+              {cursusFeeMode === "uniforme" && (
+                <>
+                  <FeesBlock
+                    fees={shortFees}
+                    onAdd={addShortFee}
+                    onUpdate={updateShortFee}
+                    onRemove={removeShortFee}
+                    locked={shortFeesLocked}
+                    onLock={lockShortFees}
+                    onUnlock={() => setShortFeesLocked(false)}
+                    label="Frais supplémentaires du programme"
+                  />
+                  <TotalDisplay total={shortTotal} label="Total par inscription" />
+                  <InstallmentsBlock
+                    installments={shortInstallments}
+                    totalPrice={shortTotal}
+                    locked={shortInstallmentsLocked}
+                    onLock={() => setShortInstallmentsLocked(true)}
+                    onUnlock={() => setShortInstallmentsLocked(false)}
+                    onAdd={addShortInstallment}
+                    onUpdate={updateShortInstallment}
+                    onRemove={removeShortInstallment}
+                    label="Échéancier du programme"
+                  />
+                </>
+              )}
               {cursusFeeMode === "par_niveau" && (
                 <p className="text-sm text-neutral-400 -mt-2">Fixez le vrai prix, les frais et l&apos;échéancier dans chaque niveau ci-dessous.</p>
               )}
+              {cursusFeeMode === "par_niveau" && (
               <div className="flex gap-1.5 flex-wrap">
                 {niveaux.map((n) => (
                   <button
@@ -2502,50 +2556,47 @@ function NouveauProgrammeForm() {
                   </button>
                 ))}
               </div>
-              {niveauActuel && (
+              )}
+              {cursusFeeMode === "par_niveau" && niveauActuel && (
                 <div className="space-y-4 pt-2 border-t border-black/[0.06]">
                   <p className="text-sm font-semibold text-neutral-600">Tarification — Niveau {niveauActuel.numero}</p>
-                  {cursusFeeMode === "par_niveau" && (
-                    <>
-                      <PriceBlock
-                        value={niveauActuel.tuition_fee}
-                        onChange={(v) => {
-                          const patch: Partial<NiveauDraft> = { tuition_fee: v };
-                          if (niveauActuel.installmentsLocked && sumInstallments(niveauActuel.installments) > parseAmount(computeTotal(v, niveauActuel.fees))) {
-                            patch.installmentsLocked = false;
-                          }
-                          updateNiveau(niveauActuel.numero, patch);
-                        }}
-                        locked={niveauActuel.priceLocked}
-                        onLock={() => updateNiveau(niveauActuel.numero, { priceLocked: true })}
-                        onUnlock={() => updateNiveau(niveauActuel.numero, { priceLocked: false })}
-                        placeholder={tuitionFee || "Hérite du prix global"}
-                        label={`Prix formation — niveau ${niveauActuel.numero}`}
-                      />
-                      <FeesBlock
-                        fees={niveauActuel.fees}
-                        onAdd={() => addNiveauFee(niveauActuel.numero)}
-                        onUpdate={(id, key, val) => updateNiveauFee(niveauActuel.numero, id, key, val)}
-                        onRemove={(id) => removeNiveauFee(niveauActuel.numero, id)}
-                        locked={niveauActuel.feesLocked}
-                        onLock={() => lockNiveauFees(niveauActuel.numero)}
-                        onUnlock={() => updateNiveau(niveauActuel.numero, { feesLocked: false })}
-                        label={`Frais supplémentaires — niveau ${niveauActuel.numero}`}
-                      />
-                      <TotalDisplay total={niveauTotal} label={`Total niveau ${niveauActuel.numero}`} />
-                      <InstallmentsBlock
-                        installments={niveauActuel.installments}
-                        totalPrice={niveauTotal}
-                        locked={niveauActuel.installmentsLocked}
-                        onLock={() => updateNiveau(niveauActuel.numero, { installmentsLocked: true })}
-                        onUnlock={() => updateNiveau(niveauActuel.numero, { installmentsLocked: false })}
-                        onAdd={(prefill) => addNiveauInstallment(niveauActuel.numero, prefill)}
-                        onUpdate={(id, key, val) => updateNiveauInstallment(niveauActuel.numero, id, key, val)}
-                        onRemove={(id) => removeNiveauInstallment(niveauActuel.numero, id)}
-                        label={`Échéancier — niveau ${niveauActuel.numero}`}
-                      />
-                    </>
-                  )}
+                  <PriceBlock
+                    value={niveauActuel.tuition_fee}
+                    onChange={(v) => {
+                      const patch: Partial<NiveauDraft> = { tuition_fee: v };
+                      if (niveauActuel.installmentsLocked && sumInstallments(niveauActuel.installments) > parseAmount(computeTotal(v, niveauActuel.fees))) {
+                        patch.installmentsLocked = false;
+                      }
+                      updateNiveau(niveauActuel.numero, patch);
+                    }}
+                    locked={niveauActuel.priceLocked}
+                    onLock={() => updateNiveau(niveauActuel.numero, { priceLocked: true })}
+                    onUnlock={() => updateNiveau(niveauActuel.numero, { priceLocked: false })}
+                    placeholder={tuitionFee || "Hérite du prix global"}
+                    label={`Prix formation — niveau ${niveauActuel.numero}`}
+                  />
+                  <FeesBlock
+                    fees={niveauActuel.fees}
+                    onAdd={() => addNiveauFee(niveauActuel.numero)}
+                    onUpdate={(id, key, val) => updateNiveauFee(niveauActuel.numero, id, key, val)}
+                    onRemove={(id) => removeNiveauFee(niveauActuel.numero, id)}
+                    locked={niveauActuel.feesLocked}
+                    onLock={() => lockNiveauFees(niveauActuel.numero)}
+                    onUnlock={() => updateNiveau(niveauActuel.numero, { feesLocked: false })}
+                    label={`Frais supplémentaires — niveau ${niveauActuel.numero}`}
+                  />
+                  <TotalDisplay total={niveauTotal} label={`Total niveau ${niveauActuel.numero}`} />
+                  <InstallmentsBlock
+                    installments={niveauActuel.installments}
+                    totalPrice={niveauTotal}
+                    locked={niveauActuel.installmentsLocked}
+                    onLock={() => updateNiveau(niveauActuel.numero, { installmentsLocked: true })}
+                    onUnlock={() => updateNiveau(niveauActuel.numero, { installmentsLocked: false })}
+                    onAdd={(prefill) => addNiveauInstallment(niveauActuel.numero, prefill)}
+                    onUpdate={(id, key, val) => updateNiveauInstallment(niveauActuel.numero, id, key, val)}
+                    onRemove={(id) => removeNiveauInstallment(niveauActuel.numero, id)}
+                    label={`Échéancier — niveau ${niveauActuel.numero}`}
+                  />
                 </div>
               )}
             </>

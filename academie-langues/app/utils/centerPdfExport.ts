@@ -1080,3 +1080,95 @@ export async function downloadClassGradeSheetPdf(params: ClassGradeSheetPdfParam
   doc.save(`releve_classe_${safe}.pdf`);
 }
 
+// ── Attestation de réussite ─────────────────────────────────────────────────
+
+export type AttestationReussitePdfParams = {
+  studentName: string;
+  programName?: string | null;
+  niveauLabel?: string | null;
+  classeLabel?: string | null;
+  academicYear?: string | null;
+  issuedAt?: string | null;
+  mention?: string | null;
+  config?: Partial<DocumentExportConfig>;
+  signatures?: { id: string; label: string; signatureUrl?: string | null }[];
+  stampUrl?: string | null;
+};
+
+export async function downloadAttestationReussitePdf(params: AttestationReussitePdfParams) {
+  const title = params.config?.title?.trim() || "Attestation de réussite";
+  const { doc, startY, cfg } = await createDoc(title, {
+    ...params.config,
+    title,
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = startY + 10;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(40, 40, 40);
+
+  const legal = cfg.legalName || "l'établissement";
+  const body = [
+    `Je soussigné(e), représentant(e) de ${legal}, atteste que :`,
+    "",
+    `${params.studentName}`,
+    "",
+    "a suivi avec succès le programme ci-dessous et obtient la présente attestation de réussite.",
+  ];
+
+  for (const line of body) {
+    if (!line) {
+      y += 4;
+      continue;
+    }
+    if (line === params.studentName) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(...cfg.blueRgb);
+      doc.text(line.toUpperCase(), pageWidth / 2, y, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(40, 40, 40);
+      y += 10;
+      continue;
+    }
+    const wrapped = doc.splitTextToSize(line, pageWidth - 40);
+    doc.text(wrapped, pageWidth / 2, y, { align: "center" });
+    y += wrapped.length * 6 + 2;
+  }
+
+  y += 6;
+  const details: string[] = [];
+  if (params.programName) details.push(`Programme : ${params.programName}`);
+  if (params.niveauLabel) details.push(`Niveau : ${params.niveauLabel}`);
+  if (params.classeLabel) details.push(`Classe : ${params.classeLabel}`);
+  if (params.academicYear) details.push(`Année académique : ${params.academicYear}`);
+  if (params.mention) details.push(`Mention : ${params.mention}`);
+  details.push(`Date d'émission : ${params.issuedAt || new Date().toLocaleDateString("fr-FR")}`);
+
+  doc.setFontSize(10);
+  doc.setTextColor(60, 60, 60);
+  for (const d of details) {
+    doc.text(d, pageWidth / 2, y, { align: "center" });
+    y += 6;
+  }
+
+  y += 8;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text(
+    "Document officiel généré par le centre. Valable sur présentation d'une pièce d'identité.",
+    pageWidth / 2,
+    y,
+    { align: "center", maxWidth: pageWidth - 40 },
+  );
+
+  await addPdfSignatures(doc, cfg, params.signatures, params.stampUrl);
+  addPdfFooter(doc, cfg);
+  const safe = params.studentName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || "apprenant";
+  doc.save(`attestation_reussite_${safe}.pdf`);
+}
+

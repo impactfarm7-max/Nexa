@@ -4,10 +4,12 @@ import { getAuthUser } from "@/app/utils/auth-server";
 import { CENTER_STAFF_ROLES } from "@/app/utils/student-routes";
 import { isCenterOperational } from "@/app/utils/center-trial";
 
-export const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-);
+const adminUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "https://placeholder.supabase.co";
+const adminKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIn0.placeholder";
+
+export const supabaseAdmin = createClient(adminUrl, adminKey);
 
 export type CenterStaffContext = {
   user: NonNullable<Awaited<ReturnType<typeof getAuthUser>>>;

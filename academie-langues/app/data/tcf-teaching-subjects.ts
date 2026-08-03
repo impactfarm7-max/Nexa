@@ -1,3 +1,5 @@
+import { TRAINER_DEFAULT_PERMISSIONS } from "@/app/utils/trainer-defaults";
+
 export const TCF_TEACHING_SUBJECTS = [
   { key: "tcf_comprehension_ecrite", label: "Compréhension écrite" },
   { key: "tcf_comprehension_orale", label: "Compréhension orale" },
@@ -72,6 +74,19 @@ export function isTcfSubjectPermission(key: string) {
 /** Exclut d'eventuelles cles tcf_* legacy dans staff_permissions */
 export function filterModulePermissions(permissions: string[]) {
   return permissions.filter((p) => !isTcfSubjectPermission(p));
+}
+
+/**
+ * Modules par défaut formateur / personnel académique.
+ * Source unique : `app/utils/trainer-defaults`.
+ */
+export const TRAINER_DEFAULT_MODULE_PERMISSIONS = TRAINER_DEFAULT_PERMISSIONS;
+
+/** Sessions Live : toujours présent dans les droits modules (tous rôles staff/formateur). */
+export function ensureDefaultLivesPermission(permissions: string[]): string[] {
+  const modules = filterModulePermissions(permissions);
+  if (modules.includes("lives")) return modules;
+  return filterModulePermissions([...modules, "lives"]);
 }
 
 /** TCF : la communauté est accessible à tout le personnel du centre. */

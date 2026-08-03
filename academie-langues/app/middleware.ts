@@ -40,7 +40,8 @@ export async function middleware(request: NextRequest) {
     '/api/creation-centre',
     '/api/center/resolve-code',
     '/api/auth/',
-    '/api/sessions/',
+    '/api/sessions/validate',
+    '/api/support/guest',
     '/api/pin/',
     '/api/activity',
   ];

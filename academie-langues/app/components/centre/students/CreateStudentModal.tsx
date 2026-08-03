@@ -6,7 +6,7 @@ import {
   ChevronRight, Globe, Phone, Lock, MapPin
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
-import { SIGNUP_COUNTRIES_FALLBACK } from "@/app/data/signup-countries";
+import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
 import {
   catalogTotalShort,
   durationLabelShort,
@@ -35,7 +35,6 @@ const MONTH_PRESETS = [1, 2, 3, 6] as const;
 // ============================================================
 // TYPES
 // ============================================================
-type CountryRef = { code: string; name: string; phone_code: string; regions: string[] };
 type FiliereOption = {
   id: string;
   name: string;
@@ -71,6 +70,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   const [birthDate, setBirthDate] = useState("");
   const [countryCode, setCountryCode] = useState("CM");
   const [phoneCode, setPhoneCode] = useState("+237");
+  const [region, setRegion] = useState("");
 
   // --- Responsable légal ---
   const [guardianName, setGuardianName] = useState("");
@@ -94,24 +94,21 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   const [customMonths, setCustomMonths] = useState("");
   const [academicYear, setAcademicYear] = useState(defaultAcademicYear());
 
-  // --- Données de référence ---
-  const [countries, setCountries] = useState<CountryRef[]>(
-    SIGNUP_COUNTRIES_FALLBACK.map((c) => ({ ...c, regions: [] }))
-  );
-
   // --- État global ---
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ emailSent: boolean; temporaryPassword?: string } | null>(null);
   const [availableCoupons, setAvailableCoupons] = useState<{ id: string; code: string; type: string; value: number }[]>([]);
 
+  const selectedCountry = findAfricaCountry(countryCode);
+  const regions = selectedCountry?.regions ?? [];
+
   // ============================================================
   // CHARGEMENT INITIAL
   // ============================================================
   useEffect(() => {
     (async () => {
-      const [{ data: countryRows }, { data: filiereRows }, { data: centerRow }, { data: coupRows }] = await Promise.all([
-        supabase.from("countries_ref").select("code, name, phone_code, regions").order("name"),
+      const [{ data: filiereRows }, { data: centerRow }, { data: coupRows }] = await Promise.all([
         supabase
           .from("filieres")
           .select("id, name, type, default_tuition_fee, pricing_mode, cursus_fee_mode, duree_valeur, duree_unite, payment_plan")
@@ -134,18 +131,6 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         });
         setAvailableCoupons(valid);
       }
-      if (countryRows?.length) {
-        const parsed = countryRows.map((c: any) => ({
-          ...c,
-          regions: typeof c.regions === "string" ? JSON.parse(c.regions) : c.regions || [],
-        })) as CountryRef[];
-        setCountries(parsed);
-        const current = parsed.find((c) => c.code === countryCode) || parsed.find((c) => c.code === "CM") || parsed[0];
-        if (current) {
-          setCountryCode(current.code);
-          setPhoneCode(current.phone_code);
-        }
-      }
       setFilieres(
         (filiereRows || []).map((f: any) => ({
           ...f,
@@ -157,18 +142,19 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   }, [centerId]);
 
   // ============================================================
-  // QUAND LE PAYS CHANGE → indicatif auto
+  // QUAND LE PAYS CHANGE → indicatif auto (modèle staff / AFRICA_54)
   // ============================================================
   const handleCountryChange = (code: string) => {
     setCountryCode(code);
-    const country = countries.find((c) => c.code === code);
-    if (country?.phone_code) setPhoneCode(country.phone_code);
+    setRegion("");
+    const country = findAfricaCountry(code);
+    if (country) setPhoneCode(country.dial);
   };
 
   const handleGuardianCountryChange = (code: string) => {
     setGuardianCountryCode(code);
-    const country = countries.find((c) => c.code === code);
-    if (country?.phone_code) setGuardianPhoneCode(country.phone_code);
+    const country = findAfricaCountry(code);
+    if (country) setGuardianPhoneCode(country.dial);
   };
 
   // ============================================================
@@ -365,8 +351,8 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
       const fullPhone = phone.trim() ? `${phoneCode} ${phone.trim()}` : null;
 
       const body: Record<string, unknown> = {
-        prenom: prenom.trim(),
-        nom: nom.trim(),
+        prenom: prenom.trim().toUpperCase(),
+        nom: nom.trim().toUpperCase(),
         email: email.trim(),
         phone: fullPhone,
         filiere_id: filiereId,
@@ -420,8 +406,9 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         const fullGuardianPhone = guardianPhone.trim() ? `${guardianPhoneCode} ${guardianPhone.trim()}` : null;
         await supabase.from("student_details").upsert({
           student_id: data.studentId,
-          country: countries.find((c) => c.code === countryCode)?.name || null,
+          country: selectedCountry?.name || null,
           country_code: phoneCode,
+          region: region.trim() || null,
           guardian_name: guardianName.trim() || null,
           guardian_relation: guardianRelation.trim() || null,
           guardian_phone: fullGuardianPhone,
@@ -502,16 +489,16 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             {isLibreCenter && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className={FIELD_LABEL}>Genre</label>
+                  <label className={FIELD_LABEL}>Genre *</label>
                   <select value={genre} onChange={(e) => setGenre(e.target.value)} className={FIELD_INPUT}>
-                    <option value="">Sélectionner...</option>
-                    <option value="M">Masculin (M)</option>
-                    <option value="F">Féminin (F)</option>
+                    <option value="">Choisir…</option>
+                    <option value="Homme">Garçon / Homme</option>
+                    <option value="Femme">Fille / Femme</option>
                     <option value="Autre">Autre</option>
                   </select>
                 </div>
                 <div>
-                  <label className={FIELD_LABEL}>Date de naissance</label>
+                  <label className={FIELD_LABEL}>Date de naissance *</label>
                   <input
                     type="date"
                     value={birthDate}
@@ -526,11 +513,24 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             <div>
               <label className={FIELD_LABEL_INLINE}><Globe size={14} /> Pays</label>
               <select value={countryCode} onChange={(e) => handleCountryChange(e.target.value)} className={FIELD_INPUT}>
-                {countries.map((c) => (
-                  <option key={c.code} value={c.code}>{c.name} ({c.phone_code})</option>
+                <option value="">Sélectionner un pays...</option>
+                {AFRICA_54.map((c) => (
+                  <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.dial})</option>
                 ))}
               </select>
             </div>
+
+            {regions.length > 0 && (
+              <div>
+                <label className={FIELD_LABEL_INLINE}><MapPin size={14} /> Région</label>
+                <select value={region} onChange={(e) => setRegion(e.target.value)} className={FIELD_INPUT}>
+                  <option value="">Sélectionner...</option>
+                  {regions.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div>
               <label className={FIELD_LABEL_INLINE}><Phone size={14} /> Téléphone</label>
@@ -542,16 +542,16 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
               </div>
             </div>
 
-            {/* Responsable légal / Tuteur */}
+            {/* Responsable légal / Tuteur — entièrement optionnel */}
             <div className="pt-3 border-t border-black/[0.06] space-y-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">Responsable légal / Tuteur (Optionnel)</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">Responsable légal / Tuteur (optionnel)</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className={FIELD_LABEL}>Nom du responsable</label>
+                  <label className={FIELD_LABEL}>Nom du responsable <span className="font-normal text-neutral-400">(optionnel)</span></label>
                   <input type="text" placeholder="ex. Jean Dupont" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} className={FIELD_INPUT} />
                 </div>
                 <div>
-                  <label className={FIELD_LABEL}>Lien</label>
+                  <label className={FIELD_LABEL}>Lien <span className="font-normal text-neutral-400">(optionnel)</span></label>
                   <select value={guardianRelation} onChange={(e) => setGuardianRelation(e.target.value)} className={FIELD_INPUT}>
                     <option value="">Sélectionner...</option>
                     {["Père", "Mère", "Tuteur", "Oncle", "Tante", "Frère", "Sœur", "Autre"].map((r) => (
@@ -564,8 +564,8 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                 <div>
                   <label className={FIELD_LABEL_INLINE}><Globe size={14} /> Pays du responsable</label>
                   <select value={guardianCountryCode} onChange={(e) => handleGuardianCountryChange(e.target.value)} className={FIELD_INPUT}>
-                    {countries.map((c) => (
-                      <option key={c.code} value={c.code}>{c.name} ({c.phone_code})</option>
+                    {AFRICA_54.map((c) => (
+                      <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.dial})</option>
                     ))}
                   </select>
                 </div>

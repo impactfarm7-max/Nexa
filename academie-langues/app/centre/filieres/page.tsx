@@ -955,17 +955,149 @@ function PublishToggleSwitch({
 }
 
 // ===========================================================================
-type NiveauRow = { id: string; annee: number; nom: string | null; tuition_fee: number | null };
+type FeeRow = { label: string; montant: number };
+type InstallmentRow = { montant: number; jours: number };
+type ParsedPlan = { fees: FeeRow[]; installments: InstallmentRow[] };
+type NiveauRow = {
+  id: string;
+  annee: number;
+  nom: string | null;
+  tuition_fee: number | null;
+  fees: FeeRow[];
+  installments: InstallmentRow[];
+};
+
+function parsePlanPreview(plan: unknown): ParsedPlan {
+  if (Array.isArray(plan)) {
+    return {
+      fees: [],
+      installments: plan
+        .map((p: { montant?: number; jours?: number }) => ({
+          montant: Number(p?.montant) || 0,
+          jours: Math.max(0, Math.floor(Number(p?.jours) || 0)),
+        }))
+        .filter((p) => p.montant > 0),
+    };
+  }
+  if (plan && typeof plan === "object") {
+    const obj = plan as {
+      fees?: { label?: string; montant?: number }[];
+      installments?: { montant?: number; jours?: number }[];
+    };
+    return {
+      fees: (obj.fees || [])
+        .map((f) => ({ label: (f.label || "").trim(), montant: Number(f.montant) || 0 }))
+        .filter((f) => f.label && f.montant > 0),
+      installments: (obj.installments || [])
+        .map((p) => ({
+          montant: Number(p?.montant) || 0,
+          jours: Math.max(0, Math.floor(Number(p?.jours) || 0)),
+        }))
+        .filter((p) => p.montant > 0),
+    };
+  }
+  return { fees: [], installments: [] };
+}
+
+function FeesPreviewList({ fees }: { fees: FeeRow[] }) {
+  if (fees.length === 0) return null;
+  return (
+    <div className="mt-2 space-y-1">
+      <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Frais supplémentaires</p>
+      {fees.map((f) => (
+        <div key={`${f.label}-${f.montant}`} className="flex items-center justify-between text-[11px]">
+          <span className="font-medium text-neutral-500">{f.label}</span>
+          <span className="font-bold text-neutral-700">{fcfa(f.montant)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function InstallmentsPreviewList({ installments }: { installments: InstallmentRow[] }) {
+  if (installments.length === 0) return null;
+  return (
+    <div className="mt-2.5 space-y-1">
+      <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Échéancier</p>
+      {installments.map((inst, idx) => (
+        <div key={`${idx}-${inst.montant}-${inst.jours}`} className="flex items-center justify-between text-[11px]">
+          <span className="font-medium text-neutral-500">
+            Échéance {idx + 1}
+            {inst.jours > 0 ? ` — J+${inst.jours}` : " — à l'inscription"}
+          </span>
+          <span className="font-bold text-neutral-700">{fcfa(inst.montant)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; onClose: () => void; onTogglePublish?: () => void }) {
   const [niveaux, setNiveaux] = useState<NiveauRow[]>([]);
+  const [filiereFees, setFiliereFees] = useState<FeeRow[]>([]);
+  const [filiereInstallments, setFiliereInstallments] = useState<InstallmentRow[]>([]);
+  const [cursusFeeMode, setCursusFeeMode] = useState<"uniforme" | "par_niveau" | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(true);
+
   useEffect(() => {
-    if (prog.type !== "cursus") return;
+    let cancelled = false;
     (async () => {
-      const { data } = await supabase.from("niveaux").select("id, annee, nom, tuition_fee").eq("filiere_id", prog.id).order("annee");
-      setNiveaux(data || []);
+      setLoadingDetail(true);
+      const { data: filiere } = await supabase
+        .from("filieres")
+        .select("payment_plan, cursus_fee_mode")
+        .eq("id", prog.id)
+        .maybeSingle();
+      if (cancelled) return;
+      const plan = parsePlanPreview(filiere?.payment_plan);
+      setFiliereFees(plan.fees);
+      setFiliereInstallments(plan.installments);
+      const mode = filiere?.cursus_fee_mode === "uniforme" || filiere?.cursus_fee_mode === "par_niveau"
+        ? filiere.cursus_fee_mode
+        : (prog.type === "cursus" ? "par_niveau" : null);
+      setCursusFeeMode(mode);
+
+      if (prog.type === "cursus") {
+        const { data } = await supabase
+          .from("niveaux")
+          .select("id, annee, nom, tuition_fee, payment_plan")
+          .eq("filiere_id", prog.id)
+          .order("annee");
+        if (cancelled) return;
+        setNiveaux(
+          (data || []).map((n: {
+            id: string;
+            annee: number;
+            nom: string | null;
+            tuition_fee: number | null;
+            payment_plan: unknown;
+          }) => {
+            const parsed = parsePlanPreview(n.payment_plan);
+            return {
+              id: n.id,
+              annee: n.annee,
+              nom: n.nom,
+              tuition_fee: n.tuition_fee,
+              fees: parsed.fees,
+              installments: parsed.installments,
+            };
+          }),
+        );
+      } else {
+        setNiveaux([]);
+      }
+      if (!cancelled) setLoadingDetail(false);
     })();
+    return () => { cancelled = true; };
   }, [prog]);
+
+  const isUniforme = prog.type === "cursus" && cursusFeeMode === "uniforme";
+  const showFilierePlan =
+    prog.type === "formation_courte" || isUniforme;
+  const filiereExtrasTotal = filiereFees.reduce((a, f) => a + f.montant, 0);
+  const displayPrice = showFilierePlan && filiereExtrasTotal > 0
+    ? fcfa((Number(prog.default_tuition_fee) || 0) + filiereExtrasTotal)
+    : priceLabel(prog);
 
   return (
     <Shell onClose={onClose} title="Aperçu du programme" wide>
@@ -978,6 +1110,12 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
               <span className="text-[10px] font-bold uppercase text-neutral-400">
                 {prog.pricing_mode === "mensuel" ? "Tarif mensuel" : "Tarif forfaitaire"}
               </span>
+            )}
+            {isUniforme && (
+              <span className="text-[10px] font-bold uppercase text-neutral-400">Tarif uniforme</span>
+            )}
+            {prog.type === "cursus" && cursusFeeMode === "par_niveau" && (
+              <span className="text-[10px] font-bold uppercase text-neutral-400">Tarif par niveau</span>
             )}
             {prog.mode && MODE_LABEL[prog.mode] && (
               <span className="text-[10px] font-bold uppercase text-neutral-400">{MODE_LABEL[prog.mode]}</span>
@@ -997,8 +1135,12 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
         <div className="grid grid-cols-2 gap-3">
           <InfoBox
             icon={Tag}
-            label={prog.type === "formation_courte" && prog.pricing_mode === "mensuel" ? "Prix / mois" : "Prix du programme"}
-            value={priceLabel(prog)}
+            label={
+              prog.type === "formation_courte" && prog.pricing_mode === "mensuel"
+                ? (filiereExtrasTotal > 0 ? "Total catalogue / mois" : "Prix / mois")
+                : (filiereExtrasTotal > 0 && showFilierePlan ? "Total du programme" : "Prix du programme")
+            }
+            value={displayPrice}
           />
           <InfoBox icon={Clock} label="Structure" value={structureLabel(prog)} />
         </div>
@@ -1026,22 +1168,86 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
             <p className="text-xs text-neutral-400 font-medium">Aucune matière renseignée.</p>
           )}
         </div>
-        {prog.type === "cursus" && niveaux.length > 0 && (
-          <div className="border border-neutral-200 rounded-2xl p-4">
-            <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2.5 flex items-center gap-1.5">
-              <Layers size={12} /> Niveaux
-            </p>
-            <div className="space-y-1.5">
-              {niveaux.map((n) => (
-                <div key={n.id} className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-neutral-700">{n.nom || `Niveau ${n.annee}`}</span>
-                  <span className="font-black text-neutral-700">
-                    {n.tuition_fee != null ? fcfa(n.tuition_fee) : fcfa(prog.default_tuition_fee)}
-                  </span>
-                </div>
-              ))}
-            </div>
+
+        {loadingDetail ? (
+          <div className="flex items-center gap-2 text-xs text-neutral-400 font-medium py-2">
+            <Loader2 size={14} className="animate-spin" /> Chargement de la tarification…
           </div>
+        ) : (
+          <>
+            {showFilierePlan && (filiereFees.length > 0 || filiereInstallments.length > 0) && (
+              <div className="border border-neutral-200 rounded-2xl p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2.5 flex items-center gap-1.5">
+                  <Tag size={12} /> Tarification
+                </p>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="font-bold text-neutral-700">
+                    {prog.type === "formation_courte" && prog.pricing_mode === "mensuel"
+                      ? "Prix / mois"
+                      : "Prix de formation"}
+                  </span>
+                  <span className="font-black text-neutral-700">{fcfa(prog.default_tuition_fee)}</span>
+                </div>
+                <FeesPreviewList fees={filiereFees} />
+                {filiereFees.length > 0 && (
+                  <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-neutral-100">
+                    <span className="font-black text-neutral-800">Total</span>
+                    <span className="font-black" style={{ color: BLUE }}>
+                      {fcfa((Number(prog.default_tuition_fee) || 0) + filiereExtrasTotal)}
+                    </span>
+                  </div>
+                )}
+                <InstallmentsPreviewList installments={filiereInstallments} />
+              </div>
+            )}
+
+            {prog.type === "cursus" && !isUniforme && niveaux.length > 0 && (
+              <div className="border border-neutral-200 rounded-2xl p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2.5 flex items-center gap-1.5">
+                  <Layers size={12} /> Niveaux &amp; échéanciers
+                </p>
+                <div className="space-y-3">
+                  {niveaux.map((n) => {
+                    const base = n.tuition_fee != null ? Number(n.tuition_fee) : (Number(prog.default_tuition_fee) || 0);
+                    const extras = n.fees.reduce((a, f) => a + f.montant, 0);
+                    return (
+                      <div key={n.id} className="rounded-xl bg-neutral-50 border border-neutral-100 p-3">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold text-neutral-700">{n.nom || `Niveau ${n.annee}`}</span>
+                          <span className="font-black text-neutral-700">
+                            {extras > 0 ? fcfa(base + extras) : fcfa(base)}
+                          </span>
+                        </div>
+                        {n.tuition_fee != null && extras > 0 && (
+                          <p className="text-[10px] text-neutral-400 mt-0.5">
+                            Formation {fcfa(base)} + frais {fcfa(extras)}
+                          </p>
+                        )}
+                        <FeesPreviewList fees={n.fees} />
+                        <InstallmentsPreviewList installments={n.installments} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {prog.type === "cursus" && isUniforme && niveaux.length > 0 && (
+              <div className="border border-neutral-200 rounded-2xl p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2.5 flex items-center gap-1.5">
+                  <Layers size={12} /> Niveaux
+                </p>
+                <div className="space-y-1.5">
+                  {niveaux.map((n) => (
+                    <div key={n.id} className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-neutral-700">{n.nom || `Niveau ${n.annee}`}</span>
+                      <span className="font-medium text-neutral-400">tarif uniforme</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </Shell>

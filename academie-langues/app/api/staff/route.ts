@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse, after } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/app/utils/email-server";
-import { filterModulePermissions, TCF_SUBJECT_KEYS, ensureTcfCommunautePermission } from "@/app/data/tcf-teaching-subjects";
+import { filterModulePermissions, TCF_SUBJECT_KEYS, ensureTcfCommunautePermission, ensureDefaultLivesPermission, TRAINER_DEFAULT_MODULE_PERMISSIONS } from "@/app/data/tcf-teaching-subjects";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -74,7 +74,7 @@ async function getCenterType(centerId: string): Promise<string | null> {
 }
 
 function applyTcfStaffPermissions(permissions: string[], centerType: string | null) {
-  return ensureTcfCommunautePermission(permissions, centerType);
+  return ensureDefaultLivesPermission(ensureTcfCommunautePermission(permissions, centerType));
 }
 
 function sanitizeModulePermissions(raw: unknown): string[] {
@@ -154,7 +154,7 @@ export async function GET(req: NextRequest) {
         access[s.id].permissions = filterModulePermissions(access[s.id].permissions);
         // Formateurs créés avant la persistance modules : afficher les droits par défaut
         if (s.role === "trainer" && access[s.id].permissions.length === 0) {
-          access[s.id].permissions = ["etudiants", "filieres", "communaute"];
+          access[s.id].permissions = [...TRAINER_DEFAULT_MODULE_PERMISSIONS];
         }
         access[s.id].permissions = applyTcfStaffPermissions(access[s.id].permissions, centerType);
       }
@@ -241,7 +241,7 @@ export async function PATCH(req: NextRequest) {
       // staff + trainer : persister les modules choisis dans l’UI
       modulePerms = sanitizeModulePermissions(body.permissions);
       if (target.role === "trainer" && modulePerms.length === 0) {
-        modulePerms = ["etudiants", "filieres", "communaute"];
+        modulePerms = [...TRAINER_DEFAULT_MODULE_PERMISSIONS];
       }
       modulePerms = applyTcfStaffPermissions(modulePerms, centerType);
 
@@ -404,7 +404,7 @@ export async function POST(req: NextRequest) {
       : role === "campus_manager"
         ? CAMPUS_MANAGER_PERMISSIONS
         : role === "trainer"
-          ? ["etudiants", "filieres", "communaute"]
+          ? [...TRAINER_DEFAULT_MODULE_PERMISSIONS]
           : [];
 
     if (role !== "campus_manager") {
@@ -435,10 +435,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Permissions de module (staff administratif uniquement)
-    const modulePerms = role === "staff"
-      ? applyTcfStaffPermissions(sanitizeModulePermissions(permissions || []), centerType)
-      : [];
+    // Permissions de module (staff + formateur — Sessions Live inclus par défaut)
+    const modulePerms = role === "staff" || role === "trainer" ? staffPermissions : [];
 
     if (modulePerms.length > 0) {
       const { error: permErr } = await supabaseAdmin
@@ -465,27 +463,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Réponse immédiate avec MDP — l'email ne doit jamais bloquer le popup côté centre
-    const loginBase = process.env.NEXT_PUBLIC_SITE_URL || "";
-    const emailPayload = {
-      to: normalizedEmail,
-      subject: "Vos accès Nexa Academy",
-      text: `Bonjour ${prenom},\n\nVotre compte personnel a été créé.\nIdentifiant : ${normalizedEmail}\nMot de passe temporaire : ${password}\n\nConnectez-vous sur : ${loginBase}/login\n\nVous devrez modifier votre mot de passe à la première connexion.`,
-    };
-
-    after(() => {
-      void sendEmail(emailPayload).catch((err) => {
-        console.error("[staff] email arrière-plan échoué:", err);
+    // Envoi synchrone (comme /api/etudiants) : `after()` + void ne garde pas
+    // le runtime assez longtemps pour finir le SMTP Gmail.
+    const loginBase = process.env.NEXT_PUBLIC_SITE_URL || "https://nexa.fr";
+    let emailResult = { sent: false, skipped: false };
+    try {
+      emailResult = await sendEmail({
+        to: normalizedEmail,
+        subject: "Vos accès Nexa Academy",
+        text: `Bonjour ${prenom},\n\nVotre compte personnel a été créé.\nIdentifiant : ${normalizedEmail}\nMot de passe temporaire : ${password}\n\nConnectez-vous sur : ${loginBase}/login\n\nVous devrez modifier votre mot de passe à la première connexion.`,
       });
-    });
+      if (!emailResult.sent) {
+        console.error("[staff] email non envoyé:", emailResult.skipped ? "GMAIL_* manquant" : "échec SMTP");
+      }
+    } catch (mailErr) {
+      console.error("[staff] email échoué (non bloquant):", mailErr);
+      emailResult = { sent: false, skipped: false };
+    }
 
     return NextResponse.json({
       id: newUser.user.id,
       prenom,
       nom,
       email: normalizedEmail,
-      emailQueued: true,
-      emailSent: false,
+      emailQueued: false,
+      emailSent: emailResult.sent,
       // Toujours renvoyé : le centre doit pouvoir copier/envoyer le MDP (WhatsApp, etc.)
       temporaryPassword: password,
     });

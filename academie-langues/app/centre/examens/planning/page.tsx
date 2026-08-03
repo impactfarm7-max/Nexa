@@ -9,8 +9,8 @@ import { supabase } from "@/app/utils/supabase";
 import { examensComplets } from "@/app/data/examens_complets";
 import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
-const BLUE = "#11224E";
-const ORANGE = "#eb670e";
+import { BLUE, ORANGE, PAGE_BG } from "@/app/centre/center-page-ui";
+import Link from "next/link";
 
 function toDatetimeLocal(iso: string): string {
   const d = new Date(iso);
@@ -265,12 +265,15 @@ export default function TcfExamPlanningPage() {
     setSaving(false);
   };
 
-  if (loading) return <CenterPageLoading />;
+  if (loading) return <CenterPageLoading className="bg-[#FFFBF7]" />;
 
   if (!isTcfCanadaCenter(centerType)) {
     return (
-      <div className="min-h-[100dvh] bg-white p-12 text-center">
-          <p className="text-sm font-bold text-neutral-500">Planning examens réservé aux centres TCF Canada.</p>
+      <div className="min-h-[100dvh] p-12 text-center" style={{ backgroundColor: PAGE_BG }}>
+          <p className="text-sm font-semibold text-neutral-500">Planning examens réservé aux centres TCF Canada.</p>
+          <Link href="/centre/examens/examensuniversels" className="mt-4 inline-block text-xs font-bold uppercase tracking-wider hover:underline" style={{ color: BLUE }}>
+            Retour
+          </Link>
       </div>
     );
   }
@@ -288,21 +291,24 @@ export default function TcfExamPlanningPage() {
   const selectedEntries = selectedDay ? days[selectedDay] || [] : [];
 
   return (
-    <div className="min-h-[100dvh] bg-white text-[#11224E] flex flex-col h-screen overflow-hidden">
-        <header className="shrink-0 border-b bg-white/80 px-6 py-5 flex items-center justify-between">
-          <div>
+    <div className="min-h-[100dvh] flex flex-col h-screen overflow-hidden text-[#11224E]" style={{ backgroundColor: PAGE_BG }}>
+        <header className="shrink-0 border-b border-black/[0.06] px-6 py-5 flex items-center justify-between gap-3" style={{ backgroundColor: PAGE_BG }}>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <a href="/centre/examens/examensuniversels" className="p-1 rounded-lg hover:bg-neutral-100"><ArrowLeft size={14} /></a>
-              <Calendar size={16} style={{ color: ORANGE }} />
-              <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Examens TCF</span>
+              <Link href="/centre/examens/examensuniversels" className="p-1 rounded-lg hover:bg-black/[0.03]"><ArrowLeft size={14} /></Link>
+              <Calendar size={16} className="text-neutral-400" />
+              <span className="text-[10px] font-bold uppercase tracking-widest text-neutral-400">Examens TCF</span>
             </div>
-            <h1 className="text-2xl font-black">Planning des examens complets</h1>
+            <h1 className="text-2xl font-extrabold tracking-tight" style={{ color: BLUE }}>Planning des examens complets</h1>
           </div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowUnlock(true)} className="h-9 px-3 rounded-xl border text-xs font-black uppercase flex items-center gap-1.5 hover:bg-neutral-50">
+          <div className="flex gap-2 shrink-0">
+            <Link href="/centre/examens/resultats" className="h-9 px-3 rounded-xl border border-black/[0.08] bg-white text-xs font-semibold flex items-center gap-1.5 hover:bg-black/[0.03]">
+              Résultats
+            </Link>
+            <button onClick={() => setShowUnlock(true)} className="h-9 px-3 rounded-xl border border-black/[0.08] bg-white text-xs font-semibold flex items-center gap-1.5 hover:bg-black/[0.03]">
               <Unlock size={14} /> Débloquer
             </button>
-            <button onClick={openCreateForm} className="h-9 px-4 rounded-xl text-white text-xs font-black uppercase flex items-center gap-1.5" style={{ backgroundColor: ORANGE }}>
+            <button onClick={openCreateForm} className="h-9 px-4 rounded-xl text-white text-xs font-semibold flex items-center gap-1.5" style={{ backgroundColor: BLUE }}>
               <Plus size={14} /> Nouvelle séance
             </button>
           </div>

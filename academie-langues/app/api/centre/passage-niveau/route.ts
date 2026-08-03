@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
       .select(`
         id, student_id, filiere_id, niveau_id, groupe_id, campus_id, status,
         tuition_fee, academic_year, passage_decision,
-        filieres!inner(id, center_id, type, default_tuition_fee, cursus_fee_mode),
+        filieres!inner(id, center_id, type, default_tuition_fee, cursus_fee_mode, payment_plan),
         niveaux(id, annee, tuition_fee, seuil_passage)
       `)
       .eq("id", enrollmentId)
@@ -146,6 +146,7 @@ export async function POST(req: NextRequest) {
       type: string;
       default_tuition_fee: number | null;
       cursus_fee_mode: string | null;
+      payment_plan: unknown;
     };
     const niveau = source.niveaux as unknown as {
       id: string;
@@ -284,7 +285,9 @@ export async function POST(req: NextRequest) {
       ? filiere.cursus_fee_mode
       : "par_niveau";
     const extras =
-      feeMode === "par_niveau" ? sumPaymentPlanFees(targetNiveau?.payment_plan) : 0;
+      feeMode === "par_niveau"
+        ? sumPaymentPlanFees(targetNiveau?.payment_plan)
+        : sumPaymentPlanFees(filiere.payment_plan);
     const tuition = resolveCursusTuition({
       feeMode,
       filiereDefault: filiere.default_tuition_fee,
@@ -344,8 +347,10 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", newEnrollmentId);
 
-    if (tuition > 0 && targetNiveau?.payment_plan) {
-      const templates = parsePaymentPlanInstallments(targetNiveau.payment_plan);
+    const planSource =
+      feeMode === "uniforme" ? filiere.payment_plan : targetNiveau?.payment_plan;
+    if (tuition > 0 && planSource) {
+      const templates = parsePaymentPlanInstallments(planSource);
       const rows = scaleInstallmentsToTotal(templates, tuition);
       if (rows.length > 0) {
         const { error: instErr } = await supabaseAdmin.from("enrollment_installments").insert(

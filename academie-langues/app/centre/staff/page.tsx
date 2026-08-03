@@ -23,6 +23,8 @@ import {
   labelForTcfSubject,
   filterModulePermissions,
   ensureTcfCommunautePermission,
+  ensureDefaultLivesPermission,
+  TRAINER_DEFAULT_MODULE_PERMISSIONS,
 } from "@/app/data/tcf-teaching-subjects";
 import {
   CenterPageLayout,
@@ -424,10 +426,15 @@ export default function CenterStaffPage() {
       birth_date:      s.birth_date    ?? null,
       campuses:  campusMap[s.id]?.names ?? [],
       campusIds: campusMap[s.id]?.ids   ?? [],
-      permissions: ensureTcfCommunautePermission(
-        filterModulePermissions(permMap[s.id] ?? []),
-        centerRow?.center_type,
-      ),
+      permissions: (() => {
+        let perms = filterModulePermissions(permMap[s.id] ?? []);
+        if (s.role === "trainer" && perms.length === 0) {
+          perms = [...TRAINER_DEFAULT_MODULE_PERMISSIONS];
+        }
+        return ensureDefaultLivesPermission(
+          ensureTcfCommunautePermission(perms, centerRow?.center_type),
+        );
+      })(),
       tcfSubjects: tcfMap[s.id] ?? [],
     })));
     setLoading(false);
@@ -764,26 +771,6 @@ export default function CenterStaffPage() {
                     <span className="hidden sm:inline">{label}</span>
                   </button>
                 ))}
-
-                {!rhEditing && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveTab("rh");
-                      setRhEditing(true);
-                    }}
-                    className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors"
-                  >
-                    <Edit3 size={12} /> Modifier
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => void toggleStatus(selectedStaff.id, selectedStaff.center_status)}
-                  className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 hover:bg-black/[0.03] transition-colors"
-                >
-                  {selectedStaff.center_status === "active" ? "Suspendre" : "Réactiver"}
-                </button>
               </div>
             </div>
           </header>
@@ -853,6 +840,28 @@ export default function CenterStaffPage() {
                   centerId={centerId}
                 />
               )}
+
+              <div className="mt-6 pt-4 border-t border-black/[0.06] flex flex-wrap gap-2 justify-end">
+                {!rhEditing && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("rh");
+                      setRhEditing(true);
+                    }}
+                    className="h-10 px-4 rounded-lg border border-black/[0.08] bg-white inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-700 hover:bg-black/[0.03]"
+                  >
+                    <Edit3 size={14} /> Modifier
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void toggleStatus(selectedStaff.id, selectedStaff.center_status)}
+                  className="h-10 px-4 rounded-lg border border-black/[0.08] bg-white text-sm font-semibold text-neutral-700 hover:bg-black/[0.03]"
+                >
+                  {selectedStaff.center_status === "active" ? "Suspendre" : "Réactiver"}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1222,7 +1231,25 @@ function StaffRHTab({
 
   const weeklyHours = parseInt(staff.work_schedule || "0") || 40;
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    prenom: string;
+    nom: string;
+    phone: string;
+    job_title: string;
+    base_salary: number | null;
+    prime: number | null;
+    weekly_hours: number | null;
+    seniority_years: number | null;
+    country: string;
+    country_code: string;
+    region: string;
+    city: string;
+    neighborhood: string;
+    id_type: string;
+    id_number: string;
+    genre: string;
+    birth_date: string;
+  }>({
     prenom:          staff.prenom,
     nom:             staff.nom,
     phone:           staff.phone    || "",
@@ -1265,6 +1292,18 @@ function StaffRHTab({
       birth_date:      staff.birth_date    || "",
     });
   }, [staff.id, staff.prenom, staff.nom, staff.phone, staff.job_title, staff.base_salary, staff.prime, staff.work_schedule, staff.seniority_years, staff.country, staff.country_code, staff.region, staff.city, staff.neighborhood, staff.id_type, staff.id_number, staff.genre, staff.birth_date, onEditingChange]);
+
+  // En mode édition : chiffres en filigrane (placeholder), champs vides pour saisie libre
+  useEffect(() => {
+    if (!editing) return;
+    setForm((prev) => ({
+      ...prev,
+      base_salary: null,
+      prime: null,
+      weekly_hours: null,
+      seniority_years: null,
+    }));
+  }, [editing]);
 
   useEffect(() => {
     let code = "";
@@ -1335,16 +1374,16 @@ function StaffRHTab({
       nom:             form.nom,
       phone:           fullPhone,
       job_title:       form.job_title    || null,
-      base_salary:     form.base_salary,
-      work_schedule:   String(form.weekly_hours),
-      seniority_years: form.seniority_years,
+      base_salary:     form.base_salary ?? staff.base_salary,
+      work_schedule:   String(form.weekly_hours ?? weeklyHours),
+      seniority_years: form.seniority_years ?? staff.seniority_years,
       country:         form.country      || null,
       city:            form.city         || null,
       neighborhood:    form.neighborhood || null,
     };
     // Colonnes optionnelles — ignorées si elles n'existent pas encore en DB
     const optionalUpdate: Record<string, unknown> = {
-      prime:        form.prime          || null,
+      prime:        form.prime ?? staff.prime ?? null,
       country_code: form.country_code   || null,
       region:       form.region         || null,
       id_type:      form.id_type        || null,
@@ -1579,16 +1618,34 @@ function StaffRHTab({
         </FField>
         <div className="grid grid-cols-2 gap-3">
           <FField label="Salaire de base (XAF)">
-            <NumInput value={form.base_salary} onChange={(v) => f("base_salary", v)} />
+            <NumInput
+              value={form.base_salary}
+              onChange={(v) => f("base_salary", v)}
+              placeholder={String(staff.base_salary || 0)}
+            />
           </FField>
           <FField label="Prime / Bonus (XAF)">
-            <NumInput value={form.prime} onChange={(v) => f("prime", v)} />
+            <NumInput
+              value={form.prime}
+              onChange={(v) => f("prime", v)}
+              placeholder={String(staff.prime || 0)}
+            />
           </FField>
           <FField label="Volume horaire (h/semaine)">
-            <NumInput value={form.weekly_hours} onChange={(v) => f("weekly_hours", v)} min={1} max={80} />
+            <NumInput
+              value={form.weekly_hours}
+              onChange={(v) => f("weekly_hours", v)}
+              min={1}
+              max={80}
+              placeholder={String(weeklyHours)}
+            />
           </FField>
           <FField label="Ancienneté (années)">
-            <NumInput value={form.seniority_years} onChange={(v) => f("seniority_years", v)} />
+            <NumInput
+              value={form.seniority_years}
+              onChange={(v) => f("seniority_years", v)}
+              placeholder={String(staff.seniority_years || 0)}
+            />
           </FField>
         </div>
       </StaffDossierSection>
@@ -1658,7 +1715,7 @@ function PermissionsChecklist({
               {opts.map((opt) => {
                 const Icon = opt.icon;
                 const checked = selected.includes(opt.key);
-                const locked = isTCF && opt.key === "communaute";
+                const locked = opt.key === "lives" || (isTCF && opt.key === "communaute");
                 return (
                   <button
                     key={opt.key}
@@ -1674,7 +1731,7 @@ function PermissionsChecklist({
                   >
                     <Icon size={14} className="shrink-0" />
                     <span className="min-w-0">
-                      {opt.label}{locked ? " (inclus TCF)" : ""}
+                      {opt.label}{opt.key === "lives" ? " (par défaut)" : locked ? " (inclus TCF)" : ""}
                     </span>
                   </button>
                 );
@@ -1705,7 +1762,7 @@ function StaffAccessTab({
   const isManager = staff.role === "campus_manager";
   const [editing,     setEditing]     = useState(false);
   const [selCampuses, setSelCampuses] = useState<string[]>(staff.campusIds);
-  const [selPerms,    setSelPerms]    = useState<string[]>(staff.permissions);
+  const [selPerms,    setSelPerms]    = useState<string[]>(ensureDefaultLivesPermission(staff.permissions));
   const [saving,      setSaving]      = useState(false);
   const [saveError,   setSaveError]   = useState<string | null>(null);
 
@@ -1713,12 +1770,13 @@ function StaffAccessTab({
     setEditing(false);
     setSaveError(null);
     setSelCampuses(staff.campusIds);
-    setSelPerms(staff.permissions);
+    setSelPerms(ensureDefaultLivesPermission(staff.permissions));
   }, [staff.id, staff.campusIds, staff.permissions]);
 
   const toggleCampus = (id: string) =>
     setSelCampuses((p) => p.includes(id) ? p.filter((c) => c !== id) : [...p, id]);
   const togglePerm = (key: string) => {
+    if (key === "lives") return;
     if (isTCF && key === "communaute") return;
     setSelPerms((p) => p.includes(key) ? p.filter((k) => k !== key) : [...p, key]);
   };
@@ -1772,7 +1830,7 @@ function StaffAccessTab({
 
   const handleCancel = () => {
     setSelCampuses(staff.campusIds);
-    setSelPerms(staff.permissions);
+    setSelPerms(ensureDefaultLivesPermission(staff.permissions));
     setSaveError(null);
     setEditing(false);
   };
@@ -2423,7 +2481,9 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
   const [selTcfSubjects, setSelTcfSubjects] = useState<string[]>([]);
 
   const [selCampuses, setSelCampuses] = useState<string[]>([]);
-  const [selPerms,    setSelPerms]    = useState<string[]>(isTCF ? ["communaute"] : []);
+  const [selPerms,    setSelPerms]    = useState<string[]>(
+    ensureDefaultLivesPermission(isTCF ? ["communaute"] : []),
+  );
 
   const [saving,           setSaving]           = useState(false);
   const [error,            setError]            = useState("");
@@ -2763,6 +2823,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
                 <PermissionsChecklist
                   selected={selPerms}
                   onToggle={(key) => {
+                    if (key === "lives") return;
                     if (isTCF && key === "communaute") return;
                     setSelPerms((p) => p.includes(key) ? p.filter((k) => k !== key) : [...p, key]);
                   }}
@@ -2826,8 +2887,34 @@ const selectCls  = `${inputCls} cursor-pointer`;
 function TInput({ value, onChange, placeholder = "", type = "text" }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
   return <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} className={inputCls} />;
 }
-function NumInput({ value, onChange, min, max }: { value: number; onChange: (v: number) => void; min?: number; max?: number }) {
-  return <input type="number" value={value} onChange={(e) => onChange(Number(e.target.value))} min={min} max={max} className={inputCls} />;
+function NumInput({
+  value,
+  onChange,
+  min,
+  max,
+  placeholder,
+}: {
+  value: number | null;
+  onChange: (v: number | null) => void;
+  min?: number;
+  max?: number;
+  placeholder?: string;
+}) {
+  return (
+    <input
+      type="number"
+      value={value === null || Number.isNaN(value) ? "" : value}
+      placeholder={placeholder}
+      onChange={(e) => {
+        const raw = e.target.value;
+        if (raw === "") onChange(null);
+        else onChange(Number(raw));
+      }}
+      min={min}
+      max={max}
+      className={inputCls}
+    />
+  );
 }
 function FField({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><label className="text-sm font-semibold text-neutral-600 block mb-1.5">{label}</label>{children}</div>;

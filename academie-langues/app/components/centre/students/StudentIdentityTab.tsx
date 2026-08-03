@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Camera, Globe, CreditCard, Users, FileText,
-  Edit3, Save, Loader2, Phone, BookOpen,
+  Edit3, Save, Loader2, Phone, BookOpen, Award,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import FicheInscriptionModal from "@/app/components/centre/students/FicheInscriptionModal";
@@ -15,6 +15,8 @@ import {
   type StudentCountryRef,
 } from "@/app/data/studentLocalisation";
 import { passageDecisionLabelFr } from "@/app/utils/cursus-passage";
+import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
+import { downloadAttestationReussitePdf } from "@/app/utils/centerPdfExport";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -86,8 +88,6 @@ type Props = {
   centerId: string;
   onAvatarUpdated: (url: string) => void;
   onEnrollmentUpdated?: () => void;
-  /** Incrémenté depuis la barre sticky pour ouvrir le mode édition dossier */
-  editTrigger?: number;
 };
 
 type StudentDetails = {
@@ -133,7 +133,6 @@ export default function StudentIdentityTab({
   centerId,
   onAvatarUpdated,
   onEnrollmentUpdated,
-  editTrigger = 0,
 }: Props) {
   const [details, setDetails] = useState<StudentDetails>({
     country: null, country_code: null, region: null,
@@ -147,7 +146,7 @@ export default function StudentIdentityTab({
   const [avatarUploading, setAvatarUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showFiche, setShowFiche] = useState(false);
-  const lastEditTrigger = useRef(0);
+  const [attestationBusy, setAttestationBusy] = useState(false);
 
   // Formulaire identité
   const [form, setForm] = useState<StudentDetails>(details);
@@ -292,13 +291,6 @@ export default function StudentIdentityTab({
     setEditing(true);
   };
 
-  useEffect(() => {
-    if (!editTrigger || editTrigger === lastEditTrigger.current) return;
-    lastEditTrigger.current = editTrigger;
-    startEdit();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- startEdit lit details au clic
-  }, [editTrigger]);
-
   const selectedPlaceFiliere = filieres.find((f) => f.id === placeFiliereId);
   const needsNiveau = selectedPlaceFiliere?.type === "cursus";
 
@@ -427,6 +419,40 @@ export default function StudentIdentityTab({
     }
   };
 
+  const downloadAttestation = async () => {
+    if (!centerId || attestationBusy) return;
+    setAttestationBusy(true);
+    try {
+      const config = await fetchDocumentExportConfig(supabase, centerId, { documentType: "attestation" });
+      const { data: sigRows } = await supabase
+        .from("bulletin_signatures")
+        .select("id, name, title, signature_url")
+        .eq("center_id", centerId)
+        .order("display_order");
+      const { data: branding } = await supabase
+        .from("center_branding")
+        .select("stamp_url")
+        .eq("center_id", centerId)
+        .maybeSingle();
+      const signatures = filterSignatures(sigRows || [], config.signatureIds);
+      await downloadAttestationReussitePdf({
+        studentName: studentName,
+        programName: enrollmentInfo?.filiere_name || null,
+        niveauLabel: enrollmentInfo?.niveau_annee != null ? `Niveau ${enrollmentInfo.niveau_annee}` : null,
+        classeLabel: enrollmentInfo?.groupe_nom || null,
+        academicYear: enrollmentInfo?.academic_year || null,
+        issuedAt: new Date().toLocaleDateString("fr-FR"),
+        config,
+        signatures,
+        stampUrl: branding?.stamp_url || null,
+      });
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Erreur lors de la génération de l'attestation.");
+    } finally {
+      setAttestationBusy(false);
+    }
+  };
+
   const regions = getRegionsForCountry(COUNTRY_OPTIONS, selectedCountryCode);
 
   if (loading) return <p className="text-sm text-neutral-400 p-8">Chargement du dossier...</p>;
@@ -435,11 +461,21 @@ export default function StudentIdentityTab({
     <div className="w-full">
       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
 
-      {editing && (
+      {editing ? (
         <div className="flex flex-wrap items-center justify-end gap-1.5 mb-4">
           <button type="button" onClick={() => setEditing(false)} className="px-3 h-9 rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 hover:bg-neutral-200 transition-colors">Annuler</button>
           <button type="button" onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: ORANGE }}>
             {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Enregistrer
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-end gap-1.5 mb-4">
+          <button
+            type="button"
+            onClick={startEdit}
+            className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors"
+          >
+            <Edit3 size={12} /> Modifier le dossier
           </button>
         </div>
       )}
@@ -449,14 +485,25 @@ export default function StudentIdentityTab({
         title="Informations générales"
         description="Photo, coordonnées et parcours d'inscription."
         actions={enrollmentId ? (
-          <button
-            type="button"
-            onClick={() => setShowFiche(true)}
-            className="inline-flex items-center gap-2 px-3 h-9 rounded-lg text-xs font-semibold text-white"
-            style={{ backgroundColor: BLUE }}
-          >
-            <FileText size={14} /> Fiche d&apos;inscription
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowFiche(true)}
+              className="inline-flex items-center gap-2 px-3 h-9 rounded-lg text-xs font-semibold text-white"
+              style={{ backgroundColor: BLUE }}
+            >
+              <FileText size={14} /> Fiche d&apos;inscription
+            </button>
+            <button
+              type="button"
+              onClick={() => void downloadAttestation()}
+              disabled={attestationBusy}
+              className="inline-flex items-center gap-2 px-3 h-9 rounded-lg text-xs font-semibold border border-black/[0.08] bg-white text-neutral-700 hover:bg-black/[0.03] disabled:opacity-50"
+            >
+              {attestationBusy ? <Loader2 size={14} className="animate-spin" /> : <Award size={14} />}
+              Attestation de réussite
+            </button>
+          </div>
         ) : undefined}
       >
         <div className="flex items-start gap-4">

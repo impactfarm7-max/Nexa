@@ -74,6 +74,12 @@ export default function CampusSettingsPage() {
   const [lockedCampuses, setLockedCampuses] = useState<Set<string>>(new Set());
   const [savedCampusId, setSavedCampusId] = useState<string | null>(null);
 
+  type StaffOpt = { id: string; label: string; role: string };
+  const [director, setDirector] = useState<StaffOpt | null>(null);
+  const [staffOptions, setStaffOptions] = useState<StaffOpt[]>([]);
+  const [directorLoading, setDirectorLoading] = useState(false);
+  const [directorSaving, setDirectorSaving] = useState(false);
+
   const selected = campuses.find((c) => c.id === selectedId) || null;
   const isDetailLocked = selectedId ? lockedCampuses.has(selectedId) : false;
 
@@ -111,6 +117,62 @@ export default function CampusSettingsPage() {
   }, [selectedId]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadDirector = useCallback(async (campusId: string) => {
+    setDirectorLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/center/campus-director?campus_id=${encodeURIComponent(campusId)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      setDirector(json.director ? { id: json.director.id, label: json.director.label, role: json.director.role } : null);
+      setStaffOptions(
+        (json.staffOptions || []).map((s: StaffOpt) => ({
+          id: s.id,
+          label: s.label,
+          role: s.role,
+        })),
+      );
+    } finally {
+      setDirectorLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedId) void loadDirector(selectedId);
+    else {
+      setDirector(null);
+      setStaffOptions([]);
+    }
+  }, [selectedId, loadDirector]);
+
+  const assignDirector = async (campusId: string, directorId: string | null) => {
+    setDirectorSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch("/api/center/campus-director", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ campus_id: campusId, director_id: directorId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        alert(json.error || "Erreur d'attribution.");
+        return;
+      }
+      setDirector(json.director ? { id: json.director.id, label: json.director.label, role: json.director.role } : null);
+      await loadDirector(campusId);
+    } finally {
+      setDirectorSaving(false);
+    }
+  };
 
   const activateMulti = async () => {
     if (!centerId) return;
@@ -467,6 +529,11 @@ export default function CampusSettingsPage() {
                               )}
                             </p>
                           </ReadField>
+                          <ReadField label="Directeur de campus">
+                            <p className="text-sm font-semibold text-neutral-700 py-2 px-3.5 rounded-lg border border-black/[0.06]" style={{ backgroundColor: SURFACE }}>
+                              {directorLoading ? "…" : director?.label || "Non attribué"}
+                            </p>
+                          </ReadField>
                           <div className="flex items-center justify-between pt-2 border-t border-black/[0.06]">
                             {savedCampusId === selected.id ? (
                               <span className="flex items-center gap-1.5 text-xs font-semibold text-neutral-600">
@@ -547,6 +614,29 @@ export default function CampusSettingsPage() {
                                 className="flex-1 h-10 px-3.5 rounded-lg border border-black/[0.08] bg-white text-sm font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
                               />
                             </div>
+                          </div>
+
+                          <div>
+                            <FieldLabel label="Directeur de campus" />
+                            <div className="flex items-center gap-2">
+                              <select
+                                value={director?.id || ""}
+                                disabled={directorLoading || directorSaving}
+                                onChange={(e) => void assignDirector(selected.id, e.target.value || null)}
+                                className="flex-1 h-10 px-3.5 rounded-lg border border-black/[0.08] bg-white text-sm font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 disabled:opacity-50"
+                              >
+                                <option value="">— Non attribué —</option>
+                                {staffOptions.map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.label}{s.role === "campus_manager" ? " · Directeur" : ""}
+                                  </option>
+                                ))}
+                              </select>
+                              {directorSaving && <Loader2 size={16} className="animate-spin text-neutral-400 shrink-0" />}
+                            </div>
+                            <p className="text-[11px] text-neutral-400 mt-1.5">
+                              Attribue le rôle Directeur de campus et rattache ce campus au collaborateur.
+                            </p>
                           </div>
 
                           <div className="flex justify-end pt-2 border-t border-black/[0.06]">

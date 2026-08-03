@@ -30,18 +30,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Subscription invalide." }, { status: 400 });
   }
 
-  // Upsert : on ne duplique pas si le même endpoint revient
-  const { error: dbError } = await supabaseAdmin
+  const { data: existing } = await supabaseAdmin
     .from("push_subscriptions")
-    .upsert(
-      {
-        user_id: user.id,
-        endpoint,
-        p256dh: keys.p256dh,
-        auth: keys.auth,
-      },
-      { onConflict: "endpoint" }
+    .select("user_id")
+    .eq("endpoint", endpoint)
+    .maybeSingle();
+
+  if (existing && existing.user_id !== user.id) {
+    return NextResponse.json(
+      { error: "Cet abonnement push est déjà lié à un autre compte." },
+      { status: 409 }
     );
+  }
+
+  const { error: dbError } = await supabaseAdmin.from("push_subscriptions").upsert(
+    {
+      user_id: user.id,
+      endpoint,
+      p256dh: keys.p256dh,
+      auth: keys.auth,
+    },
+    { onConflict: "endpoint" }
+  );
 
   if (dbError) {
     console.error("push subscribe DB error:", dbError);

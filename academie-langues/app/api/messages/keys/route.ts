@@ -9,6 +9,12 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+/** Canaux broadcast B2C (annonces) — tout utilisateur authentifié peut déchiffrer. */
+const PUBLIC_BROADCAST_CHANNELS = new Set(["general", "tcf", "anglais"]);
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 async function isAdmin(userId: string): Promise<boolean> {
   const { data } = await supabaseAdmin
     .from("profiles")
@@ -16,6 +22,23 @@ async function isAdmin(userId: string): Promise<boolean> {
     .eq("id", userId)
     .single();
   return data?.role === "admin";
+}
+
+async function canAccessCommunityChannel(userId: string, channel: string, admin: boolean) {
+  if (admin) return true;
+  if (PUBLIC_BROADCAST_CHANNELS.has(channel)) return true;
+
+  if (UUID_RE.test(channel)) {
+    const { data: membership } = await supabaseAdmin
+      .from("community_room_members")
+      .select("user_id")
+      .eq("room_id", channel)
+      .eq("user_id", userId)
+      .maybeSingle();
+    return Boolean(membership);
+  }
+
+  return false;
 }
 
 export async function POST(req: Request) {
@@ -29,7 +52,10 @@ export async function POST(req: Request) {
   let ctx: CryptoCtx;
   if (kind === "community") {
     if (!body.channel) return NextResponse.json({ error: "channel requis" }, { status: 400 });
-    ctx = { kind: "community", channel: String(body.channel) };
+    const channel = String(body.channel);
+    const allowed = await canAccessCommunityChannel(user.id, channel, admin);
+    if (!allowed) return NextResponse.json({ error: "Interdit." }, { status: 403 });
+    ctx = { kind: "community", channel };
   } else if (kind === "private") {
     const a = String(body.userA || "");
     const b = String(body.userB || "");

@@ -165,5 +165,6 @@ export function useCenterDashboard() {
     copyLink,
     handleCampus,
     canAccess,
+    role,
   };
 }

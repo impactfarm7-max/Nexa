@@ -100,7 +100,7 @@ export default function SupportPage() {
   };
 
   const fetchGuestMessages = async (token: string) => {
-    const res = await fetch(`/api/support/guest?token=${encodeURIComponent(token)}&email=${encodeURIComponent(guestEmail)}`);
+    const res = await fetch(`/api/support/guest?token=${encodeURIComponent(token)}`);
     const json = await res.json();
     setMessages(json.messages || []);
   };

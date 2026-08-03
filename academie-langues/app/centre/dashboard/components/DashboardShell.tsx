@@ -67,10 +67,12 @@ export default function DashboardShell({
       <div
         className={`${centerNotoSans.className} min-h-[100dvh] overflow-x-hidden pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] md:pb-8 bg-[linear-gradient(180deg,#F7F7F6_0%,#eef1f8_100%)]`}
       >
-        <header className="relative overflow-hidden border-b border-[#11224E]/10">
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,#11224E_0%,#1a3568_55%,#11224E_100%)]" />
-          <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-[#eb670e]/10 blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none" />
-          <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-[#eb670e]/35 to-transparent" />
+        <header className="relative z-40 border-b border-[#11224E]/10">
+          <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,#11224E_0%,#1a3568_55%,#11224E_100%)]" />
+            <div className="absolute top-0 right-0 w-48 h-48 rounded-full bg-[#eb670e]/10 blur-3xl -translate-y-1/2 translate-x-1/4" />
+            <div className="absolute bottom-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-[#eb670e]/35 to-transparent" />
+          </div>
 
           <div className="relative nexa-center-shell py-2.5 sm:py-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
@@ -99,7 +101,7 @@ export default function DashboardShell({
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0 sm:pl-2">
+              <div className="flex items-center gap-2 shrink-0 sm:pl-2 relative z-50">
                 <div className="[&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white [&_button]:h-8 [&_button]:w-8">
                   <CenterNotifications />
                 </div>

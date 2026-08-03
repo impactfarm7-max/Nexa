@@ -120,6 +120,8 @@ export function canAccessCenterPath(
   }
   if (role !== "staff") return false;
   if (pathname.startsWith("/centre/dashboard") || pathname.startsWith("/centre/mon-compte") || pathname.startsWith("/centre/profil")) return true;
+  // Sessions Live : rubrique attribuée par défaut à tout le personnel
+  if (pathname.startsWith("/centre/lives")) return true;
   return permissions.some((perm) =>
     (STAFF_PERMISSION_ROUTES[perm] || []).some((prefix) => pathname.startsWith(prefix))
   );

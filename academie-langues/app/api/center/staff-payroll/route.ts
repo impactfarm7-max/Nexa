@@ -179,6 +179,7 @@ function currentPeriodYm() {
 
 type Body =
   | { action: "add_line"; period_id: string; type: LineType; amount: number; reason: string }
+  | { action: "include_contract_prime"; period_id: string }
   | { action: "update_line"; line_id: string; amount: number; reason: string; type?: LineType }
   | { action: "delete_line"; line_id: string }
   | { action: "record_payment"; period_id: string; amount: number; payment_method: string; payment_date?: string; notes?: string }
@@ -256,6 +257,49 @@ export async function POST(req: Request) {
       type: body.type,
       amount,
       reason: body.reason.trim(),
+      created_by: actor,
+    });
+    if (insErr && isMissingTable(insErr)) return missingTableResponse();
+    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+
+    await supabaseAdmin
+      .from("staff_payroll_periods")
+      .update({ updated_at: new Date().toISOString() })
+      .eq("id", body.period_id);
+
+    return NextResponse.json(await refreshPeriodStatus(body.period_id));
+  }
+
+  if (body.action === "include_contract_prime") {
+    const check = await assertPeriod(body.period_id);
+    if (check.missing) return missingTableResponse();
+    if (!check.ok) return NextResponse.json({ error: check.error }, { status: 404 });
+
+    const staffCheck = await assertStaffInCenter(check.period.staff_id, ctx!.centerId);
+    if (!staffCheck.ok) return NextResponse.json({ error: staffCheck.error }, { status: 403 });
+
+    const amount = Math.round(Number(staffCheck.staff.prime) || 0);
+    if (amount <= 0) {
+      return NextResponse.json({ error: "Aucune prime contrat à inclure." }, { status: 400 });
+    }
+
+    const bundle = await loadPeriodBundle(body.period_id);
+    if (bundle.missing) return missingTableResponse();
+    const already = (bundle.lines || []).some(
+      (l) =>
+        l.type === "prime" &&
+        /prime\s*contrat/i.test(String(l.reason || "")) &&
+        Math.round(Number(l.amount) || 0) === amount,
+    );
+    if (already) {
+      return NextResponse.json(await refreshPeriodStatus(body.period_id));
+    }
+
+    const { error: insErr } = await supabaseAdmin.from("staff_payroll_lines").insert({
+      period_id: body.period_id,
+      type: "prime",
+      amount,
+      reason: "Prime contrat",
       created_by: actor,
     });
     if (insErr && isMissingTable(insErr)) return missingTableResponse();

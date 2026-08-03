@@ -224,6 +224,17 @@ function fmtFCFA(n: number) {
 function fmtDate(iso: string | null) { return iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—"; }
 function fmtDateShort(iso: string | null) { return iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—"; }
 
+/** Extrait le code coupon depuis discount_reason (« Coupon RENTREE25 »). */
+function couponCodeFromReason(reason?: string | null): string | null {
+  if (!reason) return null;
+  const m = reason.trim().match(/^Coupon\s+(.+)$/i);
+  return m?.[1]?.trim() || null;
+}
+
+function appliedDiscount(r: Pick<FinanceRow, "discount_amount" | "coupon_discount">): number {
+  return Number(r.discount_amount) || Number(r.coupon_discount) || 0;
+}
+
 function openWhatsApp(text: string, phone?: string | null) {
   const encoded = encodeURIComponent(text);
   const digits = String(phone || "").replace(/\D/g, "");
@@ -246,7 +257,7 @@ function toIsoDate(d: Date) {
 }
 
 function downloadFinanceLedgerCsv(rows: FinanceRow[]) {
-  const header = ["Nom", "Prénom", "Programme", "Statut", "Total", "Payé", "Reste", "Prochaine échéance"];
+  const header = ["Nom", "Prénom", "Programme", "Statut", "Total", "Payé", "Reste", "Réduction", "Coupon", "Prochaine échéance"];
   const lines = [
     header,
     ...rows.map((r) => [
@@ -257,6 +268,8 @@ function downloadFinanceLedgerCsv(rows: FinanceRow[]) {
       String(Math.round(r.tuition_fee)),
       String(Math.round(r.tuition_paid)),
       String(Math.round(r.reste_a_payer)),
+      String(Math.round(appliedDiscount(r))),
+      couponCodeFromReason(r.discount_reason) || r.discount_reason || "",
       r.next_due_date || "",
     ]),
   ];
@@ -289,7 +302,7 @@ async function buildFinanceLedgerPdf(rows: FinanceRow[], caption: string) {
   doc.text(`Genere le ${new Date().toLocaleString("fr-FR")}`, 14, 28);
   autoTable(doc, {
     startY: 32,
-    head: [["Nom", "Prenom", "Programme", "Statut", "Total", "Paye", "Reste"]],
+    head: [["Nom", "Prenom", "Programme", "Statut", "Total", "Paye", "Reste", "Coupon"]],
     body: rows.map((r) => [
       r.nom,
       r.prenom,
@@ -298,6 +311,9 @@ async function buildFinanceLedgerPdf(rows: FinanceRow[], caption: string) {
       fmtFCFA(r.tuition_fee),
       fmtFCFA(r.tuition_paid),
       fmtFCFA(r.reste_a_payer),
+      appliedDiscount(r) > 0
+        ? `${couponCodeFromReason(r.discount_reason) || "Réduc."} (−${fmtFCFA(appliedDiscount(r))})`
+        : "—",
     ]),
     styles: { font: "helvetica", fontSize: 8, cellPadding: 2, overflow: "linebreak", textColor: [40, 40, 40] },
     headStyles: { fillColor: blue, textColor: 255, fontStyle: "bold" },
@@ -864,6 +880,18 @@ export default function CenterFinancePage() {
   const tauxRecouvrement = totalCA > 0 ? ((totalEncaisse / totalCA) * 100).toFixed(1) : "0";
   const lateCount = records.filter(r => r.financial_status === "late").length;
   const paidCount = records.filter(r => r.financial_status === "paid").length;
+  const couponApplications = records
+    .filter((r) => appliedDiscount(r) > 0)
+    .map((r) => ({
+      enrollment_id: r.enrollment_id,
+      student: `${(r.prenom || "").toUpperCase()} ${(r.nom || "").toUpperCase()}`.trim(),
+      filiere: r.filiere_name,
+      amount: appliedDiscount(r),
+      reason: r.discount_reason || "Réduction",
+      code: couponCodeFromReason(r.discount_reason),
+    }))
+    .sort((a, b) => b.amount - a.amount);
+  const totalCouponsApplied = couponApplications.reduce((s, r) => s + r.amount, 0);
 
   // Aging buckets
   const aging = {
@@ -889,7 +917,7 @@ export default function CenterFinancePage() {
   const canExport = activeTab === "journal"
     ? payments.length > 0
     : activeTab === "coupons"
-      ? coupons.length > 0
+      ? coupons.length > 0 || couponApplications.length > 0
       : exportRows.length > 0;
   const exportCaption =
     activeTab === "overdue"
@@ -1055,18 +1083,20 @@ export default function CenterFinancePage() {
             <EmptyState title="Aucun dossier trouvé" hint="Modifiez la recherche." />
           ) : (
             <CenterDataTable
-              columns={["Apprenant", "Programme", "Statut", "Montant", "Actions"]}
-              columnWidths={[undefined, "20%", "10%", "21%", "11.5rem"]}
+              columns={["Apprenant", "Programme", "Statut", "Montant", "Coupon", "Actions"]}
+              columnWidths={[undefined, "18%", "9%", "18%", "14%", "11.5rem"]}
             >
               {filtered.map((r, i) => {
                 const isPaid = r.financial_status === "paid";
                 const isLate = r.financial_status === "late";
                 const statusLabel = isPaid ? "Soldé" : isLate ? "Retard" : r.financial_status === "exempt" ? "Exempt" : "En cours";
+                const discount = appliedDiscount(r);
+                const couponCode = couponCodeFromReason(r.discount_reason);
 
                 return (
                   <CenterTableRow key={r.enrollment_id} index={i}>
                     <td className="px-4 py-4 min-w-0">
-                      <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: BLUE }}>
+                      <p className="text-[13px] font-semibold leading-snug truncate uppercase" style={{ color: BLUE }}>
                         {r.prenom} {r.nom}
                       </p>
                       {r.phone && <p className="text-[11px] text-neutral-400 font-medium mt-1 truncate">{r.phone}</p>}
@@ -1085,6 +1115,18 @@ export default function CenterFinancePage() {
                       </p>
                       {r.reste_a_payer > 0 && (
                         <p className="text-[11px] text-red-600 mt-1 tabular-nums">Reste {fmtFCFA(r.reste_a_payer)} F</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 min-w-0 align-top">
+                      {discount > 0 ? (
+                        <div>
+                          <p className="text-[12px] font-semibold text-violet-700 tabular-nums">−{fmtFCFA(discount)} F</p>
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500 mt-0.5 truncate">
+                            {couponCode || r.discount_reason || "Réduction"}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="text-[12px] text-neutral-300">—</span>
                       )}
                     </td>
                     <TableActions>
@@ -1297,7 +1339,7 @@ export default function CenterFinancePage() {
 
           {/* ══════════ COUPONS ══════════ */}
           {activeTab === "coupons" && (
-            <div className="space-y-6 max-w-3xl">
+            <div className="space-y-6 max-w-4xl">
               {/* Formulaire création */}
               <div className="bg-white p-5 rounded-2xl border border-neutral-200 space-y-4">
                 <h3 className="text-sm font-medium text-neutral-900 flex items-center gap-1.5"><Tag size={14} style={{ color: ORANGE }} /> Créer un coupon</h3>
@@ -1353,6 +1395,7 @@ export default function CenterFinancePage() {
                           <p className="text-[10px] text-neutral-400">
                             {c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value)} FCFA`}
                             {c.max_uses && ` · ${c.uses_count}/${c.max_uses} utilisés`}
+                            {!c.max_uses && c.uses_count > 0 && ` · ${c.uses_count} utilisé${c.uses_count > 1 ? "s" : ""}`}
                             {c.expires_at && ` · Expire ${fmtDateShort(c.expires_at)}`}
                           </p>
                         </div>
@@ -1364,6 +1407,52 @@ export default function CenterFinancePage() {
                   ))}
                 </div>
               )}
+
+              {/* Coupons appliqués aux étudiants */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-medium text-neutral-900 flex items-center gap-1.5">
+                    <Tag size={14} style={{ color: ORANGE }} /> Coupons appliqués aux étudiants
+                  </h3>
+                  {couponApplications.length > 0 && (
+                    <p className="text-xs font-semibold text-violet-700 tabular-nums">
+                      {couponApplications.length} dossier{couponApplications.length > 1 ? "s" : ""} · −{fmtFCFA(totalCouponsApplied)} F
+                    </p>
+                  )}
+                </div>
+                {couponApplications.length === 0 ? (
+                  <p className="text-center py-8 text-sm text-neutral-400 rounded-2xl border border-dashed border-neutral-200 bg-white">
+                    Aucun coupon appliqué pour le moment.
+                  </p>
+                ) : (
+                  <CenterDataTable
+                    columns={["Apprenant", "Programme", "Coupon", "Réduction"]}
+                    columnWidths={[undefined, "28%", "18%", "16%"]}
+                  >
+                    {couponApplications.map((app, i) => (
+                      <CenterTableRow key={app.enrollment_id} index={i}>
+                        <td className="px-4 py-3.5 min-w-0">
+                          <p className="text-[13px] font-semibold truncate uppercase" style={{ color: BLUE }}>{app.student}</p>
+                        </td>
+                        <td className="px-4 py-3.5 min-w-0 align-top">
+                          <p className="text-[12px] font-medium text-neutral-600 truncate uppercase">{app.filiere || "—"}</p>
+                        </td>
+                        <td className="px-4 py-3.5 align-top">
+                          <p className="text-[12px] font-bold font-mono text-violet-700 uppercase">
+                            {app.code || "—"}
+                          </p>
+                          {!app.code && app.reason && (
+                            <p className="text-[10px] text-neutral-400 mt-0.5 truncate">{app.reason}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-[12px] font-semibold text-violet-700 tabular-nums align-top">
+                          −{fmtFCFA(app.amount)} F
+                        </td>
+                      </CenterTableRow>
+                    ))}
+                  </CenterDataTable>
+                )}
+              </div>
             </div>
           )}
       </CenterPageBody>
@@ -1577,16 +1666,20 @@ export default function CenterFinancePage() {
               </div>
             </div>
 
+            {(appliedDiscount(invoiceModal) > 0) && (
+              <div className="mb-4 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-violet-600 mb-0.5">Coupon / réduction</p>
+                <p className="text-xs font-semibold text-violet-800">
+                  −{fmtFCFA(appliedDiscount(invoiceModal))} F
+                  {invoiceModal.discount_reason ? ` — ${invoiceModal.discount_reason}` : ""}
+                </p>
+              </div>
+            )}
+
             {/* Échéancier — masqué sur ticket */}
             {invoiceInstallments.length > 0 && printFormat !== "ticket" && (
               <div className="mb-4 finance-doc-compact finance-doc-hide-ticket">
                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">Échéancier</h4>
-                {(invoiceModal.discount_amount || 0) > 0 && (
-                  <p className="mb-2 text-[10px] font-semibold text-violet-700">
-                    Réduction : −{fmtFCFA(invoiceModal.discount_amount || 0)} F
-                    {invoiceModal.discount_reason ? ` — ${invoiceModal.discount_reason}` : ""}
-                  </p>
-                )}
                 <table className="w-full text-xs border border-black/[0.06] rounded-lg overflow-hidden table-fixed">
                   <thead className="text-[9px] font-bold uppercase tracking-wider text-neutral-400" style={{ backgroundColor: SURFACE }}>
                     <tr>

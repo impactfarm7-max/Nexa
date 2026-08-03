@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { CENTER_STAFF_ROLES } from "@/app/utils/student-routes";
-import { filterModulePermissions, ensureTcfCommunautePermission } from "@/app/data/tcf-teaching-subjects";
+import { filterModulePermissions, ensureTcfCommunautePermission, ensureDefaultLivesPermission, TRAINER_DEFAULT_MODULE_PERMISSIONS } from "@/app/data/tcf-teaching-subjects";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,11 +27,11 @@ async function loadStaffPermissions(profileId: string, role: string, centerType?
   if (fromTable.length > 0) {
     permissions = fromTable;
   } else if (role === "trainer") {
-    permissions = ["etudiants", "filieres", "communaute"];
+    permissions = [...TRAINER_DEFAULT_MODULE_PERMISSIONS];
   } else {
     permissions = [];
   }
-  return ensureTcfCommunautePermission(permissions, centerType);
+  return ensureDefaultLivesPermission(ensureTcfCommunautePermission(permissions, centerType));
 }
 
 export async function GET(req: Request) {

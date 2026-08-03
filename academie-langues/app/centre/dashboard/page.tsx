@@ -4,6 +4,7 @@ import DashboardShell from "./components/DashboardShell";
 import DashboardStatsSkeleton from "./components/DashboardStatsSkeleton";
 import GenericManagerDashboard from "./components/GenericManagerDashboard";
 import TcfManagerDashboard from "./components/TcfManagerDashboard";
+import TrainerWeekSchedule from "@/app/components/TrainerWeekSchedule";
 import { useCenterDashboard } from "./hooks/useCenterDashboard";
 import { buildCenterSignupUrl } from "@/app/utils/center-signup-link";
 
@@ -21,7 +22,10 @@ export default function CenterDashboardPage() {
     copyLink,
     handleCampus,
     canAccess,
+    role,
   } = useCenterDashboard();
+
+  const isTrainer = role === "trainer";
 
   return (
     <DashboardShell
@@ -31,6 +35,11 @@ export default function CenterDashboardPage() {
       copied={copied}
       onCopyLink={copyLink}
     >
+      {isTrainer ? (
+        <div className="mb-6">
+          <TrainerWeekSchedule />
+        </div>
+      ) : null}
       {statsLoading ? (
         <DashboardStatsSkeleton variant={isTCF ? "tcf" : "generic"} />
       ) : isTCF ? (

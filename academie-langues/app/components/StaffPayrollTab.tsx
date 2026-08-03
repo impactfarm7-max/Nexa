@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { downloadPayslipPdf } from "@/app/utils/centerPdfExport";
+import { fetchDocumentExportConfig } from "@/app/utils/documentConfig";
 import { AmountInWords } from "@/app/components/AmountInWords";
 
 const BLUE = "#11224E";
@@ -138,7 +139,7 @@ type Props = {
   centerId: string;
 };
 
-export default function StaffPayrollTab({ staff }: Props) {
+export default function StaffPayrollTab({ staff, centerId }: Props) {
   const [periodYm, setPeriodYm] = useState(currentYm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -352,6 +353,7 @@ export default function StaffPayrollTab({ staff }: Props) {
     if (!totals || !period) return;
     setDownloading(true);
     try {
+      const config = await fetchDocumentExportConfig(supabase, centerId).catch(() => undefined);
       await downloadPayslipPdf({
         staffName: `${staff.prenom} ${staff.nom}`,
         jobTitle: staff.job_title,
@@ -370,6 +372,7 @@ export default function StaffPayrollTab({ staff }: Props) {
           ...p,
           payment_method: METHOD_LABELS[p.payment_method] || p.payment_method,
         })),
+        config,
       });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Téléchargement impossible.");
@@ -707,6 +710,37 @@ export default function StaffPayrollTab({ staff }: Props) {
             <span>Salaire contrat <strong className="font-semibold" style={{ color: BLUE }}>{fmt(contract.base_salary)}</strong></span>
             <span>Prime contrat <strong className="font-semibold" style={{ color: BLUE }}>{contract.prime > 0 ? fmt(contract.prime) : "—"}</strong></span>
           </div>
+          {contract.prime > 0 && period ? (
+            <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
+              <input
+                type="checkbox"
+                checked={lines.some(
+                  (l) =>
+                    l.type === "prime" &&
+                    /prime\s*contrat/i.test(l.reason || "") &&
+                    Math.round(Number(l.amount) || 0) === Math.round(Number(contract.prime) || 0),
+                )}
+                disabled={
+                  saving ||
+                  lines.some(
+                    (l) =>
+                      l.type === "prime" &&
+                      /prime\s*contrat/i.test(l.reason || "") &&
+                      Math.round(Number(l.amount) || 0) === Math.round(Number(contract.prime) || 0),
+                  )
+                }
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    void post({
+                      action: "include_contract_prime",
+                      period_id: period.id,
+                    });
+                  }
+                }}
+              />
+              Inclure la prime contrat ({fmt(contract.prime)})
+            </label>
+          ) : null}
           {period && (
             <div className="flex flex-wrap items-end gap-2">
               <div className="flex-1 min-w-[140px]">
@@ -714,6 +748,7 @@ export default function StaffPayrollTab({ staff }: Props) {
                 <input
                   type="number"
                   value={baseEdit}
+                  placeholder={String(Math.round(Number(contract.base_salary) || 0))}
                   onChange={(e) => setBaseEdit(e.target.value)}
                   className="w-full h-10 px-3 rounded-lg border border-black/[0.08] text-sm font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
                 />

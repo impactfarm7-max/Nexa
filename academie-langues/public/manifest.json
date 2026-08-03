@@ -4,8 +4,8 @@
   "description": "Votre académie 100% africaine propulsé par l'IA",
   "start_url": "/dashboard",
   "display": "standalone",
-  "background_color": "#F97316",
-  "theme_color": "#F97316",
+  "background_color": "#11224E",
+  "theme_color": "#11224E",
   "icons": [
     {
       "src": "/favicon-32x32.png",

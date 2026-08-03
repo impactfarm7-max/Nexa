@@ -79,7 +79,7 @@ export default function ShareSignupLinkMenu({
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1.5 min-w-[11.5rem] rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg overflow-hidden"
+          className="absolute right-0 top-full z-[100] mt-1.5 min-w-[11.5rem] rounded-lg border border-black/[0.08] bg-white py-1 shadow-lg overflow-hidden"
         >
           <button
             type="button"

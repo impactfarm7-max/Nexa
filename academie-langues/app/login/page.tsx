@@ -466,11 +466,21 @@ function LoginPageContent() {
 
   /** Termine la connexion : contrôle des sessions/appareils, statut du compte, redirection. */
   const finalizeLogin = async (user: PendingAuthUser, profile: PendingAuthProfile) => {
+    const { data: { session: activeSession } } = await supabase.auth.getSession();
+    const accessToken = activeSession?.access_token;
+    if (!accessToken) {
+      setLoading(false);
+      await supabase.auth.signOut();
+      return showError("Session expirée. Réessayez de vous connecter.");
+    }
+
     const res = await fetch("/api/sessions/check", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
       body: JSON.stringify({
-        userId: user.id,
         device: navigator.userAgent,
         ip: "",
       }),
@@ -627,9 +637,11 @@ function LoginPageContent() {
       // Step 3: Enregistrer la nouvelle session sur cet appareil
       const res = await fetch("/api/sessions/check", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentSession.access_token}`,
+        },
         body: JSON.stringify({
-          userId: currentSession.user.id,
           device: navigator.userAgent,
           ip: "",
         }),
@@ -709,9 +721,11 @@ function LoginPageContent() {
 
       const res = await fetch("/api/sessions/check", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({
-          userId: session.user.id,
           device: navigator.userAgent,
           ip: "",
         }),

@@ -16,7 +16,7 @@ const DEFAULT_DOC_KEY = "document";
 const DOCUMENT_TYPES = [
   { key: DEFAULT_DOC_KEY, label: "Type de document", icon: FileText, defaultTitle: "Document officiel", available: true },
   { key: "facture",     label: "Facture / Reçu",     icon: Receipt,       defaultTitle: "Reçu de Paiement", available: true },
-  { key: "attestation", label: "Attestation",        icon: Award,         defaultTitle: "Attestation de Scolarité", available: false },
+  { key: "attestation", label: "Attestation de réussite", icon: Award, defaultTitle: "Attestation de réussite", available: true },
 ];
 
 type DocConfig = {
@@ -226,7 +226,9 @@ export default function DocumentsSettingsPage() {
         })}
 
         <p className="text-[11px] text-neutral-400 pt-4 leading-relaxed px-1">
-          Le <span className="font-bold">Type de document</span> sert aux bulletins et documents généraux. Le modèle <span className="font-bold">Facture / Reçu</span> est utilisé pour les relevés et reçus dans Finances.
+          Le <span className="font-bold">Type de document</span> sert aux bulletins et documents généraux.
+          Le modèle <span className="font-bold">Facture / Reçu</span> est utilisé dans Finances.
+          L&apos;<span className="font-bold">Attestation de réussite</span> se génère depuis le dossier apprenant.
         </p>
         <p className="text-[11px] text-neutral-400 leading-relaxed px-1">
           L&apos;identité (logo, RCCM, NIU) est commune à tous les documents.
