@@ -7,6 +7,7 @@ import { PauseCircle, UserRound } from "lucide-react";
 import Sidebar from "./Sidebar";
 import BottomNav from "./BottomNav";
 import PresenceTracker from "./PresenceTracker";
+import SiteAnalyticsTracker from "./SiteAnalyticsTracker";
 import CommunityBubble from "./CommunityBubble";
 import {
   loadStudentAccess,
@@ -124,7 +125,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }, [isPublic, pathname]);
 
   if (isPublic) {
-    return <>{children}</>;
+    return <><SiteAnalyticsTracker />{children}</>;
   }
 
   const presenceTracker = <PresenceTracker />;
@@ -197,6 +198,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <>
+      <SiteAnalyticsTracker />
       {presenceTracker}
       <div className="flex w-full overflow-x-hidden" style={{ minHeight: "100dvh" }}>
         {showSidebar && <Sidebar />}
