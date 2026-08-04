@@ -9,13 +9,11 @@ import {
   Timer, Award, MessageSquare, MessageCircle,
   Download, BookOpen, BarChart3, FileDown, FileText,
   Star, Pin, PinOff, X, CheckCircle, MessageCircleCode, Ban, Zap,
-  BellRing, Radio, RefreshCcw, CalendarCheck, XCircle, Menu, Pause, Play,
-  PanelLeftClose, PanelLeftOpen, Moon, Sun, Command, ChevronRight
+  BellRing, Radio, RefreshCcw, CalendarCheck, XCircle, Menu, Pause, Play
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { encryptMessage, decryptRows } from "@/app/utils/messageCrypto.client";
 import AdminFeedbackSection from "../components/AdminFeedbackSection";
-import AdminAnalyticsSection from "../components/AdminAnalyticsSection";
 import { OFFERS_CONFIG } from "@/app/data/packOffers";
 
 type StudentProfile = {
@@ -156,12 +154,6 @@ const CHANNELS = [
 export default function RealAdminDashboard() {
   const [activeTab, setActiveTab] = useState("crm_all");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [adminTheme, setAdminTheme] = useState<"dark" | "light">("dark");
-  const [favoriteTabs, setFavoriteTabs] = useState<string[]>([]);
-  const [globalSearchOpen, setGlobalSearchOpen] = useState(false);
-  const [globalSearch, setGlobalSearch] = useState("");
-  const [notificationsOpen, setNotificationsOpen] = useState(false);
   
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
@@ -292,41 +284,6 @@ export default function RealAdminDashboard() {
   useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get("tab");
     if (tab === "support") setActiveTab("support");
-    try {
-      const preferences = JSON.parse(localStorage.getItem("nexa_admin_preferences") || "{}");
-      if (preferences.theme === "light") setAdminTheme("light");
-      if (typeof preferences.collapsed === "boolean") setSidebarCollapsed(preferences.collapsed);
-      if (Array.isArray(preferences.favorites)) setFavoriteTabs(preferences.favorites.slice(0, 5));
-      if (typeof preferences.classFilter === "string") setClassFilter(preferences.classFilter);
-      if (typeof preferences.statusFilter === "string") setStatusFilter(preferences.statusFilter);
-    } catch { /* préférences invalides : conserver les valeurs par défaut */ }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("nexa_admin_preferences", JSON.stringify({
-      theme: adminTheme,
-      collapsed: sidebarCollapsed,
-      favorites: favoriteTabs,
-      classFilter,
-      statusFilter,
-    }));
-  }, [adminTheme, sidebarCollapsed, favoriteTabs, classFilter, statusFilter]);
-
-  useEffect(() => {
-    const onShortcut = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const editing = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.tagName === "SELECT" || target?.isContentEditable;
-      if (event.key === "/" && !editing) {
-        event.preventDefault();
-        setGlobalSearchOpen(true);
-      }
-      if (event.key === "Escape") {
-        setGlobalSearchOpen(false);
-        setNotificationsOpen(false);
-      }
-    };
-    window.addEventListener("keydown", onShortcut);
-    return () => window.removeEventListener("keydown", onShortcut);
   }, []);
 
   const fetchStudents = async () => {
@@ -2025,65 +1982,8 @@ export default function RealAdminDashboard() {
     );
   };
 
-  const tabLabels: Record<string, string> = {
-    crm_all: "Tous les étudiants", crm_aucun: "Étudiants sans pack", overview: "Vue d’ensemble",
-    analytics: "Analytics", actions: "Journal d’activité", examens: "Radar simulateurs",
-    missions: "Missions et devoirs", soumissions: "Soumissions", coaching: "Coaching",
-    centres: "Centres B2B", messages: "Messages privés", support: "Support client",
-    communaute: "Modération forum", retours: "Retours utilisateurs", feedbacks: "Avis clients", push: "Notifications push",
-  };
-  Object.entries(OFFERS_CONFIG).forEach(([key, config]) => { tabLabels[`crm_${key}`] = config.name; });
-
-  const configuredPermissions = adminUser?.user_metadata?.admin_permissions;
-  const canAccessTab = (tab: string) => !Array.isArray(configuredPermissions) || configuredPermissions.length === 0 || configuredPermissions.includes(tab) || (tab.startsWith("crm_") && configuredPermissions.includes("students"));
-  const toggleFavorite = (tab: string) => setFavoriteTabs((current) => current.includes(tab) ? current.filter((item) => item !== tab) : [...current, tab].slice(-5));
-
-  const normalizedGlobalSearch = globalSearch.trim().toLowerCase();
-  const globalResults = normalizedGlobalSearch.length < 2 ? [] : [
-    ...students.filter((student) => `${student.prenom || ""} ${student.email || ""} ${student.phone || ""}`.toLowerCase().includes(normalizedGlobalSearch)).slice(0, 6).map((student) => ({ id: student.id, tab: "crm_all", type: "Étudiant", title: student.prenom || student.email || "Étudiant", detail: student.email || student.phone || "" })),
-    ...centerApplications.filter((center) => `${center.center_name} ${center.manager_name} ${center.email}`.toLowerCase().includes(normalizedGlobalSearch)).slice(0, 4).map((center) => ({ id: center.id, tab: "centres", type: "Centre", title: center.center_name, detail: center.city || center.email })),
-    ...missions.filter((mission) => `${mission.title} ${mission.description}`.toLowerCase().includes(normalizedGlobalSearch)).slice(0, 4).map((mission) => ({ id: mission.id, tab: "missions", type: "Mission", title: mission.title, detail: mission.description })),
-    ...Object.entries(tabLabels).filter(([, label]) => label.toLowerCase().includes(normalizedGlobalSearch)).slice(0, 5).map(([tab, label]) => ({ id: tab, tab, type: "Rubrique", title: label, detail: "Ouvrir cette rubrique" })),
-  ].filter((result) => canAccessTab(result.tab)).slice(0, 12);
-
-  const adminNotifications = [
-    pendingMissionSubmissionsCount > 0 && { tab: "soumissions", title: `${pendingMissionSubmissionsCount} devoir${pendingMissionSubmissionsCount > 1 ? "s" : ""} à corriger`, tone: "orange" },
-    coachingAppointments.filter((item) => item.status === "pending").length > 0 && { tab: "coaching", title: `${coachingAppointments.filter((item) => item.status === "pending").length} coaching(s) en attente`, tone: "blue" },
-    centerApplications.filter((center) => center.status === "new").length > 0 && { tab: "centres", title: `${centerApplications.filter((center) => center.status === "new").length} demande(s) de centre`, tone: "violet" },
-    conversations.reduce((total, conversation) => total + conversation.unread, 0) > 0 && { tab: "messages", title: `${conversations.reduce((total, conversation) => total + conversation.unread, 0)} message(s) privé(s) non lu(s)`, tone: "emerald" },
-    supportConversations.reduce((total, conversation) => total + conversation.unread, 0) > 0 && { tab: "support", title: `${supportConversations.reduce((total, conversation) => total + conversation.unread, 0)} demande(s) support non lue(s)`, tone: "blue" },
-  ].filter(Boolean) as { tab: string; title: string; tone: string }[];
-
-  const activeSection = activeTab.startsWith("crm")
-    ? {
-        eyebrow: "Gestion des étudiants",
-        title: activeTab === "crm_all"
-          ? "Tous les étudiants"
-          : activeTab === "crm_aucun"
-            ? "Étudiants sans pack"
-            : OFFERS_CONFIG[activeTab.replace("crm_", "") as keyof typeof OFFERS_CONFIG]?.name || "Étudiants",
-        description: "Gérez les accès, les abonnements et la progression des apprenants.",
-      }
-    : ({
-        overview: { eyebrow: "Pilotage", title: "Vue d’ensemble", description: "Les indicateurs essentiels de votre plateforme en un coup d’œil." },
-        analytics: { eyebrow: "Pilotage", title: "Analytics du site", description: "Suivez l’audience, les nouvelles visites et les pages consultées." },
-        actions: { eyebrow: "Activité", title: "Actions clients", description: "Consultez les dernières actions réalisées par vos utilisateurs." },
-        examens: { eyebrow: "Pédagogie", title: "Radar simulateurs", description: "Analysez l’utilisation des examens et des entraînements." },
-        missions: { eyebrow: "Pédagogie", title: "Missions et devoirs", description: "Créez les missions et suivez les travaux à corriger." },
-        soumissions: { eyebrow: "Pédagogie", title: "Soumissions", description: "Examinez et commentez les devoirs remis." },
-        coaching: { eyebrow: "Pédagogie", title: "Coaching", description: "Organisez les rendez-vous et les séances collectives." },
-        centres: { eyebrow: "Réseau", title: "Centres B2B", description: "Gérez les demandes et les partenariats avec les centres." },
-        messages: { eyebrow: "Communication", title: "Messages privés", description: "Échangez directement avec les apprenants." },
-        support: { eyebrow: "Communication", title: "Support client", description: "Traitez rapidement les demandes d’assistance." },
-        communaute: { eyebrow: "Communication", title: "Modération du forum", description: "Supervisez les échanges de la communauté." },
-        retours: { eyebrow: "Expérience client", title: "Retours utilisateurs", description: "Centralisez les suggestions de vos utilisateurs." },
-        feedbacks: { eyebrow: "Expérience client", title: "Avis clients", description: "Consultez et mettez en avant les témoignages." },
-        push: { eyebrow: "Communication", title: "Notifications push", description: "Envoyez une information ciblée à vos utilisateurs." },
-      } as Record<string, { eyebrow: string; title: string; description: string }>)[activeTab] ||
-      { eyebrow: "Administration", title: "Dashboard", description: "Gérez votre plateforme Nexa." };
-
   return (
-    <div className={`admin-dashboard min-h-screen font-sans flex overflow-x-hidden md:overflow-hidden ${adminTheme === "light" ? "admin-light bg-slate-100 text-slate-800" : "bg-[#070b14] text-slate-200"}`}>
+    <div className="min-h-screen bg-[#0a0f1a] text-slate-200 font-sans flex overflow-x-hidden md:overflow-hidden">
       {centerCredentials && (
         <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-[2rem] border border-emerald-500/30 bg-slate-900 p-8 text-center shadow-2xl">
@@ -2738,43 +2638,27 @@ export default function RealAdminDashboard() {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {globalSearchOpen && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[250] flex items-start justify-center bg-black/75 px-4 pt-[10vh] backdrop-blur-sm" onClick={() => setGlobalSearchOpen(false)}>
-            <motion.div initial={{ opacity: 0, y: -16, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -10 }} className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-[#0b1120] shadow-2xl" onClick={(event) => event.stopPropagation()}>
-              <div className="flex items-center gap-3 border-b border-white/[0.07] px-5"><Search className="h-5 w-5 text-orange-400" /><input autoFocus value={globalSearch} onChange={(event) => setGlobalSearch(event.target.value)} placeholder="Étudiant, centre, mission ou rubrique…" className="h-16 min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-slate-600" /><kbd className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-bold text-slate-500">ESC</kbd></div>
-              <div className="custom-scrollbar max-h-[55vh] overflow-y-auto p-2">
-                {globalSearch.trim().length < 2 && <div className="px-4 py-10 text-center"><Command className="mx-auto mb-3 h-7 w-7 text-slate-700" /><p className="text-sm text-slate-500">Saisissez au moins deux caractères pour rechercher partout.</p></div>}
-                {globalSearch.trim().length >= 2 && globalResults.length === 0 && <p className="px-4 py-10 text-center text-sm text-slate-500">Aucun résultat trouvé.</p>}
-                {globalResults.map((result) => <button key={`${result.type}-${result.id}`} onClick={() => { setActiveTab(result.tab); setGlobalSearchOpen(false); setGlobalSearch(""); }} className="flex w-full items-center gap-4 rounded-2xl px-4 py-3 text-left hover:bg-white/[0.05]"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-500/10 text-xs font-black text-orange-400">{result.type.slice(0, 1)}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-white">{result.title}</p><p className="truncate text-xs text-slate-500">{result.type} · {result.detail}</p></div><ChevronRight className="h-4 w-4 text-slate-700" /></button>)}
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-[55] bg-black/70 backdrop-blur-sm md:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* 🧭 BARRE LATÉRALE - LES RUBRIQUES */}
-      <aside className={`admin-sidebar fixed inset-y-0 left-0 z-[60] flex w-[min(88vw,19rem)] flex-col overflow-hidden border-r border-white/[0.07] bg-[#080d18] shadow-2xl shadow-black/40 transition-[width,transform] duration-300 md:sticky md:top-0 md:z-50 md:h-screen md:translate-x-0 ${sidebarCollapsed ? "admin-sidebar-collapsed md:w-20" : "md:w-[18rem]"} ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="border-b border-white/[0.06] p-5">
+      <aside className={`fixed inset-y-0 left-0 z-[60] w-72 bg-slate-950 border-r border-slate-800 flex flex-col overflow-y-auto transition-transform duration-300 md:sticky md:top-0 md:translate-x-0 md:w-64 md:h-screen md:z-50 md:overflow-visible ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3 text-white">
-              <div className="rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 p-2.5 shadow-lg shadow-orange-950/40"><Radar className="h-5 w-5" /></div>
-              <div className="admin-brand-copy"><h1 className="text-lg font-black leading-none">Nexa Admin</h1><p className="mt-1 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">Centre de contrôle</p></div>
+              <div className="bg-orange-600 p-2 rounded-xl"><Radar className="w-5 h-5" /></div>
+              <h1 className="text-xl font-black">TCF<span className="text-orange-500">.Admin</span></h1>
             </div>
-            <button onClick={() => setSidebarOpen(false)} aria-label="Fermer le menu" className="rounded-xl p-2 text-slate-500 hover:bg-white/5 hover:text-white md:hidden">
+            <button onClick={() => setSidebarOpen(false)} className="md:hidden p-2 text-slate-500 hover:text-white transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
-          <div className="admin-status mt-4 flex items-center gap-2 rounded-xl border border-emerald-500/10 bg-emerald-500/[0.06] px-3 py-2"><span className="h-2 w-2 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_10px_#34d399]" /><span className="text-[11px] font-bold text-emerald-300">Plateforme opérationnelle</span></div>
+          <button onClick={() => window.location.href = "/dashboard"} className="flex items-center gap-2 text-slate-400 hover:text-orange-500 text-xs font-bold transition-colors">← Retour au Dashboard</button>
         </div>
         
-        <nav aria-label="Navigation de l’administration" className="custom-scrollbar flex-1 space-y-1 overflow-y-auto px-3 py-4 [&_button]:min-h-10 [&_button]:focus-visible:outline-none [&_button]:focus-visible:ring-2 [&_button]:focus-visible:ring-orange-400" onClick={() => setSidebarOpen(false)}>
-          {favoriteTabs.filter((tab) => tabLabels[tab] && canAccessTab(tab)).length > 0 && <div className="mb-5 rounded-2xl border border-amber-500/10 bg-amber-500/[0.04] p-1.5"><p className="mb-1 px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-500/60">Favoris</p>{favoriteTabs.filter((tab) => tabLabels[tab] && canAccessTab(tab)).map((tab) => <button key={tab} onClick={() => setActiveTab(tab)} title={tabLabels[tab]} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-xs font-bold ${activeTab === tab ? "bg-amber-500 text-slate-950" : "text-amber-200/70 hover:bg-amber-500/10"}`}><Star className="h-3.5 w-3.5 fill-current" /><span className="truncate">{tabLabels[tab]}</span></button>)}</div>}
+        <nav className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar pb-6" onClick={() => setSidebarOpen(false)}>
           <p className="text-[10px] font-black uppercase text-slate-600 mb-2 mt-2 tracking-widest px-2">Gestion Étudiants</p>
           <button onClick={() => setActiveTab("crm_all")} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "crm_all" ? "bg-orange-500 text-white" : "text-slate-400 hover:bg-slate-900"}`}>
             <div className="flex items-center gap-3"><Users className="w-4 h-4" /> Tous</div>
@@ -2796,18 +2680,14 @@ export default function RealAdminDashboard() {
             )
           })}
 
-          <p className="mb-2 mt-6 px-2 text-[10px] font-black uppercase tracking-widest text-slate-600">Pilotage</p>
+          <p className="text-[10px] font-black uppercase text-slate-600 mb-2 mt-6 tracking-widest px-2">Plateforme</p>
           <button onClick={() => setActiveTab("overview")} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "overview" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
             <Zap className="w-4 h-4" /> Vue d'ensemble
           </button>
-          <button onClick={() => setActiveTab("analytics")} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "analytics" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
-            <BarChart3 className="w-4 h-4" /> Analytics du site
-          </button>
           <button onClick={() => setActiveTab("actions")} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "actions" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
-            <div className="flex items-center gap-3"><Activity className="w-4 h-4" /> Journal d’activité</div>
+            <div className="flex items-center gap-3"><Activity className="w-4 h-4" /> Actions Clients</div>
             <span className="text-xs bg-slate-800/50 px-2 rounded-full">{clientActivities.length}</span>
           </button>
-          <p className="mb-2 mt-6 px-2 text-[10px] font-black uppercase tracking-widest text-slate-600">Pédagogie</p>
           <button onClick={() => setActiveTab("examens")} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "examens" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
             <BarChart3 className="w-4 h-4" /> Radar Simulateurs
           </button>
@@ -2817,17 +2697,12 @@ export default function RealAdminDashboard() {
               <span className="text-[9px] font-black bg-red-500 text-white px-1.5 py-0.5 rounded-full">{pendingMissionSubmissionsCount}</span>
             )}
           </button>
-          <button onClick={() => setActiveTab("soumissions")} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "soumissions" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
-            <div className="flex items-center gap-3"><FileText className="w-4 h-4" /> Soumissions</div>
-            {pendingMissionSubmissionsCount > 0 && <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-black text-white">{pendingMissionSubmissionsCount}</span>}
-          </button>
           <button onClick={() => setActiveTab("coaching")} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "coaching" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
             <div className="flex items-center gap-3"><CalendarCheck className="w-4 h-4" /> Coaching</div>
             {coachingAppointments.filter(a => a.status === "pending").length > 0 && (
               <span className="text-[9px] font-black bg-red-500 text-white px-1.5 py-0.5 rounded-full">{coachingAppointments.filter(a => a.status === "pending").length}</span>
             )}
           </button>
-          <p className="mb-2 mt-6 px-2 text-[10px] font-black uppercase tracking-widest text-slate-600">Réseau & communication</p>
           <button onClick={() => setActiveTab("centres")} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "centres" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
             <div className="flex items-center gap-3"><Building2 className="w-4 h-4" /> Centres B2B</div>
             {centerApplications.filter(c => c.status === "new").length > 0 && (
@@ -2849,7 +2724,6 @@ export default function RealAdminDashboard() {
           <button onClick={() => setActiveTab("communaute")} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "communaute" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
             <MessageCircle className="w-4 h-4" /> Modération Forum
           </button>
-          <p className="mb-2 mt-6 px-2 text-[10px] font-black uppercase tracking-widest text-slate-600">Expérience client</p>
           <button onClick={() => setActiveTab("retours")} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "retours" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
             <MessageCircle className="w-4 h-4" /> Retours Utilisateurs
           </button>
@@ -2860,52 +2734,26 @@ export default function RealAdminDashboard() {
             <BellRing className="w-4 h-4" /> Notifications Push
           </button>
         </nav>
-        <div className="border-t border-white/[0.06] bg-[#070b14] p-3">
-          <p className="mb-2 px-2 text-[9px] font-black uppercase tracking-[0.2em] text-slate-600">Actions rapides</p>
-          <div className="grid grid-cols-3 gap-2">
-            <button onClick={exportToCSV} title="Exporter en CSV" className="flex flex-col items-center gap-1 rounded-xl border border-white/[0.06] bg-white/[0.03] px-2 py-2.5 text-[9px] font-bold text-slate-400 hover:border-orange-500/30 hover:text-orange-400"><FileDown className="h-4 w-4" />CSV</button>
-            <button onClick={exportToPDF} title="Exporter en PDF" className="flex flex-col items-center gap-1 rounded-xl border border-white/[0.06] bg-white/[0.03] px-2 py-2.5 text-[9px] font-bold text-slate-400 hover:border-orange-500/30 hover:text-orange-400"><FileText className="h-4 w-4" />PDF</button>
-            <button onClick={broadcastMessage} title="Envoyer une annonce" className="flex flex-col items-center gap-1 rounded-xl border border-indigo-500/10 bg-indigo-500/[0.05] px-2 py-2.5 text-[9px] font-bold text-indigo-300 hover:border-indigo-400/30"><MessageSquare className="h-4 w-4" />Annonce</button>
-          </div>
-          <button onClick={() => window.location.href = "/dashboard"} className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-xs font-bold text-slate-500 hover:bg-white/[0.04] hover:text-white">← Retour à l’espace étudiant</button>
-          <div className="mt-1 hidden grid-cols-2 gap-2 md:grid">
-            <button onClick={() => setAdminTheme((theme) => theme === "dark" ? "light" : "dark")} title="Changer le thème" className="flex items-center justify-center gap-2 rounded-xl p-2.5 text-xs font-bold text-slate-500 hover:bg-white/[0.04] hover:text-white">{adminTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}<span className="admin-footer-label">Thème</span></button>
-            <button onClick={() => setSidebarCollapsed((value) => !value)} title={sidebarCollapsed ? "Agrandir la sidebar" : "Réduire la sidebar"} className="flex items-center justify-center gap-2 rounded-xl p-2.5 text-xs font-bold text-slate-500 hover:bg-white/[0.04] hover:text-white">{sidebarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}<span className="admin-footer-label">Réduire</span></button>
-          </div>
-        </div>
       </aside>
 
-      <main className="flex min-h-screen min-w-0 flex-1 flex-col md:h-screen md:overflow-y-auto">
-        <header className="sticky top-0 z-40 flex min-h-[4.5rem] items-center gap-3 border-b border-white/[0.06] bg-[#070b14]/90 px-4 py-3 backdrop-blur-xl md:px-8">
-          <button onClick={() => setSidebarOpen(true)} aria-label="Ouvrir le menu" className="-ml-1 shrink-0 rounded-xl border border-white/[0.06] p-2.5 text-slate-400 hover:bg-white/5 hover:text-white md:hidden">
+      <main className="flex-1 flex flex-col min-h-screen md:h-screen md:overflow-y-auto">
+        <header className="min-h-[4rem] md:h-20 px-4 md:px-8 py-3 md:py-0 flex items-center gap-3 border-b border-slate-800 bg-slate-950/50 backdrop-blur-md sticky top-0 z-40">
+          <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-1 text-slate-400 hover:text-white transition-colors shrink-0">
             <Menu className="w-5 h-5" />
           </button>
-          <div className="min-w-0 flex-1">
-            <p className="text-[9px] font-black uppercase tracking-[0.22em] text-orange-400">{activeSection.eyebrow}</p>
-            <h1 className="truncate text-base font-black text-white sm:text-lg">{activeSection.title}</h1>
+          <div className="relative flex-1 md:w-96 md:flex-none">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input type="text" placeholder="Chercher un étudiant..." className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:border-orange-500 text-white" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
           </div>
-          {activeTab.startsWith("crm") && <div className="relative hidden w-72 lg:block"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><input type="search" aria-label="Chercher un étudiant" placeholder="Rechercher un étudiant…" className="w-full rounded-xl border border-white/[0.07] bg-white/[0.04] py-2.5 pl-10 pr-4 text-sm text-white outline-none transition focus:border-orange-500/60 focus:bg-white/[0.06]" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} /></div>}
-          <button onClick={() => setGlobalSearchOpen(true)} title="Recherche globale (/)" className="hidden items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2.5 text-xs font-bold text-slate-400 hover:bg-white/[0.06] hover:text-white sm:flex"><Search className="h-4 w-4" /><span className="hidden xl:inline">Rechercher</span><kbd className="hidden rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-slate-600 xl:inline">/</kbd></button>
-          <button onClick={() => setGlobalSearchOpen(true)} aria-label="Recherche globale" className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-slate-400 sm:hidden"><Search className="h-4 w-4" /></button>
-          <button onClick={() => toggleFavorite(activeTab)} title={favoriteTabs.includes(activeTab) ? "Retirer des favoris" : "Ajouter aux favoris"} className={`hidden rounded-xl border p-2.5 sm:block ${favoriteTabs.includes(activeTab) ? "border-amber-400/30 bg-amber-400/10 text-amber-400" : "border-white/[0.06] bg-white/[0.03] text-slate-500 hover:text-amber-400"}`}><Star className={`h-4 w-4 ${favoriteTabs.includes(activeTab) ? "fill-current" : ""}`} /></button>
-          <button onClick={() => setAdminTheme((theme) => theme === "dark" ? "light" : "dark")} aria-label="Changer le thème" className="rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-slate-400 hover:text-white md:hidden">{adminTheme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}</button>
-          <div className="relative">
-            <button onClick={() => setNotificationsOpen((value) => !value)} aria-label="Notifications" className="relative rounded-xl border border-white/[0.06] bg-white/[0.03] p-2.5 text-slate-400 hover:text-white"><Bell className="h-4 w-4" />{adminNotifications.length > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">{adminNotifications.length}</span>}</button>
-            {notificationsOpen && <div className="absolute right-0 top-12 z-50 w-[min(22rem,85vw)] rounded-2xl border border-white/10 bg-[#0b1120] p-2 shadow-2xl"><div className="flex items-center justify-between px-3 py-2"><p className="text-xs font-black uppercase tracking-wider text-white">À traiter</p><span className="text-[10px] text-slate-500">{adminNotifications.length} alerte(s)</span></div>{adminNotifications.length === 0 ? <p className="px-3 py-6 text-center text-xs text-slate-500">Tout est à jour.</p> : adminNotifications.map((notification) => <button key={notification.tab} onClick={() => { setActiveTab(notification.tab); setNotificationsOpen(false); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left hover:bg-white/5"><span className="h-2 w-2 shrink-0 rounded-full bg-orange-400" /><span className="flex-1 text-xs font-bold text-slate-300">{notification.title}</span><ChevronRight className="h-3.5 w-3.5 text-slate-600" /></button>)}</div>}
+          <div className="flex items-center gap-2 md:gap-4 ml-auto">
+            <button onClick={exportToCSV} className="px-3 md:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Download className="w-4 h-4" /><span className="hidden sm:inline">Exporter CSV</span></button>
+            <button onClick={exportToPDF} className="px-3 md:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Download className="w-4 h-4" /><span className="hidden sm:inline">Exporter PDF</span></button>
+            <button onClick={broadcastMessage} className="px-3 md:px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageSquare className="w-4 h-4" /><span className="hidden sm:inline">Annonce</span></button>
+            <div className="font-mono font-bold text-orange-400 flex items-center gap-1.5 border-l border-slate-800 pl-3 md:pl-4 text-xs md:text-sm"><Activity className="w-4 h-4 animate-pulse" />{currentTime}</div>
           </div>
-          <div className="hidden shrink-0 items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 font-mono text-xs font-bold text-orange-400 md:flex"><Activity className="h-3.5 w-3.5 animate-pulse" />{currentTime}</div>
         </header>
 
-        <div className="mx-auto w-full max-w-[1600px] p-4 md:p-8">
-          <div className="mb-6 lg:hidden">
-            <p className="text-sm leading-relaxed text-slate-500">{activeSection.description}</p>
-            {activeTab.startsWith("crm") && (
-              <div className="relative mt-4">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-                <input type="search" aria-label="Chercher un étudiant" placeholder="Rechercher un étudiant…" className="w-full rounded-xl border border-white/[0.07] bg-white/[0.04] py-3 pl-10 pr-4 text-sm text-white outline-none transition focus:border-orange-500/60" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-              </div>
-            )}
-          </div>
+        <div className="p-4 md:p-8">
 
           {/* 👥 ONGLET CRM */}
           {activeTab.startsWith("crm") && (
@@ -3486,8 +3334,6 @@ export default function RealAdminDashboard() {
               </div>
             </motion.div>
           )}
-
-          {activeTab === "analytics" && <AdminAnalyticsSection />}
 
           {/* 📊 AUTRES ONGLETS */}
           {activeTab === "actions" && (
