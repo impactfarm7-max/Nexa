@@ -1,24 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
-import { ShieldCheck, LogOut, LayoutDashboard, Building2, Inbox, Users, ScrollText } from "lucide-react";
+import {
+  BarChart3, Bell, Building2, ChevronRight, Command, Inbox, LayoutDashboard,
+  LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck,
+  Star, Sun, ScrollText, Users, X,
+} from "lucide-react";
 import { supabase } from "../utils/supabase";
+import { superadminFetch } from "../utils/superadmin-api-client";
 
-// Cette route gère elle-même son propre contrôle (rôle + éventuelle redirection
-// si le MFA est déjà actif) : elle ne doit PAS être bloquée par l'exigence
-// aal2 ci-dessous, sinon on obtient une boucle bloquante (impossible d'activer
-// le MFA puisque la page pour l'activer est elle-même gated par le MFA).
 const MFA_SETUP_PATH = "/superadmin/mfa-setup";
+const PREFS_KEY = "nexa_superadmin_preferences";
 
 const NAV_ITEMS = [
-  { href: "/superadmin/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/superadmin/centres", label: "Centres", icon: Building2 },
-  { href: "/superadmin/etudiants", label: "Étudiants", icon: Users },
-  { href: "/superadmin/demandes", label: "Demandes", icon: Inbox },
-  { href: "/superadmin/audit", label: "Journal", icon: ScrollText },
+  { href: "/superadmin/dashboard", label: "Vue d’ensemble", description: "Indicateurs du réseau", icon: LayoutDashboard, group: "Pilotage" },
+  { href: "/superadmin/analytics", label: "Analytics du site", description: "Audience et acquisition", icon: BarChart3, group: "Pilotage" },
+  { href: "/superadmin/centres", label: "Centres", description: "Gestion du réseau", icon: Building2, group: "Réseau" },
+  { href: "/superadmin/etudiants", label: "Étudiants", description: "Recherche globale", icon: Users, group: "Réseau" },
+  { href: "/superadmin/demandes", label: "Demandes", description: "Validations en attente", icon: Inbox, group: "Opérations" },
+  { href: "/superadmin/audit", label: "Journal d’audit", description: "Actions sensibles", icon: ScrollText, group: "Sécurité" },
 ];
+
+type SearchResult = { id: string; href: string; type: string; title: string; detail: string };
+type CenterRow = { id: string; name: string; city?: string | null; status: string; creatorEmail?: string | null };
 
 export default function SuperadminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -26,118 +32,140 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   const isMfaSetupRoute = pathname === MFA_SETUP_PATH;
   const [authorized, setAuthorized] = useState(false);
   const [email, setEmail] = useState<string | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [centers, setCenters] = useState<CenterRow[]>([]);
+  const [studentResults, setStudentResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
-    document.body.style.backgroundColor = "#05070d";
-    return () => {
-      document.body.style.backgroundColor = "";
-    };
+    try {
+      const prefs = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
+      setCollapsed(Boolean(prefs.collapsed));
+      if (prefs.theme === "light") setTheme("light");
+      if (Array.isArray(prefs.favorites)) setFavorites(prefs.favorites);
+    } catch { /* utiliser les préférences par défaut */ }
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ collapsed, theme, favorites }));
+  }, [collapsed, theme, favorites]);
+
+  useEffect(() => {
+    document.body.style.backgroundColor = theme === "light" ? "#f1f5f9" : "#05070d";
+    return () => { document.body.style.backgroundColor = ""; };
+  }, [theme]);
 
   useEffect(() => {
     let cancelled = false;
     setAuthorized(false);
-
     const checkSuperadmin = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.replace("/login");
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", session.user.id)
-        .single();
-
-      if (!profile || profile.role !== "superadmin") {
-        router.replace("/login");
-        return;
-      }
-
+      if (!session) return router.replace("/login");
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single();
+      if (!profile || profile.role !== "superadmin") return router.replace("/login");
       if (isMfaSetupRoute) {
-        // La page mfa-setup vérifie elle-même le niveau aal et redirige vers
-        // le dashboard si le MFA est déjà validé pour cette session.
-        if (cancelled) return;
-        setEmail(session.user.email ?? null);
-        setAuthorized(true);
+        if (!cancelled) { setEmail(session.user.email ?? null); setAuthorized(true); }
         return;
       }
-
-      // Le rôle seul ne suffit pas : la session courante doit avoir complété
-      // le second facteur (aal2). Sans ça, retour au login pour rejouer le MFA.
       const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
       if (aal?.currentLevel !== "aal2") {
-        if (aal?.nextLevel !== "aal2") {
-          router.replace(MFA_SETUP_PATH);
-          return;
-        }
+        if (aal?.nextLevel !== "aal2") return router.replace(MFA_SETUP_PATH);
         await supabase.auth.signOut();
-        router.replace("/login");
-        return;
+        return router.replace("/login");
       }
-
-      if (cancelled) return;
-      setEmail(session.user.email ?? null);
-      setAuthorized(true);
+      if (!cancelled) { setEmail(session.user.email ?? null); setAuthorized(true); }
     };
-
-    checkSuperadmin();
-    return () => {
-      cancelled = true;
-    };
+    void checkSuperadmin();
+    return () => { cancelled = true; };
   }, [router, isMfaSetupRoute]);
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    router.replace("/login");
-  };
+  useEffect(() => {
+    if (!authorized || isMfaSetupRoute) return;
+    void superadminFetch<{ centers: CenterRow[] }>("/api/superadmin/centers")
+      .then((json) => setCenters(json.centers || []))
+      .catch(() => undefined);
+  }, [authorized, isMfaSetupRoute]);
 
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const editing = ["INPUT", "TEXTAREA", "SELECT"].includes(target?.tagName || "") || target?.isContentEditable;
+      if ((event.key === "/" || (event.ctrlKey && event.key.toLowerCase() === "k")) && !editing) {
+        event.preventDefault(); setCommandOpen(true);
+      }
+      if (event.key === "Escape") { setCommandOpen(false); setNotificationsOpen(false); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    const value = query.trim();
+    if (value.length < 2) { setStudentResults([]); return; }
+    const timer = window.setTimeout(async () => {
+      setSearching(true);
+      try {
+        const json = await superadminFetch<{ students: Array<{ id: string; prenom: string | null; email: string | null; center_id: string | null }>; centers: Record<string, { name: string }> }>(`/api/superadmin/students?q=${encodeURIComponent(value)}`);
+        setStudentResults((json.students || []).slice(0, 6).map((student) => ({ id: student.id, href: "/superadmin/etudiants", type: "Étudiant", title: student.prenom || student.email || "Étudiant", detail: student.email || (student.center_id ? json.centers?.[student.center_id]?.name : "") || "" })));
+      } catch { setStudentResults([]); }
+      finally { setSearching(false); }
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  const activeItem = NAV_ITEMS.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`)) || NAV_ITEMS[0];
+  const pendingCenters = centers.filter((center) => center.status === "pending");
+  const navigationResults = query.trim().length < 2 ? [] : NAV_ITEMS.filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(query.toLowerCase())).map((item) => ({ id: item.href, href: item.href, type: "Rubrique", title: item.label, detail: item.description }));
+  const centerResults = query.trim().length < 2 ? [] : centers.filter((center) => `${center.name} ${center.city || ""} ${center.creatorEmail || ""}`.toLowerCase().includes(query.toLowerCase())).slice(0, 6).map((center) => ({ id: center.id, href: "/superadmin/centres", type: "Centre", title: center.name, detail: center.city || center.creatorEmail || "" }));
+  const results = [...navigationResults, ...centerResults, ...studentResults].slice(0, 14);
+  const groups = useMemo(() => [...new Set(NAV_ITEMS.map((item) => item.group))], []);
+  const toggleFavorite = useCallback((href: string) => setFavorites((current) => current.includes(href) ? current.filter((item) => item !== href) : [...current, href].slice(-4)), []);
+
+  const handleSignOut = async () => { await supabase.auth.signOut(); router.replace("/login"); };
   if (!authorized) return null;
-
-  // La page mfa-setup gère sa propre mise en page plein écran (carte centrée) —
-  // pas besoin du header applicatif tant que le compte n'est pas pleinement actif.
   if (isMfaSetupRoute) return <>{children}</>;
 
   return (
-    <div className="min-h-screen bg-[#05070d] text-slate-100">
-      <header className="flex flex-col gap-3 border-b border-white/10 bg-[#0a0f1c] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className="flex shrink-0 items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-orange-400" />
-          <span className="text-sm font-black uppercase tracking-widest text-white">
-            Nexa · Superadmin
-          </span>
+    <div className={`superadmin-shell flex min-h-screen ${theme === "light" ? "superadmin-light bg-slate-100 text-slate-900" : "bg-[#05070d] text-slate-100"}`}>
+      {mobileOpen && <button aria-label="Fermer le menu" className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
+      <aside className={`superadmin-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/[0.08] bg-[#080d18] shadow-2xl transition-[width,transform] duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${collapsed ? "lg:w-20" : "lg:w-72"} w-[min(88vw,18rem)] ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex h-20 items-center gap-3 border-b border-white/[0.07] px-5">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg shadow-orange-950/40"><ShieldCheck className="h-5 w-5 text-white" /></div>
+          {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-sm font-black uppercase tracking-wider text-white">Nexa Superadmin</p><p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600">Pilotage réseau</p></div>}
+          <button onClick={() => setMobileOpen(false)} className="rounded-xl p-2 text-slate-500 hover:text-white lg:hidden"><X className="h-5 w-5" /></button>
         </div>
-        <nav className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-          {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
-            const active = pathname === href || pathname.startsWith(`${href}/`);
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                  active ? "bg-orange-500/15 text-orange-300" : "text-slate-400 hover:bg-white/5 hover:text-white"
-                }`}
-              >
-                <Icon className="h-3.5 w-3.5 shrink-0" />
-                <span className="hidden sm:inline">{label}</span>
-              </Link>
-            );
-          })}
+        <nav className="custom-scrollbar flex-1 overflow-y-auto px-3 py-4" aria-label="Navigation superadmin">
+          {!collapsed && favorites.length > 0 && <div className="mb-5 rounded-2xl border border-amber-500/10 bg-amber-500/[0.04] p-1.5"><p className="px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-500/60">Favoris</p>{favorites.map((href) => { const item = NAV_ITEMS.find((entry) => entry.href === href); if (!item) return null; return <Link key={href} href={href} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-amber-200/70 hover:bg-amber-500/10"><Star className="h-3.5 w-3.5 fill-current" />{item.label}</Link>; })}</div>}
+          {groups.map((group) => <div key={group} className="mb-5">{!collapsed && <p className="mb-1.5 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-slate-600">{group}</p>}{NAV_ITEMS.filter((item) => item.group === group).map(({ href, label, description, icon: Icon }) => { const active = pathname === href || pathname.startsWith(`${href}/`); const count = href === "/superadmin/demandes" ? pendingCenters.length : 0; return <Link key={href} href={href} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)} className={`mb-1 flex min-h-12 items-center rounded-xl transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${active ? "bg-orange-500 text-white shadow-lg shadow-orange-950/30" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}><Icon className="h-4.5 w-4.5 shrink-0" />{!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{label}</p><p className={`truncate text-[9px] ${active ? "text-orange-100/70" : "text-slate-600"}`}>{description}</p></div>}{count > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">{count}</span>}</Link>; })}</div>)}
         </nav>
-        <div className="flex shrink-0 items-center gap-4">
-          {email && <span className="hidden text-xs font-medium text-slate-400 md:inline">{email}</span>}
-          <button
-            onClick={handleSignOut}
-            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 px-3 py-1.5 text-xs font-bold text-slate-300 transition-colors hover:bg-white/5"
-          >
-            <LogOut className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Déconnexion</span>
-          </button>
+        <div className="border-t border-white/[0.07] p-3">
+          <div className={`flex items-center ${collapsed ? "flex-col gap-1" : "gap-1"}`}>
+            <button onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")} title="Changer le thème" className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-white/5 hover:text-white">{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{!collapsed && "Thème"}</button>
+            <button onClick={() => setCollapsed((value) => !value)} title="Réduire la sidebar" className="hidden h-10 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-white/5 hover:text-white lg:flex">{collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}{!collapsed && "Réduire"}</button>
+          </div>
+          <button onClick={handleSignOut} className={`mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-red-500/10 hover:text-red-300`}><LogOut className="h-4 w-4" />{!collapsed && "Déconnexion"}</button>
         </div>
-      </header>
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">{children}</main>
+      </aside>
+
+      <div className="min-w-0 flex-1">
+        <header className="sticky top-0 z-30 flex h-20 items-center gap-3 border-b border-white/[0.07] bg-[#05070d]/90 px-4 backdrop-blur-xl sm:px-6">
+          <button onClick={() => setMobileOpen(true)} aria-label="Ouvrir le menu" className="rounded-xl border border-white/[0.07] p-2.5 text-slate-400 lg:hidden"><Menu className="h-5 w-5" /></button>
+          <div className="min-w-0 flex-1"><p className="text-[9px] font-black uppercase tracking-[0.22em] text-orange-400">{activeItem.group}</p><h1 className="truncate text-base font-black text-white">{activeItem.label}</h1></div>
+          <button onClick={() => setCommandOpen(true)} className="hidden items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2.5 text-xs font-bold text-slate-400 hover:text-white sm:flex"><Search className="h-4 w-4" /><span className="hidden xl:inline">Recherche globale</span><kbd className="hidden rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-slate-600 xl:inline">Ctrl K</kbd></button>
+          <button onClick={() => toggleFavorite(activeItem.href)} aria-label="Ajouter aux favoris" className={`hidden rounded-xl border p-2.5 sm:block ${favorites.includes(activeItem.href) ? "border-amber-400/30 bg-amber-400/10 text-amber-400" : "border-white/[0.07] text-slate-500"}`}><Star className={`h-4 w-4 ${favorites.includes(activeItem.href) ? "fill-current" : ""}`} /></button>
+          <div className="relative"><button onClick={() => setNotificationsOpen((value) => !value)} aria-label="Notifications" className="relative rounded-xl border border-white/[0.07] p-2.5 text-slate-400"><Bell className="h-4 w-4" />{pendingCenters.length > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">{pendingCenters.length}</span>}</button>{notificationsOpen && <div className="absolute right-0 top-12 w-[min(22rem,85vw)] rounded-2xl border border-white/10 bg-[#0b1120] p-2 shadow-2xl"><p className="px-3 py-2 text-xs font-black uppercase tracking-wider text-white">À traiter</p>{pendingCenters.length === 0 ? <p className="px-3 py-6 text-center text-xs text-slate-500">Tout est à jour.</p> : <Link href="/superadmin/demandes" onClick={() => setNotificationsOpen(false)} className="flex items-center gap-3 rounded-xl px-3 py-3 hover:bg-white/5"><span className="h-2 w-2 rounded-full bg-orange-400" /><span className="flex-1 text-xs font-bold text-slate-300">{pendingCenters.length} demande(s) de centre à traiter</span><ChevronRight className="h-4 w-4 text-slate-600" /></Link>}</div>}</div>
+          {email && <span className="hidden max-w-40 truncate text-[10px] font-medium text-slate-500 2xl:block">{email}</span>}
+        </header>
+        <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+      </div>
+
+      {commandOpen && <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/75 px-4 pt-[10vh] backdrop-blur-sm" onClick={() => setCommandOpen(false)}><div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-[#0b1120] shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex h-16 items-center gap-3 border-b border-white/[0.07] px-5"><Command className="h-5 w-5 text-orange-400" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Centre, étudiant ou rubrique…" className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-slate-600" /><kbd className="rounded border border-white/10 px-2 py-1 text-[9px] text-slate-500">ESC</kbd></div><div className="custom-scrollbar max-h-[55vh] overflow-y-auto p-2">{query.trim().length < 2 && <p className="px-4 py-10 text-center text-sm text-slate-500">Recherchez dans tout le réseau Nexa.</p>}{searching && <div className="space-y-2 p-2">{[1,2,3].map((item) => <div key={item} className="h-14 animate-pulse rounded-xl bg-white/5" />)}</div>}{!searching && query.trim().length >= 2 && results.length === 0 && <p className="px-4 py-10 text-center text-sm text-slate-500">Aucun résultat.</p>}{!searching && results.map((result) => <Link key={`${result.type}-${result.id}`} href={result.href} onClick={() => { setCommandOpen(false); setQuery(""); }} className="flex items-center gap-3 rounded-2xl px-4 py-3 hover:bg-white/5"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-xs font-black text-orange-400">{result.type[0]}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-white">{result.title}</p><p className="truncate text-xs text-slate-500">{result.type} · {result.detail}</p></div><ChevronRight className="h-4 w-4 text-slate-700" /></Link>)}</div></div></div>}
     </div>
   );
 }

@@ -374,3 +374,27 @@ body {
 .font-display {
   font-family: var(--font-display);
 }
+
+/* Mode clair du superdashboard, limité à son contenu métier. */
+.superadmin-light > div,
+.superadmin-light > div > header {
+  background-color: rgb(241 245 249 / 0.94) !important;
+}
+.superadmin-light main .bg-\[\#0a0f1c\],
+.superadmin-light main .bg-\[\#0b1120\],
+.superadmin-light main .bg-black\/20 {
+  background-color: white !important;
+}
+.superadmin-light main .border-white\/10 {
+  border-color: rgb(226 232 240) !important;
+}
+.superadmin-light main .text-white,
+.superadmin-light main .text-slate-100,
+.superadmin-light main .text-slate-200,
+.superadmin-light main .text-slate-300 {
+  color: rgb(15 23 42) !important;
+}
+.superadmin-light main .text-slate-400,
+.superadmin-light main .text-slate-500 {
+  color: rgb(71 85 105) !important;
+}
