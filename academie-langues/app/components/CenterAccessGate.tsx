@@ -11,6 +11,7 @@ import { prefetchCenterPagesFireAndForget } from "@/app/utils/center-prefetch";
 import { isCenterOperational } from "@/app/utils/center-trial";
 import CenterAppShell from "@/app/components/CenterAppShell";
 import CenterRouteSkeleton from "@/app/components/CenterRouteSkeleton";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const CENTER_UNAVAILABLE_PATH = "/centre/acces-indisponible";
 
@@ -22,6 +23,11 @@ const ONBOARDING_FREE_PATHS = [
 ];
 
 type AccessDecision = { ok: true } | { ok: false; redirect: string };
+
+function isTcfBootstrap(bootstrap: { me: Record<string, unknown> }) {
+  const center = bootstrap.me.center as { center_type?: string | null } | null;
+  return center?.center_type === "tcf_canada";
+}
 
 function evaluateCenterAccess(
   json: Record<string, unknown>,
@@ -73,11 +79,19 @@ export default function CenterAccessGate({
 }: CenterAccessGateProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { setLocaleOverride } = useI18n();
   const [ready, setReady] = useState(false);
+  const [isTcfCenter, setIsTcfCenter] = useState(false);
+
+  useEffect(() => {
+    setLocaleOverride(isTcfCenter ? "fr" : null);
+    return () => setLocaleOverride(null);
+  }, [isTcfCenter, setLocaleOverride]);
 
   useLayoutEffect(() => {
     const cached = peekCenterBootstrap();
     if (cached && evaluateCenterAccess(cached.me, pathname).ok) {
+      setIsTcfCenter(isTcfBootstrap(cached));
       setReady(true);
       prefetchCenterPagesFireAndForget(cached);
     }
@@ -100,6 +114,7 @@ export default function CenterAccessGate({
       }
 
       if (!cancelled) {
+        setIsTcfCenter(isTcfBootstrap(bootstrap));
         prefetchCenterPagesFireAndForget(bootstrap);
         setReady(true);
       }

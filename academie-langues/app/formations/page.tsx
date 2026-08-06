@@ -1,47 +1,49 @@
 "use client";
 
 import Link from "next/link";
-import { 
-  GraduationCap, 
-  Lock, 
-  ArrowRight, 
-  Globe2, 
-  BookOpen, 
-  Languages, 
+import {
+  GraduationCap,
+  Lock,
+  ArrowRight,
+  Globe2,
+  BookOpen,
+  Languages,
   Star,
   Sparkles
 } from "lucide-react";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function FormationsCatalogue() {
-  
+  const { t } = useI18n();
+
   // Catalogue des futures formations (bloquées)
   const futureCourses = [
     {
       id: "anglais",
-      title: "Anglais (IELTS / TOEFL)",
-      description: "Maîtrisez la langue de Shakespeare pour vos projets internationaux et professionnels.",
+      title: t("marketing", "formationsAnglaisTitle"),
+      description: t("marketing", "formationsAnglaisDescription"),
       icon: Globe2,
-      level: "A1 au C1",
+      level: t("marketing", "formationsAnglaisLevel"),
       color: "text-blue-500",
       bgColor: "bg-blue-500/10",
       borderColor: "border-blue-500/20"
     },
     {
       id: "allemand",
-      title: "Allemand (Goethe)",
-      description: "Atteignez le niveau B2 exigé pour étudier, vivre ou travailler en Allemagne.",
+      title: t("marketing", "formationsAllemandTitle"),
+      description: t("marketing", "formationsAllemandDescription"),
       icon: BookOpen,
-      level: "A1 au B2",
+      level: t("marketing", "formationsAllemandLevel"),
       color: "text-amber-500",
       bgColor: "bg-amber-500/10",
       borderColor: "border-amber-500/20"
     },
     {
       id: "chinois",
-      title: "Chinois (HSK)",
-      description: "Ouvrez-vous les portes de l'Asie avec notre méthode d'apprentissage accélérée.",
+      title: t("marketing", "formationsChinoisTitle"),
+      description: t("marketing", "formationsChinoisDescription"),
       icon: Languages,
-      level: "HSK 1 au 4",
+      level: t("marketing", "formationsChinoisLevel"),
       color: "text-red-500",
       bgColor: "bg-red-500/10",
       borderColor: "border-red-500/20"
@@ -58,12 +60,12 @@ export default function FormationsCatalogue() {
           <div className="w-10 h-10 md:w-12 md:h-12 bg-orange-100 rounded-xl md:rounded-2xl flex items-center justify-center border border-orange-200 shrink-0">
             <GraduationCap className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-xl md:text-3xl font-black leading-tight text-neutral-900 tracking-tight">
-              Formations NEXA
+              {t("marketing", "formationsHeroTitle")}
             </h1>
             <p className="text-[10px] md:text-sm text-neutral-500 font-medium mt-0.5 md:mt-1">
-              Explorez notre catalogue et développez de nouvelles compétences.
+              {t("marketing", "formationsHeroSubtitle")}
             </p>
           </div>
         </div>
@@ -75,7 +77,7 @@ export default function FormationsCatalogue() {
         <section className="mb-10 md:mb-12">
           <div className="flex items-center gap-3 mb-5 md:mb-6">
             <h2 className="text-sm md:text-xl font-black text-neutral-900 uppercase tracking-widest whitespace-nowrap">
-              Vos accès actifs
+              {t("marketing", "formationsActiveSectionTitle")}
             </h2>
             <div className="h-px flex-1 bg-neutral-200"></div>
           </div>
@@ -93,20 +95,20 @@ export default function FormationsCatalogue() {
                   </div>
                   <div>
                     <span className="inline-block px-3 py-1 bg-orange-500/20 text-orange-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-full mb-1.5 md:mb-2">
-                      Formation Principale
+                      {t("marketing", "formationsMainBadge")}
                     </span>
-                    <h3 className="text-xl md:text-2xl font-black text-white leading-tight">TCF Canada Intensive</h3>
-                    <p className="text-slate-400 text-xs md:text-sm mt-1">Préparation complète : Écrit, Oral, Simulateur NEXA.</p>
+                    <h3 className="text-xl md:text-2xl font-black text-white leading-tight">{t("marketing", "formationsMainCourseTitle")}</h3>
+                    <p className="text-slate-400 text-xs md:text-sm mt-1">{t("marketing", "formationsMainCourseDescription")}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto mt-2 md:mt-0">
                   <div className="text-left md:text-right mr-2">
-                    <p className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-widest">Statut</p>
-                    <p className="text-emerald-400 font-black text-xs md:text-sm">En cours</p>
+                    <p className="text-[10px] md:text-xs font-bold text-slate-300 uppercase tracking-widest">{t("marketing", "formationsStatusLabel")}</p>
+                    <p className="text-emerald-400 font-black text-xs md:text-sm">{t("marketing", "formationsStatusInProgress")}</p>
                   </div>
                   <div className="flex-1 md:flex-none bg-orange-600 md:hover:bg-orange-500 text-white px-5 md:px-6 py-3 rounded-xl font-bold text-sm md:text-base transition-colors flex items-center justify-center gap-2 shadow-lg shadow-orange-600/20 active:scale-95">
-                    Continuer <ArrowRight className="w-4 h-4" />
+                    {t("marketing", "formationsContinueButton")} <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               </div>
@@ -119,7 +121,7 @@ export default function FormationsCatalogue() {
         <section>
           <div className="flex items-center gap-3 mb-5 md:mb-6">
             <h2 className="text-sm md:text-xl font-black text-neutral-900 uppercase tracking-widest flex items-center gap-2 whitespace-nowrap">
-              <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-orange-500 shrink-0" /> À venir
+              <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-orange-500 shrink-0" /> {t("marketing", "formationsUpcomingSectionTitle")}
             </h2>
             <div className="h-px flex-1 bg-neutral-200"></div>
           </div>
@@ -130,13 +132,13 @@ export default function FormationsCatalogue() {
               return (
                 <div 
                   key={course.id} 
-                  onClick={() => alert(`⏳ La formation ${course.title} est en cours de création. Restez à l'écoute !`)}
+                  onClick={() => alert(`${t("marketing", "formationsUpcomingAlertPrefix")}${course.title}${t("marketing", "formationsUpcomingAlertSuffix")}`)}
                   className="bg-white p-5 md:p-6 rounded-[1.5rem] md:rounded-[2rem] border border-neutral-200 shadow-sm relative overflow-hidden group cursor-pointer active:scale-[0.98] transition-transform"
                 >
                   {/* Overlay Filtre Gris + Cadenas au survol */}
                   <div className="absolute inset-0 bg-slate-900/5 backdrop-blur-[1px] z-20 flex items-center justify-center opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 pointer-events-none">
                     <div className="bg-slate-900 text-white px-4 py-2 rounded-full font-bold text-xs uppercase tracking-widest flex items-center gap-2 shadow-xl">
-                      <Lock className="w-3 h-3 text-orange-500" /> Bientôt
+                      <Lock className="w-3 h-3 text-orange-500" /> {t("marketing", "formationsComingSoonBadge")}
                     </div>
                   </div>
 
@@ -154,7 +156,7 @@ export default function FormationsCatalogue() {
                     </div>
                     
                     <span className="text-[9px] md:text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-1 block">
-                      Objectif : {course.level}
+                      {t("marketing", "formationsObjectiveLabel")} {course.level}
                     </span>
                     <h3 className="text-base md:text-lg font-black text-neutral-900 leading-tight mb-2 pr-8">
                       {course.title}
@@ -167,7 +169,7 @@ export default function FormationsCatalogue() {
                   {/* Fausse barre de progression */}
                   <div className="mt-5 md:mt-6 pt-4 border-t border-neutral-100 relative z-10">
                     <div className="w-full bg-neutral-50 md:bg-neutral-100 text-neutral-400 text-[10px] md:text-xs font-bold py-2.5 rounded-lg text-center uppercase tracking-widest flex items-center justify-center gap-2">
-                      Verrouillé
+                      {t("marketing", "formationsLockedLabel")}
                     </div>
                   </div>
                 </div>

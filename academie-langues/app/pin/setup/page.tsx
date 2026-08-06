@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { ShieldCheck, KeyRound, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { resolvePostLoginPath } from "@/app/utils/student-routes";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function PinSetupPage() {
   const router = useRouter();
+  const { t } = useI18n();
 
   const [pin, setPin] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -55,11 +57,11 @@ export default function PinSetupPage() {
     setErr(null);
 
     if (!/^\d{4}$/.test(pin)) {
-      setErr("Le code doit contenir exactement 4 chiffres.");
+      setErr(t("auth", "pinSetupCodeMustBe4Digits"));
       return;
     }
     if (pin !== confirm) {
-      setErr("Les deux codes ne correspondent pas.");
+      setErr(t("auth", "pinSetupCodesDontMatch"));
       return;
     }
 
@@ -76,7 +78,7 @@ export default function PinSetupPage() {
 
       const data = await res.json();
       if (!res.ok) {
-        setErr(data.error || "Erreur lors de la sauvegarde.");
+        setErr(data.error || t("auth", "pinSetupSaveError"));
         return;
       }
 
@@ -100,7 +102,7 @@ export default function PinSetupPage() {
       }
       router.replace(resolvePostLoginPath(profile));
     } catch {
-      setErr("Erreur réseau. Réessayez.");
+      setErr(t("auth", "pinSetupNetworkError"));
     } finally {
       setLoading(false);
     }
@@ -118,13 +120,13 @@ export default function PinSetupPage() {
             <ShieldCheck className="w-8 h-8 text-orange-500" />
           </div>
           <h2 className="text-4xl font-black text-white leading-tight mb-6">
-            Sécurisez votre <span className="text-orange-500">espace.</span>
+            {t("auth", "pinSetupHeroTitlePart1")} <span className="text-orange-500">{t("auth", "pinSetupHeroTitlePart2")}</span>
           </h2>
           <p className="text-slate-400 text-lg font-medium leading-relaxed">
-            Votre code PIN à 4 chiffres protège l'accès à vos exercices et résultats. Choisissez-le avec soin.
+            {t("auth", "pinSetupHeroDescription")}
           </p>
           <ul className="mt-8 space-y-3">
-            {["Code chiffré localement", "Verrouillage automatique après inactivité", "3 tentatives avant blocage temporaire"].map((item) => (
+            {[t("auth", "pinSetupFeature1"), t("auth", "pinSetupFeature2"), t("auth", "pinSetupFeature3")].map((item) => (
               <li key={item} className="flex items-center gap-3 text-sm text-slate-400 font-medium">
                 <CheckCircle2 className="w-4 h-4 text-orange-500 shrink-0" />
                 {item}
@@ -143,17 +145,17 @@ export default function PinSetupPage() {
               <KeyRound className="w-8 h-8 text-orange-600 stroke-[1.8]" />
             </div>
             <h1 className="text-2xl font-black text-slate-900">
-              {prenom ? `Bienvenue, ${prenom} !` : "Bienvenue !"}
+              {prenom ? `${t("auth", "pinSetupWelcome")}, ${prenom} !` : t("auth", "pinSetupWelcomeNoName")}
             </h1>
             <p className="mt-2 text-sm text-slate-500 font-medium">
-              Créez votre code PIN à 4 chiffres pour sécuriser votre accès.
+              {t("auth", "pinSetupSubtitle")}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">
-                Choisissez votre code PIN
+                {t("auth", "pinSetupChooseLabel")}
               </label>
               <input
                 autoFocus
@@ -170,7 +172,7 @@ export default function PinSetupPage() {
 
             <div>
               <label className="block text-[10px] font-black text-orange-600 uppercase tracking-widest mb-2">
-                Confirmez votre code PIN
+                {t("auth", "pinSetupConfirmLabel")}
               </label>
               <input
                 inputMode="numeric"
@@ -197,12 +199,12 @@ export default function PinSetupPage() {
               disabled={loading || pin.length !== 4 || confirm.length !== 4}
               className="w-full h-14 rounded-2xl bg-slate-950 text-white font-black uppercase tracking-widest text-sm hover:bg-orange-600 transition-all disabled:opacity-40 active:scale-95 shadow-xl mt-4"
             >
-              {loading ? "Enregistrement..." : "Créer mon code PIN →"}
+              {loading ? t("auth", "pinSetupSaving") : t("auth", "pinSetupSubmit")}
             </button>
           </form>
 
           <p className="mt-10 text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center opacity-50">
-            NEXA • Première connexion sécurisée
+            {t("auth", "pinSetupFooter")}
           </p>
         </div>
       </section>

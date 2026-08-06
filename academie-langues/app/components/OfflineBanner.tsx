@@ -5,8 +5,10 @@ import { WifiOff, Wifi, Clock } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useOnlineStatus } from "@/app/hooks/useOnlineStatus";
 import { useOfflineQueue } from "@/app/hooks/useOfflineQueue";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function OfflineBanner() {
+  const { t } = useI18n();
   const { isOnline } = useOnlineStatus();
   const { pendingCount, isSyncing } = useOfflineQueue();
   const [justReconnected, setJustReconnected] = useState(false);
@@ -23,12 +25,12 @@ export default function OfflineBanner() {
   }, [isOnline, pendingCount, isSyncing]);
 
   const offlineMessage = pendingCount > 0
-    ? `Connexion perdue — ${pendingCount} action${pendingCount > 1 ? "s" : ""} en attente`
-    : "Connexion perdue. Mode hors ligne.";
+    ? t("common", "offlinePending", { count: pendingCount })
+    : t("common", "offlineMode");
 
   const reconnectMessage = syncedCount > 0
-    ? `Réseau rétabli — ${syncedCount} action${syncedCount > 1 ? "s" : ""} synchronisée${syncedCount > 1 ? "s" : ""}`
-    : "Réseau rétabli !";
+    ? t("common", "networkRestoredSynced", { count: syncedCount })
+    : t("common", "networkRestored");
 
   return (
     <AnimatePresence>
@@ -58,7 +60,7 @@ export default function OfflineBanner() {
           className="fixed top-0 left-0 w-full z-[99999] bg-amber-500 text-white py-2 px-4 shadow-lg flex items-center justify-center gap-2"
         >
           <Clock size={16} className="animate-spin" />
-          <p className="text-xs font-bold tracking-widest uppercase">Synchronisation en cours...</p>
+          <p className="text-xs font-bold tracking-widest uppercase">{t("common", "syncing")}</p>
         </motion.div>
       )}
     </AnimatePresence>

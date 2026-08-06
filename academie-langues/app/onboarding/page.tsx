@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../utils/supabase"; 
 import { ShieldCheck, UserCheck, CheckCircle, Lock } from "lucide-react";
 import { BRAND } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function Onboarding() {
   const router = useRouter();
+  const { t, locale } = useI18n();
 
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -72,7 +74,7 @@ export default function Onboarding() {
       });
       if (!res.ok) {
         const body = await res.json();
-        throw new Error(body.error || "Erreur lors de la sauvegarde du PIN.");
+        throw new Error(body.error || t("auth", "onboardingPinSaveError"));
       }
 
       // 2) Mettre à jour les métadonnées pour marquer l'onboarding comme terminé
@@ -91,7 +93,7 @@ export default function Onboarding() {
       router.replace("/choix");
       
     } catch (error: any) {
-      alert("Erreur : " + (error?.message ?? "Inconnue"));
+      alert(t("auth", "onboardingGenericError") + (error?.message ?? t("auth", "onboardingUnknownError")));
     } finally {
       setLoading(false);
     }
@@ -105,19 +107,19 @@ export default function Onboarding() {
             <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-50 text-orange-600">
               <ShieldCheck className="h-8 w-8" />
             </div>
-            <h2 className="text-2xl font-black text-slate-950">Acces complet active</h2>
+            <h2 className="text-2xl font-black text-slate-950">{t("auth", "onboardingTrialTitle")}</h2>
             <p className="mt-3 text-sm font-medium leading-relaxed text-slate-500">
-              Votre compte vient d'etre cree. Vous avez acces a toute l'application pendant 24 heures.
+              {t("auth", "onboardingTrialDescription")}
             </p>
             <p className="mt-4 rounded-2xl bg-orange-50 px-4 py-3 text-xs font-black uppercase tracking-widest text-orange-700">
-              Fin de l'essai : {trialEndsAt ? new Date(trialEndsAt).toLocaleString("fr-FR") : "dans 24 heures"}
+              {t("auth", "onboardingTrialEndLabel")} {trialEndsAt ? new Date(trialEndsAt).toLocaleString(locale === "fr" ? "fr-FR" : "en-US") : t("auth", "onboardingTrialEndDefault")}
             </p>
             <button
               type="button"
               onClick={closeTrialWelcome}
               className="mt-6 h-14 w-full rounded-2xl bg-slate-950 text-sm font-black uppercase tracking-widest text-white transition-colors hover:bg-orange-600"
             >
-              Commencer
+              {t("auth", "onboardingTrialStartButton")}
             </button>
           </div>
         </div>
@@ -135,7 +137,7 @@ export default function Onboarding() {
           />
           
           <h2 className="text-4xl font-black text-white leading-tight mb-8">
-            Dernière étape pour sécuriser votre <span className="text-orange-500">Espace Étudiant.</span>
+            {t("auth", "onboardingHeroTitlePrefix")} <span className="text-orange-500">{t("auth", "onboardingHeroTitleHighlight")}</span>
           </h2>
 
           <div className="space-y-6">
@@ -143,13 +145,13 @@ export default function Onboarding() {
               <div className="w-10 h-10 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center">
                 <ShieldCheck className="text-orange-500 w-5 h-5" />
               </div>
-              <p className="text-slate-400 font-medium">Connexion rapide via code PIN sécurisé.</p>
+              <p className="text-slate-400 font-medium">{t("auth", "onboardingFeaturePin")}</p>
             </div>
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 bg-slate-900 border border-slate-800 rounded-full flex items-center justify-center">
                 <UserCheck className="text-orange-500 w-5 h-5" />
               </div>
-              <p className="text-slate-400 font-medium">Expérience personnalisée selon votre profil.</p>
+              <p className="text-slate-400 font-medium">{t("auth", "onboardingFeatureProfile")}</p>
             </div>
           </div>
         </div>
@@ -165,10 +167,10 @@ export default function Onboarding() {
               <Lock className="w-8 h-8 text-orange-500" />
             </div>
             <h1 className="mt-6 text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
-              Création du code PIN
+              {t("auth", "onboardingFormTitle")}
             </h1>
             <p className="mt-2 text-sm text-slate-500 font-medium">
-              Veuillez créer votre PIN à 4 chiffres pour votre connexion de tous les jours.Ne l'oubliez pas!
+              {t("auth", "onboardingFormSubtitle")}
             </p>
           </div>
 
@@ -177,12 +179,12 @@ export default function Onboarding() {
             {/* Sécurité PIN */}
             <div className="space-y-6">
               <div>
-                <label className="text-[11px] font-black uppercase text-orange-600 mb-2 block text-center tracking-widest">Nouveau code PIN (4 chiffres)</label>
+                <label className="text-[11px] font-black uppercase text-orange-600 mb-2 block text-center tracking-widest">{t("auth", "onboardingPinLabel")}</label>
                 <input
                   required
                   inputMode="numeric"
                   maxLength={4}
-                  placeholder="• • • •"
+                  placeholder={t("auth", "onboardingPinPlaceholder")}
                   className="w-full h-16 bg-slate-50 border border-orange-200 rounded-2xl px-4 outline-none focus:border-orange-500 font-black text-center text-3xl tracking-[0.4em] text-slate-900 shadow-inner"
                   value={pin}
                   onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
@@ -190,12 +192,12 @@ export default function Onboarding() {
               </div>
 
               <div>
-                <label className="text-[11px] font-black uppercase text-slate-400 mb-2 block text-center tracking-widest">Confirmez le code</label>
+                <label className="text-[11px] font-black uppercase text-slate-400 mb-2 block text-center tracking-widest">{t("auth", "onboardingConfirmLabel")}</label>
                 <input
                   required
                   inputMode="numeric"
                   maxLength={4}
-                  placeholder="• • • •"
+                  placeholder={t("auth", "onboardingPinPlaceholder")}
                   className={`w-full h-16 bg-slate-50 border rounded-2xl px-4 outline-none font-black text-center text-3xl tracking-[0.4em] text-slate-900 transition-all ${
                     pin2.length === 4 && pin !== pin2 ? "border-red-300 bg-red-50" : "border-slate-100 focus:border-orange-500"
                   }`}
@@ -203,7 +205,7 @@ export default function Onboarding() {
                   onChange={(e) => setPin2(e.target.value.replace(/\D/g, ""))}
                 />
                 {pin2.length === 4 && pin !== pin2 && (
-                  <p className="text-[10px] text-center text-red-500 font-black mt-3 animate-pulse">Les codes ne correspondent pas.</p>
+                  <p className="text-[10px] text-center text-red-500 font-black mt-3 animate-pulse">{t("auth", "onboardingPinMismatch")}</p>
                 )}
               </div>
             </div>
@@ -212,16 +214,16 @@ export default function Onboarding() {
               disabled={loading || !canSubmit}
               className="w-full h-16 rounded-[1.5rem] bg-slate-950 text-white font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl disabled:opacity-30 disabled:grayscale mt-10 flex items-center justify-center gap-3"
             >
-              {loading ? "Création en cours..." : (
+              {loading ? t("auth", "onboardingSubmitLoading") : (
                 <>
-                  Sécuriser mon compte <CheckCircle className="w-5 h-5" />
+                  {t("auth", "onboardingSubmitButton")} <CheckCircle className="w-5 h-5" />
                 </>
               )}
             </button>
           </form>
 
           <p className="mt-12 text-[10px] text-slate-300 font-bold uppercase tracking-widest text-center">
-            NEXA • Système de sécurité sécurisé © 2026
+            {t("auth", "onboardingFooter")}
           </p>
         </div>
       </section>

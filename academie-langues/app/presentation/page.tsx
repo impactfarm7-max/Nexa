@@ -23,6 +23,7 @@ import {
   LibraryMock,
 } from "./components/Mockups";
 import { BRAND } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = BRAND.blue;
 const ORANGE = BRAND.orange;
@@ -50,86 +51,87 @@ const FLOAT_DOTS = [
   { left: "50%", top: "35%", size: 4, duration: 9 },
 ];
 
-const AUDIENCES = [
-  {
-    icon: Building2,
-    title: "Espace centre",
-    text: "Direction, formateurs et staff pilotent inscriptions, cours, planning, finances et examens depuis un back-office complet. Les apprenants accèdent à leur formation via les identifiants créés par le centre.",
-    href: "/ouvrir-centre",
-    cta: "Créer un centre",
-  },
-] as const;
-
-const NAV_SECTIONS = [
-  { id: "centre", label: "Dashboard" },
-  { id: "finance", label: "Finance" },
-  { id: "cours", label: "Cours" },
-  { id: "tuteur", label: "IA" },
-  { id: "bibliotheque", label: "Bibliothèque" },
-  { id: "tcf-canada", label: "Preuve" },
-  { id: "pourquoi", label: "Pourquoi" },
-  { id: "tarifs", label: "Tarifs" },
-];
-
-const WHY_NEXA = [
-  {
-    icon: TrendingDown,
-    title: "Optimisation budgétaire",
-    text: "Réduisez les coûts fixes liés à la formation physique : infrastructures, logistique et heures de présentiel multipliées.",
-  },
-  {
-    icon: TrendingUp,
-    title: "Croissance illimitée",
-    text: "Que vous gériez 50 ou 10 000 apprenants, la plateforme supporte la charge sans surcoût structurel.",
-  },
-  {
-    icon: Award,
-    title: "Image institutionnelle",
-    text: "Offrez à vos équipes un écosystème digital haut de gamme, rapide et aligné sur les meilleurs standards mondiaux.",
-  },
-];
-
-const TCF_PILLARS = [
-  {
-    icon: ScrollText,
-    title: "Compréhension écrite",
-    prepare: "Lire, analyser et répondre sous la pression du chronomètre.",
-    deploy: "80 séries d'entraînement intensives, standardisées et en autonomie complète.",
-    stat: "39 Q / série",
-  },
-  {
-    icon: Headphones,
-    title: "Compréhension orale",
-    prepare: "Comprendre des enregistrements variés, du quotidien au académique.",
-    deploy: "Banques audio calibrées TCF avec reprise automatique en cas de coupure.",
-    stat: "Audio HD",
-  },
-  {
-    icon: PenTool,
-    title: "Expression écrite",
-    prepare: "Rédiger des textes structurés, du B2 au C2.",
-    deploy: "Mode Zen pour la méthode, mode Examen (mercredi & samedi) en conditions réelles.",
-    stat: "Correction IA",
-  },
-  {
-    icon: Mic,
-    title: "Expression orale",
-    prepare: "Structurer sa parole et tenir une argumentation fluide.",
-    deploy: "Simulateur vocal avec examinateur IA, transcription et feedback instantané.",
-    stat: "Coach vocal",
-  },
-];
-
 export default function PresentationPage() {
+  const { t } = useI18n();
   const { scrollYProgress } = useScroll();
   const progressWidth = useSpring(useTransform(scrollYProgress, [0, 1], ["0%", "100%"]), {
     stiffness: 120,
     damping: 30,
   });
 
+  const AUDIENCES = [
+    {
+      icon: Building2,
+      title: t("marketing", "presentationAudienceCenterTitle"),
+      text: t("marketing", "presentationAudienceCenterText"),
+      href: "/ouvrir-centre",
+      cta: t("marketing", "presentationAudienceCenterCta"),
+    },
+  ] as const;
+
+  const NAV_SECTIONS = [
+    { id: "centre", label: t("marketing", "presentationNavDashboard") },
+    { id: "finance", label: t("marketing", "presentationNavFinance") },
+    { id: "cours", label: t("marketing", "presentationNavCourses") },
+    { id: "tuteur", label: t("marketing", "presentationNavAi") },
+    { id: "bibliotheque", label: t("marketing", "presentationNavLibrary") },
+    { id: "tcf-canada", label: t("marketing", "presentationNavProof") },
+    { id: "pourquoi", label: t("marketing", "presentationNavWhy") },
+    { id: "tarifs", label: t("marketing", "presentationNavPricing") },
+  ];
+
+  const WHY_NEXA = [
+    {
+      icon: TrendingDown,
+      title: t("marketing", "presentationWhyBudgetTitle"),
+      text: t("marketing", "presentationWhyBudgetText"),
+    },
+    {
+      icon: TrendingUp,
+      title: t("marketing", "presentationWhyGrowthTitle"),
+      text: t("marketing", "presentationWhyGrowthText"),
+    },
+    {
+      icon: Award,
+      title: t("marketing", "presentationWhyImageTitle"),
+      text: t("marketing", "presentationWhyImageText"),
+    },
+  ];
+
+  const TCF_PILLARS = [
+    {
+      icon: ScrollText,
+      title: t("marketing", "presentationTcfReadingTitle"),
+      prepare: t("marketing", "presentationTcfReadingPrepare"),
+      deploy: t("marketing", "presentationTcfReadingDeploy"),
+      stat: t("marketing", "presentationTcfReadingStat"),
+    },
+    {
+      icon: Headphones,
+      title: t("marketing", "presentationTcfListeningTitle"),
+      prepare: t("marketing", "presentationTcfListeningPrepare"),
+      deploy: t("marketing", "presentationTcfListeningDeploy"),
+      stat: t("marketing", "presentationTcfListeningStat"),
+    },
+    {
+      icon: PenTool,
+      title: t("marketing", "presentationTcfWritingTitle"),
+      prepare: t("marketing", "presentationTcfWritingPrepare"),
+      deploy: t("marketing", "presentationTcfWritingDeploy"),
+      stat: t("marketing", "presentationTcfWritingStat"),
+    },
+    {
+      icon: Mic,
+      title: t("marketing", "presentationTcfSpeakingTitle"),
+      prepare: t("marketing", "presentationTcfSpeakingPrepare"),
+      deploy: t("marketing", "presentationTcfSpeakingDeploy"),
+      stat: t("marketing", "presentationTcfSpeakingStat"),
+    },
+  ];
+
   const talkToAgent = () =>
     window.open(
-      `https://wa.me/${WHATSAPP}?text=${encodeURIComponent("Bonjour NEXA, je souhaite une démo de la plateforme de formation.")}`,
+      `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(t("marketing", "presentationWhatsappMessage"))}`,
       "_blank",
     );
 
@@ -209,7 +211,7 @@ export default function PresentationPage() {
           </div>
           <div className="flex items-center gap-2">
             <Link href="/" className="hidden px-3 py-2 text-[11px] font-bold text-neutral-400 transition hover:text-neutral-700 sm:flex">
-              Accueil
+              {t("marketing", "presentationNavHome")}
             </Link>
             <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
               <Link
@@ -217,7 +219,7 @@ export default function PresentationPage() {
                 className="flex h-10 items-center rounded-xl px-4 text-[11px] font-black text-white transition hover:opacity-90"
                 style={{ backgroundColor: ORANGE }}
               >
-                Ouvrir un centre
+                {t("marketing", "presentationNavOpenCenter")}
               </Link>
             </motion.div>
           </div>
@@ -232,14 +234,14 @@ export default function PresentationPage() {
             className="mb-4 text-[11px] font-black uppercase tracking-[0.28em]"
             style={{ color: ORANGE }}
           >
-            NEXA · L&apos;éducation de demain
+            {t("marketing", "presentationHeroEyebrow")}
           </motion.p>
           <motion.h1
             variants={heroItem}
             className="mb-5 text-[2.15rem] font-black leading-[1.05] tracking-tight sm:text-5xl md:text-[3.25rem]"
             style={{ color: BLUE }}
           >
-            Formez 10 fois plus,{" "}
+            {t("marketing", "presentationHeroTitleStart")}{" "}
             <motion.span
               className="inline-block bg-clip-text text-transparent"
               style={{
@@ -249,14 +251,14 @@ export default function PresentationPage() {
               animate={{ backgroundPosition: ["0% center", "200% center", "0% center"] }}
               transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
             >
-              sans recruter 10 fois plus.
+              {t("marketing", "presentationHeroTitleEnd")}
             </motion.span>
           </motion.h1>
           <motion.p variants={heroItem} className="mb-3 max-w-2xl text-base font-semibold leading-relaxed text-neutral-700 sm:text-lg">
-            La plateforme qui automatise et démultiplie vos capacités de formation.
+            {t("marketing", "presentationHeroSubtitle")}
           </motion.p>
           <motion.p variants={heroItem} className="mb-8 max-w-xl text-[15px] font-medium leading-relaxed text-neutral-500 sm:text-base">
-            Pilotez, formez, évaluez et accompagnez à grande échelle — gestion, pédagogie et IA dans un seul espace, pensé pour les centres, écoles et universités.
+            {t("marketing", "presentationHeroDescription")}
           </motion.p>
           <motion.div variants={heroItem} className="flex flex-row flex-wrap items-center gap-2 sm:gap-3">
             <motion.a
@@ -266,7 +268,7 @@ export default function PresentationPage() {
               whileHover={{ scale: 1.04, boxShadow: `0 12px 32px ${BLUE}33` }}
               whileTap={{ scale: 0.97 }}
             >
-              Voir la plateforme <ArrowRight size={14} className="shrink-0" />
+              {t("marketing", "presentationHeroCtaPrimary")} <ArrowRight size={14} className="shrink-0" />
             </motion.a>
             <motion.button
               type="button"
@@ -276,7 +278,7 @@ export default function PresentationPage() {
               whileHover={{ scale: 1.04, backgroundColor: "#fff7f2" }}
               whileTap={{ scale: 0.97 }}
             >
-              Demander une démo
+              {t("marketing", "presentationHeroCtaSecondary")}
             </motion.button>
           </motion.div>
           <motion.div
@@ -284,10 +286,10 @@ export default function PresentationPage() {
             className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-bold text-neutral-400"
           >
             <span className="inline-flex items-center gap-1.5">
-              <Sparkles size={12} style={{ color: ORANGE }} /> Gestion · Formation · IA
+              <Sparkles size={12} style={{ color: ORANGE }} /> {t("marketing", "presentationHeroBadgeManagement")}
             </span>
             <span className="inline-flex items-center gap-1.5">
-              <Smartphone size={12} style={{ color: BLUE }} /> App installable · réseau faible
+              <Smartphone size={12} style={{ color: BLUE }} /> {t("marketing", "presentationHeroBadgeApp")}
             </span>
           </motion.div>
         </motion.div>
@@ -303,7 +305,7 @@ export default function PresentationPage() {
             className="mb-3 text-center text-[11px] font-black uppercase tracking-[0.3em]"
             style={{ color: ORANGE }}
           >
-            Pour qui ?
+            {t("marketing", "presentationAudienceEyebrow")}
           </motion.p>
           <motion.h2
             initial={{ opacity: 0, y: 16 }}
@@ -313,7 +315,7 @@ export default function PresentationPage() {
             className="mb-10 text-center text-2xl font-black tracking-tight md:text-3xl"
             style={{ color: BLUE }}
           >
-            Un espace centre, une plateforme
+            {t("marketing", "presentationAudienceTitle")}
           </motion.h2>
           <div className="mx-auto grid max-w-lg gap-4">
             {AUDIENCES.map((a, i) => (
@@ -352,16 +354,16 @@ export default function PresentationPage() {
         <DemoSection
           index={0}
           id="centre"
-          eyebrow="Module 01"
-          title="Tableau de bord unique pour piloter votre organisation"
-          description="Pas besoin d'être expert en informatique. Les décideurs et directeurs disposent d'une vision claire, immédiate et chiffrée de leur investissement."
+          eyebrow={t("marketing", "presentationModule01Eyebrow")}
+          title={t("marketing", "presentationModule01Title")}
+          description={t("marketing", "presentationModule01Description")}
           bullets={[
-            "Contrôle en un coup d'œil : qui étudie, qui stagne, qui a terminé son parcours",
-            "Rapports détaillés : notes, exercices effectués, temps de connexion et ROI",
-            "Sécurité des accès : droits, validation et blocage des profils en un clic",
-            "Vue financière : apprenants soldés vs versements en cours",
-            "Suivi du staff enseignant et administratif, avancée des tâches assignées",
-            "Cours et devoirs programmés sur plusieurs semaines",
+            t("marketing", "presentationModule01Bullet1"),
+            t("marketing", "presentationModule01Bullet2"),
+            t("marketing", "presentationModule01Bullet3"),
+            t("marketing", "presentationModule01Bullet4"),
+            t("marketing", "presentationModule01Bullet5"),
+            t("marketing", "presentationModule01Bullet6"),
           ]}
           mock={<CenterDashboardMock />}
         />
@@ -369,13 +371,13 @@ export default function PresentationPage() {
         <DemoSection
           index={1}
           id="finance"
-          eyebrow="Module 02"
-          title="Finance et documents officiels"
-          description="Encaissez les frais de formation, suivez les échéances et générez reçus, bulletins et attestations aux couleurs de votre centre."
+          eyebrow={t("marketing", "presentationModule02Eyebrow")}
+          title={t("marketing", "presentationModule02Title")}
+          description={t("marketing", "presentationModule02Description")}
           bullets={[
-            "Mobile Money, espèces, virement : saisie simple",
-            "Échéanciers et relances automatiques",
-            "Reçus, factures, bulletins de paie et attestations personnalisés",
+            t("marketing", "presentationModule02Bullet1"),
+            t("marketing", "presentationModule02Bullet2"),
+            t("marketing", "presentationModule02Bullet3"),
           ]}
           mock={<FinanceMock />}
           reversed
@@ -384,13 +386,13 @@ export default function PresentationPage() {
         <DemoSection
           index={2}
           id="cours"
-          eyebrow="Module 03"
-          title="Cours, devoirs et parcours pédagogiques"
-          description="Créez des formations riches avec l'éditeur intégré. Protégez vos contenus et distribuez devoirs et quiz à vos groupes."
+          eyebrow={t("marketing", "presentationModule03Eyebrow")}
+          title={t("marketing", "presentationModule03Title")}
+          description={t("marketing", "presentationModule03Description")}
           bullets={[
-            "Éditeur visuel avec texte, quiz et vidéos",
-            "Devoirs ciblés par filière, groupe ou étudiant",
-            "Correction assistée par intelligence artificielle",
+            t("marketing", "presentationModule03Bullet1"),
+            t("marketing", "presentationModule03Bullet2"),
+            t("marketing", "presentationModule03Bullet3"),
           ]}
           mock={<CourseMock />}
           demoLink="/demo/cours"
@@ -399,13 +401,13 @@ export default function PresentationPage() {
         <DemoSection
           index={3}
           id="examens"
-          eyebrow="Module 04"
-          title="Examens et évaluations en ligne"
-          description="Programmez vos épreuves, convoquez vos apprenants et récupérez les résultats. Reprise automatique en cas de coupure réseau."
+          eyebrow={t("marketing", "presentationModule04Eyebrow")}
+          title={t("marketing", "presentationModule04Title")}
+          description={t("marketing", "presentationModule04Description")}
           bullets={[
-            "QCM, questions ouvertes et devoirs surveillés",
-            "Sessions planifiées par le centre",
-            "Notes, certificats et relevés générés automatiquement",
+            t("marketing", "presentationModule04Bullet1"),
+            t("marketing", "presentationModule04Bullet2"),
+            t("marketing", "presentationModule04Bullet3"),
           ]}
           mock={<ExamMock />}
           reversed
@@ -414,14 +416,14 @@ export default function PresentationPage() {
         <DemoSection
           index={4}
           id="tuteur"
-          eyebrow="Module 05"
-          title="Intelligence artificielle au service de votre rentabilité"
-          description="Le plus grand goulot d'étranglement, c'est le temps passé à corriger. NEXA automatise les processus lourds pour libérer vos formateurs."
+          eyebrow={t("marketing", "presentationModule05Eyebrow")}
+          title={t("marketing", "presentationModule05Title")}
+          description={t("marketing", "presentationModule05Description")}
           bullets={[
-            "Correction instantanée écrite et orale selon les grilles internationales",
-            "Le formateur valide et ajoute son commentaire en un clic",
-            "Quiz personnalisés générés en fin de semaine selon les lacunes de chaque apprenant",
-            "Tuteur IA disponible 24h/24 pour répondre aux questions entre les cours",
+            t("marketing", "presentationModule05Bullet1"),
+            t("marketing", "presentationModule05Bullet2"),
+            t("marketing", "presentationModule05Bullet3"),
+            t("marketing", "presentationModule05Bullet4"),
           ]}
           mock={<SimulatorMock />}
         />
@@ -429,13 +431,13 @@ export default function PresentationPage() {
         <DemoSection
           index={5}
           id="communaute"
-          eyebrow="Module 06"
-          title="Communauté et messagerie"
-          description="Créez le lien entre vos classes : forums par filière, discussions par groupe et messagerie privée sécurisée."
+          eyebrow={t("marketing", "presentationModule06Eyebrow")}
+          title={t("marketing", "presentationModule06Title")}
+          description={t("marketing", "presentationModule06Description")}
           bullets={[
-            "Salons par promotion, groupe ou filière",
-            "Messagerie privée entre apprenants et formateurs",
-            "Notifications et rappels planifiés",
+            t("marketing", "presentationModule06Bullet1"),
+            t("marketing", "presentationModule06Bullet2"),
+            t("marketing", "presentationModule06Bullet3"),
           ]}
           mock={<CommunityMock />}
           reversed
@@ -444,13 +446,13 @@ export default function PresentationPage() {
         <DemoSection
           index={6}
           id="live"
-          eyebrow="Module 07"
-          title="Sessions live et classes virtuelles"
-          description="Animez vos cours à distance comme en salle : visio intégrée, partage d'écran et suivi de présence."
+          eyebrow={t("marketing", "presentationModule07Eyebrow")}
+          title={t("marketing", "presentationModule07Title")}
+          description={t("marketing", "presentationModule07Description")}
           bullets={[
-            "Cours collectifs avec un formateur et toute la classe",
-            "Rappels automatiques avant chaque session",
-            "Planning formateur synchronisé avec le centre",
+            t("marketing", "presentationModule07Bullet1"),
+            t("marketing", "presentationModule07Bullet2"),
+            t("marketing", "presentationModule07Bullet3"),
           ]}
           mock={<LiveMock />}
         />
@@ -458,14 +460,14 @@ export default function PresentationPage() {
         <DemoSection
           index={7}
           id="bibliotheque"
-          eyebrow="Module 08"
-          title="La Grande Bibliothèque d'Afrique"
-          description="Ressources exclusives, assistant IA intégré et documents sécurisés. Vos apprenants accèdent aux livres au programme sans outil externe."
+          eyebrow={t("marketing", "presentationModule08Eyebrow")}
+          title={t("marketing", "presentationModule08Title")}
+          description={t("marketing", "presentationModule08Description")}
           bullets={[
-            "Dictionnaire et traducteur IA activables en un clic",
-            "Recherche intelligente dans titres, catégories et contenus",
-            "Documents exclusifs protégés (PDF sécurisés, accès premium)",
-            "Accès égalitaire aux ressources, même sans moyens d'achat",
+            t("marketing", "presentationModule08Bullet1"),
+            t("marketing", "presentationModule08Bullet2"),
+            t("marketing", "presentationModule08Bullet3"),
+            t("marketing", "presentationModule08Bullet4"),
           ]}
           mock={<LibraryMock />}
           reversed
@@ -483,7 +485,7 @@ export default function PresentationPage() {
               className="mb-3 text-[11px] font-black uppercase tracking-[0.3em]"
               style={{ color: ORANGE }}
             >
-              Preuve de concept
+              {t("marketing", "presentationTcfEyebrow")}
             </motion.p>
             <motion.h2
               initial={{ opacity: 0, y: 16 }}
@@ -493,7 +495,7 @@ export default function PresentationPage() {
               className="mb-4 text-2xl font-black tracking-tight md:text-3xl"
               style={{ color: BLUE }}
             >
-              Le cas TCF Canada : notre démonstration d&apos;excellence
+              {t("marketing", "presentationTcfTitle")}
             </motion.h2>
             <motion.p
               initial={{ opacity: 0, y: 16 }}
@@ -502,7 +504,7 @@ export default function PresentationPage() {
               transition={{ delay: 0.12 }}
               className="font-medium leading-relaxed text-neutral-500"
             >
-              Pour prouver la robustesse de notre architecture, nous l&apos;avons appliquée à l&apos;évaluation la plus exigeante du marché linguistique : le TCF Canada, visant les niveaux C1 et C2. NEXA reste une plateforme généraliste — le TCF en est la vitrine technique.
+              {t("marketing", "presentationTcfDescription")}
             </motion.p>
           </div>
 
@@ -556,12 +558,12 @@ export default function PresentationPage() {
                 </h3>
                 <div className="relative space-y-3">
                   <div>
-                    <p className="mb-1 text-[9px] font-black uppercase tracking-wider text-neutral-400">L&apos;apprenant prépare</p>
+                    <p className="mb-1 text-[9px] font-black uppercase tracking-wider text-neutral-400">{t("marketing", "presentationTcfLearnerPrepares")}</p>
                     <p className="text-[12px] font-medium leading-relaxed text-neutral-600">{pillar.prepare}</p>
                   </div>
                   <div className="h-px bg-black/6" />
                   <div>
-                    <p className="mb-1 text-[9px] font-black uppercase tracking-wider" style={{ color: ORANGE }}>NEXA déploie</p>
+                    <p className="mb-1 text-[9px] font-black uppercase tracking-wider" style={{ color: ORANGE }}>{t("marketing", "presentationTcfNexaDeploys")}</p>
                     <p className="text-[12px] font-medium leading-relaxed text-neutral-700">{pillar.deploy}</p>
                   </div>
                 </div>
@@ -596,10 +598,10 @@ export default function PresentationPage() {
                   </motion.div>
                 </motion.div>
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-400 mb-1">Intelligence artificielle</p>
-                  <h3 className="text-lg font-black text-white mb-2">L&apos;impact de l&apos;IA après chaque simulation</h3>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-400 mb-1">{t("marketing", "presentationAiBadge")}</p>
+                  <h3 className="text-lg font-black text-white mb-2">{t("marketing", "presentationAiTitle")}</h3>
                   <p className="max-w-xl text-[13px] font-medium leading-relaxed text-white/70">
-                    Score prédictif immédiat et rapport d&apos;audit complet selon les critères officiels du CECRL : erreurs exactes, suggestions de correction et pistes de progression téléchargeables.
+                    {t("marketing", "presentationAiDescription")}
                   </p>
                 </div>
               </div>
@@ -609,7 +611,7 @@ export default function PresentationPage() {
                   className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-2xl bg-white px-5 py-3 text-sm font-black transition hover:bg-orange-50 sm:self-center"
                   style={{ color: BLUE }}
                 >
-                  Essayer la démo <ArrowRight size={16} />
+                  {t("marketing", "presentationAiCta")} <ArrowRight size={16} />
                 </Link>
               </motion.div>
             </div>
@@ -627,7 +629,7 @@ export default function PresentationPage() {
             className="mb-3 text-center text-[11px] font-black uppercase tracking-[0.3em]"
             style={{ color: ORANGE }}
           >
-            Avantages
+            {t("marketing", "presentationWhyEyebrow")}
           </motion.p>
           <motion.h2
             initial={{ opacity: 0, y: 16 }}
@@ -637,7 +639,7 @@ export default function PresentationPage() {
             className="mb-10 text-center text-2xl font-black tracking-tight md:text-3xl"
             style={{ color: BLUE }}
           >
-            Pourquoi choisir NEXA ?
+            {t("marketing", "presentationWhyTitle")}
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 12 }}
@@ -646,7 +648,7 @@ export default function PresentationPage() {
             transition={{ delay: 0.1 }}
             className="mx-auto mb-10 max-w-2xl text-center text-[13px] font-medium leading-relaxed text-neutral-500 sm:text-sm"
           >
-            Moins de temps perdu sur l&apos;administratif. Plus de capacité pour former — avec un standard d&apos;exigence constant, de 10 à plusieurs milliers d&apos;apprenants.
+            {t("marketing", "presentationWhyDescription")}
           </motion.p>
           <div className="grid gap-4 md:grid-cols-3">
             {WHY_NEXA.map((item, i) => (
@@ -686,13 +688,13 @@ export default function PresentationPage() {
             transition={{ duration: 0.6, ease: EASE }}
           >
             <p className="mb-3 text-[11px] font-black uppercase tracking-[0.25em]" style={{ color: ORANGE }}>
-              Mobile et terrain
+              {t("marketing", "presentationMobileEyebrow")}
             </p>
             <h2 className="mb-4 text-2xl font-black tracking-tight md:text-3xl" style={{ color: BLUE }}>
-              Une app qui s&apos;installe. Même en réseau faible.
+              {t("marketing", "presentationMobileTitle")}
             </h2>
             <p className="mb-6 font-medium leading-relaxed text-neutral-500">
-              Application installable sur téléphone, code PIN de sécurité, notifications et accès pensés pour le terrain. Vos apprenants avancent sans dépendre d&apos;une connexion parfaite.
+              {t("marketing", "presentationMobileDescription")}
             </p>
             <div className="flex flex-row flex-nowrap items-center gap-1.5 sm:gap-2">
               {[Smartphone, ShieldCheck].map((Icon, i) => (
@@ -706,7 +708,7 @@ export default function PresentationPage() {
                   className="inline-flex shrink-0 items-center gap-1 rounded-xl border border-black/6 bg-neutral-50 px-2 py-1.5 text-[10px] font-bold whitespace-nowrap sm:gap-2 sm:px-3 sm:py-2 sm:text-[11px]"
                 >
                   <Icon size={13} className="shrink-0 sm:h-3.5 sm:w-3.5" style={{ color: i ? BLUE : ORANGE }} />
-                  {i === 0 ? "PWA installable" : "Sécurisé par code PIN"}
+                  {i === 0 ? t("marketing", "presentationMobileBadgePwa") : t("marketing", "presentationMobileBadgePin")}
                 </motion.span>
               ))}
             </div>
@@ -739,7 +741,7 @@ export default function PresentationPage() {
             className="mb-3 text-center text-[11px] font-black uppercase tracking-[0.3em]"
             style={{ color: ORANGE }}
           >
-            Tarification
+            {t("marketing", "presentationPricingEyebrow")}
           </motion.p>
           <motion.h2
             initial={{ opacity: 0, y: 16 }}
@@ -749,7 +751,7 @@ export default function PresentationPage() {
             className="mb-4 text-center text-2xl font-black tracking-tight md:text-3xl"
             style={{ color: BLUE }}
           >
-            Des offres adaptées à votre structure
+            {t("marketing", "presentationPricingTitle")}
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 12 }}
@@ -758,7 +760,7 @@ export default function PresentationPage() {
             transition={{ delay: 0.12 }}
             className="mx-auto mb-10 max-w-xl text-center text-[13px] font-medium leading-relaxed text-neutral-500"
           >
-            La grille tarifaire est en cours de finalisation. Contactez-nous pour une proposition sur mesure selon votre taille et vos programmes.
+            {t("marketing", "presentationPricingDescription")}
           </motion.p>
 
           <motion.div
@@ -777,14 +779,14 @@ export default function PresentationPage() {
               <CreditCard size={26} style={{ color: ORANGE }} />
             </motion.span>
             <p className="mb-2 text-lg font-black" style={{ color: BLUE }}>
-              Bientôt disponible
+              {t("marketing", "presentationPricingComingSoon")}
             </p>
             <p className="mb-6 text-[13px] font-medium leading-relaxed text-neutral-500">
-              Centres · Écoles · Universités · Formateurs indépendants — une offre claire arrivera ici. En attendant, une démo et un devis personnalisé sur simple demande.
+              {t("marketing", "presentationPricingComingSoonDescription")}
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <motion.a
-                href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent("Demande de tarification NEXA")}`}
+                href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(t("marketing", "presentationPricingEmailSubject"))}`}
                 className="inline-flex h-11 items-center gap-2 rounded-2xl px-5 text-[12px] font-black text-white"
                 style={{ backgroundColor: BLUE }}
                 whileHover={{ scale: 1.04 }}
@@ -825,14 +827,14 @@ export default function PresentationPage() {
             />
             <div className="relative mx-auto flex w-full max-w-xl flex-col items-center">
               <p className="mb-2 text-[11px] font-black uppercase tracking-[0.25em]" style={{ color: ORANGE }}>
-                NEXA · L&apos;éducation de demain
+                {t("marketing", "presentationFinalEyebrow")}
               </p>
               <h2 className="mb-3 text-xl font-black leading-snug tracking-tight sm:mb-4 sm:text-2xl md:text-3xl" style={{ color: BLUE }}>
-                Prêt à démultiplier
-                <span className="mt-1 block" style={{ color: ORANGE }}>votre capacité de formation ?</span>
+                {t("marketing", "presentationFinalTitleLine1")}
+                <span className="mt-1 block" style={{ color: ORANGE }}>{t("marketing", "presentationFinalTitleLine2")}</span>
               </h2>
               <p className="mb-6 max-w-md text-sm font-medium leading-relaxed text-neutral-500 sm:mb-8 sm:text-base">
-                Demandez une démonstration personnalisée. Yaoundé · Cameroun.
+                {t("marketing", "presentationFinalDescription")}
               </p>
               <div className="mb-6 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[12px] font-bold text-neutral-500">
                 <a href={`mailto:${CONTACT_EMAIL}`} className="inline-flex items-center gap-1.5 transition hover:opacity-80" style={{ color: BLUE }}>
@@ -852,7 +854,7 @@ export default function PresentationPage() {
                     className="inline-flex h-12 shrink-0 items-center justify-center rounded-2xl px-6 text-sm font-black text-white transition hover:opacity-95"
                     style={{ backgroundColor: ORANGE }}
                   >
-                    Demander un espace centre
+                    {t("marketing", "presentationFinalCenterCta")}
                   </Link>
                 </motion.div>
                 <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
@@ -862,7 +864,7 @@ export default function PresentationPage() {
                     className="inline-flex h-12 shrink-0 items-center justify-center rounded-2xl border-2 bg-white px-6 text-sm font-bold transition hover:bg-neutral-50"
                     style={{ borderColor: BLUE, color: BLUE }}
                   >
-                    Démo WhatsApp
+                    {t("marketing", "presentationFinalWhatsappCta")}
                   </button>
                 </motion.div>
               </div>
@@ -885,13 +887,13 @@ export default function PresentationPage() {
               <Image src={BRAND.logo} alt="" width={28} height={28} className="rounded-lg object-cover" aria-hidden />
               <span className="text-sm font-black" style={{ color: BLUE }}>NEXA</span>
             </span>
-            <span className="text-[10px] font-bold text-neutral-400">L&apos;éducation de demain</span>
+            <span className="text-[10px] font-bold text-neutral-400">{t("marketing", "presentationFooterTagline")}</span>
           </Link>
           <nav className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] font-bold text-neutral-400">
             <a href={`mailto:${CONTACT_EMAIL}`} className="transition hover:text-neutral-700">{CONTACT_EMAIL}</a>
             <a href={SITE_URL} className="transition hover:text-neutral-700" target="_blank" rel="noreferrer">nexa-edu.com</a>
-            <Link href="/ouvrir-centre" className="transition hover:text-neutral-700">Ouvrir un centre</Link>
-            <a href="#tarifs" className="transition hover:text-neutral-700">Tarifs</a>
+            <Link href="/ouvrir-centre" className="transition hover:text-neutral-700">{t("marketing", "presentationNavOpenCenter")}</Link>
+            <a href="#tarifs" className="transition hover:text-neutral-700">{t("marketing", "presentationNavPricing")}</a>
           </nav>
           <p className="shrink-0 text-[10px] font-bold text-neutral-300">© {new Date().getFullYear()} NEXA · Yaoundé</p>
         </div>

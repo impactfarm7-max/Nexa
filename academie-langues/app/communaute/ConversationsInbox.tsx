@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Search, Send, ChevronLeft, RefreshCcw, MessageCircle } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { encryptMessage, decryptRows } from "@/app/utils/messageCrypto.client";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Conversation = {
   otherId: string;
@@ -27,6 +28,7 @@ export default function ConversationsInbox({
   initialOpenUserId?: string | null;
   onUnreadCountChange?: (count: number) => void;
 }) {
+  const { t } = useI18n();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [activeOtherId, setActiveOtherId] = useState<string | null>(null);
@@ -79,7 +81,7 @@ export default function ConversationsInbox({
       for (const p of profiles || []) {
         const c = map.get(p.id);
         if (c) {
-          c.prenom = p.prenom || "Utilisateur";
+          c.prenom = p.prenom || t("dashboard", "communauteDefaultUser");
           c.role = p.role;
         }
       }
@@ -138,7 +140,7 @@ export default function ConversationsInbox({
         setActiveOtherInfo({ id: otherId, prenom: conv.prenom, role: conv.role });
       } else {
         const { data } = await supabase.from("profiles").select("id, prenom, role").eq("id", otherId).single();
-        setActiveOtherInfo(data ? { id: data.id, prenom: data.prenom || "Utilisateur", role: data.role } : null);
+        setActiveOtherInfo(data ? { id: data.id, prenom: data.prenom || t("dashboard", "communauteDefaultUser"), role: data.role } : null);
       }
     }
     await fetchThread(otherId);
@@ -179,7 +181,7 @@ export default function ConversationsInbox({
     const map = new Map<string, MessageableUser>();
     for (const m of members || []) {
       const p: any = m.profiles;
-      if (p) map.set(m.user_id, { id: m.user_id, prenom: p.prenom || "Utilisateur", role: p.role });
+      if (p) map.set(m.user_id, { id: m.user_id, prenom: p.prenom || t("dashboard", "communauteDefaultUser"), role: p.role });
     }
     setMessageableUsers(Array.from(map.values()).sort((a, b) => a.prenom.localeCompare(b.prenom)));
   };
@@ -199,9 +201,9 @@ export default function ConversationsInbox({
             {activeOtherInfo?.prenom?.charAt(0) || "?"}
           </div>
           <div>
-            <p className="font-bold text-slate-900 text-sm">{activeOtherInfo?.prenom || "Conversation"}</p>
+            <p className="font-bold text-slate-900 text-sm">{activeOtherInfo?.prenom || t("dashboard", "communauteConversation")}</p>
             {activeOtherInfo && isProfessor(activeOtherInfo.role) && (
-              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Professeur</p>
+              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">{t("dashboard", "communauteProfessor")}</p>
             )}
           </div>
         </div>

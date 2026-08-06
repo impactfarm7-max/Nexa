@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { Play, ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const ORANGE = "#eb670e";
 const BLUE = "#11224E";
@@ -34,6 +35,7 @@ export default function DemoSection({
   reversed = false,
   index = 0,
 }: DemoSectionProps) {
+  const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const [videoOk, setVideoOk] = useState(Boolean(videoSrc));
@@ -91,7 +93,7 @@ export default function DemoSection({
                 type="button"
                 onClick={handlePlay}
                 className="absolute inset-0 flex items-center justify-center bg-black/30 transition hover:bg-black/40"
-                aria-label="Lire la démo"
+                aria-label={t("marketing", "presentationDemoPlayAria")}
               >
                 <motion.span
                   className="flex h-14 w-14 items-center justify-center rounded-full bg-white/95 shadow-lg"
@@ -108,7 +110,7 @@ export default function DemoSection({
                 onClick={handlePlay}
                 className="absolute bottom-3 right-3 rounded-lg bg-black/60 px-3 py-1.5 text-[10px] font-bold text-white"
               >
-                Pause
+                {t("marketing", "presentationDemoPause")}
               </button>
             )}
           </div>
@@ -205,7 +207,7 @@ export default function DemoSection({
             className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-[12px] font-black transition hover:border-orange-200 hover:shadow-md"
             style={{ color: BLUE }}
           >
-            Voir un exemple <ExternalLink size={14} />
+            {t("marketing", "presentationDemoViewExample")} <ExternalLink size={14} />
           </Link>
         </motion.div>
       )}

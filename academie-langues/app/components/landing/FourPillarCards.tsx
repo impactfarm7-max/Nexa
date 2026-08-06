@@ -3,16 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { BRAND } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const PILLARS = [
   {
     id: "admin",
     tile: "#E8EEF8",
     ink: BRAND.blue,
-    title: "Centralisez votre gestion sur une plateforme",
-    text: "Finance, étudiants, activités — tout le pilotage du centre au même endroit, avec NEXA.",
+    key: "pillarAdmin",
     mediaSrc: "/demos/finance.mp4",
-    mediaLabel: "Module finances NEXA",
     layout: "md:col-span-7 md:row-span-2",
     mediaMinH: "min-h-[200px] sm:min-h-[260px] md:min-h-[320px]",
     mediaObject: "object-top",
@@ -21,10 +20,8 @@ const PILLARS = [
     id: "planner",
     tile: "#FFF0E4",
     ink: BRAND.blue,
-    title: "Débloquez vos cours grâce au planificateur",
-    text: "Programmez séances et parcours à l'avance, sans friction pour vos équipes pédagogiques.",
+    key: "pillarPlanner",
     mediaSrc: "/demos/cours.mp4",
-    mediaLabel: "Création de cours et planificateur NEXA",
     layout: "md:col-span-5 md:row-span-1 md:translate-y-2",
     mediaMinH: "min-h-[180px] sm:min-h-[200px]",
     mediaObject: "object-[center_20%]",
@@ -33,10 +30,8 @@ const PILLARS = [
     id: "community",
     tile: "#EEF6F0",
     ink: BRAND.blue,
-    title: "Connectez vos apprenants avec la communauté",
-    text: "Échanges, forums et notifications — une communauté intégrée à la formation.",
+    key: "pillarCommunity",
     mediaSrc: "/demos/communaute.mp4",
-    mediaLabel: "Conversations dans la communauté NEXA",
     layout: "md:col-span-5 md:row-span-1 md:-translate-y-4",
     mediaMinH: "min-h-[180px] sm:min-h-[220px]",
     mediaObject: "object-top",
@@ -45,10 +40,8 @@ const PILLARS = [
     id: "tutor",
     tile: "#F3EDE6",
     ink: BRAND.blue,
-    title: "Transformez l'apprentissage avec le Tuteur",
-    text: "Le Tuteur NEXA accompagne chaque apprenant : explications, feedback et motivation continue.",
+    key: "pillarTutor",
     mediaSrc: "/demos/simulateur.mp4",
-    mediaLabel: "Tuteur et simulateur NEXA",
     layout: "md:col-span-7 md:row-span-1",
     mediaMinH: "min-h-[180px] sm:min-h-[220px]",
     mediaObject: "object-top",
@@ -129,15 +122,16 @@ function PillarMedia({
 }
 
 export default function FourPillarCards() {
+  const { t } = useI18n();
   return (
     <section className="relative z-10 py-12 sm:py-14 xl:py-16">
       <div className="nexa-marketing-shell">
         <div className="mb-8 sm:mb-10 max-w-2xl">
           <h2 className="nexa-marketing-title mb-3" style={{ color: BRAND.blue }}>
-            L&apos;enseignement d&apos;aujourd&apos;hui et de demain
+            {t("landing", "pillarsTitle")}
           </h2>
           <p className="text-neutral-500 font-medium leading-relaxed text-[15px] sm:text-base">
-            Des outils conçus pour vos équipes et vos apprenants — testés et affinés en continu.
+            {t("landing", "pillarsDescription")}
           </p>
         </div>
 
@@ -157,14 +151,14 @@ export default function FourPillarCards() {
                   className="text-xl sm:text-2xl xl:text-[1.65rem] font-black tracking-tight leading-[1.15] mb-2.5 sm:mb-3"
                   style={{ color: p.ink }}
                 >
-                  {p.title}
+                  {t("landing", `${p.key}Title`)}
                 </h3>
                 <p className="text-[15px] sm:text-base xl:text-lg font-medium leading-relaxed text-neutral-600 mb-5 sm:mb-6 max-w-xl">
-                  {p.text}
+                  {t("landing", `${p.key}Text`)}
                 </p>
                 <PillarMedia
                   src={p.mediaSrc}
-                  label={p.mediaLabel}
+                  label={t("landing", `${p.key}Media`)}
                   minHClass={p.mediaMinH}
                   objectClass={p.mediaObject}
                 />

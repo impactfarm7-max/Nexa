@@ -19,7 +19,8 @@ import {
   type NexaOfferKey,
 } from "@/app/data/nexaOffers";
 import MarketingChrome from "@/app/components/landing/MarketingChrome";
-import { checkPasswordStrength, isPasswordStrong, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
+import { checkPasswordStrength, isPasswordStrong } from "@/app/utils/password-policy";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = BRAND.blue;
 const ORANGE = BRAND.orange;
@@ -31,15 +32,19 @@ type ProgramFamily = "native" | "generic" | null;
 
 const NATIVE_DISCIPLINES: {
   id: Extract<CenterTypeCode, "tcf_canada">;
-  title: string;
-  blurb: string;
-  points: string[];
+  titleKey: string;
+  blurbKey: string;
+  pointKeys: string[];
 }[] = [
   {
     id: "tcf_canada",
-    title: "TCF Canada",
-    blurb: "Préparation complète CE, CO, EE et EO — contenus, packs et tuteur IA inclus.",
-    points: ["Packs d'entraînement", "Simulateurs d'examen", "Coaching vocal IA"],
+    titleKey: "ouvrirCentreDiscTcfCanadaTitle",
+    blurbKey: "ouvrirCentreDiscTcfCanadaBlurb",
+    pointKeys: [
+      "ouvrirCentreDiscTcfCanadaPoint1",
+      "ouvrirCentreDiscTcfCanadaPoint2",
+      "ouvrirCentreDiscTcfCanadaPoint3",
+    ],
   },
 ];
 
@@ -48,30 +53,38 @@ const PROGRAMS: {
   /** Si défini : sélection directe de center_type. Native = null (sous-carte). */
   centerType: CenterTypeCode | null;
   icon: LucideIcon;
-  title: string;
-  subtitle: string;
-  blurb: string;
-  points: string[];
+  titleKey: string;
+  subtitleKey: string;
+  blurbKey: string;
+  pointKeys: string[];
   accent: string;
 }[] = [
   {
     family: "native",
     centerType: null,
     icon: Award,
-    title: "Formation native",
-    subtitle: "Langues & certifications",
-    blurb: "Parcours immersifs prêts à l'emploi pour les certifications linguistiques.",
-    points: ["Contenus prêts", "Suivi mesurable", "Expérience apprenant dédiée"],
+    titleKey: "ouvrirCentreProgramNativeTitle",
+    subtitleKey: "ouvrirCentreProgramNativeSubtitle",
+    blurbKey: "ouvrirCentreProgramNativeBlurb",
+    pointKeys: [
+      "ouvrirCentreProgramNativePoint1",
+      "ouvrirCentreProgramNativePoint2",
+      "ouvrirCentreProgramNativePoint3",
+    ],
     accent: ORANGE,
   },
   {
     family: "generic",
     centerType: "generic",
     icon: GraduationCap,
-    title: "Formation libre",
-    subtitle: "Vous construisez votre offre",
-    blurb: "Créez filières courtes ou longues, périodes, notes et bulletins — à votre rythme.",
-    points: ["Filières & campus", "Notes & bulletins", "Finance & échéanciers"],
+    titleKey: "ouvrirCentreProgramGenericTitle",
+    subtitleKey: "ouvrirCentreProgramGenericSubtitle",
+    blurbKey: "ouvrirCentreProgramGenericBlurb",
+    pointKeys: [
+      "ouvrirCentreProgramGenericPoint1",
+      "ouvrirCentreProgramGenericPoint2",
+      "ouvrirCentreProgramGenericPoint3",
+    ],
     accent: ORANGE,
   },
 ];
@@ -134,17 +147,27 @@ const AFRICA_54 = [
   { code: "ZW", name: "Zimbabwe",            flag: "🇿🇼", dial: "+263", regions: ["Harare", "Bulawayo", "Mutare", "Gweru"] },
 ];
 
-const OWNER_ROLES = ["PDG", "Directeur Général", "Directeur de Campus", "Caissier", "Autre"];
-
-function welcomeCopy(centerType: CenterType) {
-  if (centerType === "tcf_canada") {
-    return "Votre allié pour exceller dans la préparation au TCF Canada.";
-  }
-  return "Votre allié pour réussir votre projet d'éducation.";
-}
+const OWNER_ROLES: { value: string; labelKey: string }[] = [
+  { value: "PDG", labelKey: "ouvrirCentreRolePdg" },
+  { value: "Directeur Général", labelKey: "ouvrirCentreRoleDg" },
+  { value: "Directeur de Campus", labelKey: "ouvrirCentreRoleCampusDirector" },
+  { value: "Caissier", labelKey: "ouvrirCentreRoleCashier" },
+  { value: "Autre", labelKey: "ouvrirCentreRoleOther" },
+];
 
 export default function CreerCentrePage() {
   const router = useRouter();
+  const { t } = useI18n();
+  const welcomeCopy = (ct: CenterType) =>
+    ct === "tcf_canada"
+      ? t("marketing", "ouvrirCentreWelcomeTcfCanada")
+      : t("marketing", "ouvrirCentreWelcomeDefault");
+  const localizedCenterTypeLabel = (ct: CenterType) =>
+    ct === "tcf_canada"
+      ? centerTypeLabel(ct)
+      : ct === "generic"
+        ? t("marketing", "ouvrirCentreGenericCenterLabel")
+        : centerTypeLabel(ct);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [programFamily, setProgramFamily] = useState<ProgramFamily>(null);
   const [centerType, setCenterType] = useState<CenterType>(null);
@@ -212,7 +235,7 @@ export default function CreerCentrePage() {
   const handleSubmit = async () => {
     if (!canSubmit) return;
     if (!pwdCheck.ok) {
-      setError(pwdCheck.message || PASSWORD_POLICY_HINT);
+      setError(t("marketing", "ouvrirCentrePasswordInvalid"));
       return;
     }
     setSaving(true); setError("");
@@ -237,7 +260,7 @@ export default function CreerCentrePage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setError(data.error || "Erreur."); setSaving(false); return; }
+      if (!res.ok) { setError(data.error || t("marketing", "ouvrirCentreErrorGeneric")); setSaving(false); return; }
 
       const { createClient } = await import("@supabase/supabase-js");
       const supabase = createClient(
@@ -249,7 +272,7 @@ export default function CreerCentrePage() {
       setSaving(false);
       setStep(4);
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erreur inattendue.";
+      const message = err instanceof Error ? err.message : t("marketing", "ouvrirCentreErrorUnexpected");
       setError(message);
       setSaving(false);
     }
@@ -286,20 +309,20 @@ export default function CreerCentrePage() {
               className="font-display text-[2.75rem] xl:text-[3.5rem] 2xl:text-[3.85rem] font-black leading-[1.06] tracking-tight"
               style={{ color: BLUE }}
             >
-              Découvrez
+              {t("marketing", "ouvrirCentreHeroLine1")}
               <br />
-              comment
+              {t("marketing", "ouvrirCentreHeroLine2")}
               <br />
-              NEXA
+              {t("marketing", "ouvrirCentreHeroLine3")}
               <br />
-              peut
+              {t("marketing", "ouvrirCentreHeroLine4")}
               <br />
-              accélérer
+              {t("marketing", "ouvrirCentreHeroLine5")}
               <br />
-              <span style={{ color: ORANGE }}>votre croissance</span>.
+              <span style={{ color: ORANGE }}>{t("marketing", "ouvrirCentreHeroLine6")}</span>.
             </h2>
             <p className="mt-6 text-base leading-relaxed font-medium max-w-md" style={{ color: `${BLUE}99` }}>
-              Trois programmes. Une plateforme. Choisissez le modèle qui correspond à votre établissement.
+              {t("marketing", "ouvrirCentreHeroSubtitle")}
             </p>
           </div>
 
@@ -319,17 +342,17 @@ export default function CreerCentrePage() {
                 className="font-display text-[1.65rem] sm:text-3xl font-black leading-[1.1] tracking-tight"
                 style={{ color: BLUE }}
               >
-                Découvrez
+                {t("marketing", "ouvrirCentreHeroLine1")}
                 <br />
-                comment
+                {t("marketing", "ouvrirCentreHeroLine2")}
                 <br />
-                NEXA
+                {t("marketing", "ouvrirCentreHeroLine3")}
                 <br />
-                peut
+                {t("marketing", "ouvrirCentreHeroLine4")}
                 <br />
-                accélérer
+                {t("marketing", "ouvrirCentreHeroLine5")}
                 <br />
-                <span style={{ color: ORANGE }}>votre croissance</span>.
+                <span style={{ color: ORANGE }}>{t("marketing", "ouvrirCentreHeroLine6")}</span>.
               </h2>
             </div>
           )}
@@ -355,7 +378,11 @@ export default function CreerCentrePage() {
                 </div>
               ))}
               <span className="ml-2 text-[10px] font-black text-neutral-400 uppercase tracking-widest">
-                {step === 1 ? "Programme" : step === 2 ? "Établissement" : "Compte"}
+                {step === 1
+                  ? t("marketing", "ouvrirCentreStepLabelProgram")
+                  : step === 2
+                  ? t("marketing", "ouvrirCentreStepLabelEstablishment")
+                  : t("marketing", "ouvrirCentreStepLabelAccount")}
               </span>
             </div>
           )}
@@ -365,10 +392,10 @@ export default function CreerCentrePage() {
             <div className="space-y-6">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: BLUE }}>
-                  Créez votre centre
+                  {t("marketing", "ouvrirCentreStep1Title")}
                 </h1>
                 <p className="text-sm text-neutral-500 mt-2 font-medium">
-                  Quel programme NEXA souhaitez-vous activer ?
+                  {t("marketing", "ouvrirCentreStep1Subtitle")}
                 </p>
               </div>
 
@@ -408,7 +435,7 @@ export default function CreerCentrePage() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <h3 className="font-black text-base" style={{ color: BLUE }}>{p.title}</h3>
+                              <h3 className="font-black text-base" style={{ color: BLUE }}>{t("marketing", p.titleKey)}</h3>
                               {fullySelected && (
                                 <span
                                   className="h-5 w-5 rounded-full flex items-center justify-center shrink-0"
@@ -419,15 +446,15 @@ export default function CreerCentrePage() {
                               )}
                             </div>
                             <p className="text-[11px] font-bold uppercase tracking-wider mt-0.5" style={{ color: p.accent }}>
-                              {p.subtitle}
+                              {t("marketing", p.subtitleKey)}
                             </p>
                             <p className="text-xs text-neutral-500 leading-relaxed mt-2 font-medium">
-                              {p.blurb}
+                              {t("marketing", p.blurbKey)}
                             </p>
                             <div className="flex flex-wrap gap-x-3 gap-y-1 mt-3">
-                              {p.points.map((f) => (
+                              {p.pointKeys.map((f) => (
                                 <p key={f} className="text-[10px] text-neutral-500 flex items-center gap-1 font-medium">
-                                  <Check size={10} style={{ color: p.accent }} /> {f}
+                                  <Check size={10} style={{ color: p.accent }} /> {t("marketing", f)}
                                 </p>
                               ))}
                             </div>
@@ -438,7 +465,7 @@ export default function CreerCentrePage() {
                       {showNativeChildren && (
                         <div className="pl-3 sm:pl-5 space-y-2">
                           <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 px-1">
-                            Choisissez une discipline
+                            {t("marketing", "ouvrirCentreChooseDiscipline")}
                           </p>
                           {NATIVE_DISCIPLINES.map((d) => {
                             const discSelected = centerType === d.id;
@@ -468,7 +495,7 @@ export default function CreerCentrePage() {
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-center justify-between gap-2">
-                                      <h4 className="font-black text-sm" style={{ color: BLUE }}>{d.title}</h4>
+                                      <h4 className="font-black text-sm" style={{ color: BLUE }}>{t("marketing", d.titleKey)}</h4>
                                       {discSelected && (
                                         <span
                                           className="h-5 w-5 rounded-full flex items-center justify-center shrink-0"
@@ -479,12 +506,12 @@ export default function CreerCentrePage() {
                                       )}
                                     </div>
                                     <p className="text-xs text-neutral-500 leading-relaxed mt-1.5 font-medium">
-                                      {d.blurb}
+                                      {t("marketing", d.blurbKey)}
                                     </p>
                                     <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2.5">
-                                      {d.points.map((f) => (
+                                      {d.pointKeys.map((f) => (
                                         <p key={f} className="text-[10px] text-neutral-500 flex items-center gap-1 font-medium">
-                                          <Check size={10} style={{ color: ORANGE }} /> {f}
+                                          <Check size={10} style={{ color: ORANGE }} /> {t("marketing", f)}
                                         </p>
                                       ))}
                                     </div>
@@ -507,12 +534,12 @@ export default function CreerCentrePage() {
                 className="w-full py-3.5 rounded-xl text-sm font-black text-white disabled:opacity-30 flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: ORANGE }}
               >
-                Continuer <ArrowRight size={16} />
+                {t("marketing", "ouvrirCentreContinueButton")} <ArrowRight size={16} />
               </button>
               <p className="text-center text-[11px] text-neutral-400 font-medium">
-                Déjà un compte ?{" "}
+                {t("marketing", "ouvrirCentreAlreadyAccount")}{" "}
                 <Link href="/login" className="font-bold hover:underline" style={{ color: BLUE }}>
-                  Se connecter
+                  {t("marketing", "ouvrirCentreLoginLink")}
                 </Link>
               </p>
             </div>
@@ -523,31 +550,31 @@ export default function CreerCentrePage() {
             <div className="space-y-5">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: BLUE }}>
-                  Votre établissement
+                  {t("marketing", "ouvrirCentreStep2Title")}
                 </h1>
                 <p className="text-sm text-neutral-500 mt-1 font-medium">
-                  {centerTypeLabel(centerType)}
+                  {localizedCenterTypeLabel(centerType)}
                 </p>
               </div>
 
               <div className="space-y-3">
-                <Field label="Nom du centre *">
+                <Field label={t("marketing", "ouvrirCentreFieldCenterNameLabel")}>
                   <input
                     value={centerName}
                     onChange={e => setCenterName(e.target.value)}
-                    placeholder="Ex : Institut Alpha Formation"
+                    placeholder={t("marketing", "ouvrirCentreFieldCenterNamePlaceholder")}
                     className="input-nexa"
                   />
                 </Field>
 
-                <Field label="Pays *">
+                <Field label={t("marketing", "ouvrirCentreFieldCountryLabel")}>
                   <div className="relative">
                     <select
                       value={country}
                       onChange={e => handleCountryChange(e.target.value)}
                       className="input-nexa appearance-none pr-10 cursor-pointer"
                     >
-                      <option value="">Sélectionnez un pays</option>
+                      <option value="">{t("marketing", "ouvrirCentreFieldCountryPlaceholder")}</option>
                       {AFRICA_54.map(c => (
                         <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
                       ))}
@@ -557,14 +584,14 @@ export default function CreerCentrePage() {
                 </Field>
 
                 {selectedCountry && selectedCountry.regions.length > 0 && (
-                  <Field label="Région">
+                  <Field label={t("marketing", "ouvrirCentreFieldRegionLabel")}>
                     <div className="relative">
                       <select
                         value={region}
                         onChange={e => setRegion(e.target.value)}
                         className="input-nexa appearance-none pr-10 cursor-pointer"
                       >
-                        <option value="">Sélectionnez une région</option>
+                        <option value="">{t("marketing", "ouvrirCentreFieldRegionPlaceholder")}</option>
                         {selectedCountry.regions.map(r => (
                           <option key={r} value={r}>{r}</option>
                         ))}
@@ -574,16 +601,16 @@ export default function CreerCentrePage() {
                   </Field>
                 )}
 
-                <Field label="Ville *">
+                <Field label={t("marketing", "ouvrirCentreFieldCityLabel")}>
                   <input
                     value={city}
                     onChange={e => setCity(e.target.value)}
-                    placeholder="Saisie libre"
+                    placeholder={t("marketing", "ouvrirCentreFieldCityPlaceholder")}
                     className="input-nexa"
                   />
                 </Field>
 
-                <Field label="Téléphone">
+                <Field label={t("marketing", "ouvrirCentreFieldPhoneLabel")}>
                   <input
                     value={phone}
                     onChange={e => setPhone(e.target.value)}
@@ -592,21 +619,21 @@ export default function CreerCentrePage() {
                   />
                 </Field>
 
-                <Field label="Adresse">
+                <Field label={t("marketing", "ouvrirCentreFieldAddressLabel")}>
                   <input
                     value={address}
                     onChange={e => setAddress(e.target.value)}
-                    placeholder="Rue, quartier..."
+                    placeholder={t("marketing", "ouvrirCentreFieldAddressPlaceholder")}
                     className="input-nexa"
                   />
                 </Field>
 
                 <div className="space-y-2 pt-1">
                   <p className="text-[11px] font-black uppercase tracking-widest text-neutral-400">
-                    Offre NEXA <span className="font-medium normal-case tracking-normal text-neutral-400">(optionnel)</span>
+                    {t("marketing", "ouvrirCentreOfferLabel")} <span className="font-medium normal-case tracking-normal text-neutral-400">({t("marketing", "ouvrirCentreOfferOptional")})</span>
                   </p>
                   <p className="text-[12px] text-neutral-500 font-medium leading-relaxed">
-                    Vous pouvez choisir plus tard — pendant l&apos;essai, vous explorez en mode Ultra.
+                    {t("marketing", "ouvrirCentreOfferHint")}
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button
@@ -618,8 +645,8 @@ export default function CreerCentrePage() {
                           : "border-black/10 bg-white hover:border-black/20"
                       }`}
                     >
-                      <p className="text-sm font-black" style={{ color: BLUE }}>Je ne sais pas encore</p>
-                      <p className="text-[11px] text-neutral-500 mt-0.5">À attribuer plus tard</p>
+                      <p className="text-sm font-black" style={{ color: BLUE }}>{t("marketing", "ouvrirCentreOfferUnknown")}</p>
+                      <p className="text-[11px] text-neutral-500 mt-0.5">{t("marketing", "ouvrirCentreOfferUnknownHint")}</p>
                     </button>
                     {NEXA_OFFER_KEYS.map((key) => {
                       const offer = NEXA_OFFERS[key];
@@ -637,11 +664,11 @@ export default function CreerCentrePage() {
                         >
                           <p className="text-sm font-black" style={{ color: BLUE }}>{offer.name}</p>
                           <p className="text-[11px] text-neutral-500 mt-0.5">
-                            {offer.monthlyFee.toLocaleString("fr-FR")} FCFA/mois
+                            {offer.monthlyFee.toLocaleString("fr-FR")} {t("marketing", "ouvrirCentreOfferFcfaPerMonth")}
                             {offer.perStudentFee
-                              ? ` + ${offer.perStudentFee.toLocaleString("fr-FR")} / étudiant`
+                              ? ` + ${offer.perStudentFee.toLocaleString("fr-FR")} / ${t("marketing", "ouvrirCentreOfferPerStudent")}`
                               : ""}
-                            {" · "}max {offer.maxStudents} étudiants
+                            {" · "}{t("marketing", "ouvrirCentreOfferMax")} {offer.maxStudents} {t("marketing", "ouvrirCentreOfferStudents")}
                           </p>
                         </button>
                       );
@@ -656,7 +683,7 @@ export default function CreerCentrePage() {
                   onClick={() => setStep(1)}
                   className="h-12 px-5 rounded-xl border border-black/10 bg-white text-neutral-600 text-sm font-semibold hover:border-black/20 flex items-center gap-1.5 transition-colors"
                 >
-                  <ArrowLeft size={14} /> Retour
+                  <ArrowLeft size={14} /> {t("marketing", "ouvrirCentreBackButton")}
                 </button>
                 <button
                   type="button"
@@ -665,7 +692,7 @@ export default function CreerCentrePage() {
                   className="flex-1 h-12 rounded-xl text-sm font-black text-white disabled:opacity-30 flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
                   style={{ backgroundColor: ORANGE }}
                 >
-                  Continuer <ArrowRight size={16} />
+                  {t("marketing", "ouvrirCentreContinueButton")} <ArrowRight size={16} />
                 </button>
               </div>
             </div>
@@ -676,40 +703,40 @@ export default function CreerCentrePage() {
             <div className="space-y-5">
               <div>
                 <h1 className="text-2xl sm:text-3xl font-black tracking-tight" style={{ color: BLUE }}>
-                  Votre compte administrateur
+                  {t("marketing", "ouvrirCentreAdminAccountTitle")}
                 </h1>
                 <p className="text-sm text-neutral-500 mt-1 font-medium">
-                  Responsable de <span className="font-bold" style={{ color: BLUE }}>{centerName}</span>
+                  {t("marketing", "ouvrirCentreManagerOf")} <span className="font-bold" style={{ color: BLUE }}>{centerName}</span>
                 </p>
               </div>
 
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Prénom *">
+                  <Field label={t("marketing", "ouvrirCentreFirstNameLabel")}>
                     <input value={ownerPrenom} onChange={e => setOwnerPrenom(e.target.value)} className="input-nexa" />
                   </Field>
-                  <Field label="Nom *">
+                  <Field label={t("marketing", "ouvrirCentreLastNameLabel")}>
                     <input value={ownerNom} onChange={e => setOwnerNom(e.target.value)} className="input-nexa" />
                   </Field>
                 </div>
 
-                <Field label="Fonction">
+                <Field label={t("marketing", "ouvrirCentreRoleLabel")}>
                   <div className="relative">
                     <select
                       value={ownerRole}
                       onChange={e => setOwnerRole(e.target.value)}
                       className="input-nexa appearance-none pr-10 cursor-pointer"
                     >
-                      <option value="">Sélectionnez une fonction</option>
-                      {OWNER_ROLES.map(r => (
-                        <option key={r} value={r}>{r}</option>
+                      <option value="">{t("marketing", "ouvrirCentreRolePlaceholder")}</option>
+                      {OWNER_ROLES.map((role) => (
+                        <option key={role.value} value={role.value}>{t("marketing", role.labelKey)}</option>
                       ))}
                     </select>
                     <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
                   </div>
                 </Field>
 
-                <Field label="Email *">
+                <Field label={t("marketing", "ouvrirCentreEmailLabel")}>
                   <input
                     type="email"
                     value={ownerEmail}
@@ -719,7 +746,7 @@ export default function CreerCentrePage() {
                   />
                 </Field>
 
-                <Field label="Mot de passe *">
+                <Field label={t("marketing", "ouvrirCentrePasswordLabel")}>
                   <div className="relative">
                     <input
                       type={showPassword ? "text" : "password"}
@@ -742,8 +769,8 @@ export default function CreerCentrePage() {
                     ownerPassword.length > 0 && !isPasswordStrong(ownerPassword) ? "text-red-500" : "text-neutral-400"
                   }`}>
                     {ownerPassword.length > 0 && !pwdCheck.ok
-                      ? (pwdCheck.message || PASSWORD_POLICY_HINT)
-                      : PASSWORD_POLICY_HINT}
+                      ? t("marketing", "ouvrirCentrePasswordInvalid")
+                      : t("marketing", "ouvrirCentrePasswordHint")}
                   </p>
                 </Field>
               </div>
@@ -759,7 +786,7 @@ export default function CreerCentrePage() {
                   <p className="text-sm font-black" style={{ color: BLUE }}>{centerName}</p>
                   <p className="text-[10px] text-neutral-400 font-medium">
                     {city}{country ? ` · ${AFRICA_54.find(c => c.code === country)?.name}` : ""} ·{" "}
-                    {centerTypeLabel(centerType)}
+                    {localizedCenterTypeLabel(centerType)}
                   </p>
                 </div>
               </div>
@@ -776,7 +803,7 @@ export default function CreerCentrePage() {
                   onClick={() => setStep(2)}
                   className="h-12 px-5 rounded-xl border border-black/10 bg-white text-neutral-600 text-sm font-semibold hover:border-black/20 flex items-center gap-1.5 transition-colors"
                 >
-                  <ArrowLeft size={14} /> Retour
+                  <ArrowLeft size={14} /> {t("marketing", "ouvrirCentreBackButton")}
                 </button>
                 <button
                   type="button"
@@ -786,13 +813,13 @@ export default function CreerCentrePage() {
                   style={{ backgroundColor: ORANGE }}
                 >
                   {saving ? <Loader2 size={16} className="animate-spin" /> : <Building2 size={16} />}
-                  {saving ? "Création en cours…" : "Créer mon centre"}
+                  {saving ? t("marketing", "ouvrirCentreCreating") : t("marketing", "ouvrirCentreCreateButton")}
                 </button>
               </div>
 
               <p className="text-center text-[10px] text-neutral-400 font-medium">
-                En créant votre centre, vous acceptez les{" "}
-                <Link href="/cgu" className="underline" style={{ color: BLUE }}>CGU</Link> de NEXA.
+                {t("marketing", "ouvrirCentreTermsPrefix")}{" "}
+                <Link href="/cgu" className="underline" style={{ color: BLUE }}>{t("marketing", "ouvrirCentreTermsLink")}</Link>{" "}{t("marketing", "ouvrirCentreTermsSuffix")}
               </p>
             </div>
           )}
@@ -802,10 +829,10 @@ export default function CreerCentrePage() {
             <div className="space-y-8 text-center border border-black/[0.08] bg-white p-8 sm:p-10">
               <div className="space-y-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-neutral-400">
-                  {centerTypeLabel(centerType)}
+                  {localizedCenterTypeLabel(centerType)}
                 </p>
                 <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight" style={{ color: BLUE }}>
-                  Bienvenue dans votre<br />espace <span style={{ color: ORANGE }}>NEXA</span>
+                  {t("marketing", "ouvrirCentreSuccessTitleLine1")}<br />{t("marketing", "ouvrirCentreSuccessTitleLine2")} <span style={{ color: ORANGE }}>NEXA</span>
                 </h1>
               </div>
 
@@ -817,9 +844,9 @@ export default function CreerCentrePage() {
               </div>
 
               <div className="border border-black/[0.08] bg-[#FFFBF7] p-4 text-left space-y-1.5">
-                <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-widest">Votre demande a été transmise</p>
+                <p className="text-[10px] font-semibold text-neutral-400 uppercase tracking-widest">{t("marketing", "ouvrirCentreRequestSent")}</p>
                 <p className="text-[12px] text-neutral-500 leading-relaxed font-medium">
-                  L&apos;équipe NEXA étudie votre dossier. Vous pouvez configurer votre espace librement en attendant l&apos;activation.
+                  {t("marketing", "ouvrirCentreRequestReview")}
                 </p>
               </div>
 
@@ -830,10 +857,10 @@ export default function CreerCentrePage() {
                   className="w-full py-3.5 rounded-xl text-[13px] font-black text-white hover:opacity-90 transition-opacity"
                   style={{ backgroundColor: ORANGE }}
                 >
-                  Configurer votre espace centre
+                  {t("marketing", "ouvrirCentreConfigureButton")}
                 </button>
                 <p className="text-[11px] text-neutral-400 font-medium">
-                  En 2 minutes, configurons ensemble votre espace centre.
+                  {t("marketing", "ouvrirCentreConfigureHint")}
                 </p>
               </div>
             </div>

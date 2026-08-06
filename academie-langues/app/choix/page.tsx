@@ -5,10 +5,12 @@ import { useRouter } from 'next/navigation';
 import { supabase } from "@/app/utils/supabase";
 import { STUDENT_HOME } from "@/app/utils/student-routes"; 
 import { GraduationCap, Globe2, ChevronRight, CheckCircle2, LayoutDashboard } from "lucide-react";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function SelectionPage() {
   const router = useRouter();
-  
+  const { t } = useI18n();
+
   // 🎯 On initialise l'état
   const [formation, setFormation] = useState("tcf");
   const [isLoading, setIsLoading] = useState(false);
@@ -51,15 +53,15 @@ export default function SelectionPage() {
   const formations = [
     { 
       id: "tcf", 
-      title: "TCF Canada", 
-      description: "Préparation officielle et intensive.",
+      title: "TCF Canada",
+      description: t("auth", "choixTcfDescription"),
       icon: GraduationCap,
       available: true
     },
-    { 
-      id: "anglais", 
-      title: "Anglais IELTS", 
-      description: "Bientôt disponible dans l'Académie.",
+    {
+      id: "anglais",
+      title: t("auth", "choixEnglishTitle"),
+      description: t("auth", "choixEnglishDescription"),
       icon: Globe2,
       available: false
     }
@@ -87,7 +89,7 @@ export default function SelectionPage() {
       router.push('/dashboard');
     } catch (error: any) {
       console.error("Erreur de sélection :", error);
-      alert("Erreur lors de l'enregistrement de votre choix. Veuillez réessayer.");
+      alert(t("auth", "choixSaveError"));
     } finally {
       setIsLoading(false);
     }
@@ -118,10 +120,10 @@ export default function SelectionPage() {
             <GraduationCap className="w-8 h-8 text-orange-600" />
           </div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight mb-3">
-            Votre Programme
+            {t("auth", "choixTitle")}
           </h1>
           <p className="text-sm text-slate-500 font-medium max-w-[280px] mx-auto leading-relaxed">
-            Sélectionnez votre parcours pour personnaliser votre expérience.
+            {t("auth", "choixSubtitle")}
           </p>
         </div>
 
@@ -175,7 +177,7 @@ export default function SelectionPage() {
                   
                   {!f.available && (
                     <span className="text-[8px] font-black uppercase tracking-[0.1em] text-slate-400 bg-slate-100 px-2 py-1 rounded-md border border-slate-200">
-                      Bientôt
+                      {t("auth", "choixComingSoon")}
                     </span>
                   )}
                 </button>
@@ -193,7 +195,7 @@ export default function SelectionPage() {
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             ) : (
               <>
-                Lancer ma préparation <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                {t("auth", "choixStartButton")} <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </>
             )}
           </button>

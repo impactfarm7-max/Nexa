@@ -16,16 +16,19 @@ import {
   Plus,
   FileWarning,
 } from "lucide-react";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
 
-const TRAINING = [
-  { icon: ScrollText, title: "Cours théoriques", sub: "Modules & PDF" },
-  { icon: Headphones, title: "Vidéos & audio", sub: "Leçons en ligne" },
-  { icon: PenTool, title: "Devoirs", sub: "À rendre" },
-  { icon: Mic, title: "Sessions live", sub: "Visio intégrée" },
-];
+function getTraining(t: (ns: "marketing", key: string) => string) {
+  return [
+    { icon: ScrollText, title: t("marketing", "presentationPhoneTrainingCoursesTitle"), sub: t("marketing", "presentationPhoneTrainingCoursesSub") },
+    { icon: Headphones, title: t("marketing", "presentationPhoneTrainingVideoTitle"), sub: t("marketing", "presentationPhoneTrainingVideoSub") },
+    { icon: PenTool, title: t("marketing", "presentationPhoneTrainingHomeworkTitle"), sub: t("marketing", "presentationPhoneTrainingHomeworkSub") },
+    { icon: Mic, title: t("marketing", "presentationPhoneTrainingLiveTitle"), sub: t("marketing", "presentationPhoneTrainingLiveSub") },
+  ];
+}
 
 function IOSCellularSignal() {
   const bars = [3, 5, 7, 9];
@@ -83,12 +86,13 @@ function StatusBar() {
 }
 
 function BottomNavMock() {
+  const { t } = useI18n();
   const items = [
-    { icon: LayoutDashboard, label: "Accueil", active: true },
-    { icon: MessageCircle, label: "Mon Tuteur" },
+    { icon: LayoutDashboard, label: t("marketing", "presentationPhoneNavHome"), active: true },
+    { icon: MessageCircle, label: t("marketing", "presentationPhoneNavTutor") },
     { icon: null, label: "" },
-    { icon: FileText, label: "Devoirs" },
-    { icon: Users, label: "Communauté" },
+    { icon: FileText, label: t("marketing", "presentationPhoneNavHomework") },
+    { icon: Users, label: t("marketing", "presentationPhoneNavCommunity") },
   ];
 
   return (
@@ -123,6 +127,8 @@ function BottomNavMock() {
 }
 
 function StudentDashboardScreen() {
+  const { t } = useI18n();
+  const TRAINING = getTraining(t);
   return (
     <div className="flex h-full flex-col bg-[#FAFAF9] text-[#0a0a0a]">
       <StatusBar />
@@ -135,12 +141,12 @@ function StudentDashboardScreen() {
               className="inline-block rounded-full px-1.5 py-px text-[5.5px] font-bold uppercase tracking-wider"
               style={{ color: ORANGE, backgroundColor: "#FFF3E8" }}
             >
-              Espace Étudiant
+              {t("marketing", "presentationPhoneStudentSpaceBadge")}
             </span>
             <h2 className="mt-0.5 truncate text-[10px] font-black leading-tight" style={{ color: BLUE }}>
-              Bonjour, ondoa
+              {t("marketing", "presentationPhoneGreeting")}
             </h2>
-            <p className="text-[6px] font-medium text-neutral-400">Voici votre semaine en un coup d&apos;œil.</p>
+            <p className="text-[6px] font-medium text-neutral-400">{t("marketing", "presentationPhoneWeekOverview")}</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[#DCE3FF] bg-[#EEF2FF]">
@@ -160,10 +166,10 @@ function StudentDashboardScreen() {
           <div className="mb-1 flex items-center justify-between">
             <h3 className="flex items-center gap-0.5 text-[7px] font-black" style={{ color: BLUE }}>
               <Sparkles size={7} style={{ color: ORANGE }} />
-              Mes cours en cours
+              {t("marketing", "presentationPhoneMyCoursesTitle")}
             </h3>
             <span className="rounded-full px-1 py-px text-[5px] font-bold uppercase tracking-wide" style={{ color: ORANGE, backgroundColor: "#FFF3E8" }}>
-              Filière Management
+              {t("marketing", "presentationPhoneManagementTrack")}
             </span>
           </div>
           <div className="grid grid-cols-2 gap-1">
@@ -186,12 +192,12 @@ function StudentDashboardScreen() {
           <div className="mb-1 flex items-center justify-between">
             <h3 className="flex items-center gap-0.5 text-[6.5px] font-black" style={{ color: BLUE }}>
               <NotebookPen size={7} style={{ color: ORANGE }} />
-              Mes notes de la semaine
+              {t("marketing", "presentationPhoneMyGradesTitle")}
             </h3>
-            <span className="text-[5px] font-bold text-neutral-400">Tout voir →</span>
+            <span className="text-[5px] font-bold text-neutral-400">{t("marketing", "presentationPhoneSeeAll")}</span>
           </div>
           <p className="py-2 text-center text-[6px] font-medium leading-snug text-neutral-400">
-            Votre prochain contrôle est prévu vendredi.
+            {t("marketing", "presentationPhoneNextTestFriday")}
           </p>
         </div>
 
@@ -200,11 +206,11 @@ function StudentDashboardScreen() {
           <div className="mb-1 flex items-center justify-between">
             <h3 className="flex items-center gap-0.5 text-[6.5px] font-black" style={{ color: BLUE }}>
               <FileWarning size={7} style={{ color: ORANGE }} />
-              Devoirs en attente
+              {t("marketing", "presentationPhoneHomeworkPendingTitle")}
             </h3>
-            <span className="text-[5px] font-bold text-neutral-400">Tout voir →</span>
+            <span className="text-[5px] font-bold text-neutral-400">{t("marketing", "presentationPhoneSeeAll")}</span>
           </div>
-          <p className="py-1.5 text-center text-[6px] font-medium text-neutral-400">Tout est à jour, bravo ! 🎉</p>
+          <p className="py-1.5 text-center text-[6px] font-medium text-neutral-400">{t("marketing", "presentationPhoneAllUpToDate")}</p>
         </div>
 
         {/* Discipline */}
@@ -212,15 +218,15 @@ function StudentDashboardScreen() {
           <div className="mb-1 flex items-center justify-between gap-1">
             <h3 className="flex items-center gap-0.5 text-[6.5px] font-black text-white">
               <Flame size={7} className="text-orange-400" />
-              Ma discipline cette semaine
+              {t("marketing", "presentationPhoneDisciplineTitle")}
             </h3>
-            <span className="text-[4.5px] font-bold uppercase tracking-wide text-white/50">Continuez 💪</span>
+            <span className="text-[4.5px] font-bold uppercase tracking-wide text-white/50">{t("marketing", "presentationPhoneKeepGoing")}</span>
           </div>
           <div className="grid grid-cols-3 gap-1">
             {[
-              { n: "4", l: "Jours actifs" },
-              { n: "2", l: "Lives suivis" },
-              { n: "3", l: "Devoirs rendus" },
+              { n: "4", l: t("marketing", "presentationPhoneStatActiveDays") },
+              { n: "2", l: t("marketing", "presentationPhoneStatLivesAttended") },
+              { n: "3", l: t("marketing", "presentationPhoneStatHomeworkSubmitted") },
             ].map((s) => (
               <div key={s.l} className="rounded-lg bg-white/10 p-1 text-center">
                 <p className="text-[9px] font-black text-white">{s.n}</p>
@@ -237,6 +243,7 @@ function StudentDashboardScreen() {
 }
 
 export default function IPhone17ProMaxMock() {
+  const { t } = useI18n();
   return (
     <div className="relative mx-auto w-[min(100%,210px)] sm:w-[220px]">
       <div className="absolute -inset-x-3 bottom-0 top-6 rounded-[2.2rem] bg-black/10 blur-xl" />
@@ -272,7 +279,7 @@ export default function IPhone17ProMaxMock() {
       </div>
 
       <p className="mt-3 text-center text-[9px] font-bold text-neutral-400">
-        Dashboard étudiant · NEXA mobile
+        {t("marketing", "presentationPhoneCaption")}
       </p>
     </div>
   );

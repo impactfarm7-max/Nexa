@@ -4,29 +4,32 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { BRAND } from "@/app/utils/brand";
 import MarketingChrome from "@/app/components/landing/MarketingChrome";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const ORANGE = BRAND.orange;
 
-const VALUES = [
-  {
-    title: "Accessibilité",
-    text: "L’éducation de qualité ne doit plus être un luxe. NEXA démocratise une formation moderne et mesurable pour les centres et les apprenants partout en Afrique.",
-  },
-  {
-    title: "Excellence pédagogique",
-    text: "Chaque outil — planificateur, communauté, examens, tuteur — est conçu pour servir l’acte d’enseigner et d’apprendre, pas pour complexifier le quotidien.",
-  },
-  {
-    title: "Amplification",
-    text: "Le X de NEXA est le multiplicateur. Nous ne digitalisons pas seulement : nous amplifions chaque centre, chaque formateur, chaque apprenant.",
-  },
-  {
-    title: "Confiance & continuité",
-    text: "Une plateforme unique, une vision claire pour les équipes, un accompagnement agent pour démarrer — de la demande centre au suivi des parcours.",
-  },
-] as const;
-
 export default function ValeursPage() {
+  const { t } = useI18n();
+
+  const VALUES = [
+    {
+      title: t("marketing", "valeursCard1Title"),
+      text: t("marketing", "valeursCard1Text"),
+    },
+    {
+      title: t("marketing", "valeursCard2Title"),
+      text: t("marketing", "valeursCard2Text"),
+    },
+    {
+      title: t("marketing", "valeursCard3Title"),
+      text: t("marketing", "valeursCard3Text"),
+    },
+    {
+      title: t("marketing", "valeursCard4Title"),
+      text: t("marketing", "valeursCard4Text"),
+    },
+  ] as const;
+
   return (
     <MarketingChrome active="valeurs">
       {/* Hero + mission */}
@@ -37,8 +40,8 @@ export default function ValeursPage() {
           className="nexa-marketing-title mb-5 max-w-3xl"
           style={{ color: BRAND.blue }}
         >
-          L&apos;accès à l&apos;éducation de qualité
-          <br className="hidden sm:block" /> ne sera plus un luxe
+          {t("marketing", "valeursHeroTitleLine1")}
+          <br className="hidden sm:block" /> {t("marketing", "valeursHeroTitleLine2")}
         </motion.h1>
         <motion.div
           initial={{ opacity: 0, scaleX: 0.6 }}
@@ -54,8 +57,7 @@ export default function ValeursPage() {
           transition={{ delay: 0.12 }}
           className="text-neutral-500 font-medium text-base sm:text-lg leading-relaxed max-w-2xl"
         >
-          NEXA construit une techno éducative au service des centres, des enseignants et des apprenants —
-          pour démocratiser une formation moderne, mesurable et accessible partout en Afrique.
+          {t("marketing", "valeursHeroSubtitle")}
         </motion.p>
       </section>
 
@@ -69,7 +71,7 @@ export default function ValeursPage() {
             className="text-[11px] font-black uppercase tracking-[0.28em] mb-3"
             style={{ color: ORANGE }}
           >
-            Notre mission
+            {t("marketing", "valeursMissionEyebrow")}
           </motion.p>
           <motion.h2
             initial={{ opacity: 0, y: 14 }}
@@ -86,8 +88,7 @@ export default function ValeursPage() {
             viewport={{ once: true }}
             className="text-neutral-500 font-medium max-w-2xl mx-auto leading-relaxed text-base sm:text-lg"
           >
-            Le <strong className="text-neutral-800">X</strong> est le multiplicateur — l&apos;infini des possibles.
-            NEXA ne se contente pas de digitaliser : elle amplifie chaque centre, chaque formateur, chaque apprenant.
+            {t("marketing", "valeursMissionBodyPrefix")} <strong className="text-neutral-800">X</strong> {t("marketing", "valeursMissionBodySuffix")}
           </motion.p>
         </div>
       </section>
@@ -116,10 +117,10 @@ export default function ValeursPage() {
       {/* CTA */}
       <section className="max-w-3xl mx-auto px-4 sm:px-5 pb-14 sm:pb-16 text-center">
         <h2 className="nexa-marketing-title mb-3" style={{ color: BRAND.blue }}>
-          Construisons l&apos;avenir de la formation ensemble
+          {t("marketing", "valeursCtaTitle")}
         </h2>
         <p className="text-neutral-500 font-medium mb-7 max-w-md mx-auto">
-          Découvrez la plateforme ou explorez les programmes adaptés à votre centre.
+          {t("marketing", "valeursCtaSubtitle")}
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <Link
@@ -127,13 +128,13 @@ export default function ValeursPage() {
             className="w-full sm:w-auto inline-flex items-center justify-center h-12 px-7 rounded-2xl text-sm font-black text-white transition hover:opacity-90"
             style={{ backgroundColor: BRAND.blue }}
           >
-            Découvrir la plateforme
+            {t("marketing", "valeursCtaPrimary")}
           </Link>
           <Link
             href="/programmes"
             className="w-full sm:w-auto inline-flex items-center justify-center h-12 px-7 rounded-2xl text-sm font-bold border border-black/10 bg-white text-neutral-700 hover:border-black/20 transition"
           >
-            Voir nos programmes
+            {t("marketing", "valeursCtaSecondary")}
           </Link>
         </div>
       </section>

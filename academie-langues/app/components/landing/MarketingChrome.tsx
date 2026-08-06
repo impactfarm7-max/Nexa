@@ -6,6 +6,8 @@ import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { BRAND } from "@/app/utils/brand";
+import LanguageSwitcher from "@/app/components/LanguageSwitcher";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const WHATSAPP = "237621105640";
 
@@ -21,11 +23,12 @@ export default function MarketingChrome({
   /** Masque le footer (ex. wizard /ouvrir-centre). */
   hideFooter?: boolean;
 }) {
+  const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const talkToAgent = () =>
     window.open(
-      `https://wa.me/${WHATSAPP}?text=${encodeURIComponent("Bonjour NEXA, je souhaite en savoir plus sur la plateforme.")}`,
+      `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(t("landing", "whatsappMessage"))}`,
       "_blank",
     );
 
@@ -70,32 +73,33 @@ export default function MarketingChrome({
                 NEXA
               </span>
             </Link>
-            <nav className="hidden sm:flex items-center gap-1" aria-label="Navigation principale">
-              {navLink("/programmes", "Nos programmes", "programmes")}
-              {navLink("/valeurs", "Nos valeurs", "valeurs")}
+            <nav className="hidden sm:flex items-center gap-1" aria-label={t("landing", "mainNav")}>
+              {navLink("/programmes", t("landing", "programs"), "programmes")}
+              {navLink("/valeurs", t("landing", "values"), "valeurs")}
             </nav>
           </div>
 
           <div className="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0">
+            <LanguageSwitcher compact />
             <Link
               href="/presentation"
               className="hidden md:flex items-center h-10 px-4 rounded-xl text-[12px] xl:text-[13px] font-bold border border-black/10 bg-white hover:border-black/20 transition whitespace-nowrap"
             >
-              Découvrir la plateforme
+              {t("landing", "discover")}
             </Link>
             <button
               type="button"
               onClick={talkToAgent}
               className="hidden md:flex items-center h-10 px-4 rounded-xl text-[12px] xl:text-[13px] font-bold border border-black/10 bg-white hover:border-black/20 transition whitespace-nowrap"
             >
-              Discuter avec un agent
+              {t("landing", "talkToAgent")}
             </button>
             <Link
               href="/login"
               className="flex items-center h-10 px-4 sm:px-5 rounded-xl text-[12px] xl:text-[13px] font-black text-white transition hover:opacity-90 whitespace-nowrap"
               style={{ backgroundColor: BRAND.blue }}
             >
-              Se connecter
+              {t("landing", "login")}
             </Link>
           </div>
 
@@ -103,7 +107,7 @@ export default function MarketingChrome({
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
             className="sm:hidden w-10 h-10 rounded-xl border border-black/10 bg-white flex items-center justify-center text-neutral-700"
-            aria-label="Menu"
+            aria-label={t("landing", "menu")}
           >
             {mobileOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -119,14 +123,15 @@ export default function MarketingChrome({
             >
               <div className="px-4 py-4 flex flex-col gap-2">
                 <Link href="/programmes" onClick={() => setMobileOpen(false)} className="flex items-center h-11 px-4 rounded-xl text-sm font-bold text-neutral-700">
-                  Nos programmes
+                  {t("landing", "programs")}
                 </Link>
                 <Link href="/valeurs" onClick={() => setMobileOpen(false)} className="flex items-center h-11 px-4 rounded-xl text-sm font-bold text-neutral-700">
-                  Nos valeurs
+                  {t("landing", "values")}
                 </Link>
                 <div className="h-px bg-black/[0.06] my-1" />
+                <LanguageSwitcher />
                 <Link href="/presentation" onClick={() => setMobileOpen(false)} className="flex items-center h-11 px-4 rounded-xl text-sm font-bold border border-black/10 bg-white">
-                  Découvrir la plateforme
+                  {t("landing", "discover")}
                 </Link>
                 <button
                   type="button"
@@ -136,7 +141,7 @@ export default function MarketingChrome({
                   }}
                   className="flex items-center h-11 px-4 rounded-xl text-sm font-bold border border-black/10 bg-white text-left"
                 >
-                  Discuter avec un agent
+                  {t("landing", "talkToAgent")}
                 </button>
                 <Link
                   href="/login"
@@ -144,7 +149,7 @@ export default function MarketingChrome({
                   className="flex items-center justify-center h-11 px-4 rounded-xl text-sm font-black text-white"
                   style={{ backgroundColor: BRAND.blue }}
                 >
-                  Se connecter
+                  {t("landing", "login")}
                 </Link>
               </div>
             </motion.div>
@@ -163,10 +168,10 @@ export default function MarketingChrome({
             <span className="text-[10px] text-neutral-400 font-bold">NEXT × AFRICA</span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-[11px] font-bold text-neutral-400">
-            <Link href="/programmes" className="hover:text-neutral-700 transition">Programmes</Link>
-            <Link href="/valeurs" className="hover:text-neutral-700 transition">Valeurs</Link>
-            <Link href="/presentation" className="hover:text-neutral-700 transition">Présentation</Link>
-            <Link href="/ouvrir-centre" className="hover:text-neutral-700 transition">Ouvrir un centre</Link>
+            <Link href="/programmes" className="hover:text-neutral-700 transition">{t("landing", "programs")}</Link>
+            <Link href="/valeurs" className="hover:text-neutral-700 transition">{t("landing", "values")}</Link>
+            <Link href="/presentation" className="hover:text-neutral-700 transition">{t("landing", "presentation")}</Link>
+            <Link href="/ouvrir-centre" className="hover:text-neutral-700 transition">{t("landing", "openCenter")}</Link>
           </div>
           <p className="text-[10px] text-neutral-300 font-bold">© {new Date().getFullYear()} NEXA</p>
         </div>

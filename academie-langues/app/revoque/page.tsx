@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldOff, MessageCircle, GraduationCap, LogOut } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const NEXA_WHATSAPP = "+237683375069";
 
@@ -19,6 +20,7 @@ function normalizeWhatsApp(phone: string | null | undefined): string | null {
 
 export default function RevoquePage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [centerName, setCenterName] = useState<string | null>(null);
   const [centerPhone, setCenterPhone] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -59,8 +61,8 @@ export default function RevoquePage() {
     const wa = normalizeWhatsApp(centerPhone) || normalizeWhatsApp(NEXA_WHATSAPP);
     const msg = encodeURIComponent(
       centerName
-        ? `Bonjour ${centerName}, mon accès à la plateforme a été révoqué. Je souhaite régulariser ma situation. Pouvez-vous m'aider ?`
-        : "Bonjour NEXA, mon accès à la plateforme a été révoqué. Je souhaite régulariser ma situation. Pouvez-vous m'aider ?",
+        ? `${t("auth", "revoqueContactGreeting")} ${centerName}, ${t("auth", "revoqueContactBody")}`
+        : `${t("auth", "revoqueContactGreeting")} NEXA, ${t("auth", "revoqueContactBody")}`,
     );
     window.open(`https://wa.me/${wa}?text=${msg}`, "_blank");
   };
@@ -89,17 +91,16 @@ export default function RevoquePage() {
           <ShieldOff className="w-8 h-8 text-red-400" />
         </div>
 
-        <h1 className="text-2xl font-black text-white mb-3">Accès révoqué</h1>
+        <h1 className="text-2xl font-black text-white mb-3">{t("auth", "revoqueTitle")}</h1>
         <p className="text-neutral-400 text-sm leading-relaxed mb-2">
-          Ton accès à la plateforme a été révoqué
-          {centerName ? " par ton centre." : " par l'administration."}
+          {t("auth", "revoqueAccessRevoked")}
+          {centerName ? ` ${t("auth", "revoqueByCenter")}` : ` ${t("auth", "revoqueByAdmin")}`}
         </p>
         {centerName ? (
           <p className="text-white font-black text-base mb-4 break-words">{centerName}</p>
         ) : null}
         <p className="text-neutral-500 text-sm leading-relaxed mb-2">
-          Si tu penses qu&apos;il s&apos;agit d&apos;une erreur ou si tu souhaites régulariser ta situation,
-          contacte directement :
+          {t("auth", "revoqueContactInstructions")}
         </p>
         <p className="text-white font-black text-base mb-8 break-words">{displayName}</p>
 
@@ -108,7 +109,7 @@ export default function RevoquePage() {
           className="w-full flex items-center justify-center gap-2.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-black text-sm py-4 rounded-2xl transition-all shadow-lg shadow-orange-500/25 mb-3"
         >
           <MessageCircle className="w-5 h-5 shrink-0" />
-          <span className="truncate">Contacter {displayName}</span>
+          <span className="truncate">{t("auth", "revoqueContactButton")} {displayName}</span>
         </button>
 
         <button
@@ -116,7 +117,7 @@ export default function RevoquePage() {
           className="w-full flex items-center justify-center gap-2 text-neutral-500 hover:text-neutral-300 text-sm font-semibold py-3 rounded-2xl transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          Se déconnecter
+          {t("auth", "revoqueLogout")}
         </button>
       </div>
     </div>

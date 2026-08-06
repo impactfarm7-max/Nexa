@@ -8,6 +8,7 @@ import {
   ArrowLeft, Search, Crown, BookMarked, Languages, FileText,
   PenTool, ScrollText, MessageCircle, Video,
 } from "lucide-react";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -131,6 +132,7 @@ function DashCard({
 }
 
 export function CenterDashboardMock({ embedded = false }: { embedded?: boolean }) {
+  const { t } = useI18n();
   const [totalStudents, setTotalStudents] = useState(0);
   useEffect(() => {
     const target = 248;
@@ -173,56 +175,56 @@ export function CenterDashboardMock({ embedded = false }: { embedded?: boolean }
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="min-w-0">
               <p className="text-[7px] sm:text-[8px] font-bold uppercase tracking-wide text-neutral-400 truncate">
-                Institut Horizon · Douala
+                {t("marketing", "presentationMockInstituteLabel")}
               </p>
               <h3 className="text-[11px] sm:text-[13px] font-black truncate" style={{ color: BLUE }}>
-                Bonjour, Marie 👋
+                {t("marketing", "presentationMockGreeting")}
               </h3>
             </div>
             <div className="shrink-0 flex items-center gap-1 rounded-lg border border-neutral-200 bg-white px-1.5 py-1 text-[7px] sm:text-[8px] font-bold" style={{ color: BLUE }}>
               <Copy size={9} />
-              <span className="hidden sm:inline">Lien d&apos;inscription</span>
+              <span className="hidden sm:inline">{t("marketing", "presentationMockRegistrationLink")}</span>
             </div>
           </div>
 
           <div className="rounded-lg bg-amber-50 border border-amber-100 px-2 py-1 mb-2">
             <p className="text-[6px] sm:text-[7px] font-bold uppercase tracking-wide text-amber-800 leading-snug">
-              En attente d&apos;activation par NEXA · vous pouvez configurer votre espace librement.
+              {t("marketing", "presentationMockPendingActivation")}
             </p>
           </div>
 
           {/* 4 cartes KPI */}
           <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-            <DashCard title="Étudiants" icon={Users} iconBg="bg-blue-50 border-blue-100" iconColor="text-blue-600">
-              <MiniStat label="Inscrits aujourd'hui" value="3" />
-              <MiniStat label="Cette semaine" value="18" />
-              <MiniStat label="Inactifs (+3j)" value="5" />
-              <MiniStat label="Actifs sur cours" value="142" accent="#059669" />
+            <DashCard title={t("marketing", "presentationMockStudentsTitle")} icon={Users} iconBg="bg-blue-50 border-blue-100" iconColor="text-blue-600">
+              <MiniStat label={t("marketing", "presentationMockEnrolledToday")} value="3" />
+              <MiniStat label={t("marketing", "presentationMockThisWeek")} value="18" />
+              <MiniStat label={t("marketing", "presentationMockInactive3d")} value="5" />
+              <MiniStat label={t("marketing", "presentationMockActiveOnCourse")} value="142" accent="#059669" />
               <div className="mt-1.5 pt-1.5 border-t border-neutral-100 flex justify-between items-center">
-                <span className="text-[7px] font-bold text-neutral-400">Total</span>
+                <span className="text-[7px] font-bold text-neutral-400">{t("marketing", "presentationMockTotal")}</span>
                 <span className="text-sm font-black" style={{ color: BLUE }}>{totalStudents}</span>
               </div>
             </DashCard>
 
-            <DashCard title="Planning du jour" icon={Calendar} iconBg="bg-purple-50 border-purple-100" iconColor="text-purple-600">
-              <MiniStat label="Cours planifiés" value="2" />
-              <MiniStat label="Sessions live" value="1" />
+            <DashCard title={t("marketing", "presentationMockDailyPlanning")} icon={Calendar} iconBg="bg-purple-50 border-purple-100" iconColor="text-purple-600">
+              <MiniStat label={t("marketing", "presentationMockPlannedCourses")} value="2" />
+              <MiniStat label={t("marketing", "presentationMockLiveSessions")} value="1" />
               <div className="mt-1.5 rounded-lg bg-purple-50/80 p-1.5 text-center">
-                <p className="text-[7px] text-purple-700 font-bold">Prochain live à 15h</p>
+                <p className="text-[7px] text-purple-700 font-bold">{t("marketing", "presentationMockNextLiveAt3pm")}</p>
               </div>
             </DashCard>
 
-            <DashCard title="Examens" icon={ClipboardList} iconBg="bg-orange-50 border-orange-100" iconColor={ORANGE}>
-              <MiniStat label="Programmés" value="4" />
+            <DashCard title={t("marketing", "presentationMockExamsTitle")} icon={ClipboardList} iconBg="bg-orange-50 border-orange-100" iconColor={ORANGE}>
+              <MiniStat label={t("marketing", "presentationMockScheduled")} value="4" />
               <div className="mt-1.5 rounded-lg bg-neutral-50 p-1.5 text-center">
-                <p className="text-[7px] text-neutral-400 font-bold">Contrôle continu vendredi</p>
+                <p className="text-[7px] text-neutral-400 font-bold">{t("marketing", "presentationMockContinuousAssessmentFriday")}</p>
               </div>
             </DashCard>
 
-            <DashCard title="Finance" icon={Wallet} iconBg="bg-emerald-50 border-emerald-100" iconColor="text-emerald-600">
-              <MiniStat label="Encaissé aujourd'hui" value="425 000 F" accent="#059669" />
+            <DashCard title={t("marketing", "presentationMockFinanceTitle")} icon={Wallet} iconBg="bg-emerald-50 border-emerald-100" iconColor="text-emerald-600">
+              <MiniStat label={t("marketing", "presentationMockCollectedToday")} value="425 000 F" accent="#059669" />
               <div className="mt-1.5 pt-1.5 border-t border-neutral-100 flex justify-between items-center">
-                <span className="text-[7px] font-bold text-red-500">En retard</span>
+                <span className="text-[7px] font-bold text-red-500">{t("marketing", "presentationMockOverdue")}</span>
                 <span className="text-[9px] font-black text-red-600">2</span>
               </div>
             </DashCard>
@@ -234,10 +236,11 @@ export function CenterDashboardMock({ embedded = false }: { embedded?: boolean }
 }
 
 export function FinanceMock() {
+  const { t } = useI18n();
   const rows = [
-    { name: "Amina K.", amount: "85 000", status: "Payé", color: "emerald" },
-    { name: "Jean-Paul M.", amount: "42 500", status: "Partiel", color: "amber" },
-    { name: "Fatou D.", amount: "85 000", status: "En retard", color: "red" },
+    { name: "Amina K.", amount: "85 000", status: t("marketing", "presentationMockPaid"), color: "emerald" },
+    { name: "Jean-Paul M.", amount: "42 500", status: t("marketing", "presentationMockPartial"), color: "amber" },
+    { name: "Fatou D.", amount: "85 000", status: t("marketing", "presentationMockOverdue"), color: "red" },
   ];
   const [visible, setVisible] = useState(0);
   useEffect(() => {
@@ -249,8 +252,8 @@ export function FinanceMock() {
     <Frame title="nexa.app/centre/finance">
       <div className="p-4">
         <div className="flex justify-between items-center mb-3">
-          <p className="text-[11px] font-black" style={{ color: BLUE }}>Finance, Rentrée 2026</p>
-          <span className="text-[9px] font-bold px-2 py-1 rounded-lg text-white" style={{ backgroundColor: ORANGE }}>+ Reçu PDF</span>
+          <p className="text-[11px] font-black" style={{ color: BLUE }}>{t("marketing", "presentationMockFinanceHeader")}</p>
+          <span className="text-[9px] font-bold px-2 py-1 rounded-lg text-white" style={{ backgroundColor: ORANGE }}>{t("marketing", "presentationMockReceiptPdf")}</span>
         </div>
         <div className="space-y-2">
           {rows.slice(0, visible).map((r, i) => (
@@ -261,7 +264,7 @@ export function FinanceMock() {
             >
               <div>
                 <p className="text-[11px] font-black text-neutral-800">{r.name}</p>
-                <p className="text-[9px] text-neutral-400">Mobile Money · Tranche 2/3</p>
+                <p className="text-[9px] text-neutral-400">{t("marketing", "presentationMockMobileMoneyInstallment")}</p>
               </div>
               <div className="text-right">
                 <p className="text-[11px] font-black" style={{ color: BLUE }}>{r.amount} FCFA</p>

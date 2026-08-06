@@ -2,18 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BRAND } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const PERSONAS = [
   {
     id: "chef",
-    label: "Chefs d'établissement",
-    title: "Apportez à votre établissement des solutions innovantes à grande échelle",
-    description:
-      "Consacrez moins de temps aux tâches administratives et plus à enrichir l'apprentissage. Offrez aux équipes des outils, des ressources et une vision claire pour piloter campus, filières et finances.",
-    cta: "Explorer les solutions pour les responsables",
+    key: "leader",
     href: "/ouvrir-centre",
     photo: "/personna-chef.jpeg",
     objectPosition: "50% 30%",
@@ -21,11 +18,7 @@ const PERSONAS = [
   },
   {
     id: "enseignant",
-    label: "Enseignants",
-    title: "Gagnez du temps et enrichissez l'apprentissage de chaque élève",
-    description:
-      "Préparez vos cours, publiez du contenu et suivez la progression sans friction. Le planificateur et le constructeur libèrent du temps pour ce qui compte : enseigner.",
-    cta: "Explorer les solutions pour les enseignants",
+    key: "teacher",
     href: "/presentation",
     photo: "/personna-enseignant.jpeg",
     objectPosition: "50% 25%",
@@ -33,11 +26,7 @@ const PERSONAS = [
   },
   {
     id: "apprenant",
-    label: "Apprenants",
-    title: "Apprenez avec un accompagnement continu, où que vous soyez",
-    description:
-      "Cours, communauté, examens et Tuteur IA sur une seule plateforme. Une expérience fluide, motivante et mesurable — conçue pour progresser vraiment.",
-    cta: "Découvrir l'expérience apprenant",
+    key: "learner",
     href: "/presentation",
     photo: "/persona-apprenants.jpeg",
     objectPosition: "50% 35%",
@@ -46,26 +35,34 @@ const PERSONAS = [
 ] as const;
 
 export default function PersonaTabs() {
+  const { locale, t } = useI18n();
   const [active, setActive] = useState(0);
   const baseId = useId();
-  const persona = PERSONAS[active];
+  const personas = useMemo(() => PERSONAS.map((persona) => ({
+    ...persona,
+    label: t("landing", `${persona.key}Label`),
+    title: t("landing", `${persona.key}Title`),
+    description: t("landing", `${persona.key}Description`),
+    cta: t("landing", `${persona.key}Cta`),
+  })), [locale, t]);
+  const persona = personas[active];
 
   return (
     <section className="relative z-10 py-12 sm:py-14 xl:py-16">
       <div className="nexa-marketing-shell">
         <div className="mb-7 sm:mb-8 max-w-3xl">
           <h2 className="nexa-marketing-title max-w-3xl" style={{ color: BRAND.blue }}>
-            Une plateforme adaptée à chaque rôle.
+            {t("landing", "personasTitle")}
           </h2>
         </div>
 
         {/* C3 — onglets épurés */}
         <div
           role="tablist"
-          aria-label="Personas NEXA"
+          aria-label={t("landing", "personasLabel")}
           className="flex gap-0 border-b border-black/[0.08] mb-0 overflow-x-auto"
         >
-          {PERSONAS.map((p, i) => {
+          {personas.map((p, i) => {
             const selected = i === active;
             return (
               <button
@@ -81,7 +78,7 @@ export default function PersonaTabs() {
                   if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
                     e.preventDefault();
                     const dir = e.key === "ArrowRight" ? 1 : -1;
-                    setActive((cur) => (cur + dir + PERSONAS.length) % PERSONAS.length);
+                    setActive((cur) => (cur + dir + personas.length) % personas.length);
                   }
                 }}
                 className="relative shrink-0 px-4 sm:px-5 py-3.5 text-[13px] sm:text-[14px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
@@ -122,7 +119,7 @@ export default function PersonaTabs() {
             <div className="relative order-1 aspect-[4/3] sm:aspect-[16/10] lg:aspect-auto lg:min-h-[480px] bg-[#E8E4DE]">
               <Image
                 src={persona.photo}
-                alt={`Illustration — ${persona.label}`}
+                alt={`${t("landing", "illustration")} — ${persona.label}`}
                 fill
                 priority={active === 0}
                 sizes="(max-width: 1024px) 100vw, 50vw"

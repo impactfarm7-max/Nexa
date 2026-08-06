@@ -4,9 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, ArrowLeft, AlertTriangle, ShieldCheck, Fingerprint } from "lucide-react";
 import { supabase } from "../utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function PinPage() {
   const router = useRouter();
+  const { t } = useI18n();
 
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
@@ -30,14 +32,14 @@ export default function PinPage() {
     setErr(null);
 
     if (pin.length !== 4) {
-      setErr("Le code doit contenir 4 chiffres.");
+      setErr(t("auth", "pinCodeMustBe4Digits"));
       return;
     }
 
     // Vérification du lockout
     if (lockedUntil && Date.now() < lockedUntil) {
       const remaining = Math.ceil((lockedUntil - Date.now()) / 1000 / 60);
-      setErr(`Trop de tentatives. Réessayez dans ${remaining} min.`);
+      setErr(`${t("auth", "pinTooManyAttempts")} ${remaining} ${t("auth", "pinMinutesSuffix")}`);
       setPin("");
       return;
     }
@@ -69,9 +71,9 @@ export default function PinPage() {
           const until = Date.now() + 5 * 60 * 1000;
           setLockedUntil(until);
           setAttempts(0);
-          setErr("Compte verrouillé 5 min après 3 tentatives incorrectes.");
+          setErr(t("auth", "pinLockedAfterAttempts"));
         } else {
-          setErr(`Code secret incorrect. ${3 - newAttempts} tentative(s) restante(s).`);
+          setErr(`${t("auth", "pinIncorrectCode")} ${3 - newAttempts} ${t("auth", "pinAttemptsRemaining")}`);
         }
         return;
       }
@@ -112,7 +114,7 @@ export default function PinPage() {
       router.replace(nextPath);
 
     } catch {
-      setErr("Erreur système. Réessayez.");
+      setErr(t("auth", "pinSystemError"));
     } finally {
       setLoading(false);
     }
@@ -130,16 +132,15 @@ export default function PinPage() {
           </div>
           
           <h2 className="text-4xl font-black text-white leading-tight mb-6">
-            Votre session est <span className="text-orange-500">protégée.</span>
+            {t("auth", "pinHeroTitlePart1")} <span className="text-orange-500">{t("auth", "pinHeroTitlePart2")}</span>
           </h2>
           <p className="text-slate-400 text-lg font-medium leading-relaxed mb-8">
-            Pour garantir la confidentialité de vos exercices et de vos résultats, 
-            veuillez entrer votre code secret de l'Académie.
+            {t("auth", "pinHeroDescription")}
           </p>
 
           <div className="flex items-center gap-3 py-3 px-5 bg-orange-500/10 border border-orange-500/20 rounded-2xl w-fit">
             <ShieldCheck className="w-5 h-5 text-orange-500" />
-            <span className="text-orange-500 text-sm font-bold tracking-wide uppercase">Chiffrement local actif</span>
+            <span className="text-orange-500 text-sm font-bold tracking-wide uppercase">{t("auth", "pinEncryptionActive")}</span>
           </div>
         </div>
       </section>
@@ -152,16 +153,16 @@ export default function PinPage() {
               <Lock className="w-8 h-8 text-orange-600 stroke-[1.8]" />
             </div>
             <h1 className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
-              Espace Verrouillé
+              {t("auth", "pinLockedSpaceTitle")}
             </h1>
             <p className="mt-2 text-sm text-slate-500 font-medium italic">
-              Entrez votre code secret à 4 chiffres
+              {t("auth", "pinEnterCode")}
             </p>
           </div>
 
           <div className="bg-white border border-slate-100 lg:border-none rounded-[2.5rem] p-8 lg:p-0 shadow-[0_20px_60px_rgba(0,0,0,0.06)] lg:shadow-none">
             <label className="block text-[11px] font-black uppercase text-orange-600 mb-4 text-center tracking-widest">
-              Code de déverrouillage
+              {t("auth", "pinUnlockCodeLabel")}
             </label>
 
             <input
@@ -194,7 +195,11 @@ export default function PinPage() {
                 disabled={loading || pin.length !== 4 || (lockedUntil !== null && Date.now() < lockedUntil)}
                 className="w-full h-16 rounded-[1.5rem] bg-slate-950 text-white font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-xl shadow-slate-950/20 disabled:opacity-30 flex items-center justify-center gap-3"
               >
-                {loading ? "Vérification..." : lockedUntil && Date.now() < lockedUntil ? "Verrouillé" : "Déverrouiller ✅"}
+                {loading
+                  ? t("auth", "pinVerifying")
+                  : lockedUntil && Date.now() < lockedUntil
+                  ? t("auth", "pinLocked")
+                  : t("auth", "pinUnlock")}
               </button>
 
               <button
@@ -202,13 +207,13 @@ export default function PinPage() {
                 className="w-full h-14 rounded-2xl bg-white border border-slate-200 text-slate-500 font-bold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2 text-sm"
               >
                 <ArrowLeft className="w-4 h-4" />
-                Quitter l'espace
+                {t("auth", "pinExitSpace")}
               </button>
             </div>
           </div>
 
           <p className="mt-12 text-[10px] text-slate-400 font-bold uppercase tracking-widest text-center opacity-40">
-            NEXA • Security Protocol 2.6.0
+            {t("auth", "pinFooter")}
           </p>
         </div>
       </section>

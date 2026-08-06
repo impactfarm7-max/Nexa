@@ -16,6 +16,8 @@ import {
   SuiteModulesGrid,
 } from "@/app/components/landing";
 import TypewriterHeroTitle from "@/app/components/landing/TypewriterHeroTitle";
+import LanguageSwitcher from "@/app/components/LanguageSwitcher";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const ORANGE = BRAND.orange;
 const WHATSAPP = "237621105640";
@@ -27,6 +29,7 @@ const fadeUp = (delay = 0) => ({
 });
 
 export default function LandingPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -60,7 +63,7 @@ export default function LandingPage() {
 
   const talkToAgent = () =>
     window.open(
-      `https://wa.me/${WHATSAPP}?text=${encodeURIComponent("Bonjour NEXA, je souhaite en savoir plus sur la plateforme.")}`,
+      `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(t("landing", "whatsappMessage"))}`,
       "_blank",
     );
 
@@ -102,32 +105,33 @@ export default function LandingPage() {
             </Link>
 
             {/* Programmes / Valeurs — pages dédiées */}
-            <nav className="hidden sm:flex items-center gap-1" aria-label="Navigation principale">
+            <nav className="hidden sm:flex items-center gap-1" aria-label={t("landing", "mainNav")}>
               <Link
                 href="/programmes"
                 className="px-2.5 py-1.5 text-[12px] xl:text-[13px] font-bold text-neutral-600 hover:text-[#11224E] transition"
               >
-                Nos programmes
+                {t("landing", "programs")}
               </Link>
               <Link
                 href="/valeurs"
                 className="px-2.5 py-1.5 text-[12px] xl:text-[13px] font-bold text-neutral-600 hover:text-[#11224E] transition"
               >
-                Nos valeurs
+                {t("landing", "values")}
               </Link>
             </nav>
           </div>
 
           {/* E3 — actions à droite */}
           <div className="hidden sm:flex items-center gap-2 sm:gap-3 shrink-0">
+            <LanguageSwitcher compact />
             <Link href="/presentation" className="hidden md:flex items-center h-10 px-4 rounded-xl text-[12px] xl:text-[13px] font-bold border border-black/10 bg-white hover:border-black/20 transition whitespace-nowrap">
-              Découvrir la plateforme
+              {t("landing", "discover")}
             </Link>
             <button onClick={talkToAgent} className="hidden md:flex items-center h-10 px-4 rounded-xl text-[12px] xl:text-[13px] font-bold border border-black/10 bg-white hover:border-black/20 transition whitespace-nowrap">
-              Discuter avec un agent
+              {t("landing", "talkToAgent")}
             </button>
             <Link href="/login" className="flex items-center h-10 px-4 sm:px-5 rounded-xl text-[12px] xl:text-[13px] font-black text-white transition hover:opacity-90 whitespace-nowrap" style={{ backgroundColor: BRAND.blue }}>
-              Se connecter
+              {t("landing", "login")}
             </Link>
           </div>
 
@@ -135,7 +139,7 @@ export default function LandingPage() {
             type="button"
             onClick={() => setMobileNavOpen((v) => !v)}
             className="sm:hidden w-10 h-10 rounded-xl border border-black/10 bg-white flex items-center justify-center text-neutral-700"
-            aria-label="Menu"
+            aria-label={t("landing", "menu")}
           >
             {mobileNavOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
@@ -155,24 +159,25 @@ export default function LandingPage() {
                   onClick={() => setMobileNavOpen(false)}
                   className="flex items-center h-11 px-4 rounded-xl text-sm font-bold text-neutral-700"
                 >
-                  Nos programmes
+                  {t("landing", "programs")}
                 </Link>
                 <Link
                   href="/valeurs"
                   onClick={() => setMobileNavOpen(false)}
                   className="flex items-center h-11 px-4 rounded-xl text-sm font-bold text-neutral-700"
                 >
-                  Nos valeurs
+                  {t("landing", "values")}
                 </Link>
                 <div className="h-px bg-black/[0.06] my-1" />
+                <LanguageSwitcher />
                 <Link href="/presentation" onClick={() => setMobileNavOpen(false)} className="flex items-center h-11 px-4 rounded-xl text-sm font-bold border border-black/10 bg-white">
-                  Découvrir la plateforme
+                  {t("landing", "discover")}
                 </Link>
                 <button onClick={() => { setMobileNavOpen(false); talkToAgent(); }} className="flex items-center h-11 px-4 rounded-xl text-sm font-bold border border-black/10 bg-white text-left">
-                  Discuter avec un agent
+                  {t("landing", "talkToAgent")}
                 </button>
                 <Link href="/login" onClick={() => setMobileNavOpen(false)} className="flex items-center justify-center h-11 px-4 rounded-xl text-sm font-black text-white" style={{ backgroundColor: BRAND.blue }}>
-                  Se connecter
+                  {t("landing", "login")}
                 </Link>
               </div>
             </motion.div>
@@ -192,8 +197,7 @@ export default function LandingPage() {
           />
 
           <p className="text-[15px] sm:text-lg xl:text-xl text-neutral-500 font-medium leading-relaxed max-w-2xl mx-auto mb-7 sm:mb-8">
-            Nous déployons une technologie qui façonne des expériences enrichissantes
-            pour ceux qui transmettent le savoir — et pour ceux qui le reçoivent.
+            {t("landing", "heroDescription")}
           </p>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -202,13 +206,13 @@ export default function LandingPage() {
               className="inline-flex items-center justify-center min-h-12 px-7 sm:px-8 py-3.5 rounded-2xl text-[13px] sm:text-sm font-black text-white transition hover:opacity-95 active:scale-[0.98]"
               style={{ backgroundColor: BRAND.blue, boxShadow: `0 12px 32px ${BRAND.blue}28` }}
             >
-              Découvrir la plateforme
+              {t("landing", "discover")}
             </Link>
             <Link
               href="/ouvrir-centre"
               className="inline-flex items-center justify-center min-h-12 px-7 sm:px-8 py-3.5 rounded-2xl text-[13px] sm:text-sm font-bold border border-black/10 bg-white text-neutral-700 transition hover:border-black/20 hover:bg-[#FFFBF7] active:scale-[0.98]"
             >
-              Demander un espace centre
+              {t("landing", "requestCenter")}
             </Link>
           </div>
         </motion.div>
@@ -228,7 +232,7 @@ export default function LandingPage() {
         <div className="nexa-marketing-shell flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
           <div>
             <h2 className="nexa-marketing-title" style={{ color: BRAND.blue }}>
-              Programmes, mission et valeurs NEXA
+              {t("landing", "bridgeTitle")}
             </h2>
           </div>
           <div className="flex flex-col sm:flex-row gap-3">
@@ -236,14 +240,14 @@ export default function LandingPage() {
               href="/programmes"
               className="inline-flex items-center justify-center h-11 px-5 rounded-xl text-[13px] font-bold border border-black/10 bg-white hover:border-black/20 transition"
             >
-              Nos programmes →
+              {t("landing", "programs")} →
             </Link>
             <Link
               href="/valeurs"
               className="inline-flex items-center justify-center h-11 px-5 rounded-xl text-[13px] font-bold text-white transition hover:opacity-90"
               style={{ backgroundColor: BRAND.blue }}
             >
-              Nos valeurs →
+              {t("landing", "values")} →
             </Link>
           </div>
         </div>
@@ -254,43 +258,42 @@ export default function LandingPage() {
         <div className="absolute inset-0 opacity-20" style={{ background: `radial-gradient(circle at 80% 20%, ${ORANGE}, transparent 50%)` }} />
         <div className="relative nexa-marketing-shell grid lg:grid-cols-2 gap-8 xl:gap-12 items-center">
           <motion.div initial={{ opacity: 0, x: -20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }}>
-            <p className="text-[11px] font-black uppercase tracking-[0.25em] mb-3" style={{ color: ORANGE }}>Vous êtes un centre ?</p>
-            <h2 className="nexa-marketing-title text-white leading-tight mb-4">NEXA est fait<br />pour vous.</h2>
+            <p className="text-[11px] font-black uppercase tracking-[0.25em] mb-3" style={{ color: ORANGE }}>{t("landing", "centerEyebrow")}</p>
+            <h2 className="nexa-marketing-title text-white leading-tight mb-4">{t("landing", "centerTitle")}</h2>
             <p className="text-white/60 font-medium leading-relaxed mb-6 max-w-md">
-              Gérez vos filières, vos campus, vos formateurs et vos finances.
-              Un agent NEXA vous accompagne dès la validation de votre demande.
+              {t("landing", "centerDescription")}
             </p>
             <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-2.5 mb-7 text-[13px] font-semibold text-white/75">
               {[
-                "Gestion multi-campus",
-                "Bulletins & périodes",
-                "Planning intelligent",
-                "Communauté intégrée",
-                "Finance & encaissements",
-                "Constructeur de cours",
+                "centerFeature1",
+                "centerFeature2",
+                "centerFeature3",
+                "centerFeature4",
+                "centerFeature5",
+                "centerFeature6",
               ].map((c) => (
                 <li key={c} className="flex items-center gap-2.5">
                   <span className="h-1 w-1 rounded-full shrink-0" style={{ backgroundColor: ORANGE }} aria-hidden />
-                  {c}
+                  {t("landing", c)}
                 </li>
               ))}
             </ul>
             <Link href="/ouvrir-centre" className="inline-flex items-center h-12 px-7 rounded-2xl text-sm font-black text-white transition hover:opacity-90" style={{ backgroundColor: ORANGE }}>
-              Faire une demande — Centre
+              {t("landing", "centerRequest")}
             </Link>
           </motion.div>
 
           <motion.div initial={{ opacity: 0, x: 20 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6 }} className="border border-white/10 bg-white/[0.06] backdrop-blur p-6 sm:p-8">
             <div className="space-y-0 divide-y divide-white/10">
               {[
-                { step: "01", text: "Remplissez le formulaire de demande" },
-                { step: "02", text: "Validation — un agent vous contacte très bientôt" },
-                { step: "03", text: "Configuration de votre espace centre" },
-                { step: "04", text: "Formation de votre équipe & lancement" },
+                { step: "01", key: "centerStep1" },
+                { step: "02", key: "centerStep2" },
+                { step: "03", key: "centerStep3" },
+                { step: "04", key: "centerStep4" },
               ].map((s) => (
                 <div key={s.step} className="flex items-start gap-4 py-4 first:pt-0 last:pb-0">
                   <span className="text-[11px] font-black w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-white" style={{ backgroundColor: ORANGE }}>{s.step}</span>
-                  <p className="text-sm font-semibold text-white/80 pt-1.5">{s.text}</p>
+                  <p className="text-sm font-semibold text-white/80 pt-1.5">{t("landing", s.key)}</p>
                 </div>
               ))}
             </div>
@@ -312,17 +315,17 @@ export default function LandingPage() {
             aria-hidden
           />
           <h2 className="nexa-marketing-title mb-3" style={{ color: BRAND.blue }}>
-            L&apos;éducation pour tous.
+            {t("landing", "finalTitle")}
           </h2>
           <p className="text-neutral-500 font-medium mb-6 max-w-md mx-auto">
-            Rejoignez la révolution EdTech qui transforme la formation en Afrique.
+            {t("landing", "finalDescription")}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <button onClick={talkToAgent} className="w-full sm:w-auto inline-flex items-center justify-center h-12 px-8 rounded-2xl text-sm font-bold border-2 transition hover:bg-neutral-50" style={{ borderColor: ORANGE, color: ORANGE }}>
-              Discuter avec un agent
+              {t("landing", "talkToAgent")}
             </button>
             <Link href="/ouvrir-centre" className="w-full sm:w-auto inline-flex items-center justify-center h-12 px-8 rounded-2xl text-sm font-black text-white transition hover:opacity-90" style={{ backgroundColor: BRAND.blue }}>
-              Créer un centre
+              {t("landing", "createCenter")}
             </Link>
           </div>
         </motion.div>
@@ -337,10 +340,10 @@ export default function LandingPage() {
             <span className="text-[10px] text-neutral-400 font-bold">NEXT × AFRICA</span>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-5 text-[11px] font-bold text-neutral-400">
-            <Link href="/programmes" className="hover:text-neutral-700 transition">Programmes</Link>
-            <Link href="/valeurs" className="hover:text-neutral-700 transition">Valeurs</Link>
-            <Link href="/presentation" className="hover:text-neutral-700 transition">Présentation</Link>
-            <Link href="/ouvrir-centre" className="hover:text-neutral-700 transition">Ouvrir un centre</Link>
+            <Link href="/programmes" className="hover:text-neutral-700 transition">{t("landing", "programs")}</Link>
+            <Link href="/valeurs" className="hover:text-neutral-700 transition">{t("landing", "values")}</Link>
+            <Link href="/presentation" className="hover:text-neutral-700 transition">{t("landing", "presentation")}</Link>
+            <Link href="/ouvrir-centre" className="hover:text-neutral-700 transition">{t("landing", "openCenter")}</Link>
             <Link href="/cgu" className="hover:text-neutral-700 transition">CGU</Link>
           </div>
           <p className="text-[10px] text-neutral-300 font-bold">© {new Date().getFullYear()} NEXA</p>

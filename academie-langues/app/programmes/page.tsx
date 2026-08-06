@@ -5,79 +5,90 @@ import { motion, useReducedMotion } from "framer-motion";
 import { Languages, Timer, Route } from "lucide-react";
 import { BRAND } from "@/app/utils/brand";
 import MarketingChrome from "@/app/components/landing/MarketingChrome";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const WHATSAPP = "237621105640";
 const ORANGE = BRAND.orange;
 
-const PROGRAMS = [
+const PROGRAM_META = [
   {
     id: "natif",
     icon: Languages,
     tint: "#E8EEF8",
     accent: BRAND.blue,
-    eyebrow: "Programme 01",
-    title: "Programme natif",
-    subtitle: "En collaboration avec IAG Academy",
-    lead:
-      "Une technologie complète pour les disciplines de langue et de certification — conçue pour des parcours exigeants, mesurables et immersifs.",
-    body: [
-      "Le programme natif s’adresse aux centres qui préparent TCF Canada, TEF, IELTS et d’autres parcours d’immersion linguistique. Il s’appuie sur l’expertise IAG Academy et sur la plateforme NEXA : contenus, entraînements, examens sécurisés, communauté et tuteur.",
-      "Objectif : offrir une expérience « native » de la discipline — de la pédagogie au suivi — sans empiler des outils disparates. Une seule plateforme, une seule vérité sur la progression de chaque apprenant.",
-    ],
-    points: [
-      "Parcours langues & certifications (TCF, TEF, IELTS…)",
-      "Techno pédagogique intégrée : cours, quiz, simulateurs, live",
-      "Suivi mesurable pour le centre et l’équipe pédagogique",
-    ],
   },
   {
     id: "court",
     icon: Timer,
     tint: "#FFF0E4",
     accent: ORANGE,
-    eyebrow: "Programme 02",
-    title: "Programme court",
-    subtitle: "Cursus de moins d’un an",
-    lead:
-      "Le meilleur de NEXA pour les formations intensives : rythme soutenu, suivi serré, résultats visibles rapidement.",
-    body: [
-      "Idéal pour les bootcamps, préparations accélérées et offres professionnelles courtes. Le programme court concentre planification, publication de contenus, évaluations et communication apprenant dans un flux simple.",
-      "Vos équipes gardent le contrôle du calendrier et de la qualité pédagogique ; vos apprenants voient clairement où ils en sont — semaine après semaine.",
-    ],
-    points: [
-      "Intensité et clarté du parcours (< 12 mois)",
-      "Planification, devoirs et feedback en un même lieu",
-      "Pilotage centre sans complexité d’un cursus long",
-    ],
   },
   {
     id: "pluriannuel",
     icon: Route,
     tint: "#F3EDE6",
     accent: BRAND.blue,
-    eyebrow: "Programme 03",
-    title: "Programme pluri-annuel",
-    subtitle: "De l’entrée à la sortie",
-    lead:
-      "La gestion complète du cycle de vie de l’apprenant : filières, périodes, bulletins, progression et administration.",
-    body: [
-      "Conçu pour les écoles et centres qui forment sur plusieurs années. Le programme pluri-annuel structure filières et campus, périodes académiques, notes et bulletins, tout en conservant la collaboration pédagogique au quotidien.",
-      "NEXA devient le système nerveux de votre établissement : moins d’outils éparpillés, plus de continuité pour les équipes et les familles.",
-    ],
-    points: [
-      "Filières, périodes et bulletins sur le long terme",
-      "Vision centre multi-campus et multi-promotions",
-      "Continuité pédagogique de l’inscription à la sortie",
-    ],
   },
 ] as const;
 
 export default function ProgrammesPage() {
   const reduceMotion = useReducedMotion();
+  const { t } = useI18n();
+
+  const PROGRAMS = [
+    {
+      ...PROGRAM_META[0],
+      eyebrow: t("marketing", "programmesNativeEyebrow"),
+      title: t("marketing", "programmesNativeTitle"),
+      subtitle: t("marketing", "programmesNativeSubtitle"),
+      lead: t("marketing", "programmesNativeLead"),
+      body: [
+        t("marketing", "programmesNativeBody1"),
+        t("marketing", "programmesNativeBody2"),
+      ],
+      points: [
+        t("marketing", "programmesNativePoint1"),
+        t("marketing", "programmesNativePoint2"),
+        t("marketing", "programmesNativePoint3"),
+      ],
+    },
+    {
+      ...PROGRAM_META[1],
+      eyebrow: t("marketing", "programmesCourtEyebrow"),
+      title: t("marketing", "programmesCourtTitle"),
+      subtitle: t("marketing", "programmesCourtSubtitle"),
+      lead: t("marketing", "programmesCourtLead"),
+      body: [
+        t("marketing", "programmesCourtBody1"),
+        t("marketing", "programmesCourtBody2"),
+      ],
+      points: [
+        t("marketing", "programmesCourtPoint1"),
+        t("marketing", "programmesCourtPoint2"),
+        t("marketing", "programmesCourtPoint3"),
+      ],
+    },
+    {
+      ...PROGRAM_META[2],
+      eyebrow: t("marketing", "programmesPluriEyebrow"),
+      title: t("marketing", "programmesPluriTitle"),
+      subtitle: t("marketing", "programmesPluriSubtitle"),
+      lead: t("marketing", "programmesPluriLead"),
+      body: [
+        t("marketing", "programmesPluriBody1"),
+        t("marketing", "programmesPluriBody2"),
+      ],
+      points: [
+        t("marketing", "programmesPluriPoint1"),
+        t("marketing", "programmesPluriPoint2"),
+        t("marketing", "programmesPluriPoint3"),
+      ],
+    },
+  ];
 
   const talkToAgent = () =>
     window.open(
-      `https://wa.me/${WHATSAPP}?text=${encodeURIComponent("Bonjour NEXA, je souhaite en savoir plus sur les programmes.")}`,
+      `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(t("marketing", "programmesWhatsappMessage"))}`,
       "_blank",
     );
 
@@ -92,7 +103,7 @@ export default function ProgrammesPage() {
           style={{ color: BRAND.blue }}
         >
           <span className="relative inline z-0">
-            03 programmes · 03 cibles · 01 plateforme
+            {t("marketing", "programmesHeroTitle")}
             <motion.span
               aria-hidden
               className="absolute inset-0 -z-10 origin-left rounded-[3px]"
@@ -113,7 +124,7 @@ export default function ProgrammesPage() {
           transition={{ delay: 0.1 }}
           className="text-neutral-500 font-medium text-base sm:text-lg leading-relaxed max-w-2xl"
         >
-          Une seule plateforme NEXA, trois formats adaptés à votre offre.
+          {t("marketing", "programmesHeroSubtitle")}
         </motion.p>
       </section>
 
@@ -181,10 +192,10 @@ export default function ProgrammesPage() {
       {/* CTA */}
       <section className="max-w-3xl mx-auto px-4 sm:px-5 py-12 sm:py-16 text-center">
         <h2 className="nexa-marketing-title mb-3" style={{ color: BRAND.blue }}>
-          Quel programme pour votre centre ?
+          {t("marketing", "programmesCtaTitle")}
         </h2>
         <p className="text-neutral-500 font-medium mb-7 max-w-md mx-auto">
-          Un agent NEXA vous aide à choisir le format adapté à votre offre — sans engagement complexe.
+          {t("marketing", "programmesCtaSubtitle")}
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button
@@ -193,13 +204,13 @@ export default function ProgrammesPage() {
             className="w-full sm:w-auto inline-flex items-center justify-center h-12 px-7 rounded-2xl text-sm font-black text-white transition hover:opacity-90"
             style={{ backgroundColor: ORANGE }}
           >
-            Parler à un agent
+            {t("marketing", "programmesCtaTalkToAgent")}
           </button>
           <Link
             href="/ouvrir-centre"
             className="w-full sm:w-auto inline-flex items-center justify-center h-12 px-7 rounded-2xl text-sm font-bold border border-black/10 bg-white text-neutral-700 hover:border-black/20 transition"
           >
-            Demander un espace centre
+            {t("marketing", "programmesCtaRequestSpace")}
           </Link>
         </div>
       </section>

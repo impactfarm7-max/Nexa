@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 // Configuration du moteur PDF
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -15,6 +16,7 @@ interface PdfReaderProps {
 }
 
 export default function PdfReader({ file, pageNumber, onLoadSuccess }: PdfReaderProps) {
+  const { t } = useI18n();
   const [pdfRenderWidth, setPdfRenderWidth] = useState(800);
 
   // Le PDF s'adapte à la taille de l'écran
@@ -40,7 +42,7 @@ export default function PdfReader({ file, pageNumber, onLoadSuccess }: PdfReader
       loading={
         <div className="flex flex-col items-center justify-center h-64 gap-3">
           <div className="w-9 h-9 border-[3px] border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-          <p className="text-sm font-medium text-neutral-500 animate-pulse">Chargement du document…</p>
+          <p className="text-sm font-medium text-neutral-500 animate-pulse">{t("dashboard", "bibliothequePdfLoading")}</p>
         </div>
       }
       className="flex flex-col items-center"

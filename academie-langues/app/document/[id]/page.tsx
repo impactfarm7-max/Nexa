@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Download, FileText, Loader2 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -18,6 +19,7 @@ type MediaMeta = {
 export default function DocumentViewerPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { t } = useI18n();
   const id = params?.id;
 
   const [meta, setMeta] = useState<MediaMeta | null>(null);
@@ -36,7 +38,7 @@ export default function DocumentViewerPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) {
-          setError("Connecte-toi pour ouvrir ce document.");
+          setError(t("marketing", "documentLoginRequired"));
           return;
         }
 
@@ -45,20 +47,20 @@ export default function DocumentViewerPage() {
         const metaRes = await fetch(`/api/lesson-media/${id}?meta=1`, { headers });
         if (!metaRes.ok) {
           const body = await metaRes.json().catch(() => ({}));
-          throw new Error(body.error || "Document introuvable.");
+          throw new Error(body.error || t("marketing", "documentNotFoundError"));
         }
         const metaJson = (await metaRes.json()) as MediaMeta;
         if (cancelled) return;
         setMeta({ ...metaJson, downloadable: metaJson.downloadable !== false });
 
         if (metaJson.type === "video_link") {
-          throw new Error("Ce lien s'ouvre à l'extérieur de l'application.");
+          throw new Error(t("marketing", "documentExternalLinkError"));
         }
 
         const fileRes = await fetch(`/api/lesson-media/${id}`, { headers });
         if (!fileRes.ok) {
           const body = await fileRes.json().catch(() => ({}));
-          throw new Error(body.error || "Impossible de charger le fichier.");
+          throw new Error(body.error || t("marketing", "documentLoadFileError"));
         }
 
         const blob = await fileRes.blob();
@@ -68,7 +70,7 @@ export default function DocumentViewerPage() {
         setBlobUrl(url);
       } catch (e: unknown) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Erreur de chargement.");
+          setError(e instanceof Error ? e.message : t("marketing", "documentGenericLoadError"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -108,12 +110,12 @@ export default function DocumentViewerPage() {
           onClick={() => router.back()}
           className="flex items-center gap-1.5 text-xs font-bold text-neutral-500 hover:text-orange-600"
         >
-          <ArrowLeft size={14} /> Retour
+          <ArrowLeft size={14} /> {t("marketing", "documentBackButton")}
         </button>
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <FileText size={16} style={{ color: ORANGE }} className="shrink-0" />
           <h1 className="text-sm font-black truncate">
-            {meta?.label || "Document"}
+            {meta?.label || t("marketing", "documentTitleFallback")}
           </h1>
         </div>
         {canDownload && blobUrl && (
@@ -123,12 +125,12 @@ export default function DocumentViewerPage() {
             className="flex items-center gap-1.5 h-9 px-3 rounded-lg text-[10px] font-black uppercase tracking-widest text-white shrink-0"
             style={{ backgroundColor: ORANGE }}
           >
-            <Download size={13} /> Télécharger
+            <Download size={13} /> {t("marketing", "documentDownloadButton")}
           </button>
         )}
         {meta && !canDownload && !loading && !error && (
           <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400 shrink-0">
-            Lecture seule
+            {t("marketing", "documentReadOnlyLabel")}
           </span>
         )}
       </header>
@@ -137,7 +139,7 @@ export default function DocumentViewerPage() {
         {loading && (
           <div className="flex-1 flex flex-col items-center justify-center gap-3 text-neutral-400">
             <Loader2 size={28} className="animate-spin" style={{ color: ORANGE }} />
-            <p className="text-xs font-bold">Chargement du document…</p>
+            <p className="text-xs font-bold">{t("marketing", "documentLoadingLabel")}</p>
           </div>
         )}
 
@@ -150,14 +152,14 @@ export default function DocumentViewerPage() {
               className="mt-2 h-10 px-4 rounded-xl text-xs font-black uppercase tracking-widest text-white"
               style={{ backgroundColor: BLUE }}
             >
-              Retour
+              {t("marketing", "documentBackButton")}
             </button>
           </div>
         )}
 
         {!loading && !error && blobUrl && meta?.type === "pdf" && (
           <iframe
-            title={meta.label || "PDF"}
+            title={meta.label || t("marketing", "documentPdfTitleFallback")}
             src={`${blobUrl}#toolbar=${canDownload ? 1 : 0}`}
             className="flex-1 w-full border-0 bg-neutral-200"
           />
@@ -179,19 +181,19 @@ export default function DocumentViewerPage() {
           <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6">
             {canDownload ? (
               <>
-                <p className="text-sm font-bold text-neutral-500">Fichier prêt.</p>
+                <p className="text-sm font-bold text-neutral-500">{t("marketing", "documentFileReadyLabel")}</p>
                 <button
                   type="button"
                   onClick={() => void handleDownload()}
                   className="h-10 px-5 rounded-xl text-xs font-black uppercase tracking-widest text-white flex items-center gap-2"
                   style={{ backgroundColor: ORANGE }}
                 >
-                  <Download size={14} /> Télécharger
+                  <Download size={14} /> {t("marketing", "documentDownloadButton")}
                 </button>
               </>
             ) : (
               <p className="text-sm font-bold text-neutral-500 text-center">
-                Ce cours n&apos;autorise pas le téléchargement. Ouvre le document depuis la leçon en lecture seule.
+                {t("marketing", "documentDownloadDisabledMessage")}
               </p>
             )}
           </div>

@@ -4,11 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
 import { supabase } from "../../utils/supabase";
+import { useI18n } from "../../i18n/I18nProvider";
 
 const BLUE = "#11224E";
 
 export default function SuperadminMfaSetupPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const enrollStarted = useRef(false);
 
   const [checking, setChecking] = useState(true);
@@ -64,7 +66,7 @@ export default function SuperadminMfaSetupPage() {
       });
 
       if (enrollError || !data) {
-        setError("Impossible de préparer la double authentification. Réessayez.");
+        setError(t("superadmin", "mfaPrepareError"));
         setPreparing(false);
         return;
       }
@@ -91,7 +93,7 @@ export default function SuperadminMfaSetupPage() {
 
     if (verifyError) {
       setVerifying(false);
-      setError("Code invalide. Vérifiez l'heure de votre appareil et réessayez.");
+      setError(t("superadmin", "mfaInvalidCode"));
       return;
     }
 
@@ -119,20 +121,18 @@ export default function SuperadminMfaSetupPage() {
         <div className="mb-6 flex items-center gap-2">
           <ShieldCheck className="h-6 w-6 text-orange-400" />
           <h1 className="text-lg font-black uppercase tracking-widest text-white">
-            Sécurisation du compte
+            {t("superadmin", "mfaTitle")}
           </h1>
         </div>
 
         <p className="mb-6 text-sm leading-relaxed text-slate-400">
-          L&apos;accès superadmin exige une double authentification. Scannez ce QR code avec
-          une application comme Google Authenticator, Authy ou 1Password, puis entrez le
-          code généré ci-dessous.
+          {t("superadmin", "mfaDescription")}
         </p>
 
         {preparing && (
           <div className="flex items-center justify-center gap-2 py-10 text-slate-400">
             <Loader2 className="h-5 w-5 animate-spin" />
-            <span className="text-sm">Préparation en cours...</span>
+            <span className="text-sm">{t("superadmin", "mfaPreparing")}</span>
           </div>
         )}
 
@@ -140,12 +140,12 @@ export default function SuperadminMfaSetupPage() {
           <form onSubmit={handleVerify} className="space-y-5">
             <div className="flex justify-center rounded-2xl bg-white p-4">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={qrCode} alt="QR code MFA" className="h-44 w-44" />
+              <img src={qrCode} alt={t("superadmin", "mfaQrAlt")} className="h-44 w-44" />
             </div>
 
             {secret && (
               <p className="text-center text-xs text-slate-500">
-                Ou entrez manuellement : <span className="font-mono text-slate-300">{secret}</span>
+                {t("superadmin", "mfaManualEntry")} : <span className="font-mono text-slate-300">{secret}</span>
               </p>
             )}
 
@@ -171,7 +171,7 @@ export default function SuperadminMfaSetupPage() {
               className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-sm font-black text-white shadow-lg transition-all hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
               style={{ backgroundColor: BLUE }}
             >
-              {verifying ? "Vérification..." : "Activer et continuer"}
+              {verifying ? t("superadmin", "mfaVerifying") : t("superadmin", "mfaActivate")}
               {!verifying && <ArrowRight size={16} />}
             </button>
           </form>
@@ -179,7 +179,7 @@ export default function SuperadminMfaSetupPage() {
 
         {!preparing && !qrCode && (
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-sm text-red-300">
-            {error || "Une erreur est survenue."}
+            {error || t("superadmin", "mfaGenericError")}
           </div>
         )}
       </div>

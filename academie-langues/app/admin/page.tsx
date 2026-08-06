@@ -15,6 +15,7 @@ import { supabase } from "../utils/supabase";
 import { encryptMessage, decryptRows } from "@/app/utils/messageCrypto.client";
 import AdminFeedbackSection from "../components/AdminFeedbackSection";
 import { OFFERS_CONFIG } from "@/app/data/packOffers";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type StudentProfile = {
   id: string; prenom: string | null; email: string | null; phone: string | null;
@@ -152,6 +153,7 @@ const CHANNELS = [
 ];
 
 export default function RealAdminDashboard() {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState("crm_all");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   

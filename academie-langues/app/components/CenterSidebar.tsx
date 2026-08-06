@@ -17,6 +17,8 @@ import { normalizeCenterType, type CenterTypeCode } from "@/app/data/center-type
 import { getCenterMeCache, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import { BRAND } from "@/app/utils/brand";
 import { CenterBrandMark } from "@/app/centre/center-page-ui";
+import LanguageSwitcher from "@/app/components/LanguageSwitcher";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 /* ─── Constantes ────────────────────────────────────────────────────────── */
 const SIDEBAR_W_VAR  = "--nexa-center-sidebar-w";
@@ -44,86 +46,86 @@ type NavItem = {
 
 /* ─── Listes de navigation — Centre Générique ───────────────────────────── */
 const MANAGER_NAV: NavItem[] = [
-  { label: "Dashboard",        icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
-  { label: "Programmes",       icon: GitBranch,       path: "/centre/filieres",                   permKey: "filieres" },
-  { label: "Staff",            icon: GraduationCap,   path: "/centre/staff",                      permKey: "staff" },
-  { label: "Étudiants",        icon: Users,           path: "/centre/etudiants",                  permKey: "etudiants" },
-  { label: "Finance",          icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
-  { label: "Planning horaire", icon: Calendar,        path: "/centre/cours/planning",             permKey: "planning" },
-  { label: "Sessions Live",    icon: Video,           path: "/centre/lives",                      permKey: "lives" },
-  { label: "Examens / Notes",  icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
-  { label: "Rapports",         icon: BarChart3,       path: "/centre/rapports",                   permKey: "rapports" },
-  { label: "Communauté",       icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
-  { label: "Paramètres",       icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
+  { label: "navDashboard",        icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
+  { label: "navProgrammes",       icon: GitBranch,       path: "/centre/filieres",                   permKey: "filieres" },
+  { label: "navStaff",            icon: GraduationCap,   path: "/centre/staff",                      permKey: "staff" },
+  { label: "navEtudiants",        icon: Users,           path: "/centre/etudiants",                  permKey: "etudiants" },
+  { label: "navFinance",          icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
+  { label: "navPlanningHoraire",  icon: Calendar,        path: "/centre/cours/planning",             permKey: "planning" },
+  { label: "navSessionsLive",     icon: Video,           path: "/centre/lives",                      permKey: "lives" },
+  { label: "navExamensNotes",     icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
+  { label: "navRapports",         icon: BarChart3,       path: "/centre/rapports",                   permKey: "rapports" },
+  { label: "navCommunaute",       icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
+  { label: "navParametres",       icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
 const TRAINER_DEFAULT_NAV: NavItem[] = [
-  { label: "Dashboard",  icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
+  { label: "navDashboard",  icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
   {
-    label: "Cours",
+    label: "navCours",
     icon: BookOpen,
     path: "/centre/cours",
     permKey: "cours",
     children: [
-      { label: "Constructeur de cours", icon: PenTool,    path: "/centre/cours/gestion-cours" },
-      { label: "Missions & Devoirs",    icon: BookMarked, path: "/centre/cours/devoirs" },
+      { label: "navCoursConstructeur", icon: PenTool,    path: "/centre/cours/gestion-cours" },
+      { label: "navMissionsDevoirs",   icon: BookMarked, path: "/centre/cours/devoirs" },
     ],
   },
-  { label: "Planning",       icon: Calendar,      path: "/centre/cours/planning",             permKey: "planning" },
-  { label: "Sessions Live",  icon: Video,         path: "/centre/lives",                      permKey: "lives" },
-  { label: "Examens / Notes", icon: ClipboardList, path: "/centre/examens/examensuniversels",  permKey: "examens" },
-  { label: "Communauté",     icon: MessageSquare, path: "/centre/communaute",                 permKey: "communaute" },
+  { label: "navPlanning",       icon: Calendar,      path: "/centre/cours/planning",             permKey: "planning" },
+  { label: "navSessionsLive",   icon: Video,         path: "/centre/lives",                      permKey: "lives" },
+  { label: "navExamensNotes",   icon: ClipboardList, path: "/centre/examens/examensuniversels",  permKey: "examens" },
+  { label: "navCommunaute",     icon: MessageSquare, path: "/centre/communaute",                 permKey: "communaute" },
 ];
 
 const EXTRA_TRAINER_ITEMS: NavItem[] = [
-  { label: "Étudiants",  icon: Users,         path: "/centre/etudiants",             permKey: "etudiants" },
-  { label: "Finance",    icon: CreditCard,    path: "/centre/finance",               permKey: "finance" },
-  { label: "Staff",      icon: GraduationCap, path: "/centre/staff",                 permKey: "staff" },
-  { label: "Programmes", icon: GitBranch,     path: "/centre/filieres",              permKey: "filieres" },
-  { label: "Rapports",   icon: BarChart3,     path: "/centre/rapports",              permKey: "rapports" },
-  { label: "Paramètres", icon: Settings2,     path: "/centre/parametres/entreprise", permKey: "parametres" },
+  { label: "navEtudiants",  icon: Users,         path: "/centre/etudiants",             permKey: "etudiants" },
+  { label: "navFinance",    icon: CreditCard,    path: "/centre/finance",               permKey: "finance" },
+  { label: "navStaff",      icon: GraduationCap, path: "/centre/staff",                 permKey: "staff" },
+  { label: "navProgrammes", icon: GitBranch,     path: "/centre/filieres",              permKey: "filieres" },
+  { label: "navRapports",   icon: BarChart3,     path: "/centre/rapports",              permKey: "rapports" },
+  { label: "navParametres", icon: Settings2,     path: "/centre/parametres/entreprise", permKey: "parametres" },
 ];
 
 /* ─── Listes de navigation — Centre TCF Canada ──────────────────────────── */
 const TCF_FORMATION_ITEM: NavItem = {
-  label: "Formation",
+  label: "navFormation",
   icon: BookOpen,
   path: "/centre/cours",
   children: [
-    { label: "Cours",              icon: PenTool,    path: "/centre/cours/gestion-cours", permKey: "cours" },
-    { label: "Planning",           icon: Calendar,   path: "/centre/cours/planning",      permKey: "planning" },
-    { label: "Missions & Devoirs", icon: BookMarked, path: "/centre/cours/devoirs",       permKey: "cours" },
+    { label: "navCoursConstructeur", icon: PenTool,    path: "/centre/cours/gestion-cours", permKey: "cours" },
+    { label: "navPlanning",          icon: Calendar,   path: "/centre/cours/planning",      permKey: "planning" },
+    { label: "navMissionsDevoirs",   icon: BookMarked, path: "/centre/cours/devoirs",       permKey: "cours" },
   ],
 };
 
 const TCF_MANAGER_NAV: NavItem[] = [
-  { label: "Dashboard",     icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
-  { label: "Staff",         icon: GraduationCap,   path: "/centre/staff",                      permKey: "staff" },
-  { label: "Étudiants TCF", icon: Users,           path: "/centre/tcf/etudiants",              permKey: "etudiants" },
-  { label: "Programme TCF", icon: Flag,            path: "/centre/tcf/programme",              permKey: "filieres" },
+  { label: "navDashboard",     icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
+  { label: "navStaff",         icon: GraduationCap,   path: "/centre/staff",                      permKey: "staff" },
+  { label: "navEtudiantsTcf",  icon: Users,           path: "/centre/tcf/etudiants",              permKey: "etudiants" },
+  { label: "navProgrammeTcf",  icon: Flag,            path: "/centre/tcf/programme",              permKey: "filieres" },
   TCF_FORMATION_ITEM,
-  { label: "Examens / Notes", icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
-  { label: "Finance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
-  { label: "Communauté",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
-  { label: "Sessions Live", icon: Video,           path: "/centre/lives",                      permKey: "lives" },
-  { label: "Paramètres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
+  { label: "navExamensNotes",  icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
+  { label: "navFinance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
+  { label: "navCommunaute",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
+  { label: "navSessionsLive",  icon: Video,           path: "/centre/lives",                      permKey: "lives" },
+  { label: "navParametres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
 const TCF_TRAINER_NAV: NavItem[] = [
-  { label: "Mon Tableau de bord", icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
+  { label: "navMyDashboard",  icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
   TCF_FORMATION_ITEM,
-  { label: "Examens / Notes",     icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
-  { label: "Sessions Live",       icon: Video,           path: "/centre/lives",                      permKey: "lives" },
-  { label: "Communauté",          icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
+  { label: "navExamensNotes", icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
+  { label: "navSessionsLive", icon: Video,           path: "/centre/lives",                      permKey: "lives" },
+  { label: "navCommunaute",   icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
 ];
 
 const TCF_EXTRA_TRAINER_ITEMS: NavItem[] = [
-  { label: "Étudiants TCF", icon: Users,         path: "/centre/tcf/etudiants",         permKey: "etudiants" },
-  { label: "Programme TCF", icon: Flag,          path: "/centre/tcf/programme",         permKey: "filieres" },
-  { label: "Finance",       icon: CreditCard,    path: "/centre/finance",               permKey: "finance" },
-  { label: "Staff",         icon: GraduationCap, path: "/centre/staff",                 permKey: "staff" },
-  { label: "Rapports",      icon: BarChart3,     path: "/centre/rapports",              permKey: "rapports" },
-  { label: "Paramètres",    icon: Settings2,     path: "/centre/parametres/entreprise", permKey: "parametres" },
+  { label: "navEtudiantsTcf", icon: Users,         path: "/centre/tcf/etudiants",         permKey: "etudiants" },
+  { label: "navProgrammeTcf", icon: Flag,          path: "/centre/tcf/programme",         permKey: "filieres" },
+  { label: "navFinance",      icon: CreditCard,    path: "/centre/finance",               permKey: "finance" },
+  { label: "navStaff",        icon: GraduationCap, path: "/centre/staff",                 permKey: "staff" },
+  { label: "navRapports",     icon: BarChart3,     path: "/centre/rapports",              permKey: "rapports" },
+  { label: "navParametres",   icon: Settings2,     path: "/centre/parametres/entreprise", permKey: "parametres" },
 ];
 
 /* ─── Formation courte : shell type TCF, sans routes / contenu TCF ───────── */
@@ -207,6 +209,7 @@ function CenterSidebarInner() {
   const pathname    = usePathname();
   const router      = useRouter();
   const searchParams = useSearchParams();
+  const { t }        = useI18n();
 
   const [centerId,          setCenterId]          = useState<string | null>(null);
   const [centerName,        setCenterName]        = useState("Mon Établissement");
@@ -447,7 +450,7 @@ function CenterSidebarInner() {
     return (
       <Link
         href={item.path}
-        title={isCollapsed && !indent ? item.label : undefined}
+        title={isCollapsed && !indent ? t("centre", item.label) : undefined}
         className={itemCls(isAct, indent)}
         style={isAct ? activeItemStyle : { color: "rgba(17,34,78,0.62)" }}
       >
@@ -464,7 +467,7 @@ function CenterSidebarInner() {
           style={{ color: isAct ? "#fff" : "rgba(17,34,78,0.45)" }}
         />
         {(!isCollapsed || indent) && (
-          <span className={indent ? "text-[12px]" : "text-[13px]"}>{item.label}</span>
+          <span className={indent ? "text-[12px]" : "text-[13px]"}>{t("centre", item.label)}</span>
         )}
       </Link>
     );
@@ -484,7 +487,7 @@ function CenterSidebarInner() {
             if (isCollapsed) { router.push(item.path); return; }
             setCoursOpen(v => !v);
           }}
-          title={isCollapsed ? item.label : undefined}
+          title={isCollapsed ? t("centre", item.label) : undefined}
           className={`w-full ${itemCls(highlight)}`}
           style={highlight ? activeItemStyle : { color: "rgba(17,34,78,0.62)" }}
         >
@@ -501,7 +504,7 @@ function CenterSidebarInner() {
           />
           {!isCollapsed && (
             <>
-              <span className="flex-1 text-left text-[13px]">{item.label}</span>
+              <span className="flex-1 text-left text-[13px]">{t("centre", item.label)}</span>
               {coursOpen
                 ? <ChevronUp   size={12} className="shrink-0" style={{ color: highlight ? "rgba(255,255,255,0.7)" : "rgba(17,34,78,0.35)" }} />
                 : <ChevronDown size={12} className="shrink-0" style={{ color: highlight ? "rgba(255,255,255,0.7)" : "rgba(17,34,78,0.35)" }} />}
@@ -576,7 +579,7 @@ function CenterSidebarInner() {
                   </span>
                 )}
                 <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: "rgba(17,34,78,0.40)" }}>
-                  {uploadingLogo ? "Envoi…" : `Plan ${planType}`}
+                  {uploadingLogo ? t("centre", "sidebarEnvoi") : t("centre", "sidebarPlan").replace("{plan}", planType)}
                 </span>
               </div>
             </div>
@@ -596,7 +599,7 @@ function CenterSidebarInner() {
         {/* Bouton réduction — intégré dans le header (comme Claude/Gemini) */}
         <button
           onClick={toggleCollapse}
-          title={isCollapsed ? "Développer" : "Réduire"}
+          title={isCollapsed ? t("centre", "sidebarExpand") : t("centre", "sidebarCollapse")}
           className={`rounded-xl p-1.5 transition-all hover:bg-black/[0.05] shrink-0 ${
             isCollapsed ? "mt-1" : ""
           }`}
@@ -617,7 +620,7 @@ function CenterSidebarInner() {
           >
             <Building2 size={12} className="shrink-0" style={{ color: "rgba(17,34,78,0.40)" }} />
             <span className="flex-1 text-left text-[11px] font-bold truncate" style={{ color: "rgba(17,34,78,0.70)" }}>
-              {activeBranch?.name || "Campus"}
+              {activeBranch?.name || t("centre", "sidebarCampus")}
             </span>
             <ChevronDown
               size={11}
@@ -664,8 +667,8 @@ function CenterSidebarInner() {
           <>
             <SectionLabel label={
               isManager
-                ? (isTCF ? "Centre TCF Canada" : isShort ? "Formation courte" : "Gestion centre")
-                : "Mon espace"
+                ? (isTCF ? t("centre", "sidebarSectionCentreTcfCanada") : isShort ? t("centre", "sidebarSectionFormationCourte") : t("centre", "sidebarSectionGestionCentre"))
+                : t("centre", "sidebarSectionMonEspace")
             } />
             {buildManagerNav().map(item =>
               item.children
@@ -680,7 +683,7 @@ function CenterSidebarInner() {
           const { defaultItems, extraItems } = buildTrainerNav();
           return (
             <>
-              <SectionLabel label={isTCF ? "Espace Formateur TCF" : isShort ? "Espace Formateur" : "Mon espace"} />
+              <SectionLabel label={isTCF ? t("centre", "sidebarSectionEspaceFormateurTcf") : isShort ? t("centre", "sidebarSectionEspaceFormateur") : t("centre", "sidebarSectionMonEspace")} />
               {defaultItems.map(item =>
                 item.children
                   ? <CoursExpandable key={item.path} item={item} />
@@ -688,7 +691,7 @@ function CenterSidebarInner() {
               )}
               {extraItems.length > 0 && (
                 <>
-                  <SectionLabel label="Accès supplémentaires" />
+                  <SectionLabel label={t("centre", "sidebarSectionAccesSupplementaires")} />
                   {extraItems.map(item => <NavLink key={item.path} item={item} />)}
                 </>
               )}
@@ -703,10 +706,11 @@ function CenterSidebarInner() {
         className="px-2.5 py-3 shrink-0 border-t border-black/[0.06]"
         style={{ backgroundColor: "rgba(255,255,255,0.65)" }}
       >
+        {!isTCF && !isCollapsed && <div className="mb-2 px-0.5"><LanguageSwitcher /></div>}
         <Link
           href="/centre/profil"
           className={`flex items-center rounded-xl transition-colors hover:bg-black/[0.04] ${isCollapsed ? "justify-center p-2" : "gap-2.5 px-2.5 py-2"}`}
-          title="Mon profil"
+          title={t("centre", "sidebarMonProfil")}
         >
           {/* Avatar */}
           <div
@@ -720,12 +724,12 @@ function CenterSidebarInner() {
             <div className="flex-1 min-w-0">
               <p className="text-[12px] font-black truncate" style={{ color: BLUE }}>{userPrenom}</p>
               <p className="text-[9px] font-bold uppercase tracking-wider truncate" style={{ color: "rgba(17,34,78,0.40)" }}>
-                {userRole === "admin"          ? "Administrateur"
-                 : userRole === "center_manager" ? "Responsable"
-                 : userRole === "campus_manager" ? "Dir. de campus"
-                 : userRole === "staff"          ? "Administratif"
-                 : userRole === "trainer"        ? "Formateur"
-                 : "Personnel"}
+                {userRole === "admin"          ? t("centre", "roleAdministrateur")
+                 : userRole === "center_manager" ? t("centre", "roleResponsable")
+                 : userRole === "campus_manager" ? t("centre", "roleDirCampus")
+                 : userRole === "staff"          ? t("centre", "roleAdministratif")
+                 : userRole === "trainer"        ? t("centre", "roleFormateur")
+                 : t("centre", "rolePersonnel")}
               </p>
             </div>
           )}

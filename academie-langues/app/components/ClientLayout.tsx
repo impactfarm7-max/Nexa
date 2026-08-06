@@ -17,6 +17,7 @@ import {
 import { isPublicAppRoute } from "@/app/utils/public-routes";
 import { BRAND } from "@/app/utils/brand";
 import { initPwaInstallCapture } from "@/app/utils/pwa-install";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const EXAM_PASSAGE_KEY = "nexa_exam_passage";
 
@@ -35,12 +36,33 @@ function isImmersiveExamPassage(pathname: string | null) {
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { t, setLocaleOverride } = useI18n();
   const isPublic = isPublicAppRoute(pathname);
   const isProfilePage = Boolean(pathname?.startsWith("/profil"));
 
   useEffect(() => {
     initPwaInstallCapture();
   }, []);
+
+  useEffect(() => {
+    if (pathname?.startsWith("/centre")) return;
+    if (isPublic) {
+      setLocaleOverride(null);
+      return () => setLocaleOverride(null);
+    }
+    let cancelled = false;
+    const apply = (centerType?: string | null) => {
+      if (cancelled) return;
+      const isTcfExperience = pathname?.startsWith("/tcf-canada") || centerType === "tcf_canada";
+      setLocaleOverride(isTcfExperience ? "fr" : null);
+    };
+    apply(peekStudentAccess()?.centerType);
+    void loadStudentAccess().then((access) => apply(access?.centerType));
+    return () => {
+      cancelled = true;
+      setLocaleOverride(null);
+    };
+  }, [isPublic, pathname, setLocaleOverride]);
 
   const hideSidebar =
     pathname?.includes("/quiz") ||
@@ -125,7 +147,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }, [isPublic, pathname]);
 
   if (isPublic) {
-    return <><SiteAnalyticsTracker />{children}</>;
+    return <>
+      <SiteAnalyticsTracker />
+      {children}
+    </>;
   }
 
   const presenceTracker = <PresenceTracker />;
@@ -144,16 +169,16 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           <PauseCircle className="h-7 w-7" style={{ color: BRAND.blue }} />
         </div>
         <p className="text-lg font-black" style={{ color: BRAND.blue }}>
-          Profil en pause
+          {t("dashboard", "profilPausedTitle")}
         </p>
         <p className="mt-2 text-sm font-medium text-slate-500 leading-relaxed">
-          Votre formation est temporairement suspendue
-          {centerName ? <> par <strong>{centerName}</strong></> : " par votre centre"}.
-          {" "}Contactez votre centre pour reprendre.
+          {t("dashboard", "profilPausedBodyPrefix")}
+          {centerName ? <> {t("dashboard", "profilPausedBy")} <strong>{centerName}</strong></> : ` ${t("dashboard", "profilPausedByYourCenter")}`}.
+          {" "}{t("dashboard", "profilPausedContact")}
         </p>
         {pauseReason && (
           <div className="mt-4 rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-3 text-left">
-            <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Motif</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">{t("dashboard", "profilPausedReasonLabel")}</p>
             <p className="mt-1 text-sm font-bold text-blue-900 leading-relaxed">{pauseReason}</p>
           </div>
         )}
@@ -163,7 +188,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           style={{ backgroundColor: BRAND.orange }}
         >
           <UserRound className="h-4 w-4" />
-          Voir mon profil
+          {t("dashboard", "profilPausedViewProfile")}
         </Link>
       </div>
     </div>

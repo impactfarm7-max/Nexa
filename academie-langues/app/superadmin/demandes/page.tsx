@@ -21,6 +21,7 @@ import { findAfricaCountry } from "../../data/africa-54";
 import { FicheField, FicheSection } from "../_components/fiche";
 import { NEXA_OFFERS, nexaOfferLabel } from "../../data/nexaOffers";
 import { centerTypeLabel } from "../../data/center-types";
+import { useI18n } from "../../i18n/I18nProvider";
 
 type PendingCenterManager = {
   role: string | null;
@@ -60,15 +61,15 @@ type CenterDetail = {
   creatorEmail: string | null;
 };
 
-function formatTrialRemaining(createdAt: string): { label: string; expired: boolean } {
+function formatTrialRemaining(createdAt: string, expiredLabel: string, minutesLabel: string, hoursLabel: string): { label: string; expired: boolean } {
   const remainingMs = centerTrialRemainingMs(createdAt);
-  if (remainingMs <= 0) return { label: "Essai expiré", expired: true };
+  if (remainingMs <= 0) return { label: expiredLabel, expired: true };
   const hours = Math.floor(remainingMs / (60 * 60 * 1000));
   if (hours < 1) {
     const minutes = Math.max(1, Math.floor(remainingMs / (60 * 1000)));
-    return { label: `${minutes} min restantes`, expired: false };
+    return { label: minutesLabel.replace("{count}", String(minutes)), expired: false };
   }
-  return { label: `${hours}h restantes`, expired: false };
+  return { label: hoursLabel.replace("{count}", String(hours)), expired: false };
 }
 
 function formatCountry(codeOrName: string | null | undefined) {
@@ -95,11 +96,12 @@ function managerFrom(center: PendingCenter, detail?: CenterDetail | null) {
 }
 
 function FormAnswer({ label, value }: { label: string; value?: string | null }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-xl border border-white/10 bg-black/20 px-3 py-2.5">
       <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">{label}</p>
       <p className="mt-1 text-sm font-bold text-white break-words">
-        {value?.trim() ? value : <span className="text-slate-600">Non renseigné</span>}
+        {value?.trim() ? value : <span className="text-slate-600">{t("superadmin", "requestsNotProvided")}</span>}
       </p>
     </div>
   );
@@ -114,6 +116,7 @@ function CandidatureFicheModal({
   fallback: PendingCenter;
   onClose: () => void;
 }) {
+  const { locale, t } = useI18n();
   const [detail, setDetail] = useState<CenterDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +130,7 @@ function CandidatureFicheModal({
         const json = await superadminFetch<CenterDetail>(`/api/superadmin/centers/${centerId}`);
         if (!cancelled) setDetail(json);
       } catch (e: any) {
-        if (!cancelled) setError(e.message || "Impossible de charger la fiche.");
+        if (!cancelled) setError(e.message || t("superadmin", "requestsDetailLoadError"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -139,7 +142,7 @@ function CandidatureFicheModal({
 
   const center = detail?.center || fallback;
   const manager = managerFrom(fallback, detail);
-  const trial = formatTrialRemaining(center.created_at);
+  const trial = formatTrialRemaining(center.created_at, t("superadmin", "requestsTrialExpired"), t("superadmin", "requestsMinutesRemaining"), t("superadmin", "requestsHoursRemaining"));
   const offerKey = center.nexa_offer || null;
   const offer = offerKey && offerKey in NEXA_OFFERS ? NEXA_OFFERS[offerKey as keyof typeof NEXA_OFFERS] : null;
 
@@ -151,56 +154,56 @@ function CandidatureFicheModal({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-orange-400/80">Fiche candidature</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-orange-400/80">{t("superadmin", "requestsApplicationFile")}</p>
             <h2 className="mt-1 text-xl font-black text-white">{center.name}</h2>
             <p className="mt-1 text-xs text-slate-500">
-              Réponses du formulaire « Ouvrir un centre » ·{" "}
+              {t("superadmin", "requestsFormAnswers")} ·{" "}
               <span className={trial.expired ? "text-red-300" : "text-amber-300"}>{trial.label}</span>
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-white/5 hover:text-white" aria-label="Fermer">
+          <button onClick={onClose} className="rounded-lg p-1.5 text-slate-500 hover:bg-white/5 hover:text-white" aria-label={t("superadmin", "requestsClose")}>
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {loading ? (
           <p className="flex items-center justify-center gap-2 py-16 text-sm text-slate-500">
-            <Loader2 className="h-4 w-4 animate-spin" /> Chargement de la fiche…
+            <Loader2 className="h-4 w-4 animate-spin" /> {t("superadmin", "requestsDetailLoading")}
           </p>
         ) : (
           <>
             {error && (
               <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-                {error} — affichage des données déjà disponibles.
+                {error} — {t("superadmin", "requestsFallbackData")}
               </div>
             )}
 
             <div className="mt-6 space-y-5">
               <section>
                 <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-orange-400/70">
-                  1 · Programme choisi
+                  1 · {t("superadmin", "requestsChosenProgram")}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <FormAnswer label="Type de formation" value={centerTypeLabel(center.center_type)} />
-                  <FormAnswer label="Code technique" value={center.center_type} />
+                  <FormAnswer label={t("superadmin", "requestsTrainingType")} value={centerTypeLabel(center.center_type)} />
+                  <FormAnswer label={t("superadmin", "requestsTechnicalCode")} value={center.center_type} />
                 </div>
               </section>
 
               <section>
                 <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-orange-400/70">
-                  2 · Votre établissement
+                  2 · {t("superadmin", "requestsInstitution")}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <FormAnswer label="Nom du centre *" value={center.name} />
-                  <FormAnswer label="Pays *" value={formatCountry(center.country)} />
-                  <FormAnswer label="Région" value={center.region} />
-                  <FormAnswer label="Ville *" value={center.city} />
-                  <FormAnswer label="Téléphone" value={center.phone} />
-                  <FormAnswer label="Adresse" value={center.address} />
-                  <FormAnswer label="Offre NEXA (optionnel)" value={nexaOfferLabel(center.nexa_offer)} />
+                  <FormAnswer label={t("superadmin", "requestsCenterName")} value={center.name} />
+                  <FormAnswer label={t("superadmin", "requestsCountry")} value={formatCountry(center.country)} />
+                  <FormAnswer label={t("superadmin", "requestsRegion")} value={center.region} />
+                  <FormAnswer label={t("superadmin", "requestsCity")} value={center.city} />
+                  <FormAnswer label={t("superadmin", "requestsPhone")} value={center.phone} />
+                  <FormAnswer label={t("superadmin", "requestsAddress")} value={center.address} />
+                  <FormAnswer label={t("superadmin", "requestsOfferOptional")} value={nexaOfferLabel(center.nexa_offer)} />
                   {offer && (
                     <FormAnswer
-                      label="Détail offre"
+                      label={t("superadmin", "requestsOfferDetails")}
                       value={`${offer.monthlyFee.toLocaleString("fr-FR")} FCFA/mois · max ${offer.maxStudents} étudiants · ${offer.maxLives} lives`}
                     />
                   )}
@@ -209,26 +212,26 @@ function CandidatureFicheModal({
 
               <section>
                 <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-orange-400/70">
-                  3 · Responsable du compte
+                  3 · {t("superadmin", "requestsAccountManager")}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <FormAnswer label="Prénom *" value={manager.prenom} />
-                  <FormAnswer label="Nom *" value={manager.nom} />
-                  <FormAnswer label="Email *" value={manager.email} />
-                  <FormAnswer label="Fonction / rôle" value={manager.role} />
-                  <FormAnswer label="Téléphone contact" value={manager.phone} />
-                  <FormAnswer label="Mot de passe" value="Non affiché (sécurité)" />
+                  <FormAnswer label={t("superadmin", "requestsFirstName")} value={manager.prenom} />
+                  <FormAnswer label={t("superadmin", "requestsLastName")} value={manager.nom} />
+                  <FormAnswer label={t("superadmin", "requestsEmail")} value={manager.email} />
+                  <FormAnswer label={t("superadmin", "requestsRole")} value={manager.role} />
+                  <FormAnswer label={t("superadmin", "requestsContactPhone")} value={manager.phone} />
+                  <FormAnswer label={t("superadmin", "requestsPassword")} value={t("superadmin", "requestsPasswordHidden")} />
                 </div>
               </section>
 
               <section>
                 <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-orange-400/70">
-                  Métadonnées plateforme
+                  {t("superadmin", "requestsPlatformMetadata")}
                 </p>
                 <div className="grid gap-2 sm:grid-cols-2">
                   <FormAnswer
-                    label="Date de la demande"
-                    value={new Date(center.created_at).toLocaleString("fr-FR", {
+                    label={t("superadmin", "requestsRequestDate")}
+                    value={new Date(center.created_at).toLocaleString(locale === "en" ? "en-US" : "fr-FR", {
                       day: "numeric",
                       month: "long",
                       year: "numeric",
@@ -236,8 +239,8 @@ function CandidatureFicheModal({
                       minute: "2-digit",
                     })}
                   />
-                  <FormAnswer label="Statut" value={center.status} />
-                  <FormAnswer label="Code centre" value={center.code} />
+                  <FormAnswer label={t("superadmin", "requestsStatus")} value={center.status} />
+                  <FormAnswer label={t("superadmin", "requestsCenterCode")} value={center.code} />
                   <FormAnswer label="Slug" value={center.signup_slug || null} />
                 </div>
               </section>
@@ -262,7 +265,8 @@ function PendingCenterCard({
   onReject: (id: string, name: string) => void;
   onOpenFiche: (id: string) => void;
 }) {
-  const trial = formatTrialRemaining(center.created_at);
+  const { locale, t } = useI18n();
+  const trial = formatTrialRemaining(center.created_at, t("superadmin", "requestsTrialExpired"), t("superadmin", "requestsMinutesRemaining"), t("superadmin", "requestsHoursRemaining"));
   const manager = managerFrom(center);
   const countryLabel = formatCountry(center.country);
 
@@ -281,8 +285,8 @@ function PendingCenterCard({
             </span>
           </div>
           <p className="mt-1 text-xs font-bold text-slate-500">
-            Créé le{" "}
-            {new Date(center.created_at).toLocaleDateString("fr-FR", {
+            {t("superadmin", "requestsCreatedOn")}{" "}
+            {new Date(center.created_at).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", {
               day: "numeric",
               month: "long",
               year: "numeric",
@@ -296,49 +300,49 @@ function PendingCenterCard({
             onClick={() => onOpenFiche(center.id)}
             className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-200 hover:border-orange-500/40 hover:text-orange-300"
           >
-            <FileText className="h-3.5 w-3.5" /> Fiche candidature
+            <FileText className="h-3.5 w-3.5" /> {t("superadmin", "requestsApplicationFile")}
           </button>
           <button
             onClick={() => onActivate(center.id, center.name)}
             disabled={busy}
             className="flex items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-emerald-300 hover:bg-emerald-500 hover:text-white disabled:opacity-50"
           >
-            <ShieldCheck className="h-3.5 w-3.5" /> Activer
+            <ShieldCheck className="h-3.5 w-3.5" /> {t("superadmin", "requestsActivate")}
           </button>
           <button
             onClick={() => onReject(center.id, center.name)}
             disabled={busy}
             className="flex items-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-red-300 hover:bg-red-500 hover:text-white disabled:opacity-50"
           >
-            <ShieldOff className="h-3.5 w-3.5" /> Rejeter
+            <ShieldOff className="h-3.5 w-3.5" /> {t("superadmin", "requestsReject")}
           </button>
         </div>
       </div>
 
       <div className="mt-5 space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-4">
-        <FicheSection label="Centre (formulaire)">
-          <FicheField label="Type" value={centerTypeLabel(center.center_type)} />
-          <FicheField label="Offre NEXA" value={nexaOfferLabel(center.nexa_offer)} />
-          <FicheField label="Ville" value={center.city} icon={<MapPin className="h-3 w-3 text-slate-500" />} />
-          <FicheField label="Région" value={center.region} />
+        <FicheSection label={t("superadmin", "requestsCenterForm")}>
+          <FicheField label={t("superadmin", "requestsType")} value={centerTypeLabel(center.center_type)} />
+          <FicheField label={t("superadmin", "requestsOffer")} value={nexaOfferLabel(center.nexa_offer)} />
+          <FicheField label={t("superadmin", "requestsCityShort")} value={center.city} icon={<MapPin className="h-3 w-3 text-slate-500" />} />
+          <FicheField label={t("superadmin", "requestsRegion")} value={center.region} />
           <FicheField
-            label="Pays"
+            label={t("superadmin", "requestsCountryShort")}
             value={countryLabel}
             icon={!findAfricaCountry(center.country || "") && center.country ? <Globe className="h-3 w-3 text-slate-500" /> : undefined}
           />
-          <FicheField label="Téléphone" value={center.phone} icon={<Phone className="h-3 w-3 text-orange-400" />} />
-          <FicheField label="Email centre" value={center.email || center.creatorEmail} icon={<Mail className="h-3 w-3 text-orange-400" />} />
-          <FicheField label="Adresse" value={center.address} span />
-          {center.code && <FicheField label="Code centre" value={center.code} mono span />}
+          <FicheField label={t("superadmin", "requestsPhone")} value={center.phone} icon={<Phone className="h-3 w-3 text-orange-400" />} />
+          <FicheField label={t("superadmin", "requestsCenterEmail")} value={center.email || center.creatorEmail} icon={<Mail className="h-3 w-3 text-orange-400" />} />
+          <FicheField label={t("superadmin", "requestsAddress")} value={center.address} span />
+          {center.code && <FicheField label={t("superadmin", "requestsCenterCode")} value={center.code} mono span />}
         </FicheSection>
 
-        <FicheSection label="Responsable (formulaire)">
-          <FicheField label="Prénom" value={manager.prenom} />
-          <FicheField label="Nom" value={manager.nom} />
-          <FicheField label="Nom complet" value={manager.fullName} />
-          <FicheField label="Fonction" value={manager.role} />
+        <FicheSection label={t("superadmin", "requestsManagerForm")}>
+          <FicheField label={t("superadmin", "requestsFirstNameShort")} value={manager.prenom} />
+          <FicheField label={t("superadmin", "requestsLastNameShort")} value={manager.nom} />
+          <FicheField label={t("superadmin", "requestsFullName")} value={manager.fullName} />
+          <FicheField label={t("superadmin", "requestsRoleShort")} value={manager.role} />
           <FicheField label="Email" value={manager.email} icon={<Mail className="h-3 w-3 text-orange-400" />} />
-          <FicheField label="Téléphone" value={manager.phone} icon={<Phone className="h-3 w-3 text-orange-400" />} />
+          <FicheField label={t("superadmin", "requestsPhone")} value={manager.phone} icon={<Phone className="h-3 w-3 text-orange-400" />} />
         </FicheSection>
       </div>
     </div>
@@ -346,6 +350,7 @@ function PendingCenterCard({
 }
 
 export default function SuperadminDemandesPage() {
+  const { t } = useI18n();
   const [pendingCenters, setPendingCenters] = useState<PendingCenter[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -361,7 +366,7 @@ export default function SuperadminDemandesPage() {
       const centersJson = await superadminFetch<{ centers: PendingCenter[] }>("/api/superadmin/centers");
       setPendingCenters((centersJson.centers || []).filter((c) => c.status === "pending"));
     } catch (e: any) {
-      setError(e.message || "Erreur de chargement.");
+      setError(e.message || t("superadmin", "requestsLoadError"));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -375,8 +380,8 @@ export default function SuperadminDemandesPage() {
   const decideCenter = async (id: string, name: string, nextStatus: "active" | "rejected") => {
     const confirmMsg =
       nextStatus === "active"
-        ? `Valider et activer le centre "${name}" ? Son accès à la plateforme sera confirmé sans limite d'essai.`
-        : `Rejeter la candidature du centre "${name}" ? Il n'a jamais été validé et son accès sera bloqué.`;
+        ? t("superadmin", "requestsConfirmActivate", { name })
+        : t("superadmin", "requestsConfirmReject", { name });
     if (!window.confirm(confirmMsg)) return;
 
     setActionId(id);
@@ -387,7 +392,7 @@ export default function SuperadminDemandesPage() {
       });
       await load(true);
     } catch (e: any) {
-      alert(e.message || "Action impossible.");
+      alert(e.message || t("superadmin", "requestsActionImpossible"));
     } finally {
       setActionId(null);
     }
@@ -406,9 +411,9 @@ export default function SuperadminDemandesPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-white">Demandes</h1>
+          <h1 className="text-2xl font-black text-white">{t("superadmin", "requestsTitle")}</h1>
           <p className="mt-1 text-sm text-slate-400">
-            {sortedPendingCenters.length} centre{sortedPendingCenters.length > 1 ? "s" : ""} en essai à traiter.
+            {t("superadmin", "requestsCount", { count: sortedPendingCenters.length })}
           </p>
         </div>
         <button
@@ -416,7 +421,7 @@ export default function SuperadminDemandesPage() {
           className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0a0f1c] px-4 py-2 text-xs font-bold text-slate-300 hover:border-orange-500/40 hover:text-orange-400"
         >
           <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Actualiser
+          {t("superadmin", "analyticsRefresh")}
         </button>
       </div>
 
@@ -425,11 +430,11 @@ export default function SuperadminDemandesPage() {
       )}
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-slate-500">Chargement...</p>
+        <p className="py-10 text-center text-sm text-slate-500">{t("superadmin", "requestsLoading")}</p>
       ) : sortedPendingCenters.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-12 text-center">
           <Building2 className="mx-auto mb-4 h-10 w-10 text-slate-700" />
-          <p className="font-bold text-slate-400">Aucune demande à traiter pour l&apos;instant</p>
+          <p className="font-bold text-slate-400">{t("superadmin", "requestsEmpty")}</p>
         </div>
       ) : (
         <div className="grid gap-4">

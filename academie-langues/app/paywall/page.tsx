@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, MessageCircle, GraduationCap, CheckCircle2, Clock } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function PaywallPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [prenom, setPrenom] = useState<string>("");
 
   useEffect(() => {
@@ -27,7 +29,7 @@ export default function PaywallPage() {
   }, [router]);
 
   const handleContact = () => {
-    const msg = encodeURIComponent("Bonjour NEXA, ma periode d'essai de 24 heures est terminee. Je souhaite effectuer un achat pour continuer a utiliser l'application. Pouvez-vous m'aider ?");
+    const msg = encodeURIComponent(t("auth", "paywallWhatsappMessage"));
     window.open(`https://wa.me/237683375069?text=${msg}`, "_blank");
   };
 
@@ -60,21 +62,21 @@ export default function PaywallPage() {
         </div>
 
         <h1 className="text-2xl font-black text-white mb-2">
-          {prenom ? `${prenom}, ta` : "Ta"} période d'essai est terminée
+          {prenom ? `${prenom}, ${t("auth", "paywallTrialEndedNamed")}` : t("auth", "paywallTrialEndedAnon")}
         </h1>
         <p className="text-neutral-400 text-sm leading-relaxed mb-7">
-          Tu as utilise tes 24 heures d'essai gratuit. Pour continuer ta preparation au TCF Canada, effectue un achat afin d'activer ton acces premium.
+          {t("auth", "paywallDescription")}
         </p>
 
         {/* Ce que tu obtiens */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6 text-left space-y-2.5">
-          <p className="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-3">Avec l'accès premium</p>
+          <p className="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-3">{t("auth", "paywallPremiumHeading")}</p>
           {[
-            "40 séries de Compréhension Écrite",
-            "40 séries de Compréhension Orale",
-            "Simulateurs Expression Écrite & Orale",
-            "Corrections IA détaillées illimitées",
-            "Suivi de progression par compte",
+            t("auth", "paywallFeature1"),
+            t("auth", "paywallFeature2"),
+            t("auth", "paywallFeature3"),
+            t("auth", "paywallFeature4"),
+            t("auth", "paywallFeature5"),
           ].map((item) => (
             <div key={item} className="flex items-center gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
@@ -89,7 +91,7 @@ export default function PaywallPage() {
           className="w-full flex items-center justify-center gap-2.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-black text-sm py-4 rounded-2xl transition-all shadow-lg shadow-orange-500/25 mb-3"
         >
           <MessageCircle className="w-5 h-5" />
-          Effectuer un achat
+          {t("auth", "paywallPurchaseButton")}
         </button>
 
         {/* Retour dashboard */}
@@ -98,14 +100,14 @@ export default function PaywallPage() {
           className="w-full flex items-center justify-center gap-2 text-neutral-500 hover:text-neutral-300 text-sm font-semibold py-3 rounded-2xl transition-colors"
         >
           <GraduationCap className="w-4 h-4" />
-          Retour au dashboard
+          {t("auth", "paywallBackToDashboard")}
         </button>
       </div>
 
       {/* Mention durée d'essai */}
       <div className="flex items-center gap-2 mt-6 z-10">
         <Clock className="w-3.5 h-3.5 text-neutral-600" />
-        <p className="text-[11px] text-neutral-600 font-medium">Essai gratuit de 24 heures inclus a l'inscription</p>
+        <p className="text-[11px] text-neutral-600 font-medium">{t("auth", "paywallTrialMention")}</p>
       </div>
     </div>
   );

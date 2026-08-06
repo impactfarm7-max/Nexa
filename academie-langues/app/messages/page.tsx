@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { supabase } from "@/app/utils/supabase";
 import { encryptMessage, decryptRows } from "@/app/utils/messageCrypto.client";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type PrivateMessage = {
   id: string;
@@ -27,6 +28,7 @@ function formatTime(dateStr: string) {
 }
 
 export default function MessagesPage() {
+  const { t } = useI18n();
   const pathname = usePathname();
   const [messages, setMessages] = useState<PrivateMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -171,7 +173,7 @@ export default function MessagesPage() {
         aId = adminFromHistory.from_user_id;
       } else {
         const context = await fetchAdminId();
-        if (!context?.adminId) return alert("Impossible de contacter le support pour l'instant.");
+        if (!context?.adminId) return alert(t("dashboard", "messagesErrorContactSupport"));
         aId = context.adminId;
         messageCenterId = context.centerId;
         setCenterId(context.centerId);
@@ -207,7 +209,7 @@ export default function MessagesPage() {
         </div>
         <div className="min-w-0">
           <p className={`${STUDENT_TEXT.pageTitle} truncate`} style={{ color: BRAND.blue }}>{conversationName}</p>
-          <p className={STUDENT_TEXT.subtitle}>Support & Accompagnement</p>
+          <p className={STUDENT_TEXT.subtitle}>{t("dashboard", "messagesSubtitle")}</p>
         </div>
       </div>
 
@@ -215,15 +217,15 @@ export default function MessagesPage() {
         {loading ? (
           <div className="flex items-center justify-center mt-16 gap-2 text-neutral-400">
             <RefreshCcw size={16} className="animate-spin" />
-            <span className="text-sm">Chargement...</span>
+            <span className="text-sm">{t("dashboard", "messagesLoading")}</span>
           </div>
         ) : messages.length === 0 ? (
           <div className="text-center mt-16 space-y-4 px-6">
             <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mx-auto border border-orange-100">
               <ShieldCheck size={28} className="text-orange-500" />
             </div>
-            <p className="font-bold text-neutral-700">Aucun message pour l&apos;instant</p>
-            <p className="text-sm text-neutral-400">Envoie un message au support. On te repond rapidement.</p>
+            <p className="font-bold text-neutral-700">{t("dashboard", "messagesEmptyTitle")}</p>
+            <p className="text-sm text-neutral-400">{t("dashboard", "messagesEmptyBody")}</p>
           </div>
         ) : (
           messages.map((msg, i) => {
@@ -255,7 +257,7 @@ export default function MessagesPage() {
                     </div>
                     <p className="text-[10px] px-1 text-neutral-400">
                       {formatTime(msg.created_at)}
-                      {isMe && msg.read_at && <span className="ml-1"> - Lu</span>}
+                      {isMe && msg.read_at && <span className="ml-1"> - {t("dashboard", "messagesReadIndicator")}</span>}
                     </p>
                   </div>
                 </div>
@@ -275,7 +277,7 @@ export default function MessagesPage() {
           ref={textareaRef}
           value={newMessage}
           onChange={handleMessageChange}
-          placeholder="Ecrire un message..."
+          placeholder={t("dashboard", "messagesInputPlaceholder")}
           rows={1}
           className="flex-1 bg-neutral-100 rounded-3xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-orange-400/30 text-neutral-800 transition resize-none overflow-y-auto"
           disabled={sending}

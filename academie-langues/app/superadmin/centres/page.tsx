@@ -8,6 +8,7 @@ import { superadminFetch } from "../../utils/superadmin-api-client";
 import { centerTrialRemainingMs } from "../../utils/center-trial";
 import { findAfricaCountry } from "../../data/africa-54";
 import { FicheField, FicheSection } from "../_components/fiche";
+import { useI18n } from "../../i18n/I18nProvider";
 import {
   NEXA_OFFER_KEYS,
   NEXA_OFFERS,
@@ -79,56 +80,55 @@ function StatBadge({ label, value, tone }: { label: string; value: number; tone:
   );
 }
 
-function formatTrialRemaining(createdAt: string): { label: string; expired: boolean } {
+function formatTrialRemaining(createdAt: string, expiredLabel: string, minutesLabel: string, hoursLabel: string): { label: string; expired: boolean } {
   const remainingMs = centerTrialRemainingMs(createdAt);
-  if (remainingMs <= 0) return { label: "Essai expiré", expired: true };
+  if (remainingMs <= 0) return { label: expiredLabel, expired: true };
   const hours = Math.floor(remainingMs / (60 * 60 * 1000));
   if (hours < 1) {
     const minutes = Math.max(1, Math.floor(remainingMs / (60 * 1000)));
-    return { label: `${minutes} min restantes`, expired: false };
+    return { label: minutesLabel.replace("{count}", String(minutes)), expired: false };
   }
-  return { label: `${hours}h restantes`, expired: false };
+  return { label: hoursLabel.replace("{count}", String(hours)), expired: false };
 }
 
-const STATUS_TEXT: Record<CenterRow["status"], string> = {
-  active: "Actif",
-  pending: "En attente",
-  suspended: "Suspendu",
-  rejected: "Rejeté",
-};
-
 function StatusPill({ status }: { status: CenterRow["status"] }) {
+  const { t } = useI18n();
   if (status === "active") {
     return (
       <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-300">
-        Actif
+        {t("superadmin", "centersStatusActive")}
       </span>
     );
   }
   if (status === "pending") {
     return (
       <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-amber-300">
-        En attente
+        {t("superadmin", "centersStatusPending")}
       </span>
     );
   }
   if (status === "rejected") {
     return (
       <span className="rounded-full border border-slate-500/30 bg-slate-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-slate-300">
-        Rejeté
+        {t("superadmin", "centersStatusRejected")}
       </span>
     );
   }
   return (
     <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-red-300">
-      Suspendu
+      {t("superadmin", "centersStatusSuspended")}
     </span>
   );
 }
 
 /** Vue liste volontairement neutre : le detail (stats, essai, actions) n'apparait qu'au clic. */
 function CenterCard({ center, onOpen }: { center: CenterRow; onOpen: (id: string) => void }) {
-  const trial = center.status === "pending" ? formatTrialRemaining(center.created_at) : null;
+  const { t } = useI18n();
+  const trial = center.status === "pending" ? formatTrialRemaining(center.created_at, t("superadmin", "requestsTrialExpired"), t("superadmin", "requestsMinutesRemaining"), t("superadmin", "requestsHoursRemaining")) : null;
+  const statusText = {
+    active: t("superadmin", "centersStatusActive"), pending: t("superadmin", "centersStatusPending"),
+    suspended: t("superadmin", "centersStatusSuspended"), rejected: t("superadmin", "centersStatusRejected"),
+  }[center.status];
   return (
     <button
       onClick={() => onOpen(center.id)}
@@ -137,7 +137,7 @@ function CenterCard({ center, onOpen }: { center: CenterRow; onOpen: (id: string
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-black text-white">{center.name}</h3>
         <span className="mt-0.5 shrink-0 text-[10px] font-bold uppercase tracking-widest text-slate-500">
-          {STATUS_TEXT[center.status]}
+          {statusText}
         </span>
       </div>
       <p className="flex items-center gap-1 text-xs text-slate-500">
@@ -163,6 +163,7 @@ export default function SuperadminCentresPage() {
 }
 
 function SuperadminCentresPageContent() {
+  const { t } = useI18n();
   const searchParams = useSearchParams();
   const [centers, setCenters] = useState<CenterRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,7 +184,7 @@ function SuperadminCentresPageContent() {
       const json = await superadminFetch<{ centers: CenterRow[] }>("/api/superadmin/centers");
       setCenters(json.centers || []);
     } catch (e: any) {
-      setError(e.message || "Erreur de chargement.");
+      setError(e.message || t("superadmin", "centersLoadError"));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -202,7 +203,7 @@ function SuperadminCentresPageContent() {
       const json = await superadminFetch<CenterDetail>(`/api/superadmin/centers/${id}`);
       setDetail(json);
     } catch (e: any) {
-      setError(e.message || "Erreur de chargement du centre.");
+      setError(e.message || t("superadmin", "centersDetailLoadError"));
       setSelectedId(null);
     } finally {
       setDetailLoading(false);
@@ -234,7 +235,7 @@ function SuperadminCentresPageContent() {
       setDetail({ ...detail, center: { ...detail.center, status: nextStatus } });
       setCenters((prev) => prev.map((c) => (c.id === detail.center.id ? { ...c, status: nextStatus } : c)));
     } catch (e: any) {
-      alert(e.message || "Action impossible.");
+      alert(e.message || t("superadmin", "requestsActionImpossible"));
     } finally {
       setStatusUpdating(false);
     }
@@ -242,8 +243,8 @@ function SuperadminCentresPageContent() {
 
   const setCenterOffer = async (nextOffer: NexaOfferKey | null) => {
     if (!detail) return;
-    const label = nextOffer ? NEXA_OFFERS[nextOffer].name : "aucune (non attribuée)";
-    if (!window.confirm(`Attribuer l'offre « ${label} » au centre "${detail.center.name}" ? Les plafonds s'appliquent immédiatement.`)) {
+    const label = nextOffer ? NEXA_OFFERS[nextOffer].name : t("superadmin", "centersNoOfferAssigned");
+    if (!window.confirm(t("superadmin", "centersConfirmOffer", { label, name: detail.center.name }))) {
       return;
     }
     setOfferUpdating(true);
@@ -258,7 +259,7 @@ function SuperadminCentresPageContent() {
         prev.map((c) => (c.id === detail.center.id ? { ...c, nexa_offer: offer } : c))
       );
     } catch (e: any) {
-      alert(e.message || "Attribution impossible.");
+      alert(e.message || t("superadmin", "centersOfferImpossible"));
     } finally {
       setOfferUpdating(false);
     }
@@ -269,10 +270,10 @@ function SuperadminCentresPageContent() {
     if (detail.center.status === "active") {
       setCenterStatus(
         "suspended",
-        `Suspendre l'accès du centre "${detail.center.name}" ? Le personnel et les étudiants ne pourront plus se connecter.`
+        t("superadmin", "centersConfirmSuspend", { name: detail.center.name })
       );
     } else {
-      setCenterStatus("active", `Réactiver l'accès du centre "${detail.center.name}" ?`);
+      setCenterStatus("active", t("superadmin", "centersConfirmReactivate", { name: detail.center.name }));
     }
   };
 
@@ -280,7 +281,7 @@ function SuperadminCentresPageContent() {
     if (!detail) return;
     setCenterStatus(
       "active",
-      `Réexaminer et activer le centre "${detail.center.name}" ? Son accès à la plateforme sera rétabli.`
+      t("superadmin", "centersConfirmReexamine", { name: detail.center.name })
     );
   };
 
@@ -288,12 +289,12 @@ function SuperadminCentresPageContent() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-black text-white">Centres</h1>
+          <h1 className="text-2xl font-black text-white">{t("superadmin", "centersTitle")}</h1>
           <p className="mt-1 text-sm text-slate-400">
-            {decidedCentersCount} centre(s) sur le réseau Nexa.
+            {t("superadmin", "centersNetworkCount", { count: decidedCentersCount })}
             {pendingCenters.length > 0 && (
               <Link href="/superadmin/demandes" className="ml-1 font-bold text-amber-400 hover:underline">
-                {pendingCenters.length} en essai à traiter →
+                {t("superadmin", "centersTrialsToHandle", { count: pendingCenters.length })} →
               </Link>
             )}
           </p>
@@ -303,7 +304,7 @@ function SuperadminCentresPageContent() {
           className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0a0f1c] px-4 py-2 text-xs font-bold text-slate-300 hover:border-orange-500/40 hover:text-orange-400"
         >
           <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          Actualiser
+          {t("superadmin", "analyticsRefresh")}
         </button>
       </div>
 
@@ -312,14 +313,14 @@ function SuperadminCentresPageContent() {
       )}
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-slate-500">Chargement des centres...</p>
+        <p className="py-10 text-center text-sm text-slate-500">{t("superadmin", "centersLoading")}</p>
       ) : decidedCentersCount === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-12 text-center">
           <Building2 className="mx-auto mb-4 h-10 w-10 text-slate-700" />
-          <p className="font-bold text-slate-400">Aucun centre validé pour l&apos;instant</p>
+          <p className="font-bold text-slate-400">{t("superadmin", "centersEmpty")}</p>
           {pendingCenters.length > 0 && (
             <Link href="/superadmin/demandes" className="mt-3 inline-flex items-center gap-1 text-sm font-bold text-amber-400 hover:underline">
-              Voir les {pendingCenters.length} centre(s) en essai <ArrowRight className="h-3.5 w-3.5" />
+              {t("superadmin", "centersViewTrials", { count: pendingCenters.length })} <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           )}
         </div>
@@ -330,7 +331,7 @@ function SuperadminCentresPageContent() {
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-emerald-400" />
                 <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">
-                  Actifs ({activeCenters.length})
+                  {t("superadmin", "centersActiveGroup")} ({activeCenters.length})
                 </h2>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -346,7 +347,7 @@ function SuperadminCentresPageContent() {
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-red-400" />
                 <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">
-                  Suspendus ({suspendedCenters.length})
+                  {t("superadmin", "centersSuspendedGroup")} ({suspendedCenters.length})
                 </h2>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -362,7 +363,7 @@ function SuperadminCentresPageContent() {
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-slate-500" />
                 <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">
-                  Rejetés ({rejectedCenters.length})
+                  {t("superadmin", "centersRejectedGroup")} ({rejectedCenters.length})
                 </h2>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -382,7 +383,7 @@ function SuperadminCentresPageContent() {
             onClick={(e) => e.stopPropagation()}
           >
             {detailLoading || !detail ? (
-              <p className="py-10 text-center text-sm text-slate-500">Chargement...</p>
+              <p className="py-10 text-center text-sm text-slate-500">{t("superadmin", "requestsLoading")}</p>
             ) : (
               <>
                 <div className="flex items-start justify-between gap-3">
@@ -392,12 +393,12 @@ function SuperadminCentresPageContent() {
                     {detail.center.status === "pending" && (
                       <span
                         className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
-                          formatTrialRemaining(detail.center.created_at).expired
+                          formatTrialRemaining(detail.center.created_at, t("superadmin", "requestsTrialExpired"), t("superadmin", "requestsMinutesRemaining"), t("superadmin", "requestsHoursRemaining")).expired
                             ? "border-red-500/20 bg-red-500/10 text-red-300"
                             : "border-amber-500/20 bg-amber-500/10 text-amber-300"
                         }`}
                       >
-                        <Clock className="h-2.5 w-2.5" /> {formatTrialRemaining(detail.center.created_at).label}
+                        <Clock className="h-2.5 w-2.5" /> {formatTrialRemaining(detail.center.created_at, t("superadmin", "requestsTrialExpired"), t("superadmin", "requestsMinutesRemaining"), t("superadmin", "requestsHoursRemaining")).label}
                       </span>
                     )}
                   </div>
@@ -407,22 +408,22 @@ function SuperadminCentresPageContent() {
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <StatBadge label="actifs" value={detail.stats.actifs} tone="bg-emerald-500/10 text-emerald-300" />
-                  <StatBadge label="pause" value={detail.stats.pauses} tone="bg-amber-500/10 text-amber-300" />
-                  <StatBadge label="expirés" value={detail.stats.expires} tone="bg-slate-700/40 text-slate-300" />
-                  <StatBadge label="révoqués" value={detail.stats.revoques} tone="bg-red-500/10 text-red-300" />
+                  <StatBadge label={t("superadmin", "centersStatActive")} value={detail.stats.actifs} tone="bg-emerald-500/10 text-emerald-300" />
+                  <StatBadge label={t("superadmin", "centersStatPaused")} value={detail.stats.pauses} tone="bg-amber-500/10 text-amber-300" />
+                  <StatBadge label={t("superadmin", "centersStatExpired")} value={detail.stats.expires} tone="bg-slate-700/40 text-slate-300" />
+                  <StatBadge label={t("superadmin", "centersStatRevoked")} value={detail.stats.revoques} tone="bg-red-500/10 text-red-300" />
                 </div>
 
                 <div className="mt-6 space-y-4 rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                  <FicheSection label="Centre">
+                  <FicheSection label={t("superadmin", "centersTitle")}>
                     <FicheField
-                      label="Type"
-                      value={detail.center.center_type ? CENTER_TYPE_LABEL[detail.center.center_type] || detail.center.center_type : undefined}
+                      label={t("superadmin", "requestsType")}
+                      value={detail.center.center_type === "generic" ? t("superadmin", "centersGenericType") : detail.center.center_type ? CENTER_TYPE_LABEL[detail.center.center_type] || detail.center.center_type : undefined}
                     />
-                    <FicheField label="Ville" value={detail.center.city} icon={<MapPin className="h-3 w-3 text-slate-500" />} />
-                    <FicheField label="Région" value={detail.center.region} />
+                    <FicheField label={t("superadmin", "requestsCityShort")} value={detail.center.city} icon={<MapPin className="h-3 w-3 text-slate-500" />} />
+                    <FicheField label={t("superadmin", "requestsRegion")} value={detail.center.region} />
                     <FicheField
-                      label="Pays"
+                      label={t("superadmin", "requestsCountryShort")}
                       value={(() => {
                         if (!detail.center.country) return undefined;
                         const c = findAfricaCountry(detail.center.country);
@@ -430,12 +431,12 @@ function SuperadminCentresPageContent() {
                       })()}
                       icon={detail.center.country && !findAfricaCountry(detail.center.country) ? <Globe className="h-3 w-3 text-slate-500" /> : undefined}
                     />
-                    <FicheField label="Téléphone" value={detail.center.phone} icon={<Phone className="h-3 w-3 text-orange-400" />} />
+                    <FicheField label={t("superadmin", "requestsPhone")} value={detail.center.phone} icon={<Phone className="h-3 w-3 text-orange-400" />} />
                     <FicheField label="Email" value={detail.center.email} icon={<Mail className="h-3 w-3 text-orange-400" />} />
-                    {detail.center.code && <FicheField label="Code centre" value={detail.center.code} mono />}
-                    {detail.center.address && <FicheField label="Adresse" value={detail.center.address} span />}
+                    {detail.center.code && <FicheField label={t("superadmin", "requestsCenterCode")} value={detail.center.code} mono />}
+                    {detail.center.address && <FicheField label={t("superadmin", "requestsAddress")} value={detail.center.address} span />}
                     <FicheField
-                      label="Offre NEXA"
+                      label={t("superadmin", "requestsOffer")}
                       value={nexaOfferLabel(detail.center.nexa_offer)}
                       span
                     />
@@ -443,7 +444,7 @@ function SuperadminCentresPageContent() {
 
                   <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 p-4">
                     <p className="mb-2 text-[10px] font-black uppercase tracking-widest text-orange-400/80">
-                      Attribuer / changer l&apos;offre
+                      {t("superadmin", "centersChangeOffer")}
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {NEXA_OFFER_KEYS.map((key) => {
@@ -470,31 +471,31 @@ function SuperadminCentresPageContent() {
                         onClick={() => void setCenterOffer(null)}
                         className="rounded-lg border border-white/10 bg-black/20 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-slate-400 hover:border-red-500/40 hover:text-red-300 disabled:opacity-40"
                       >
-                        Retirer
+                        {t("superadmin", "centersRemoveOffer")}
                       </button>
                     </div>
                     <p className="mt-2 text-[11px] text-slate-500">
                       {detail.center.nexa_offer
-                        ? `${NEXA_OFFERS[detail.center.nexa_offer as NexaOfferKey]?.maxStudents ?? "—"} étudiants max · ${NEXA_OFFERS[detail.center.nexa_offer as NexaOfferKey]?.maxLives ?? "—"} lives`
-                        : "Sans offre : Ultra pendant l'essai 72h ; attribuez une offre après validation."}
+                        ? t("superadmin", "centersOfferLimits", { students: NEXA_OFFERS[detail.center.nexa_offer as NexaOfferKey]?.maxStudents ?? "—", lives: NEXA_OFFERS[detail.center.nexa_offer as NexaOfferKey]?.maxLives ?? "—" })
+                        : t("superadmin", "centersNoOfferHint")}
                     </p>
                   </div>
 
                   <div className="border-t border-white/10 pt-4">
                     <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-orange-400/70">
-                      Responsable{detail.managers.length > 1 ? "s" : ""}
+                      {t("superadmin", "centersManagers")}
                     </p>
                     {(detail.creatorEmail || detail.center.email) && (
                       <div className="mb-3 rounded-lg border border-orange-500/20 bg-orange-500/5 p-3">
                         <FicheField
-                          label="Email créateur / responsable"
+                          label={t("superadmin", "centersCreatorEmail")}
                           value={detail.creatorEmail || detail.center.email}
                           icon={<Mail className="h-3 w-3 text-orange-400" />}
                         />
                       </div>
                     )}
                     {detail.managers.length === 0 ? (
-                      <p className="text-sm text-slate-500">Aucun responsable enregistré.</p>
+                      <p className="text-sm text-slate-500">{t("superadmin", "centersNoManager")}</p>
                     ) : (
                       <div className="space-y-3">
                         {detail.managers.map((m, i) => {
@@ -507,10 +508,10 @@ function SuperadminCentresPageContent() {
                           return (
                             <div key={m.profiles?.id || i} className="rounded-lg border border-white/10 bg-black/20 p-3">
                               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <FicheField label="Nom complet" value={fullName} />
-                                <FicheField label="Fonction" value={roleLabel} />
+                                <FicheField label={t("superadmin", "requestsFullName")} value={fullName} />
+                                <FicheField label={t("superadmin", "requestsRoleShort")} value={roleLabel} />
                                 <FicheField label="Email" value={managerEmail} icon={<Mail className="h-3 w-3 text-orange-400" />} />
-                                <FicheField label="Téléphone" value={m.profiles?.phone} icon={<Phone className="h-3 w-3 text-orange-400" />} />
+                                <FicheField label={t("superadmin", "requestsPhone")} value={m.profiles?.phone} icon={<Phone className="h-3 w-3 text-orange-400" />} />
                               </div>
                             </div>
                           );
@@ -522,16 +523,16 @@ function SuperadminCentresPageContent() {
 
                 <div className="mt-6">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">
-                    Étudiants récents ({detail.students.length})
+                    {t("superadmin", "centersRecentStudents")} ({detail.students.length})
                   </p>
                   <div className="mt-2 max-h-56 space-y-1.5 overflow-y-auto">
                     {detail.students.length === 0 ? (
-                      <p className="text-sm text-slate-500">Aucun étudiant pour l&apos;instant.</p>
+                      <p className="text-sm text-slate-500">{t("superadmin", "centersNoStudents")}</p>
                     ) : (
                       detail.students.map((s) => (
                         <div key={s.id} className="flex items-center justify-between rounded-lg bg-white/[0.02] px-3 py-1.5 text-xs">
                           <span className="font-semibold text-slate-300">{s.prenom || s.email || "—"}</span>
-                          <span className="text-slate-500">{s.tag_status || "actif"}</span>
+                          <span className="text-slate-500">{s.tag_status || t("superadmin", "centersStatusActive")}</span>
                         </div>
                       ))
                     )}
@@ -544,7 +545,7 @@ function SuperadminCentresPageContent() {
                       href="/superadmin/demandes"
                       className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500/10 px-4 py-3 text-sm font-black text-amber-300 transition-opacity hover:bg-amber-500/20"
                     >
-                      <Clock className="h-4 w-4" /> Ce centre est en essai — le traiter dans Demandes <ArrowRight className="h-3.5 w-3.5" />
+                      <Clock className="h-4 w-4" /> {t("superadmin", "centersHandleTrial")} <ArrowRight className="h-3.5 w-3.5" />
                     </Link>
                   ) : detail.center.status === "rejected" ? (
                     <button
@@ -552,7 +553,7 @@ function SuperadminCentresPageContent() {
                       disabled={statusUpdating}
                       className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500/10 px-4 py-3 text-sm font-black text-emerald-300 transition-opacity hover:bg-emerald-500/20 disabled:opacity-50"
                     >
-                      <ShieldCheck className="h-4 w-4" /> Réexaminer et activer
+                      <ShieldCheck className="h-4 w-4" /> {t("superadmin", "centersReexamine")}
                     </button>
                   ) : (
                     <button
@@ -566,11 +567,11 @@ function SuperadminCentresPageContent() {
                     >
                       {detail.center.status === "active" ? (
                         <>
-                          <ShieldOff className="h-4 w-4" /> Suspendre ce centre
+                          <ShieldOff className="h-4 w-4" /> {t("superadmin", "centersSuspend")}
                         </>
                       ) : (
                         <>
-                          <ShieldCheck className="h-4 w-4" /> Réactiver ce centre
+                          <ShieldCheck className="h-4 w-4" /> {t("superadmin", "centersReactivate")}
                         </>
                       )}
                     </button>

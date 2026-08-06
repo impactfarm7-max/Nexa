@@ -21,6 +21,8 @@ import { useTutorGlobalLock } from "../hooks/useTutorGlobalLock";
 import { BRAND, STUDENT_TEXT } from "../utils/brand";
 import { peekStudentAccess } from "../utils/student-access-cache";
 import ProfileAvatar from "./ProfileAvatar";
+import LanguageSwitcher from "./LanguageSwitcher";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 
 
@@ -65,6 +67,7 @@ function sidebarWidthPx(collapsed: boolean): string {
 
 
 export default function Sidebar() {
+  const { t } = useI18n();
 
   const pathname = usePathname();
 
@@ -72,7 +75,7 @@ export default function Sidebar() {
 
   const tutorLock = useTutorGlobalLock(isAdmin);
 
-  const [userName, setUserName] = useState("Étudiant");
+  const [userName, setUserName] = useState(t("dashboard", "sidebarDefaultStudentName"));
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
 
   const cachedAccess = peekStudentAccess();
@@ -217,10 +220,23 @@ export default function Sidebar() {
   const navPaths = getStudentNavPaths(centerId);
 
   const navItems = getStudentNavItems({ centerId, centerType });
+  const isTcfExperience = centerType === "tcf_canada" || pathname?.startsWith("/tcf-canada");
+  const navLabel = (label: string) => {
+    const keys: Record<string, string> = {
+      "Tableau de bord": "navDashboard", Accueil: "navHome",
+      "Mon tuteur": "navTutor", Tuteur: "navTutorShort",
+      "Session Live": "navLive", Live: "navLive",
+      "Cours et Quiz": "navCoursesQuiz", "Mes cours": "navCourses", Cours: "navCoursesShort",
+      "Mes Devoirs": "navHomework", Devoirs: "navHomeworkShort",
+      "Bibliothèque": "navLibrary", "Mode Examen": "navExamMode", Examen: "navExamShort",
+      "Communauté": "navCommunity", "Dashboard Admin": "navAdmin", Admin: "navAdmin",
+    };
+    return keys[label] ? t("dashboard", keys[label]) : label;
+  };
 
   const isCenterStudent = Boolean(centerId);
-  const brandTitle = isCenterStudent ? (centerName || "Mon centre") : "NEXA";
-  const brandTagline = isCenterStudent ? "Propulsé par NEXA" : "L'élite";
+  const brandTitle = isCenterStudent ? (centerName || t("dashboard", "sidebarMyCenter")) : "NEXA";
+  const brandTagline = isCenterStudent ? t("dashboard", "sidebarPoweredByNexa") : t("dashboard", "sidebarElite");
 
   const brandLogoBox = (size: "md" | "sm") => {
     const box =
@@ -395,7 +411,7 @@ export default function Sidebar() {
 
           onClick={toggleCollapse}
 
-          title={isCollapsed ? "Développer" : "Réduire"}
+          title={isCollapsed ? t("common", "expand") : t("common", "collapse")}
 
           className={`rounded-xl p-1.5 md:p-2 xl:p-2.5 transition-all hover:bg-white/10 text-white/50 hover:text-white shrink-0 ${
 
@@ -433,7 +449,7 @@ export default function Sidebar() {
 
           >
 
-            Mon parcours
+            {t("common", "myJourney")}
 
           </p>
 
@@ -453,6 +469,8 @@ export default function Sidebar() {
 
 
 
+        {!isTcfExperience && !isCollapsed && <div className="px-2 pb-2"><LanguageSwitcher dark /></div>}
+
         {navItems.map((item) => {
 
           const isActive = pathname === item.path;
@@ -467,7 +485,7 @@ export default function Sidebar() {
 
               href={item.path}
 
-              title={isCollapsed ? item.label : undefined}
+              title={isCollapsed ? navLabel(item.label) : undefined}
 
               className={itemCls(isActive)}
 
@@ -491,7 +509,7 @@ export default function Sidebar() {
 
               {!isCollapsed && (
 
-                <span className={`${STUDENT_TEXT.sidebarItem} truncate flex-1 min-w-0`}>{item.label}</span>
+                <span className={`${STUDENT_TEXT.sidebarItem} truncate flex-1 min-w-0`}>{navLabel(item.label)}</span>
 
               )}
 
@@ -533,7 +551,7 @@ export default function Sidebar() {
 
               >
 
-                Admin
+                {t("dashboard", "sidebarAdminSection")}
 
               </p>
 
@@ -553,7 +571,7 @@ export default function Sidebar() {
 
               href={STUDENT_ADMIN_NAV_ITEM.path}
 
-              title={isCollapsed ? STUDENT_ADMIN_NAV_ITEM.label : undefined}
+              title={isCollapsed ? t("dashboard", "navAdmin") : undefined}
 
               className={itemCls(pathname === "/admin")}
 
@@ -579,7 +597,7 @@ export default function Sidebar() {
 
                 <span className={`${STUDENT_TEXT.sidebarItem} truncate flex-1 min-w-0`}>
 
-                  {STUDENT_ADMIN_NAV_ITEM.label}
+                  {t("dashboard", "navAdmin")}
 
                 </span>
 
@@ -609,7 +627,7 @@ export default function Sidebar() {
 
           href={navPaths.profil}
 
-          title={isCollapsed ? `Profil : ${userName}` : undefined}
+          title={isCollapsed ? `${t("dashboard", "sidebarProfileTitle")} : ${userName}` : undefined}
 
           className={`flex items-center min-w-0 rounded-xl xl:rounded-2xl transition-colors hover:bg-white/10 ${
 
@@ -635,7 +653,7 @@ export default function Sidebar() {
 
             <div className="flex-1 min-w-0 overflow-hidden">
 
-              <p className={`${STUDENT_TEXT.sidebarMeta} text-white/40 truncate`}>Mon compte</p>
+              <p className={`${STUDENT_TEXT.sidebarMeta} text-white/40 truncate`}>{t("dashboard", "sidebarMyAccount")}</p>
 
               <p className={`${STUDENT_TEXT.sidebarProfile} text-white truncate mt-0.5`}>{userName}</p>
 

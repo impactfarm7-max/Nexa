@@ -4,9 +4,11 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Trophy, MessageCircle, GraduationCap, LogOut, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function TerminePage() {
   const router = useRouter();
+  const { t } = useI18n();
 
   useEffect(() => {
     const check = async () => {
@@ -20,9 +22,7 @@ export default function TerminePage() {
   }, [router]);
 
   const handleContact = () => {
-    const msg = encodeURIComponent(
-      "Bonjour NEXA, ma formation est terminée. Je souhaite continuer ma préparation. Pouvez-vous m'aider ?"
-    );
+    const msg = encodeURIComponent(t("auth", "termineWhatsappMessage"));
     window.open(`https://wa.me/+237683375069?text=${msg}`, "_blank");
   };
 
@@ -48,20 +48,19 @@ export default function TerminePage() {
           <Trophy className="w-8 h-8 text-yellow-400" />
         </div>
 
-        <h1 className="text-2xl font-black text-white mb-3">Formation terminée</h1>
+        <h1 className="text-2xl font-black text-white mb-3">{t("auth", "termineTitle")}</h1>
         <p className="text-neutral-400 text-sm leading-relaxed mb-7">
-          Félicitations ! Ta formation NEXA est arrivée à son terme. Nous espérons que
-          cette préparation t'a bien aidé pour le TCF Canada.
+          {t("auth", "termineDescription")}
         </p>
 
         <div className="bg-white/5 border border-white/10 rounded-2xl p-4 mb-6 text-left space-y-2.5">
           <p className="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-3">
-            Tu souhaites aller plus loin ?
+            {t("auth", "termineGoFurtherLabel")}
           </p>
           {[
-            "Renouveler ton accès à la plateforme",
-            "Passer à une formation supérieure",
-            "Préparer une nouvelle session TCF",
+            t("auth", "termineItem1"),
+            t("auth", "termineItem2"),
+            t("auth", "termineItem3"),
           ].map((item) => (
             <div key={item} className="flex items-center gap-2.5">
               <CheckCircle2 className="w-4 h-4 text-orange-400 shrink-0" />
@@ -75,7 +74,7 @@ export default function TerminePage() {
           className="w-full flex items-center justify-center gap-2.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-black text-sm py-4 rounded-2xl transition-all shadow-lg shadow-orange-500/25 mb-3"
         >
           <MessageCircle className="w-5 h-5" />
-          Contacter NEXA
+          {t("auth", "termineContactButton")}
         </button>
 
         <button
@@ -83,7 +82,7 @@ export default function TerminePage() {
           className="w-full flex items-center justify-center gap-2 text-neutral-500 hover:text-neutral-300 text-sm font-semibold py-3 rounded-2xl transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          Se déconnecter
+          {t("auth", "termineLogoutButton")}
         </button>
       </div>
     </div>

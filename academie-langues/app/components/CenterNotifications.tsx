@@ -5,6 +5,7 @@ import { Bell } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { usePushNotifications } from "@/app/hooks/usePushNotifications";
 import { BLUE } from "@/app/centre/center-page-ui";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type NotificationRow = {
   id: string;
@@ -19,6 +20,7 @@ type NotificationRow = {
  * Logique conservée : fetch, realtime INSERT, marquage lu, push opt-in.
  */
 export default function CenterNotifications() {
+  const { locale, t } = useI18n();
   const { status, subscribe, subscribeError } = usePushNotifications();
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [open, setOpen] = useState(false);
@@ -86,7 +88,7 @@ export default function CenterNotifications() {
         }}
         className="relative flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-lg bg-white text-neutral-600 transition-colors hover:bg-[#11224E]/[0.04]"
         style={{ border: `1.5px solid ${BLUE}`, color: BLUE }}
-        title="Notifications"
+        title={t("common", "notifications")}
         aria-expanded={open}
         aria-haspopup="menu"
       >
@@ -105,7 +107,7 @@ export default function CenterNotifications() {
         >
           <div className="border-b border-black/[0.06] p-4">
             <p className="text-[12px] font-extrabold uppercase tracking-wider" style={{ color: BLUE }}>
-              Notifications
+              {t("common", "notifications")}
             </p>
             {(status === "unsubscribed" || status === "error") && (
               <button
@@ -115,20 +117,20 @@ export default function CenterNotifications() {
                 }}
                 className="mt-3 w-full rounded-lg bg-orange-600 px-4 py-2 text-[11px] font-extrabold uppercase tracking-widest text-white hover:bg-orange-500"
               >
-                Activer les push du centre
+                {t("common", "enableCenterPush")}
               </button>
             )}
             {subscribeError && <p className="mt-2 text-[12px] font-semibold text-red-500">{subscribeError}</p>}
           </div>
           <div className="max-h-96 overflow-y-auto p-2">
             {notifications.length === 0 ? (
-              <p className="p-4 text-[12px] font-medium text-neutral-400">Aucune notification.</p>
+              <p className="p-4 text-[12px] font-medium text-neutral-400">{t("common", "noNotifications")}</p>
             ) : (
               notifications.map((notification) => (
                 <div key={notification.id} className="rounded-lg p-3 hover:bg-[#11224E]/[0.03]">
                   <p className="text-[14px] font-semibold text-neutral-800">{notification.message}</p>
                   <p className="mt-1 text-[12px] font-medium text-neutral-400">
-                    {new Date(notification.created_at).toLocaleString("fr-FR", {
+                    {new Date(notification.created_at).toLocaleString(locale === "fr" ? "fr-FR" : "en-US", {
                       dateStyle: "short",
                       timeStyle: "short",
                     })}

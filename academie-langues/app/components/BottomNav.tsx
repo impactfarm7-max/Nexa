@@ -20,8 +20,10 @@ import {
 import { useTutorGlobalLock } from "../hooks/useTutorGlobalLock";
 import { motion, AnimatePresence } from "framer-motion";
 import { peekStudentAccess } from "../utils/student-access-cache";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function BottomNav() {
+  const { t } = useI18n();
   const pathname = usePathname();
   const cachedAccess = peekStudentAccess();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -35,6 +37,19 @@ export default function BottomNav() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const tutorLock = useTutorGlobalLock(isAdmin);
+
+  const navLabel = (label: string) => {
+    const keys: Record<string, string> = {
+      "Tableau de bord": "navDashboard", Accueil: "navHome",
+      "Mon tuteur": "navTutor", Tuteur: "navTutorShort",
+      "Session Live": "navLive", Live: "navLive",
+      "Cours et Quiz": "navCoursesQuiz", "Mes cours": "navCourses", Cours: "navCoursesShort",
+      "Mes Devoirs": "navHomework", Devoirs: "navHomeworkShort",
+      "Bibliothèque": "navLibrary", "Mode Examen": "navExamMode", Examen: "navExamShort",
+      "Communauté": "navCommunity", "Dashboard Admin": "navAdmin", Admin: "navAdmin",
+    };
+    return keys[label] ? t("dashboard", keys[label]) : label;
+  };
 
   useEffect(() => {
     setIsMenuOpen(false);
@@ -143,7 +158,7 @@ export default function BottomNav() {
           </span>
         )}
         <span className={`text-[10px] mt-1 text-center leading-tight transition-colors truncate max-w-full ${isActive ? "text-[#11224E] font-bold" : "text-slate-400 font-medium"}`}>
-          {item.shortLabel ?? item.label}
+          {navLabel(item.shortLabel ?? item.label)}
         </span>
       </Link>
     );
@@ -173,11 +188,11 @@ export default function BottomNav() {
             className="md:hidden fixed bottom-[calc(70px+env(safe-area-inset-bottom))] left-3 right-3 max-h-[min(70vh,520px)] overflow-y-auto bg-white rounded-3xl shadow-2xl p-4 z-[50] border border-slate-100"
           >
             <div className="flex items-center justify-between mb-4 px-1">
-              <p className="text-sm font-black text-[#11224E]">Navigation</p>
+              <p className="text-sm font-black text-[#11224E]">{t("dashboard", "mobileNavigation")}</p>
               <button
                 onClick={() => setIsMenuOpen(false)}
                 className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
-                aria-label="Fermer le menu"
+                aria-label={t("dashboard", "mobileCloseMenu")}
               >
                 <X size={16} />
               </button>
@@ -203,7 +218,7 @@ export default function BottomNav() {
                         J-{tutorLock.daysRemaining}
                       </span>
                     )}
-                    <span className="text-xs font-bold text-slate-700 text-center leading-tight">{item.label}</span>
+                    <span className="text-xs font-bold text-slate-700 text-center leading-tight">{navLabel(item.label)}</span>
                   </Link>
                 );
               })}
@@ -217,7 +232,7 @@ export default function BottomNav() {
                 <div className="w-12 h-12 rounded-full bg-[#11224E]/10 flex items-center justify-center text-[#11224E]">
                   <User size={22} />
                 </div>
-                <span className="text-xs font-bold text-slate-700">Mon Profil</span>
+                <span className="text-xs font-bold text-slate-700">{t("dashboard", "mobileProfile")}</span>
               </Link>
 
               <Link
@@ -232,7 +247,7 @@ export default function BottomNav() {
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                 )}
-                <span className="text-xs font-bold text-slate-700">Support</span>
+                <span className="text-xs font-bold text-slate-700">{t("dashboard", "mobileSupport")}</span>
               </Link>
 
               {isAdmin && (
@@ -245,7 +260,7 @@ export default function BottomNav() {
                   <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center text-[#eb670e]">
                     <ShieldCheck size={22} />
                   </div>
-                  <span className="text-xs font-bold text-slate-700">{STUDENT_ADMIN_NAV_ITEM.label}</span>
+                  <span className="text-xs font-bold text-slate-700">{t("dashboard", "navAdmin")}</span>
                 </Link>
               )}
             </div>
@@ -263,7 +278,7 @@ export default function BottomNav() {
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="relative w-14 h-14 bg-[#eb670e] rounded-full flex items-center justify-center shadow-lg shadow-[#eb670e]/40 border-4 border-white transition-transform active:scale-90"
-              aria-label="Ouvrir le menu de navigation"
+              aria-label={t("dashboard", "mobileOpenMenu")}
             >
               <motion.div
                 animate={{ rotate: isMenuOpen ? 45 : 0 }}

@@ -6,6 +6,7 @@ import { ArrowLeft, Headphones, ImageIcon, RefreshCcw, Send, ShieldCheck, X } fr
 import { supabase } from "@/app/utils/supabase";
 import { encryptMessage, decryptRows } from "@/app/utils/messageCrypto.client";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type SupportMessage = {
   id: string;
@@ -20,8 +21,8 @@ type SupportMessage = {
   sender_name?: string | null;
 };
 
-function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString("fr-FR", {
+function formatTime(dateStr: string, locale: string) {
+  return new Date(dateStr).toLocaleTimeString(locale, {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -47,6 +48,8 @@ function isBotMessage(message: string) {
 
 export default function SupportPage() {
   const router = useRouter();
+  const { locale, t } = useI18n();
+  const dateLocale = locale === "fr" ? "fr-FR" : "en-US";
   const [user, setUser] = useState<any>(null);
   const [adminId, setAdminId] = useState<string | null>(null);
   const [messages, setMessages] = useState<SupportMessage[]>([]);
@@ -84,7 +87,7 @@ export default function SupportPage() {
         .from("profiles")
         .select("id, prenom")
         .in("id", adminIds);
-      setAdminNames(Object.fromEntries((profiles || []).map((p: any) => [p.id, p.prenom || "Support client"])));
+      setAdminNames(Object.fromEntries((profiles || []).map((p: any) => [p.id, p.prenom || t("dashboard", "supportDefaultAgent")])));
     } else {
       setAdminNames({});
     }
@@ -202,7 +205,7 @@ export default function SupportPage() {
       body: formData,
     });
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error || "Upload impossible");
+    if (!res.ok) throw new Error(json.error || t("dashboard", "supportUploadError"));
     return json.url as string;
   };
 
@@ -264,7 +267,7 @@ export default function SupportPage() {
           body: JSON.stringify({ token: guestToken, guestName, guestEmail, message: msg, imageUrl }),
         });
         const json = await res.json();
-        if (!res.ok) { setBotTyping(false); throw new Error(json.error || "Message non envoye"); }
+        if (!res.ok) { setBotTyping(false); throw new Error(json.error || t("dashboard", "supportMessageError")); }
         setGuestConversationStarted(true);
         await fetchGuestMessages(guestToken);
         setBotTyping(false);
@@ -273,7 +276,7 @@ export default function SupportPage() {
       setInput("");
       handleImageChange(null);
     } catch (error: any) {
-      setSendError(error?.message || "Impossible d'envoyer l'image.");
+      setSendError(error?.message || t("dashboard", "supportUploadError"));
     } finally {
       setSending(false);
     }
@@ -286,7 +289,7 @@ export default function SupportPage() {
           <button
             onClick={() => router.push(user ? "/dashboard" : "/login")}
             className="min-w-[44px] min-h-[44px] w-11 h-11 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors shrink-0"
-            aria-label="Retour au dashboard"
+            aria-label={t("dashboard", "supportBack")}
           >
             <ArrowLeft className="w-5 h-5 text-slate-700" />
           </button>
@@ -294,8 +297,8 @@ export default function SupportPage() {
             <Headphones className="w-5 h-5 text-white" />
           </div>
           <div className="min-w-0">
-            <p className={`${STUDENT_TEXT.pageTitle} leading-tight truncate`} style={{ color: BRAND.blue }}>Support client</p>
-            <p className={`${STUDENT_TEXT.subtitle} truncate`}>{user ? "Assistance technique, compte, paiement" : "Aide connexion et accès au compte"}</p>
+            <p className={`${STUDENT_TEXT.pageTitle} leading-tight truncate`} style={{ color: BRAND.blue }}>{t("dashboard", "supportTitle")}</p>
+            <p className={`${STUDENT_TEXT.subtitle} truncate`}>{user ? t("dashboard", "supportUserSubtitle") : t("dashboard", "supportGuestSubtitle")}</p>
           </div>
         </div>
       </header>
@@ -305,22 +308,22 @@ export default function SupportPage() {
           {loading ? (
             <div className="flex items-center justify-center py-24 gap-2 text-slate-400">
               <RefreshCcw className="w-4 h-4 animate-spin" />
-              <span className="text-sm font-bold">Chargement du support...</span>
+              <span className="text-sm font-bold">{t("dashboard", "supportLoading")}</span>
             </div>
           ) : messages.length === 0 ? (
             <div className="text-center py-20 px-6">
               <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto border border-blue-100 mb-4">
                 <ShieldCheck className="w-8 h-8 text-blue-600" />
               </div>
-              <p className="font-black text-slate-800">Besoin d'aide ?</p>
-              <p className="text-sm text-slate-400 mt-1">Ecrivez votre demande, le service client vous repondra ici.</p>
+              <p className="font-black text-slate-800">{t("dashboard", "supportNeedHelp")}</p>
+              <p className="text-sm text-slate-400 mt-1">{t("dashboard", "supportEmptyBody")}</p>
             </div>
           ) : messages.map((msg, i) => {
             const isMe = user ? msg.from_user_id === user.id : msg.sender === "guest";
             const bot = !isMe && isBotMessage(msg.message || "");
-            const rawResponder = msg.sender_name || (msg.from_user_id ? adminNames[msg.from_user_id] : null) || "Support client";
+            const rawResponder = msg.sender_name || (msg.from_user_id ? adminNames[msg.from_user_id] : null) || t("dashboard", "supportDefaultAgent");
             const responderName = !isMe
-              ? (bot ? "Assistant NEXA 🤖" : `${rawResponder} (Assistance NEXA)`)
+              ? (bot ? t("dashboard", "supportAssistant") : `${rawResponder} (${t("dashboard", "supportAgentSuffix")})`)
               : null;
             const imageUrl = getImageUrlFromMessage(msg);
             const messageText = getMessageTextWithoutImageLink(msg.message || "");
@@ -332,7 +335,7 @@ export default function SupportPage() {
                 {showDate && (
                   <div className="text-center my-4">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
-                      {new Date(msg.created_at).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}
+                      {new Date(msg.created_at).toLocaleDateString(dateLocale, { weekday: "long", day: "numeric", month: "long" })}
                     </span>
                   </div>
                 )}
@@ -356,17 +359,17 @@ export default function SupportPage() {
                       >
                         <img
                           src={imageUrl}
-                          alt="Capture envoyee au support"
+                          alt={t("dashboard", "supportImageAlt")}
                           className="block max-h-72 w-auto max-w-[min(280px,70vw)] object-contain"
                         />
                         <span className={`flex items-center gap-1.5 px-3 py-2 text-[10px] font-black uppercase tracking-widest ${isMe ? "text-blue-100" : "text-slate-400"}`}>
-                          <ImageIcon className="w-3 h-3" /> Télécharger l'image
+                          <ImageIcon className="w-3 h-3" /> {t("dashboard", "supportDownloadImage")}
                         </span>
                       </button>
                     )}
                     {messageText && <p>{messageText}</p>}
                     <p className={`text-[10px] mt-1 ${isMe ? "text-blue-100" : "text-slate-400"}`}>
-                      {formatTime(msg.created_at)}{isMe && msg.read_at ? " · Lu" : ""}
+                      {formatTime(msg.created_at, dateLocale)}{isMe && msg.read_at ? ` · ${t("dashboard", "supportRead")}` : ""}
                     </p>
                   </div>
                   </div>
@@ -377,7 +380,7 @@ export default function SupportPage() {
           {botTyping && (
             <div className="flex justify-start">
               <div className="flex flex-col items-start">
-                <p className="mb-1 px-2 text-[11px] font-black uppercase tracking-wider text-slate-400">Assistant NEXA 🤖</p>
+                <p className="mb-1 px-2 text-[11px] font-black uppercase tracking-wider text-slate-400">{t("dashboard", "supportAssistant")}</p>
                 <div className="bg-white border border-slate-200 rounded-[1.5rem] rounded-bl-sm px-5 py-4 shadow-sm">
                   <div className="flex items-center gap-1.5">
                     <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
@@ -399,24 +402,24 @@ export default function SupportPage() {
               type="text"
               value={guestName}
               onChange={(e) => setGuestName(e.target.value)}
-              placeholder="Votre nom"
+              placeholder={t("dashboard", "supportGuestName")}
               className="h-11 rounded-2xl bg-slate-100 border-2 border-slate-100 focus:border-blue-500 focus:bg-white outline-none px-4 text-sm font-medium transition-colors"
             />
             <input
               type="email"
               value={guestEmail}
               onChange={(e) => setGuestEmail(e.target.value)}
-              placeholder="Email de votre compte"
+              placeholder={t("dashboard", "supportGuestEmail")}
               className="h-11 rounded-2xl bg-slate-100 border-2 border-slate-100 focus:border-blue-500 focus:bg-white outline-none px-4 text-sm font-medium transition-colors"
             />
           </div>
         )}
         {imagePreview && (
           <div className="nexa-student-shell mb-3 flex items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-2">
-            <img src={imagePreview} alt="Apercu" className="h-14 w-14 rounded-xl object-cover" />
+            <img src={imagePreview} alt={t("dashboard", "supportPreviewAlt")} className="h-14 w-14 rounded-xl object-cover" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-black text-slate-800">{selectedImage?.name}</p>
-              <p className="text-[10px] font-semibold text-slate-400">Image prete a envoyer</p>
+              <p className="text-[10px] font-semibold text-slate-400">{t("dashboard", "supportImageReady")}</p>
             </div>
             <button type="button" onClick={() => handleImageChange(null)} className="rounded-full bg-white p-2 text-slate-400 hover:text-red-500">
               <X className="h-4 w-4" />
@@ -444,7 +447,7 @@ export default function SupportPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            placeholder="Ecrire au service client..."
+            placeholder={t("dashboard", "supportInputPlaceholder")}
             className="flex-1 min-h-[44px] h-14 rounded-full bg-slate-100 border-2 border-slate-100 focus:border-blue-500 focus:bg-white outline-none px-6 text-sm font-medium transition-colors"
             disabled={sending || (!!user && !adminId)}
           />

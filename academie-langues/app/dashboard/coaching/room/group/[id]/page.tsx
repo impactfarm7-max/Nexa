@@ -9,10 +9,12 @@ import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import { ArrowLeft, Lock, Video } from "lucide-react";
 import { peekStudentAccess } from "@/app/utils/student-access-cache";
 import { resolveMeetingExitPath } from "@/app/utils/student-routes";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type State = "loading" | "ready" | "error";
 
 export default function GroupCoachingRoomPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const params = useParams();
   const sessionId = String(params?.id || "");
@@ -55,7 +57,7 @@ export default function GroupCoachingRoomPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErrorMsg(json.error || "Impossible de rejoindre la séance.");
+        setErrorMsg(json.error || t("dashboard", "coachingGroupRoomJoinError"));
         setState("error");
         return;
       }
@@ -93,7 +95,7 @@ export default function GroupCoachingRoomPage() {
           <div className="flex items-center gap-3 text-white">
             <div className="flex items-center gap-2">
               <Video size={16} className="text-orange-500" />
-              <span className="text-sm font-bold">Coaching Groupe</span>
+              <span className="text-sm font-bold">{t("dashboard", "coachingGroupRoomLabel")}</span>
             </div>
             <CoachingTimer endsAt={room.endsAt} />
           </div>
@@ -101,7 +103,7 @@ export default function GroupCoachingRoomPage() {
             onClick={leave}
             className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors"
           >
-            Quitter
+            {t("dashboard", "coachingGroupRoomLeaveButton")}
           </button>
         </div>
         <div className="flex-1 min-h-0 relative">
@@ -121,13 +123,13 @@ export default function GroupCoachingRoomPage() {
         <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mb-6 border border-orange-100">
           <Lock className="w-8 h-8 text-orange-600" />
         </div>
-        <h1 className={`${STUDENT_TEXT.sectionTitle} mb-3`} style={{ color: BRAND.blue }}>Séance indisponible</h1>
+        <h1 className={`${STUDENT_TEXT.sectionTitle} mb-3`} style={{ color: BRAND.blue }}>{t("dashboard", "coachingGroupRoomUnavailableTitle")}</h1>
         <p className="text-slate-500 mb-8 font-medium text-sm leading-relaxed">{errorMsg}</p>
         <button
           onClick={leave}
           className="w-full bg-slate-950 hover:bg-orange-600 text-white py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2"
         >
-          <ArrowLeft size={14} /> Retour au coaching
+          <ArrowLeft size={14} /> {t("dashboard", "coachingGroupRoomBackButton")}
         </button>
       </div>
     </div>

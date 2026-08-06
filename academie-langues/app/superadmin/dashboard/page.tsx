@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Building2, Users, AlertTriangle, ShieldCheck, Inbox, ArrowRight } from "lucide-react";
 import { superadminFetch } from "../../utils/superadmin-api-client";
 import { centerTrialRemainingMs } from "../../utils/center-trial";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type CenterStats = { actifs: number; pauses: number; expires: number; termines: number; revoques: number; total: number };
 type CenterRow = { id: string; status: "active" | "suspended" | "pending" | "rejected"; created_at: string; stats: CenterStats };
@@ -12,6 +13,7 @@ type CenterRow = { id: string; status: "active" | "suspended" | "pending" | "rej
 const URGENT_TRIAL_THRESHOLD_MS = 24 * 60 * 60 * 1000;
 
 export default function SuperadminDashboardPage() {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [centers, setCenters] = useState<CenterRow[]>([]);
 
@@ -39,19 +41,19 @@ export default function SuperadminDashboardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-black text-white">Vue d&apos;ensemble réseau</h1>
-        <p className="mt-1 text-sm text-slate-400">Pilotage des centres et des étudiants du réseau Nexa.</p>
+        <h1 className="text-2xl font-black text-white">{t("superadmin", "dashboardTitle")}</h1>
+        <p className="mt-1 text-sm text-slate-400">{t("superadmin", "dashboardSubtitle")}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Link href="/superadmin/centres" className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5 transition-colors hover:border-orange-500/30">
           <Building2 className="h-5 w-5 text-orange-400" />
-          <p className="mt-3 text-xs font-bold uppercase tracking-widest text-slate-500">Centres actifs</p>
+          <p className="mt-3 text-xs font-bold uppercase tracking-widest text-slate-500">{t("superadmin", "dashboardActiveCenters")}</p>
           <p className="mt-1 text-2xl font-black text-white">{loading ? "—" : `${activeCenters} / ${decidedCentersTotal}`}</p>
         </Link>
         <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
           <Users className="h-5 w-5 text-orange-400" />
-          <p className="mt-3 text-xs font-bold uppercase tracking-widest text-slate-500">Étudiants actifs</p>
+          <p className="mt-3 text-xs font-bold uppercase tracking-widest text-slate-500">{t("superadmin", "dashboardActiveStudents")}</p>
           <p className="mt-1 text-2xl font-black text-white">{loading ? "—" : totalActiveStudents}</p>
         </div>
         <Link
@@ -67,9 +69,9 @@ export default function SuperadminDashboardPage() {
           ) : (
             <ShieldCheck className="h-5 w-5 text-orange-400" />
           )}
-          <p className="mt-3 text-xs font-bold uppercase tracking-widest text-slate-500">Essais à échéance (&lt;24h)</p>
+          <p className="mt-3 text-xs font-bold uppercase tracking-widest text-slate-500">{t("superadmin", "dashboardTrialsExpiring")}</p>
           <p className={`mt-1 text-2xl font-black ${urgentTrials > 0 ? "text-red-400" : "text-emerald-400"}`}>
-            {loading ? "—" : urgentTrials > 0 ? urgentTrials : "Aucun"}
+            {loading ? "—" : urgentTrials > 0 ? urgentTrials : t("superadmin", "dashboardNone")}
           </p>
         </Link>
       </div>
@@ -83,10 +85,10 @@ export default function SuperadminDashboardPage() {
             <Inbox className="h-5 w-5 text-orange-400" />
             <div>
               <p className="font-bold text-white">
-                {pendingCenters} demande{pendingCenters > 1 ? "s" : ""} à traiter
+                {t("superadmin", "dashboardRequestsToHandle").replace("{count}", String(pendingCenters)).replace("{plural}", pendingCenters > 1 ? "s" : "")}
               </p>
               <p className="text-xs text-slate-400">
-                Centre{pendingCenters > 1 ? "s" : ""} en essai (72h) à valider ou rejeter.
+                {t("superadmin", "dashboardCentersTrial").replace("{plural}", pendingCenters > 1 ? "s" : "")}
               </p>
             </div>
           </div>

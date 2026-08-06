@@ -32,6 +32,7 @@ import { supabase } from "../utils/supabase";
 import { logClientActivity } from "../utils/client-activity";
 import { logoutAndClearSession } from "../utils/session";
 import { useSimulationLimit } from "@/app/hooks/useSimulationLimit";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import StudentRouteSkeleton from "@/app/components/StudentRouteSkeleton";
 import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
@@ -71,6 +72,7 @@ const formatDateCourte = (dateStr: string) => {
 
 export default function ProfilPage() {
   const router = useRouter();
+  const { t } = useI18n();
 
   const [profileMode, setProfileMode] = useState<"unknown" | "center" | "b2c">("unknown");
   const [loading, setLoading] = useState(true);
@@ -288,11 +290,11 @@ export default function ProfilPage() {
 
     // Vérification taille (max 2MB) et type
     if (file.size > 2 * 1024 * 1024) {
-      alert("Image trop lourde. Maximum 2 Mo.");
+      alert(t("dashboard", "profilImageTooLarge"));
       return;
     }
     if (!file.type.startsWith("image/")) {
-      alert("Fichier non supporté. Choisissez une image.");
+      alert(t("dashboard", "profilFileNotSupported"));
       return;
     }
 

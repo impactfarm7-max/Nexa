@@ -11,7 +11,8 @@ import { logClientActivity } from "../utils/client-activity";
 import { resolvePostLoginPath, isCenterStaff, isSuperAdmin, isPrivilegedRole } from "../utils/student-routes";
 import { prepareForLogin, isRefreshTokenError } from "../utils/supabase-auth";
 import { SIGNUP_COUNTRIES_FALLBACK, type SignupCountry } from "../data/signup-countries";
-import { checkPasswordStrength, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
+import { checkPasswordStrength } from "@/app/utils/password-policy";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Step = "LOGIN" | "SIGNUP_FORM" | "SIGNUP_SUCCESS" | "RESET_PWD" | "SUPERADMIN_MFA";
 
@@ -37,6 +38,7 @@ const ORANGE = "#eb670e";
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useI18n();
 
   const [step, setStep] = useState<Step>("LOGIN");
   const [loading, setLoading] = useState(false);
@@ -120,7 +122,7 @@ function LoginPageContent() {
     if (searchParams.get("reason") === "pending_validation") {
       setMsg({
         type: "info",
-        text: "Votre compte n'a pas encore été validé par votre centre. Veuillez réessayer plus tard.",
+        text: t("auth", "loginAccountPendingValidation"),
       });
     }
 
@@ -140,7 +142,7 @@ function LoginPageContent() {
       })
         .then(async (res) => {
           const json = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(json.error || "Centre invalide.");
+          if (!res.ok) throw new Error(json.error || t("auth", "loginInvalidCenter"));
           applyCenterInfo(json.center);
           if (openCenterSignup) {
             setStep("SIGNUP_FORM");
@@ -155,9 +157,9 @@ function LoginPageContent() {
           const detail = err instanceof Error ? err.message : "";
           setMsg({
             type: "error",
-            text: detail && detail !== "Centre invalide."
+            text: detail && detail !== t("auth", "loginInvalidCenter")
               ? detail
-              : "Lien centre invalide ou introuvable. Demandez un nouveau lien a votre centre.",
+              : t("auth", "loginInvalidCenterLink"),
           });
         })
         .finally(() => setResolvingCenterLink(false));
@@ -189,14 +191,14 @@ function LoginPageContent() {
         className="h-10 px-4 rounded-full bg-orange-50 border border-orange-100 text-orange-600 font-black text-[10px] sm:text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-orange-100 transition-colors shadow-sm"
       >
         <MessageCircle className="w-4 h-4" />
-        Support
+        {t("auth", "loginSupportButton")}
       </button>
 
       {showSupportMenu && (
         <>
           <button
             type="button"
-            aria-label="Fermer le support"
+            aria-label={t("auth", "loginCloseSupport")}
             className="fixed inset-0 z-40 cursor-default"
             onClick={() => setShowSupportMenu(false)}
           />
@@ -206,8 +208,8 @@ function LoginPageContent() {
                 <MessageCircle className="h-5 w-5" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-black text-slate-900">Besoin d'aide ?</p>
-                <p className="mt-0.5 text-xs font-medium leading-snug text-slate-500">Contactez le service client pour un probleme de connexion.</p>
+                <p className="text-sm font-black text-slate-900">{t("auth", "loginNeedHelp")}</p>
+                <p className="mt-0.5 text-xs font-medium leading-snug text-slate-500">{t("auth", "loginContactSupportDesc")}</p>
               </div>
               <button
                 type="button"
@@ -227,8 +229,8 @@ function LoginPageContent() {
                   <Phone className="h-5 w-5 text-emerald-600" />
                 </span>
                 <span>
-                  <span className="block text-sm font-black text-slate-900">Appeler le service client</span>
-                  <span className="block text-xs font-medium text-slate-400">Assistance immediate</span>
+                  <span className="block text-sm font-black text-slate-900">{t("auth", "loginCallSupport")}</span>
+                  <span className="block text-xs font-medium text-slate-400">{t("auth", "loginImmediateAssistance")}</span>
                 </span>
               </button>
               <button
@@ -240,8 +242,8 @@ function LoginPageContent() {
                   <MessageCircle className="h-5 w-5 text-orange-600" />
                 </span>
                 <span>
-                  <span className="block text-sm font-black text-slate-900">Ecrire au service client</span>
-                  <span className="block text-xs font-medium text-slate-400">Ouvre le chat support</span>
+                  <span className="block text-sm font-black text-slate-900">{t("auth", "loginWriteSupport")}</span>
+                  <span className="block text-xs font-medium text-slate-400">{t("auth", "loginOpenChatSupport")}</span>
                 </span>
               </button>
             </div>
@@ -259,7 +261,7 @@ function LoginPageContent() {
       setStep("RESET_PWD");
       setMsg({
         type: "error",
-        text: "Le lien de récupération a expiré. Entrez votre e-mail pour recevoir un nouveau lien.",
+        text: t("auth", "loginResetLinkExpired"),
       });
       window.history.replaceState(null, "", "/login");
     }
@@ -268,7 +270,7 @@ function LoginPageContent() {
       setStep("RESET_PWD");
       setMsg({
         type: "error",
-        text: "Le lien de récupération est invalide. Entrez votre e-mail pour recommencer.",
+        text: t("auth", "loginResetLinkInvalid"),
       });
       window.history.replaceState(null, "", "/login");
     }
@@ -355,7 +357,7 @@ function LoginPageContent() {
       setLoading(false);
       if (isRefreshTokenError(error.message)) {
         await prepareForLogin();
-        return showError("Session expirée. Réessayez de vous connecter.");
+        return showError(t("auth", "loginSessionExpired"));
       }
       if (error.message.includes("Invalid login credentials")) {
         try {
@@ -418,7 +420,7 @@ function LoginPageContent() {
       ) {
         setLoading(false);
         await supabase.auth.signOut();
-        showInfo("Votre compte n'a pas encore été validé par votre centre. Veuillez réessayer plus tard.");
+        showInfo(t("auth", "loginAccountPendingValidation"));
         return;
       }
 
@@ -778,14 +780,12 @@ function LoginPageContent() {
     e.preventDefault();
 
     if (!acceptCGU) {
-      return showError(
-        "Vous devez accepter les CGU et la Politique de Confidentialité pour continuer.",
-      );
+      return showError(t("auth", "loginMustAcceptTerms"));
     }
 
     const pwdCheck = checkPasswordStrength(password);
     if (!pwdCheck.ok) {
-      return showError(pwdCheck.message || PASSWORD_POLICY_HINT);
+      return showError(t("auth", "loginPasswordPolicyHint"));
     }
 
     setLoading(true);
@@ -808,7 +808,7 @@ function LoginPageContent() {
         }
       } catch (error: any) {
         setLoading(false);
-        return showError(error.message || "Code centre invalide.");
+        return showError(error.message || t("auth", "loginInvalidCenterCode"));
       }
     }
 
@@ -836,12 +836,12 @@ function LoginPageContent() {
     if (error) {
       setLoading(false);
       if (error.message.includes("already registered"))
-        return showError("Cet e-mail possède déjà un compte.");
+        return showError(t("auth", "loginEmailAlreadyRegistered"));
       if (
         error.message.includes("Password should be at least")
         || /weak|uppercase|lowercase|digit|character/i.test(error.message)
       )
-        return showError(PASSWORD_POLICY_HINT);
+        return showError(t("auth", "loginPasswordPolicyHint"));
       return showError(error.message);
     }
 
@@ -1028,7 +1028,7 @@ function LoginPageContent() {
 
               {!compact && (
                 <p className="mx-auto max-w-sm text-base font-normal leading-relaxed text-white/60">
-                  Votre inscription en quelques étapes simples et sécurisées.
+                  {t("auth", "loginSignupStepsDesc")}
                 </p>
               )}
             </>
@@ -1036,13 +1036,13 @@ function LoginPageContent() {
             <>
               <div className="space-y-2">
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/45">
-                  Bon retour
+                  {t("auth", "loginWelcomeBack")}
                 </p>
                 <h2
                   className={`font-bold leading-tight ${compact ? "text-xl" : "text-3xl lg:text-4xl"}`}
                   style={{ color: linkedCenter || centerLinkLabel ? ORANGE : "white" }}
                 >
-                  {linkedCenter || centerLinkLabel ? academyName : "Content de vous revoir"}
+                  {linkedCenter || centerLinkLabel ? academyName : t("auth", "loginGladToSeeYou")}
                 </h2>
                 {(linkedCenter || centerLinkLabel) && (
                   <div
@@ -1053,7 +1053,7 @@ function LoginPageContent() {
               </div>
               {!compact && (
                 <p className="mx-auto max-w-sm text-base font-normal leading-relaxed text-white/60">
-                  Connectez-vous pour accéder à votre espace et poursuivre votre formation.
+                  {t("auth", "loginConnectDesc")}
                 </p>
               )}
             </>
@@ -1064,10 +1064,10 @@ function LoginPageContent() {
       {!hideFooter && !compact && (
         <div className="relative z-10 mx-auto mt-auto w-full max-w-sm border-t border-white/10 pt-8">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/35">
-            Propulsé par Nexa
+            {t("auth", "loginPoweredBy")}
           </p>
           <p className="mt-2 text-sm font-normal leading-relaxed text-white/50">
-            L&apos;éducation ne sera plus jamais un problème en Afrique.
+            {t("auth", "loginEducationTagline")}
           </p>
         </div>
       )}
@@ -1078,26 +1078,26 @@ function LoginPageContent() {
     <p className="pt-2 text-center text-sm font-medium text-slate-500">
       {target === "SIGNUP_FORM" ? (
         <>
-          Pas encore de compte ?{" "}
+          {t("auth", "loginNoAccountYet")}{" "}
           <button
             type="button"
             onClick={() => { setStep("SIGNUP_FORM"); setMsg(null); }}
             className="font-black hover:underline"
             style={{ color: ORANGE }}
           >
-            Créer un compte
+            {t("auth", "loginCreateAccount")}
           </button>
         </>
       ) : (
         <>
-          Déjà un compte ?{" "}
+          {t("auth", "loginAlreadyHaveAccount")}{" "}
           <button
             type="button"
             onClick={() => { setStep("LOGIN"); setMsg(null); }}
             className="font-black hover:underline"
             style={{ color: BLUE }}
           >
-            Se connecter
+            {t("auth", "loginSignIn")}
           </button>
         </>
       )}
@@ -1112,8 +1112,8 @@ function LoginPageContent() {
             <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-50">
               <Clock className="h-7 w-7 animate-pulse" style={{ color: ORANGE }} />
             </div>
-            <h1 className="mt-5 text-xl font-black" style={{ color: BLUE }}>Préparation de votre inscription</h1>
-            <p className="mt-2 text-sm font-medium text-slate-500">Vérification du lien de votre centre...</p>
+            <h1 className="mt-5 text-xl font-black" style={{ color: BLUE }}>{t("auth", "loginPreparingSignup")}</h1>
+            <p className="mt-2 text-sm font-medium text-slate-500">{t("auth", "loginVerifyingCenterLink")}</p>
           </div>
         </div>
       )}
@@ -1171,13 +1171,13 @@ function LoginPageContent() {
                 <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50">
                   <ShieldOff className="h-6 w-6 text-red-500" />
                 </div>
-                <h3 className="text-lg font-black text-slate-900">Accès révoqué</h3>
+                <h3 className="text-lg font-black text-slate-900">{t("auth", "loginAccessRevoked")}</h3>
                 <p className="mt-2 text-sm font-medium leading-relaxed text-slate-500">
-                  Votre accès à la plateforme a été retiré par votre centre. Pour revenir, contactez votre centre afin de demander une nouvelle inscription.
+                  {t("auth", "loginAccessRevokedDesc")}
                 </p>
                 {revokedPopup.reason && (
                   <div className="mt-4 rounded-2xl border border-red-100 bg-red-50/70 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-red-400">Motif</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-red-400">{t("auth", "loginReasonLabel")}</p>
                     <p className="mt-1 text-sm font-bold leading-relaxed text-red-700">{revokedPopup.reason}</p>
                   </div>
                 )}
@@ -1186,7 +1186,7 @@ function LoginPageContent() {
                   onClick={() => setRevokedPopup(null)}
                   className="mt-5 w-full rounded-xl bg-slate-900 py-3 text-xs font-black uppercase tracking-widest text-white hover:bg-slate-800"
                 >
-                  Compris
+                  {t("auth", "loginUnderstood")}
                 </button>
               </div>
             </div>
@@ -1196,9 +1196,9 @@ function LoginPageContent() {
             {deviceStep && (
               <div className="space-y-4">
                 <div>
-                  <h2 className="text-2xl font-black text-slate-900">Limite d&apos;appareils</h2>
+                  <h2 className="text-2xl font-black text-slate-900">{t("auth", "loginDeviceLimitTitle")}</h2>
                   <p className="mt-1 text-sm font-medium text-slate-500">
-                    Déconnectez un appareil pour continuer.
+                    {t("auth", "loginDeviceLimitDesc")}
                   </p>
                 </div>
                 {activeSessions.map((session) => (
@@ -1208,10 +1208,10 @@ function LoginPageContent() {
                   >
                     <div className="min-w-0 pr-3">
                       <p className="truncate text-xs font-bold text-slate-700">
-                        {session.device?.substring(0, 50) || "Appareil inconnu"}
+                        {session.device?.substring(0, 50) || t("auth", "loginUnknownDevice")}
                       </p>
                       <p className="mt-1 text-[10px] text-slate-400">
-                        Dernière activité : {new Date(session.lastSeen).toLocaleDateString()}
+                        {t("auth", "loginLastActivity")} {new Date(session.lastSeen).toLocaleDateString()}
                       </p>
                     </div>
                     <button
@@ -1220,7 +1220,7 @@ function LoginPageContent() {
                       className="shrink-0 rounded-xl px-4 py-2.5 text-xs font-black text-white transition-opacity hover:opacity-90 disabled:opacity-50"
                       style={{ backgroundColor: ORANGE }}
                     >
-                      {removingId === session.id ? "..." : "Déconnecter"}
+                      {removingId === session.id ? "..." : t("auth", "loginDisconnect")}
                     </button>
                   </div>
                 ))}
@@ -1228,7 +1228,7 @@ function LoginPageContent() {
                   onClick={() => { setDeviceStep(false); setMsg(null); }}
                   className="w-full py-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600"
                 >
-                  Annuler
+                  {t("auth", "loginCancel")}
                 </button>
               </div>
             )}
@@ -1236,8 +1236,8 @@ function LoginPageContent() {
             {!deviceStep && step === "LOGIN" && (
               <form onSubmit={handleLogin} className="space-y-5">
                 <div>
-                  <h2 className={formTitle}>Connexion</h2>
-                  <p className={formSubtitle}>Entrez vos identifiants pour accéder à votre espace.</p>
+                  <h2 className={formTitle}>{t("auth", "loginConnectionTitle")}</h2>
+                  <p className={formSubtitle}>{t("auth", "loginEnterCredentialsDesc")}</p>
                 </div>
 
                 <div className={fieldWrap}>
@@ -1245,7 +1245,7 @@ function LoginPageContent() {
                   <input
                     required
                     type="email"
-                    placeholder="Adresse e-mail"
+                    placeholder={t("auth", "loginEmailPlaceholder")}
                     className={fieldInput}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -1257,7 +1257,7 @@ function LoginPageContent() {
                   <input
                     required
                     type={showLoginPassword ? "text" : "password"}
-                    placeholder="Mot de passe"
+                    placeholder={t("auth", "loginPasswordPlaceholder")}
                     className={`${fieldInput} pr-12 ${!showLoginPassword && password.length > 0 ? "tracking-widest" : ""}`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -1279,7 +1279,7 @@ function LoginPageContent() {
                     className="text-xs font-black hover:underline"
                     style={{ color: ORANGE }}
                   >
-                    Mot de passe oublié ?
+                    {t("auth", "loginForgotPassword")}
                   </button>
                 </div>
 
@@ -1288,7 +1288,7 @@ function LoginPageContent() {
                   className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-sm font-black text-white shadow-lg transition-all hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
                   style={{ backgroundColor: BLUE }}
                 >
-                  {loading ? "Vérification..." : "Entrer dans l'Académie"}
+                  {loading ? t("auth", "loginVerifying") : t("auth", "loginEnterAcademy")}
                   {!loading && <ArrowRight size={16} />}
                 </button>
 
@@ -1298,9 +1298,9 @@ function LoginPageContent() {
             {!deviceStep && step === "SUPERADMIN_MFA" && (
               <form onSubmit={handleVerifySuperadminMfa} className="space-y-5">
                 <div>
-                  <h2 className={formTitle}>Vérification en deux étapes</h2>
+                  <h2 className={formTitle}>{t("auth", "loginTwoStepVerification")}</h2>
                   <p className={formSubtitle}>
-                    Entrez le code à 6 chiffres généré par votre application d&apos;authentification.
+                    {t("auth", "loginEnterMfaCode")}
                   </p>
                 </div>
 
@@ -1323,7 +1323,7 @@ function LoginPageContent() {
                   className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-sm font-black text-white shadow-lg transition-all hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
                   style={{ backgroundColor: BLUE }}
                 >
-                  {mfaVerifying ? "Vérification..." : "Valider"}
+                  {mfaVerifying ? t("auth", "loginVerifying") : t("auth", "loginValidate")}
                   {!mfaVerifying && <ArrowRight size={16} />}
                 </button>
 
@@ -1338,7 +1338,7 @@ function LoginPageContent() {
                   }}
                   className="w-full py-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600"
                 >
-                  Annuler
+                  {t("auth", "loginCancel")}
                 </button>
               </form>
             )}
@@ -1346,21 +1346,21 @@ function LoginPageContent() {
             {!deviceStep && step === "SIGNUP_FORM" && (
               <form onSubmit={handleSignup} className="space-y-4 sm:space-y-5">
                 <div>
-                  <h2 className={formTitle}>Créer un compte</h2>
-                  <p className={formSubtitle}>Complétez les informations ci-dessous.</p>
+                  <h2 className={formTitle}>{t("auth", "loginCreateAccount")}</h2>
+                  <p className={formSubtitle}>{t("auth", "loginCompleteInfoBelow")}</p>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <input
                     required
-                    placeholder="Prénom"
+                    placeholder={t("auth", "loginFirstNamePlaceholder")}
                     className={fieldStandalone}
                     value={prenom}
                     onChange={(e) => setPrenom(e.target.value)}
                   />
                   <input
                     required
-                    placeholder="Nom"
+                    placeholder={t("auth", "loginLastNamePlaceholder")}
                     className={fieldStandalone}
                     value={nom}
                     onChange={(e) => setNom(e.target.value)}
@@ -1388,7 +1388,7 @@ function LoginPageContent() {
                   <input
                     required
                     type="tel"
-                    placeholder="Numéro de téléphone"
+                    placeholder={t("auth", "loginPhonePlaceholder")}
                     className={fieldInput}
                     value={phone}
                     onChange={(e) => setPhone(e.target.value.replace(/[^\d\s]/g, ""))}
@@ -1399,7 +1399,7 @@ function LoginPageContent() {
                   <div className="pl-3 text-slate-400"><MapPin className="h-4 w-4" /></div>
                   <input
                     required
-                    placeholder="Ville"
+                    placeholder={t("auth", "loginCityPlaceholder")}
                     className={fieldInput}
                     value={ville}
                     onChange={(e) => setVille(e.target.value)}
@@ -1411,7 +1411,7 @@ function LoginPageContent() {
                   type="number"
                   min={10}
                   max={99}
-                  placeholder="Âge"
+                  placeholder={t("auth", "loginAgePlaceholder")}
                   className={fieldStandalone}
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
@@ -1422,7 +1422,7 @@ function LoginPageContent() {
                   <input
                     required
                     type="email"
-                    placeholder="Adresse e-mail"
+                    placeholder={t("auth", "loginEmailPlaceholder")}
                     className={fieldInput}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -1434,7 +1434,7 @@ function LoginPageContent() {
                     <div className="pl-3 text-slate-400"><Building2 className="h-4 w-4" /></div>
                     <input
                       type="text"
-                      placeholder="Code centre"
+                      placeholder={t("auth", "loginCenterCodePlaceholder")}
                       className={`${fieldInput} uppercase`}
                       value={centerCode}
                       onChange={(e) => {
@@ -1450,7 +1450,7 @@ function LoginPageContent() {
                   <input
                     required
                     type={showSignupPassword ? "text" : "password"}
-                    placeholder="Mot de passe (ex. : Nexa2026)"
+                    placeholder={t("auth", "loginPasswordExamplePlaceholder")}
                     className={`${fieldInput} pr-12 ${!showSignupPassword && password.length > 0 ? "tracking-widest" : ""}`}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -1466,7 +1466,7 @@ function LoginPageContent() {
                   </button>
                 </div>
                 <p className="px-1 text-[10px] font-medium leading-relaxed text-slate-400">
-                  {PASSWORD_POLICY_HINT}
+                  {t("auth", "loginPasswordPolicyHint")}
                 </p>
 
                 <label className="flex cursor-pointer items-start gap-3 select-none">
@@ -1486,13 +1486,13 @@ function LoginPageContent() {
                     </div>
                   </div>
                   <span className="text-[11px] font-medium leading-relaxed text-slate-500">
-                    J&apos;accepte les{" "}
+                    {t("auth", "loginAcceptThe")}{" "}
                     <a href="/cgu" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline" style={{ color: ORANGE }} onClick={(e) => e.stopPropagation()}>
-                      CGU
+                      {t("auth", "loginCguLabel")}
                     </a>{" "}
-                    et la{" "}
+                    {t("auth", "loginAndThe")}{" "}
                     <a href="/politique-confidentialite" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline" style={{ color: ORANGE }} onClick={(e) => e.stopPropagation()}>
-                      Politique de confidentialité
+                      {t("auth", "loginPrivacyPolicyLabel")}
                     </a>.
                   </span>
                 </label>
@@ -1502,7 +1502,7 @@ function LoginPageContent() {
                   className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-sm font-black text-white shadow-lg shadow-orange-500/20 transition-all hover:opacity-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
                   style={{ backgroundColor: ORANGE }}
                 >
-                  {loading ? "Création en cours..." : "Créer mon compte"}
+                  {loading ? t("auth", "loginCreatingAccount") : t("auth", "loginCreateMyAccount")}
                   {!loading && <ArrowRight size={16} />}
                 </button>
 
@@ -1514,7 +1514,7 @@ function LoginPageContent() {
               <div className="space-y-6">
                 <div className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-amber-700">
                   <Clock size={12} />
-                  En attente de validation
+                  {t("auth", "loginPendingValidationBadge")}
                 </div>
 
                 <div className="flex h-16 w-16 items-center justify-center rounded-[1.5rem] border border-emerald-100 bg-emerald-50">
@@ -1522,11 +1522,11 @@ function LoginPageContent() {
                 </div>
 
                 <div>
-                  <h2 className={formTitle}>Félicitations !</h2>
+                  <h2 className={formTitle}>{t("auth", "loginCongratulations")}</h2>
                   <p className={formSubtitle}>
-                    Votre compte a été créé avec succès chez{" "}
+                    {t("auth", "loginAccountCreatedSuccessAt")}{" "}
                     <span className="font-semibold text-slate-800">{successCenterName || academyName}</span>.
-                    Votre centre validera votre inscription sous peu.
+                    {" "}{t("auth", "loginCenterWillValidate")}
                   </p>
                 </div>
 
@@ -1537,7 +1537,7 @@ function LoginPageContent() {
                   className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-sm font-black text-white shadow-xl transition-all hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
                   style={{ backgroundColor: BLUE }}
                 >
-                  {loading ? "Préparation..." : "Configurer mon code PIN"}
+                  {loading ? t("auth", "loginPreparing") : t("auth", "loginConfigurePinCode")}
                   {!loading && <ArrowRight size={16} />}
                 </button>
               </div>
@@ -1546,8 +1546,8 @@ function LoginPageContent() {
             {!deviceStep && step === "RESET_PWD" && (
               <form onSubmit={handleResetPwd} className="space-y-5">
                 <div>
-                  <h2 className={formTitle}>Mot de passe oublié</h2>
-                  <p className={formSubtitle}>Nous vous enverrons un lien de réinitialisation par e-mail.</p>
+                  <h2 className={formTitle}>{t("auth", "loginForgotPasswordTitle")}</h2>
+                  <p className={formSubtitle}>{t("auth", "loginResetLinkDesc")}</p>
                 </div>
 
                 <div className={fieldWrap}>
@@ -1555,7 +1555,7 @@ function LoginPageContent() {
                   <input
                     required
                     type="email"
-                    placeholder="Adresse e-mail"
+                    placeholder={t("auth", "loginEmailPlaceholder")}
                     className={fieldInput}
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -1567,7 +1567,7 @@ function LoginPageContent() {
                   className="flex h-[52px] w-full items-center justify-center rounded-2xl text-sm font-black text-white transition-all hover:opacity-95 disabled:opacity-50"
                   style={{ backgroundColor: ORANGE }}
                 >
-                  {loading ? "Envoi en cours..." : "Envoyer le lien"}
+                  {loading ? t("auth", "loginSendingInProgress") : t("auth", "loginSendResetLink")}
                 </button>
 
                 <button
@@ -1575,7 +1575,7 @@ function LoginPageContent() {
                   onClick={() => setStep("LOGIN")}
                   className="w-full py-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600"
                 >
-                  Retour à la connexion
+                  {t("auth", "loginBackToLogin")}
                 </button>
               </form>
             )}

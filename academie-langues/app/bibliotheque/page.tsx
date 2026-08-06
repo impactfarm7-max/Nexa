@@ -17,6 +17,7 @@ import dynamic from 'next/dynamic';
 const PdfReader = dynamic(() => import('./PdfReader'), { ssr: false });
 
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const ICONS_MAP: Record<string, typeof LibraryBig> = {
   BookOpen: LibraryBig,
@@ -31,6 +32,7 @@ const ICONS_MAP: Record<string, typeof LibraryBig> = {
 };
 
 export default function BibliothequePage() {
+  const { t } = useI18n();
   const router = useRouter();
   const { loading: centerLoading, isPluriannual } = useStudentCenterContext();
   const [viewingDoc, setViewingDoc] = useState<string | null>(null);

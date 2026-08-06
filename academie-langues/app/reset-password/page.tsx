@@ -5,8 +5,10 @@ import { supabase } from "@/app/utils/supabase";
 import { useRouter } from "next/navigation";
 import { Lock, CheckCircle2 } from "lucide-react";
 import { checkPasswordStrength, isPasswordStrong, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function ResetPasswordPage() {
+  const { t } = useI18n();
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -61,7 +63,7 @@ export default function ResetPasswordPage() {
 
     if (error) {
       // Si ça échoue, c'est souvent parce que le lien a expiré (durée de vie : 1h)
-      setErrorMsg("Le lien est invalide ou a expiré. Veuillez recommencer la procédure.");
+      setErrorMsg(t("auth", "resetLinkExpiredOrInvalid"));
     } else {
       setDone(true);
       // On le renvoie vers la page de connexion après 2 secondes
@@ -75,8 +77,8 @@ export default function ResetPasswordPage() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-center">
         <div className="max-w-sm">
           <CheckCircle2 className="w-16 h-16 text-emerald-500 mx-auto mb-4 animate-in zoom-in duration-300" />
-          <h1 className="text-2xl font-black text-slate-900">Mot de passe à jour !</h1>
-          <p className="text-slate-500 mt-2 font-medium">Redirection vers la connexion...</p>
+          <h1 className="text-2xl font-black text-slate-900">{t("auth", "resetPasswordUpdated")}</h1>
+          <p className="text-slate-500 mt-2 font-medium">{t("auth", "resetRedirecting")}</p>
         </div>
       </div>
     );
@@ -88,13 +90,13 @@ export default function ResetPasswordPage() {
         <div className="w-16 h-16 bg-orange-50 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-orange-100">
           <Lock className="text-orange-500 w-8 h-8" />
         </div>
-        <h1 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">Nouveau mot de passe</h1>
-        <p className="text-sm text-slate-500 mb-8 font-medium">Choisissez un mot de passe sécurisé pour votre compte NEXA.</p>
+        <h1 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">{t("auth", "resetTitle")}</h1>
+        <p className="text-sm text-slate-500 mb-8 font-medium">{t("auth", "resetSubtitle")}</p>
 
-        <input 
-          required 
-          type="password" 
-          placeholder="Nouveau mot de passe"
+        <input
+          required
+          type="password"
+          placeholder={t("auth", "resetPlaceholder")}
           className="w-full h-14 bg-slate-50 border border-slate-100 rounded-2xl px-5 outline-none focus:border-orange-500 font-bold mb-2 text-sm placeholder:font-medium placeholder:text-slate-400 tracking-widest transition-all"
           value={password}
           onChange={(e) => { setPassword(e.target.value); setErrorMsg(null); }}
@@ -113,7 +115,7 @@ export default function ResetPasswordPage() {
           {loading ? (
             <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
           ) : (
-            "Enregistrer"
+            t("auth", "resetSubmit")
           )}
         </button>
       </form>
