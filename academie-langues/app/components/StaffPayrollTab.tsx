@@ -9,6 +9,7 @@ import { supabase } from "@/app/utils/supabase";
 import { downloadPayslipPdf } from "@/app/utils/centerPdfExport";
 import { fetchDocumentExportConfig } from "@/app/utils/documentConfig";
 import { AmountInWords } from "@/app/components/AmountInWords";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const SURFACE = "#F7F7F6";
@@ -49,14 +50,14 @@ type Period = {
   notes: string | null;
 };
 
-function fmt(n: number) {
-  return Math.round(n).toLocaleString("fr-FR");
+function fmt(n: number, locale: "fr" | "en" = "fr") {
+  return Math.round(n).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB");
 }
 
-function periodLabel(ym: string) {
+function periodLabel(ym: string, locale: "fr" | "en" = "fr") {
   const [y, m] = ym.split("-").map(Number);
   const d = new Date(y, (m || 1) - 1, 1);
-  return d.toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  return d.toLocaleDateString(locale === "fr" ? "fr-FR" : "en-GB", { month: "long", year: "numeric" });
 }
 
 function currentYm() {
@@ -140,6 +141,11 @@ type Props = {
 };
 
 export default function StaffPayrollTab({ staff, centerId }: Props) {
+  const { locale, t } = useI18n();
+  const statusLabel = (status: string) => t("centre", status === "draft" ? "staffPayrollDraft" : status === "validated" ? "staffPayrollValidated" : status === "paid" ? "staffPayrollPaid" : status);
+  const lineTitle = (type: LineType) => t("centre", type === "prime" ? "staffPayrollBonus" : type === "retenue" ? "staffPayrollDeduction" : "staffPayrollAdjustment");
+  const lineHint = (type: LineType) => t("centre", type === "prime" ? "staffPayrollBonusHint" : type === "retenue" ? "staffPayrollDeductionHint" : "staffPayrollAdjustmentHint");
+  const methodLabel = (method: string) => t("centre", method === "especes" ? "staffPayrollCash" : method === "mobile_money" ? "staffPayrollMobileMoney" : method === "virement" ? "staffPayrollTransfer" : method === "cheque" ? "staffPayrollCheck" : method === "autre" ? "staffPayrollOther" : method);
   const [periodYm, setPeriodYm] = useState(currentYm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -190,7 +196,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
     setMissingTable(false);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(t("centre", "passageSessionExpired"));
       const res = await fetch(
         `/api/center/staff-payroll?staff_id=${encodeURIComponent(staff.id)}&period=${encodeURIComponent(periodYm)}`,
         { headers: { Authorization: `Bearer ${session.access_token}` } },
@@ -204,16 +210,16 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         setTotals(null);
         return;
       }
-      if (!res.ok) throw new Error(json.error || "Chargement impossible.");
+      if (!res.ok) throw new Error(json.error || t("centre", "staffPayrollLoadError"));
       setContract(json.contract || { base_salary: staff.base_salary, prime: staff.prime });
       applyBundle(json);
       setHistory(json.history || []);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur.");
+      setError(e instanceof Error ? e.message : t("centre", "staffPayrollError"));
     } finally {
       setLoading(false);
     }
-  }, [staff.id, staff.base_salary, staff.prime, periodYm]);
+  }, [staff.id, staff.base_salary, staff.prime, periodYm, t]);
 
   useEffect(() => {
     void load();
@@ -224,7 +230,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
     setError("");
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(t("centre", "passageSessionExpired"));
       const res = await fetch("/api/center/staff-payroll", {
         method: "POST",
         headers: {
@@ -236,9 +242,9 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
       const json = await res.json().catch(() => ({}));
       if (res.status === 503 || json.code === "MISSING_TABLE") {
         setMissingTable(true);
-        throw new Error(json.error || "Tables paie absentes.");
+        throw new Error(json.error || t("centre", "staffPayrollTablesMissing"));
       }
-      if (!res.ok) throw new Error(json.error || "Action impossible.");
+      if (!res.ok) throw new Error(json.error || t("centre", "staffPayrollActionError"));
       applyBundle(json);
       const histRes = await fetch(
         `/api/center/staff-payroll?staff_id=${encodeURIComponent(staff.id)}&period=${encodeURIComponent(periodYm)}`,
@@ -252,7 +258,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
       }
       return true;
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur.");
+      setError(e instanceof Error ? e.message : t("centre", "staffPayrollError"));
       return false;
     } finally {
       setSaving(false);
@@ -278,7 +284,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
   const submitLine = async () => {
     if (!period) return;
     if (!lineReason.trim()) {
-      setError("Le motif est obligatoire.");
+      setError(t("centre", "staffPayrollReasonRequired"));
       return;
     }
     const ok = editingLineId
@@ -358,8 +364,8 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         staffName: `${staff.prenom} ${staff.nom}`,
         jobTitle: staff.job_title,
         periodYm,
-        periodLabel: periodLabel(periodYm),
-        statusLabel: STATUS_LABEL[period.status] || period.status,
+        periodLabel: periodLabel(periodYm, locale),
+        statusLabel: statusLabel(period.status),
         base: totals.base,
         primes: totals.primes,
         retenues: totals.retenues,
@@ -370,12 +376,12 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         lines,
         payments: payments.map((p) => ({
           ...p,
-          payment_method: METHOD_LABELS[p.payment_method] || p.payment_method,
+          payment_method: methodLabel(p.payment_method),
         })),
         config,
       });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Téléchargement impossible.");
+      setError(e instanceof Error ? e.message : t("centre", "staffPayrollDownloadError"));
     } finally {
       setDownloading(false);
     }
@@ -398,7 +404,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-neutral-400 gap-2 text-sm font-medium">
-        <Loader2 size={16} className="animate-spin" /> Chargement…
+        <Loader2 size={16} className="animate-spin" /> {t("centre", "staffPayrollLoading")}
       </div>
     );
   }
@@ -407,10 +413,10 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
     return (
       <div className="max-w-lg mx-auto mt-10 rounded-xl border border-black/[0.06] bg-white p-6 space-y-2">
         <div className="flex items-center gap-2 font-semibold text-sm" style={{ color: BLUE }}>
-          <AlertTriangle size={16} className="text-neutral-500" /> Configuration requise
+          <AlertTriangle size={16} className="text-neutral-500" /> {t("centre", "staffPayrollSetupRequired")}
         </div>
         <p className="text-sm text-neutral-500 leading-relaxed font-medium">
-          Exécutez <code className="font-mono text-xs bg-neutral-100 px-1.5 py-0.5 rounded">supabase-staff-payroll.sql</code> dans Supabase, puis rechargez.
+          {t("centre", "staffPayrollSetupHelp", { file: "supabase-staff-payroll.sql" })}
         </p>
       </div>
     );
@@ -420,14 +426,14 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
     <div className="w-full">
       <PayrollSection
         icon={CalendarDays}
-        title="Journal de l'année"
-        description="Vue annuelle des périodes de paie. Ouvrez un mois pour le consulter ou le compléter."
+        title={t("centre", "staffPayrollYearJournal")}
+        description={t("centre", "staffPayrollYearJournalHelp")}
         actions={
           <select
             value={journalYear}
             onChange={(e) => setJournalYear(e.target.value)}
             className="h-8 px-2.5 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 outline-none"
-            aria-label="Année"
+            aria-label={t("centre", "staffPayrollYear")}
           >
             {yearOptions.map((y) => (
               <option key={y} value={y}>{y}</option>
@@ -437,7 +443,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
       >
         {yearJournal.length === 0 ? (
           <p className="text-sm text-neutral-400 font-medium">
-            Aucune période enregistrée pour {journalYear}.
+            {t("centre", "staffPayrollNoPeriodYear", { year: journalYear })}
           </p>
         ) : (
           <div className="overflow-x-auto rounded-lg border border-black/[0.06] bg-white">
@@ -456,12 +462,12 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                     <tr key={h.id} className="border-b border-black/[0.04] last:border-0">
                       <td className="px-3.5 py-3">
                         <p className="text-sm font-semibold capitalize" style={{ color: BLUE }}>
-                          {periodLabel(h.period_ym)}
+                          {periodLabel(h.period_ym, locale)}
                         </p>
                         <p className="text-xs text-neutral-400 font-medium mt-0.5">{h.period_ym}</p>
                       </td>
                       <td className="px-3.5 py-3 text-sm font-medium text-neutral-600">
-                        {STATUS_LABEL[h.status] || h.status}
+                        {statusLabel(h.status)}
                       </td>
                       <td className="px-3.5 py-3">
                         <button
@@ -513,11 +519,11 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-base font-extrabold tracking-tight capitalize" style={{ color: BLUE }}>
-              {periodLabel(periodYm)}
+              {periodLabel(periodYm, locale)}
             </p>
             <p className="text-sm text-neutral-500 font-medium mt-0.5">
               {staff.prenom} {staff.nom}
-              {period ? ` · ${STATUS_LABEL[period.status]}` : ""}
+              {period ? ` · ${statusLabel(period.status)}` : ""}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -549,16 +555,16 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Net à payer</p>
                 <p className="text-2xl font-extrabold tracking-tight tabular-nums mt-1" style={{ color: BLUE }}>
-                  {fmt(totals.net)}
+                  {fmt(totals.net, locale)}
                   <span className="text-sm text-neutral-400 ml-1.5 font-semibold">XAF</span>
                 </p>
               </div>
               <div className="text-right text-sm text-neutral-500 font-medium space-y-0.5">
-                <p>Versé <span className="text-neutral-800 tabular-nums font-semibold">{fmt(totals.paid)}</span></p>
+                <p>Versé <span className="text-neutral-800 tabular-nums font-semibold">{fmt(totals.paid, locale)}</span></p>
                 <p>
                   Reste{" "}
                   <span className={`tabular-nums font-semibold ${totals.reste > 0 ? "text-neutral-900" : "text-neutral-500"}`}>
-                    {totals.reste > 0 ? fmt(totals.reste) : "Soldé"}
+                    {totals.reste > 0 ? fmt(totals.reste, locale) : t("centre", "financeAccountSettled")}
                   </span>
                 </p>
               </div>
@@ -566,15 +572,15 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             <div className="mt-4 pt-3 border-t border-black/[0.06] grid grid-cols-3 gap-3 text-sm">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Base</p>
-                <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>{fmt(totals.base)}</p>
+                <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>{fmt(totals.base, locale)}</p>
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Primes</p>
-                <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>+{fmt(totals.primes)}</p>
+                <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>+{fmt(totals.primes, locale)}</p>
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Retenues</p>
-                <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>−{fmt(totals.retenues)}</p>
+                <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>−{fmt(totals.retenues, locale)}</p>
               </div>
             </div>
           </div>
@@ -632,7 +638,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                   <li key={l.id} className="px-4 py-3 flex items-center justify-between gap-3 group">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 text-xs text-neutral-400 font-medium">
-                        <span>{LINE_TITLE[l.type]}</span>
+                        <span>{lineTitle(l.type)}</span>
                         <span>·</span>
                         <span>{new Date(l.created_at).toLocaleDateString("fr-FR")}</span>
                       </div>
@@ -640,7 +646,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className="text-sm tabular-nums font-semibold mr-1" style={{ color: BLUE }}>
-                        {l.type === "retenue" ? "−" : "+"}{fmt(Number(l.amount))}
+                        {l.type === "retenue" ? "−" : "+"}{fmt(Number(l.amount), locale)}
                       </span>
                       <button type="button" onClick={() => openEditLine(l)} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]" title="Modifier">
                         <Pencil size={14} />
@@ -675,12 +681,12 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                         {new Date(p.payment_date).toLocaleDateString("fr-FR")}
                       </p>
                       <p className="text-xs text-neutral-400 font-medium mt-0.5">
-                        {METHOD_LABELS[p.payment_method] || p.payment_method}
+                        {methodLabel(p.payment_method)}
                         {p.notes ? ` · ${p.notes}` : ""}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-sm tabular-nums font-semibold mr-1" style={{ color: BLUE }}>+{fmt(Number(p.amount))}</span>
+                      <span className="text-sm tabular-nums font-semibold mr-1" style={{ color: BLUE }}>+{fmt(Number(p.amount), locale)}</span>
                       <button type="button" onClick={() => openEditPay(p)} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]">
                         <Pencil size={14} />
                       </button>
@@ -707,8 +713,8 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         <div className="rounded-lg border border-black/[0.06] bg-white p-4 space-y-3">
           <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Contrat & base du mois</p>
           <div className="flex flex-wrap gap-4 text-sm text-neutral-600 font-medium">
-            <span>Salaire contrat <strong className="font-semibold" style={{ color: BLUE }}>{fmt(contract.base_salary)}</strong></span>
-            <span>Prime contrat <strong className="font-semibold" style={{ color: BLUE }}>{contract.prime > 0 ? fmt(contract.prime) : "—"}</strong></span>
+            <span>Salaire contrat <strong className="font-semibold" style={{ color: BLUE }}>{fmt(contract.base_salary, locale)}</strong></span>
+            <span>Prime contrat <strong className="font-semibold" style={{ color: BLUE }}>{contract.prime > 0 ? fmt(contract.prime, locale) : "—"}</strong></span>
           </div>
           {contract.prime > 0 && period ? (
             <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
@@ -738,7 +744,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                   }
                 }}
               />
-              Inclure la prime contrat ({fmt(contract.prime)})
+              Inclure la prime contrat ({fmt(contract.prime, locale)})
             </label>
           ) : null}
           {period && (
@@ -786,9 +792,9 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>
-                  {editingLineId ? `Modifier · ${LINE_TITLE[lineType]}` : LINE_TITLE[lineType]}
+                  {editingLineId ? `Modifier · ${lineTitle(lineType)}` : lineTitle(lineType)}
                 </h3>
-                <p className="text-sm text-neutral-500 mt-0.5 font-medium">{LINE_HINT[lineType]}</p>
+                <p className="text-sm text-neutral-500 mt-0.5 font-medium">{lineHint(lineType)}</p>
               </div>
               <button type="button" onClick={() => setLineOpen(false)} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500">
                 <X size={18} />
@@ -858,7 +864,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                   {editingPayId ? "Corriger le versement" : "Versement"}
                 </h3>
                 {totals && !editingPayId && (
-                  <p className="text-sm text-neutral-500 mt-0.5 font-medium">Reste {fmt(totals.reste)} XAF</p>
+                  <p className="text-sm text-neutral-500 mt-0.5 font-medium">Reste {fmt(totals.reste, locale)} XAF</p>
                 )}
               </div>
               <button type="button" onClick={() => setPayOpen(false)} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500">
@@ -884,8 +890,8 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                   onChange={(e) => setPayMethod(e.target.value)}
                   className="w-full h-11 px-3 rounded-lg border border-black/[0.08] text-sm font-semibold outline-none bg-white"
                 >
-                  {Object.entries(METHOD_LABELS).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
+                  {["especes", "mobile_money", "virement", "cheque", "autre"].map((k) => (
+                    <option key={k} value={k}>{methodLabel(k)}</option>
                   ))}
                 </select>
               </div>

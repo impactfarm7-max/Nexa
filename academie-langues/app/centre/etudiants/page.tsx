@@ -7,6 +7,7 @@ import {
   Share2, Printer, Calendar, BookOpen,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import { loadCenterBootstrap, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import { fetchCenterApi, clearCenterApiCache } from "@/app/utils/center-api-client";
 import CenterContentSkeleton from "@/app/components/CenterContentSkeleton";
@@ -95,25 +96,23 @@ function fmtBirth(iso: string | null): string {
   if (!y || !m || !d) return iso;
   return `${y}/${m}/${d}`;
 }
-function calcAge(iso: string | null): string {
+function calcAge(iso: string | null, unit = "ans"): string {
   if (!iso) return "";
   const diff = Date.now() - new Date(iso).getTime();
   const age  = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
-  return isNaN(age) || age < 0 ? "" : `${age} ans`;
+  return isNaN(age) || age < 0 ? "" : `${age} ${unit}`;
 }
 
-function statusLabelFr(st: StudentRow["center_status"]) {
-  return st === "active" ? "Actif" : st === "paused" ? "Suspendu" : "Révoqué";
-}
+type StudentExportLabels = { title: string; lastName: string; firstName: string; email: string; phone: string; program: string; status: string; active: string; suspended: string; revoked: string; allStatuses: string; allPrograms: string; filter: string; generatedOn: string; search: string; lines: string };
 
-function toStudentExportRows(list: StudentRow[]): ExportStudentRow[] {
+function toStudentExportRows(list: StudentRow[], labels: StudentExportLabels): ExportStudentRow[] {
   return list.map((s) => ({
     nom: (s.nom || "").toUpperCase(),
     prenom: (s.prenom || "").toUpperCase(),
     email: s.email || "",
     telephone: s.phone || "",
     filiere: (s.enrollments[0]?.filiere_name_raw || "").toUpperCase(),
-    statut: statusLabelFr(s.center_status),
+    statut: s.center_status === "active" ? labels.active : s.center_status === "paused" ? labels.suspended : labels.revoked,
   }));
 }
 
@@ -122,19 +121,20 @@ function studentsFilterCaption(
   filiereName: string | null,
   statusFilter: StatusFilter,
   count: number,
+  labels: StudentExportLabels,
 ) {
   const statusPart =
-    statusFilter === "all" ? "Tous statuts"
-    : statusFilter === "active" ? "Actifs"
-    : statusFilter === "paused" ? "Suspendus"
-    : "Révoqués";
+    statusFilter === "all" ? labels.allStatuses
+    : statusFilter === "active" ? labels.active
+    : statusFilter === "paused" ? labels.suspended
+    : labels.revoked;
   const parts = [
-    filiereName ? `Filière: ${filiereName}` : "Toutes filières",
+    filiereName ? `${labels.program}: ${filiereName}` : labels.allPrograms,
     statusPart,
   ];
   const q = search.trim();
-  if (q) parts.push(`Recherche: ${q}`);
-  parts.push(`${count} ligne${count > 1 ? "s" : ""}`);
+  if (q) parts.push(`${labels.search}: ${q}`);
+  parts.push(`${count} ${labels.lines}`);
   return parts.join(" · ");
 }
 
@@ -145,8 +145,8 @@ function studentsPdfFilename() {
   return `apprenants-${new Date().toISOString().slice(0, 10)}.pdf`;
 }
 
-function downloadStudentsCsv(rows: ExportStudentRow[]) {
-  const header = ["Nom", "Prénom", "Email", "Téléphone", "Filière", "Statut"];
+function downloadStudentsCsv(rows: ExportStudentRow[], labels: StudentExportLabels) {
+  const header = [labels.lastName, labels.firstName, labels.email, labels.phone, labels.program, labels.status];
   const lines = [
     header,
     ...rows.map((r) => [r.nom, r.prenom, r.email, r.telephone, r.filiere, r.statut]),
@@ -163,7 +163,7 @@ function downloadStudentsCsv(rows: ExportStudentRow[]) {
   URL.revokeObjectURL(url);
 }
 
-async function buildStudentsPdfDoc(rows: ExportStudentRow[], filterCaption: string) {
+async function buildStudentsPdfDoc(rows: ExportStudentRow[], filterCaption: string, labels: StudentExportLabels, locale: string) {
   const { default: jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -173,13 +173,13 @@ async function buildStudentsPdfDoc(rows: ExportStudentRow[], filterCaption: stri
   doc.setTextColor(...blue);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text("Apprenants", 14, 18);
+  doc.text(labels.title, 14, 18);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
-  doc.text(`Filtre: ${filterCaption}`, 14, 25, { maxWidth: pageWidth - 28 });
-  doc.text(`Genere le ${new Date().toLocaleString("fr-FR")}`, 14, 31);
+  doc.text(`${labels.filter}: ${filterCaption}`, 14, 25, { maxWidth: pageWidth - 28 });
+  doc.text(`${labels.generatedOn} ${new Date().toLocaleString(locale === "en" ? "en-US" : "fr-FR")}`, 14, 31);
 
   doc.setDrawColor(...blue);
   doc.setLineWidth(0.4);
@@ -187,7 +187,7 @@ async function buildStudentsPdfDoc(rows: ExportStudentRow[], filterCaption: stri
 
   autoTable(doc, {
     startY: 40,
-    head: [["Nom", "Prenom", "Email", "Telephone", "Filiere", "Statut"]],
+    head: [[labels.lastName, labels.firstName, labels.email, labels.phone, labels.program, labels.status]],
     body: rows.map((r) => [r.nom, r.prenom, r.email, r.telephone, r.filiere, r.statut]),
     styles: { font: "helvetica", fontSize: 8, cellPadding: 2, overflow: "linebreak", textColor: [40, 40, 40] },
     headStyles: { fillColor: blue, textColor: 255, fontStyle: "bold" },
@@ -198,13 +198,13 @@ async function buildStudentsPdfDoc(rows: ExportStudentRow[], filterCaption: stri
   return doc;
 }
 
-async function downloadStudentsPdf(rows: ExportStudentRow[], filterCaption: string) {
-  const doc = await buildStudentsPdfDoc(rows, filterCaption);
+async function downloadStudentsPdf(rows: ExportStudentRow[], filterCaption: string, labels: StudentExportLabels, locale: string) {
+  const doc = await buildStudentsPdfDoc(rows, filterCaption, labels, locale);
   doc.save(studentsPdfFilename());
 }
 
-async function silentDownloadStudentsPdf(rows: ExportStudentRow[], filterCaption: string) {
-  const doc = await buildStudentsPdfDoc(rows, filterCaption);
+async function silentDownloadStudentsPdf(rows: ExportStudentRow[], filterCaption: string, labels: StudentExportLabels, locale: string) {
+  const doc = await buildStudentsPdfDoc(rows, filterCaption, labels, locale);
   const filename = studentsPdfFilename();
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);
@@ -232,6 +232,14 @@ function openWhatsApp(text: string, phone?: string) {
 // PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════════════════
 export default function CenterStudentsPage() {
+  const { t, locale } = useI18n();
+  const exportLabels: StudentExportLabels = {
+    title: t("centre", "studentsTitle"), lastName: t("centre", "enrollmentLastName"), firstName: t("centre", "enrollmentFirstName"),
+    email: t("centre", "accountEmail"), phone: t("centre", "accountPhone"), program: t("centre", "enrollmentProgram"), status: t("centre", "settingsStatus"),
+    active: t("centre", "summaryActive"), suspended: t("centre", "summarySuspended"), revoked: t("centre", "studentsRevokedPlural"),
+    allStatuses: t("centre", "studentsAllStatuses"), allPrograms: t("centre", "reportsAllPrograms"), filter: t("centre", "financeFilter"),
+    generatedOn: t("centre", "financeGeneratedOn"), search: t("centre", "financeSearchLabel"), lines: t("centre", "studentsLines"),
+  };
   const [students,           setStudents]           = useState<StudentRow[]>([]);
   const [shellLoading,       setShellLoading]       = useState(true);
   const [dataLoading,        setDataLoading]        = useState(true);
@@ -341,14 +349,14 @@ export default function CenterStudentsPage() {
     if (!centerId) return;
     setActivating(true);
     const { error } = await supabase.from("enrollments").update({ status: "active" }).eq("id", enrollmentId);
-    if (error) alert("Erreur : " + error.message);
+    if (error) alert(`${t("centre", "membersError")} : ${error.message}`);
     else await loadStudents(centerId, { silent: true, force: true });
     clearCenterApiCache("/api/center/enrollments-list");
     setActivating(false);
   };
 
   const revokeStudent = async (studentId: string) => {
-    if (!confirm("Révoquer cet apprenant ? Il n'aura plus accès au centre.")) return;
+    if (!confirm(t("centre", "studentsRevokeConfirm"))) return;
     await toggleStatus(studentId, "revoked");
   };
 
@@ -363,15 +371,15 @@ export default function CenterStudentsPage() {
       <CenterPageLayout
         header={
           <CenterPageHeader
-            title="Apprenants"
+            title={t("centre", "studentsTitle")}
             actions={
               <>
                 <OutlineHeaderButton disabled>
-                  <Share2 size={15} /> Partager
+                  <Share2 size={15} /> {t("centre", "share")}
                 </OutlineHeaderButton>
                 <AgentIaComingSoonButton />
                 <OutlineHeaderButton disabled>
-                  <Plus size={15} strokeWidth={2.25} /> Créer
+                  <Plus size={15} strokeWidth={2.25} /> {t("centre", "financeCreate")}
                 </OutlineHeaderButton>
               </>
             }
@@ -390,20 +398,20 @@ export default function CenterStudentsPage() {
     return matchSearch && matchFiliere && matchStatus;
   });
 
-  const exportRows = toStudentExportRows(filtered);
+  const exportRows = toStudentExportRows(filtered, exportLabels);
   const canExport = exportRows.length > 0;
   const filiereFilterName = filiereFilter
     ? (filiereStats.find(([id]) => id === filiereFilter)?.[1].name ?? null)
     : null;
-  const filterCaption = studentsFilterCaption(search, filiereFilterName, statusFilter, exportRows.length);
+  const filterCaption = studentsFilterCaption(search, filiereFilterName, statusFilter, exportRows.length, exportLabels);
 
   const sendWhatsAppPdf = async () => {
     if (!canExport) return;
     setShareBusy(true);
     try {
-      const filename = await silentDownloadStudentsPdf(exportRows, filterCaption);
+      const filename = await silentDownloadStudentsPdf(exportRows, filterCaption, exportLabels, locale);
       openWhatsApp(
-        `Liste des apprenants Nexa (${exportRows.length}). PDF pret a joindre: ${filename}`,
+        t("centre", "studentsWhatsappMessage", { count: exportRows.length, filename }),
         waPhone,
       );
       setWaPhoneOpen(false);
@@ -432,7 +440,7 @@ export default function CenterStudentsPage() {
                 />
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-400 leading-none mb-1">
-                    Modifier le dossier
+                    {t("centre", "studentsEditRecord")}
                   </p>
                   <h1
                     className="text-xl sm:text-2xl font-extrabold tracking-tight leading-tight truncate uppercase"
@@ -445,9 +453,9 @@ export default function CenterStudentsPage() {
 
               <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-wrap justify-end">
                 {([
-                  { key: "identity" as const, label: "Dossier",  icon: Users,          disabled: false },
-                  { key: "finance"  as const, label: "Finance",  icon: Wallet,         disabled: !selectedEnrollment || selectedEnrollment.status === "draft" },
-                  { key: "grades"   as const, label: "Notes",    icon: GraduationCap,  disabled: !selectedEnrollment || selectedEnrollment.status === "draft" },
+                  { key: "identity" as const, label: t("centre", "studentsRecord"),  icon: Users,          disabled: false },
+                  { key: "finance"  as const, label: t("centre", "bottomFinance"),  icon: Wallet,         disabled: !selectedEnrollment || selectedEnrollment.status === "draft" },
+                  { key: "grades"   as const, label: t("centre", "studentsGrades"),    icon: GraduationCap,  disabled: !selectedEnrollment || selectedEnrollment.status === "draft" },
                 ]).map(({ key, label, icon: Icon, disabled }) => (
                   <button
                     key={key}
@@ -472,7 +480,7 @@ export default function CenterStudentsPage() {
                     onClick={() => void revokeStudent(selectedStudent.id)}
                     className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 hover:bg-black/[0.03] transition-colors"
                   >
-                    Révoqué
+                    {t("centre", "studentsRevoked")}
                   </button>
                 )}
               </div>
@@ -480,7 +488,7 @@ export default function CenterStudentsPage() {
           </header>
         ) : (
           <CenterPageHeader
-            title="Apprenants"
+            title={t("centre", "studentsTitle")}
             actions={
               <>
                 <ApprenantsShareMenu
@@ -488,13 +496,13 @@ export default function CenterStudentsPage() {
                   busy={shareBusy}
                   onCsv={() => {
                     if (!canExport) return;
-                    downloadStudentsCsv(exportRows);
+                    downloadStudentsCsv(exportRows, exportLabels);
                   }}
                   onPdf={async () => {
                     if (!canExport) return;
                     setShareBusy(true);
                     try {
-                      await downloadStudentsPdf(exportRows, filterCaption);
+                      await downloadStudentsPdf(exportRows, filterCaption, exportLabels, locale);
                     } finally {
                       setShareBusy(false);
                     }
@@ -507,8 +515,8 @@ export default function CenterStudentsPage() {
                 <AgentIaComingSoonButton />
                 <OutlineHeaderButton onClick={() => setShowCreateModal(true)}>
                   <Plus size={15} strokeWidth={2.25} />
-                  <span className="hidden sm:inline">Créer un apprenant</span>
-                  <span className="sm:hidden">Créer</span>
+                  <span className="hidden sm:inline">{t("centre", "studentsCreateLearner")}</span>
+                  <span className="sm:hidden">{t("centre", "financeCreate")}</span>
                 </OutlineHeaderButton>
               </>
             }
@@ -525,36 +533,36 @@ export default function CenterStudentsPage() {
                     className="inline-flex flex-wrap items-center rounded-lg border border-black/[0.06] px-3 py-1.5"
                     style={{ backgroundColor: SURFACE }}
                   >
-                    <span className="font-bold">{rosterStats.total}</span> inscrit{rosterStats.total > 1 ? "s" : ""}
+                    <span className="font-bold">{rosterStats.total}</span> {t("centre", "studentsRegisteredCount", { count: rosterStats.total })}
                     <StatSep />
-                    <span className="font-semibold">{rosterStats.active} actif{rosterStats.active > 1 ? "s" : ""}</span>
+                    <span className="font-semibold">{rosterStats.active} {t("centre", "studentsActiveCount", { count: rosterStats.active })}</span>
                     <StatSep />
-                    <span className="font-semibold text-amber-700">{rosterStats.paused} suspendu{rosterStats.paused > 1 ? "s" : ""}</span>
+                    <span className="font-semibold text-amber-700">{rosterStats.paused} {t("centre", "studentsSuspendedCount", { count: rosterStats.paused })}</span>
                     <StatSep />
-                    <span className="font-semibold">{rosterStats.filieres} filière{rosterStats.filieres > 1 ? "s" : ""}</span>
+                    <span className="font-semibold">{rosterStats.filieres} {t("centre", "studentsProgramCount", { count: rosterStats.filieres })}</span>
                   </span>
                 }
               >
-                <ToolbarSearch value={search} onChange={setSearch} placeholder="Rechercher…" />
+                <ToolbarSearch value={search} onChange={setSearch} placeholder={t("centre", "financeSearch")} />
                 <ToolbarSelect
-                  label="Filtrer par statut"
+                  label={t("centre", "studentsFilterStatus")}
                   value={statusFilter}
                   onChange={(v) => setStatusFilter(v as StatusFilter)}
                   minWidth="7.5rem"
                   options={[
-                    { value: "all", label: "Tous statuts" },
-                    { value: "active", label: "Actifs" },
-                    { value: "paused", label: "Suspendus" },
-                    { value: "revoked", label: "Révoqués" },
+                    { value: "all", label: t("centre", "studentsAllStatuses") },
+                    { value: "active", label: t("centre", "summaryActive") },
+                    { value: "paused", label: t("centre", "summarySuspended") },
+                    { value: "revoked", label: t("centre", "studentsRevokedPlural") },
                   ]}
                 />
                 <ToolbarSelect
-                  label="Filtrer par filière"
+                  label={t("centre", "studentsFilterProgram")}
                   value={filiereFilter ?? "all"}
                   onChange={(v) => setFiliereFilter(v === "all" ? null : v)}
                   minWidth="10rem"
                   options={[
-                    { value: "all", label: "Toutes filières" },
+                    { value: "all", label: t("centre", "reportsAllPrograms") },
                     ...filiereStats.map(([id, { name, count }]) => ({
                       value: id,
                       label: `${name} (${count})`,
@@ -565,8 +573,8 @@ export default function CenterStudentsPage() {
 
               {filtered.length === 0 ? (
                 <EmptyState
-                  title="Aucun apprenant trouvé"
-                  hint="Modifiez la recherche ou les filtres."
+                  title={t("centre", "studentsNoneFound")}
+                  hint={t("centre", "studentsChangeSearchFilters")}
                   action={
                     <OutlineHeaderButton
                       className="mt-5 mx-auto"
@@ -576,23 +584,23 @@ export default function CenterStudentsPage() {
                         setFiliereFilter(null);
                       }}
                     >
-                      Réinitialiser les filtres
+                      {t("centre", "studentsResetFilters")}
                     </OutlineHeaderButton>
                   }
                 />
               ) : (
                 <CenterDataTable
-                  columns={["Nom", "Filière", "Statut", "Inscription", "Actions"]}
+                  columns={[t("centre", "enrollmentLastName"), t("centre", "enrollmentProgram"), t("centre", "settingsStatus"), t("centre", "discountEnrollment"), t("centre", "financeActions")]}
                   columnWidths={[undefined, "18%", "14%", "16%", "10.75rem"]}
                 >
                   {filtered.map((s, i) => {
                     const primaryEnr = s.enrollments[0];
                     const hasDraft = s.enrollments.some((e) => e.status === "draft");
                     const statusLabel =
-                      s.center_status === "active" || !s.center_status ? "Actif"
-                      : s.center_status === "paused" ? "Suspendu"
-                      : "Révoqué";
-                    const enrStatus = hasDraft ? "Brouillon" : primaryEnr?.status === "active" ? "Active" : primaryEnr ? "Inscrit" : "—";
+                      s.center_status === "active" || !s.center_status ? t("centre", "campusActive")
+                      : s.center_status === "paused" ? t("centre", "summarySuspended")
+                      : t("centre", "studentsRevoked");
+                    const enrStatus = hasDraft ? t("centre", "enrollmentDraft") : primaryEnr?.status === "active" ? t("centre", "studentsActiveEnrollment") : primaryEnr ? t("centre", "studentsRegistered") : "—";
 
                     return (
                       <CenterTableRow key={s.id} index={i}>
@@ -609,7 +617,7 @@ export default function CenterStudentsPage() {
                           <span className={`text-[12px] font-semibold ${
                             hasDraft || (s.center_status && s.center_status !== "active") ? "text-red-600" : "text-neutral-600"
                           }`}>
-                            {hasDraft ? "Brouillon" : statusLabel}
+                            {hasDraft ? t("centre", "enrollmentDraft") : statusLabel}
                           </span>
                         </td>
                         <td className="px-4 py-3.5 text-[12px] font-medium text-neutral-700">
@@ -646,7 +654,7 @@ export default function CenterStudentsPage() {
                           }`}
                           style={selectedEnrollmentId === e.id ? { backgroundColor: BLUE } : undefined}
                         >
-                          {e.filiere_name_raw ? e.filiere_name_raw.toUpperCase() : ""}{e.status === "draft" ? " (Brouillon)" : ""}
+                          {e.filiere_name_raw ? e.filiere_name_raw.toUpperCase() : ""}{e.status === "draft" ? ` (${t("centre", "enrollmentDraft")})` : ""}
                         </button>
                       ))}
                     </div>
@@ -657,8 +665,8 @@ export default function CenterStudentsPage() {
                       <div className="flex items-start gap-2.5 min-w-0">
                         <AlertTriangle className="text-neutral-500 shrink-0 mt-0.5" size={15} />
                         <div>
-                          <p className="text-sm font-semibold text-neutral-900">Inscription en attente</p>
-                          <p className="text-xs text-neutral-500 mt-0.5">Activez le dossier pour débloquer la scolarité.</p>
+                          <p className="text-sm font-semibold text-neutral-900">{t("centre", "studentsPendingEnrollment")}</p>
+                          <p className="text-xs text-neutral-500 mt-0.5">{t("centre", "studentsActivateHelp")}</p>
                         </div>
                       </div>
                       <button
@@ -668,7 +676,7 @@ export default function CenterStudentsPage() {
                         className="h-9 px-4 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-1.5 shrink-0 hover:opacity-90 transition-opacity disabled:opacity-50"
                         style={{ backgroundColor: BLUE }}
                       >
-                        {activating ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Valider
+                        {activating ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} {t("centre", "studentsValidate")}
                       </button>
                     </div>
                   )}
@@ -752,14 +760,14 @@ export default function CenterStudentsPage() {
           >
             <div className="flex items-start justify-between gap-3 mb-3">
               <h3 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>WhatsApp (PDF)</h3>
-              <button type="button" onClick={() => setWaPhoneOpen(false)} className="text-neutral-400 hover:text-neutral-700" aria-label="Fermer">
+              <button type="button" onClick={() => setWaPhoneOpen(false)} className="text-neutral-400 hover:text-neutral-700" aria-label={t("centre", "periodClose")}>
                 <X size={18} />
               </button>
             </div>
             <p className="text-[12px] text-neutral-500 font-medium mb-3 leading-relaxed">
-              Le PDF de la liste filtrée est préparé dans l&apos;app, puis WhatsApp s&apos;ouvre pour ce numéro. Joignez ensuite le fichier téléchargé.
+              {t("centre", "studentsWhatsappHelp")}
             </p>
-            <label className="block text-sm font-semibold text-neutral-600 mb-1.5">Numéro (indicatif pays)</label>
+            <label className="block text-sm font-semibold text-neutral-600 mb-1.5">{t("centre", "financePhoneCountryCode")}</label>
             <input
               value={waPhone}
               onChange={(e) => setWaPhone(e.target.value)}
@@ -775,7 +783,7 @@ export default function CenterStudentsPage() {
                 disabled={shareBusy}
                 className="flex-1 h-10 rounded-lg text-xs font-semibold bg-neutral-100 text-neutral-600"
               >
-                Annuler
+                {t("centre", "periodCancel")}
               </button>
               <button
                 type="button"
@@ -785,7 +793,7 @@ export default function CenterStudentsPage() {
                 style={{ backgroundColor: BLUE }}
               >
                 {shareBusy ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
-                Ouvrir WhatsApp
+                {t("centre", "financeOpenWhatsapp")}
               </button>
             </div>
           </div>
@@ -807,11 +815,13 @@ function StudentViewModal({
   onClose: () => void;
   onOpenDossier: () => void;
 }) {
+  const { t } = useI18n();
   const primary = student.enrollments[0];
   const statusLabel =
-    student.center_status === "active" ? "Actif"
-    : student.center_status === "paused" ? "Suspendu"
-    : "Révoqué";
+    student.center_status === "active" ? t("centre", "campusActive")
+    : student.center_status === "paused" ? t("centre", "summarySuspended")
+    : t("centre", "studentsRevoked");
+  const passageLabel = (decision: string) => decision === "admis" ? t("centre", "studentsPassed") : decision === "redouble" ? t("centre", "studentsRepeats") : decision === "ajourne" ? t("centre", "studentsDeferred") : passageDecisionLabelFr(decision);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
@@ -819,10 +829,10 @@ function StudentViewModal({
         className="bg-white rounded-3xl p-6 md:p-7 max-w-2xl w-full shadow-2xl relative my-8 border border-black/[0.06]"
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" onClick={onClose} className="absolute top-6 right-6 text-neutral-400 hover:text-black" aria-label="Fermer">
+        <button type="button" onClick={onClose} className="absolute top-6 right-6 text-neutral-400 hover:text-black" aria-label={t("centre", "periodClose")}>
           <X size={20} />
         </button>
-        <h3 className="text-lg font-black mb-5" style={{ color: BLUE }}>Aperçu de l&apos;apprenant</h3>
+        <h3 className="text-lg font-black mb-5" style={{ color: BLUE }}>{t("centre", "studentsLearnerPreview")}</h3>
 
         <div className="space-y-5">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
@@ -857,22 +867,22 @@ function StudentViewModal({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <PreviewInfoBox
               icon={Calendar}
-              label="Âge"
-              value={student.birth_date ? `${calcAge(student.birth_date)} · ${fmtBirth(student.birth_date)}` : "—"}
+              label={t("centre", "studentsAge")}
+              value={student.birth_date ? `${calcAge(student.birth_date, t("centre", "studentsYears"))} · ${fmtBirth(student.birth_date)}` : "—"}
             />
             <PreviewInfoBox
               icon={Users}
-              label="Genre"
+              label={t("centre", "accountGender")}
               value={
-                student.genre === "Homme" ? "Garçon / Homme"
-                : student.genre === "Femme" ? "Fille / Femme"
-                : student.genre === "Autre" ? "Autre"
+                student.genre === "Homme" ? t("centre", "studentsBoyMan")
+                : student.genre === "Femme" ? t("centre", "studentsGirlWoman")
+                : student.genre === "Autre" ? t("centre", "studentsOther")
                 : "—"
               }
             />
             <PreviewInfoBox
               icon={Users}
-              label="Classe"
+              label={t("centre", "enrollmentClass")}
               value={primary?.groupe_nom || "—"}
             />
           </div>
@@ -880,16 +890,16 @@ function StudentViewModal({
           {primary && (
             <div>
               <p className="text-[10px] font-black uppercase tracking-wider text-neutral-400 mb-2.5 flex items-center gap-1.5">
-                <BookOpen size={12} /> Programme
+                <BookOpen size={12} /> {t("centre", "enrollmentProgram")}
               </p>
               <div className="rounded-2xl border border-neutral-200 p-4 space-y-2">
                 <p className="text-sm font-bold text-neutral-800 uppercase">{primary.filiere_name_raw ? primary.filiere_name_raw.toUpperCase() : ""}</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500 font-medium">
-                  {primary.niveau_annee != null && <span>Niveau {primary.niveau_annee}</span>}
+                  {primary.niveau_annee != null && <span>{t("centre", "enrollmentLevel")} {primary.niveau_annee}</span>}
                   {primary.duration_label && <span>{primary.duration_label}</span>}
                   {primary.academic_year && <span>{primary.academic_year}</span>}
                   {primary.passage_decision && (
-                    <span>Passage : {passageDecisionLabelFr(primary.passage_decision)}</span>
+                    <span>{t("centre", "studentsProgression")} : {passageLabel(primary.passage_decision)}</span>
                   )}
                 </div>
               </div>
@@ -902,7 +912,7 @@ function StudentViewModal({
               onClick={onClose}
               className="flex-1 h-11 rounded-xl text-xs font-semibold bg-neutral-100 text-neutral-600"
             >
-              Fermer
+              {t("centre", "periodClose")}
             </button>
             <button
               type="button"
@@ -910,7 +920,7 @@ function StudentViewModal({
               className="flex-1 h-11 rounded-xl text-xs font-black uppercase text-white inline-flex items-center justify-center gap-1.5"
               style={{ backgroundColor: BLUE }}
             >
-              <Edit3 size={14} /> Ouvrir le dossier
+              <Edit3 size={14} /> {t("centre", "studentsOpenRecord")}
             </button>
           </div>
         </div>
@@ -983,6 +993,7 @@ function ApprenantsShareMenu({
   onPdf: () => void | Promise<void>;
   onWhatsAppPdf: () => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -1015,7 +1026,7 @@ function ApprenantsShareMenu({
         className="gap-1.5"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} strokeWidth={2.25} />}
-        <span className="hidden sm:inline">Partager</span>
+        <span className="hidden sm:inline">{t("centre", "share")}</span>
       </OutlineHeaderButton>
       {open && (
         <div
@@ -1064,6 +1075,7 @@ function GradesTab({
   userId: string;
   onPassageDone?: () => void;
 }) {
+  const { t } = useI18n();
   const [matieres,       setMatieres]       = useState<FiliereMatiereRow[]>([]);
   const [gradesByMatiere, setGradesByMatiere] = useState<Record<string, GradeRow[]>>({});
   const [periods,        setPeriods]        = useState<Period[]>([]);
@@ -1130,8 +1142,8 @@ function GradesTab({
     const matiere = matieres.find((m) => m.id === filiereMatiereId);
     const bareme = matiere?.max_score || 20;
     const num = parseFloat(score);
-    if (isNaN(num) || num < 0) return setError("Note invalide.");
-    if (num > bareme) return setError(`Note supérieure au barème /${bareme}.`);
+    if (isNaN(num) || num < 0) return setError(t("centre", "gradesInvalid"));
+    if (num > bareme) return setError(t("centre", "gradesAboveScale", { scale: bareme }));
     const titleTrim = title.trim();
     const { error: insErr } = await supabase.from("grades").insert({
       enrollment_id: enrollment.id,
@@ -1143,12 +1155,12 @@ function GradesTab({
       title: titleTrim || null,
       comment: comment.trim() || null,
     });
-    if (insErr) return setError(insErr.message.includes("policy") ? "Vous n'êtes pas habilité à noter cette matière." : insErr.message);
+    if (insErr) return setError(insErr.message.includes("policy") ? t("centre", "gradesUnauthorized") : insErr.message);
     setAddingFor(null); setScore(""); setComment(""); setPeriodId(""); setTitle("");
     await load();
   };
 
-  if (loading) return <p className="text-sm text-neutral-400 p-8">Chargement des notes…</p>;
+  if (loading) return <p className="text-sm text-neutral-400 p-8">{t("centre", "gradesLoading")}</p>;
 
   return (
     <div className="w-full">
@@ -1169,11 +1181,11 @@ function GradesTab({
               <GraduationCap size={18} style={{ color: BLUE }} />
             </div>
             <h2 className="text-lg sm:text-xl font-extrabold tracking-tight leading-tight" style={{ color: BLUE }}>
-              Notes & bulletin
+              {t("centre", "gradesTitle")}
             </h2>
           </div>
           <p className="text-sm text-neutral-500 mt-3 leading-relaxed font-medium">
-            Saisie des notes par matière. Le bulletin s&apos;adapte aux périodes du centre
+            {t("centre", "gradesDescription")}
             {enrollment.academic_year ? ` · ${enrollment.academic_year}` : ""}.
           </p>
           <div className="mt-4">
@@ -1183,7 +1195,7 @@ function GradesTab({
               className="h-9 px-3 rounded-lg text-xs font-semibold text-white inline-flex items-center gap-1.5 hover:opacity-90"
               style={{ backgroundColor: BLUE }}
             >
-              <Printer size={12} /> Bulletin
+              <Printer size={12} /> {t("centre", "gradesReportCard")}
             </button>
           </div>
         </div>
@@ -1191,7 +1203,7 @@ function GradesTab({
         <div className="space-y-4 w-full min-w-0 rounded-xl border border-black/[0.06] p-5 sm:p-6" style={{ backgroundColor: SURFACE }}>
           {matieres.length === 0 && (
             <p className="text-sm text-neutral-400 font-medium italic py-4">
-              Aucune matière configurée pour ce niveau.
+              {t("centre", "gradesNoSubject")}
             </p>
           )}
 
@@ -1207,7 +1219,7 @@ function GradesTab({
                   </p>
                   <p className="text-xs text-neutral-500 font-medium mt-0.5">
                     /{m.max_score} · ×{m.coefficient}
-                    {m.formateurs.length > 0 ? ` · ${m.formateurs.join(", ")}` : " · Aucun formateur"}
+                    {m.formateurs.length > 0 ? ` · ${m.formateurs.join(", ")}` : ` · ${t("centre", "gradesNoTrainer")}`}
                   </p>
                 </div>
                 <button
@@ -1215,7 +1227,7 @@ function GradesTab({
                   onClick={() => setAddingFor(addingFor === m.id ? null : m.id)}
                   className="h-9 w-9 rounded-lg border border-black/[0.08] inline-flex items-center justify-center hover:bg-black/[0.03] shrink-0"
                   style={{ color: ORANGE }}
-                  aria-label="Ajouter une note"
+                  aria-label={t("centre", "gradesAdd")}
                 >
                   <Plus size={16} />
                 </button>
@@ -1225,8 +1237,8 @@ function GradesTab({
                 {(gradesByMatiere[m.id] ?? []).map((g) => (
                   <div key={g.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                     <span className="text-neutral-600 font-medium min-w-0">
-                      {g.period_name || "Sans période"}
-                      {g.title ? ` · ${g.title}` : " · Note principale"}
+                      {g.period_name || t("centre", "gradesNoPeriod")}
+                      {g.title ? ` · ${g.title}` : ` · ${t("centre", "gradesMainGrade")}`}
                       {g.comment ? ` · ${g.comment}` : ""}
                     </span>
                     <span className="font-extrabold text-emerald-700 shrink-0">
@@ -1236,15 +1248,15 @@ function GradesTab({
                 ))}
               </div>
               {!gradesByMatiere[m.id]?.length && (
-                <p className="text-xs text-neutral-400 font-medium italic py-1">Aucune note.</p>
+                <p className="text-xs text-neutral-400 font-medium italic py-1">{t("centre", "gradesNone")}</p>
               )}
 
               {addingFor === m.id && (
                 <div className="mt-4 pt-4 border-t border-black/[0.06] space-y-3">
                   <div>
-                    <label className={FIELD_LABEL}>Intitulé</label>
+                    <label className={FIELD_LABEL}>{t("centre", "gradesLabel")}</label>
                     <input
-                      placeholder="Vide = note principale · ex. Devoir 1"
+                      placeholder={t("centre", "gradesLabelPlaceholder")}
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       className={FIELD_INPUT}
@@ -1252,7 +1264,7 @@ function GradesTab({
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className={FIELD_LABEL}>Note /{m.max_score}</label>
+                      <label className={FIELD_LABEL}>{t("centre", "studentsGrades")} /{m.max_score}</label>
                       <input
                         type="number"
                         value={score}
@@ -1261,13 +1273,13 @@ function GradesTab({
                       />
                     </div>
                     <div>
-                      <label className={FIELD_LABEL}>Période</label>
+                      <label className={FIELD_LABEL}>{t("centre", "reportsPeriod")}</label>
                       <select
                         value={periodId}
                         onChange={(e) => setPeriodId(e.target.value)}
                         className={FIELD_INPUT}
                       >
-                        <option value="">Sans période</option>
+                        <option value="">{t("centre", "gradesNoPeriod")}</option>
                         {periods.map((p) => (
                           <option key={p.id} value={p.id}>{p.name}</option>
                         ))}
@@ -1275,7 +1287,7 @@ function GradesTab({
                     </div>
                   </div>
                   <div>
-                    <label className={FIELD_LABEL}>Appréciation (optionnel)</label>
+                    <label className={FIELD_LABEL}>{t("centre", "gradesCommentOptional")}</label>
                     <input
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
@@ -1293,7 +1305,7 @@ function GradesTab({
                     className="h-10 px-4 rounded-lg text-sm font-semibold text-white hover:opacity-90"
                     style={{ backgroundColor: ORANGE }}
                   >
-                    Enregistrer
+                    {t("centre", "accountSave")}
                   </button>
                 </div>
               )}

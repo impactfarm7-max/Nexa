@@ -28,8 +28,9 @@ import {
   AgentIaComingSoonButton,
 } from "../center-page-ui";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
-const fcfa = (n: number | null | undefined) => (Number(n) || 0).toLocaleString("fr-FR") + " FCFA";
+const fcfa = (n: number | null | undefined, locale: "fr" | "en" = "fr") => (Number(n) || 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB") + " FCFA";
 
 /** Affichage seul (UI / PDF / CSV) — la valeur en base reste inchangée. */
 function displayProgrammeName(name: string | null | undefined) {
@@ -63,15 +64,18 @@ const MODE_LABEL: Record<string, string> = {
   hybride: "Hybride",
 };
 
-function structureLabel(p: ProgrammeCard) {
-  if (p.type === "cursus") return `${p.nb_niveaux || 1} niveau${(p.nb_niveaux || 1) > 1 ? "x" : ""}`;
+function structureLabel(p: ProgrammeCard, locale: "fr" | "en" = "fr", t?: (namespace: "centre", key: string, params?: Record<string, string | number>) => string) {
+  if (p.type === "cursus") {
+    const count = p.nb_niveaux || 1;
+    return t ? t("centre", count > 1 ? "programsLevelMany" : "programsLevelOne", { count }) : `${count} niveau${count > 1 ? "x" : ""}`;
+  }
   return `${p.duree_valeur || 0} ${p.duree_unite || ""}`.trim();
 }
 
-function priceLabel(p: ProgrammeCard) {
-  const amount = fcfa(p.default_tuition_fee);
+function priceLabel(p: ProgrammeCard, locale: "fr" | "en" = "fr", t?: (namespace: "centre", key: string, params?: Record<string, string | number>) => string) {
+  const amount = fcfa(p.default_tuition_fee, locale);
   if (p.type !== "formation_courte") return amount;
-  if (p.pricing_mode === "mensuel") return `${amount} / mois`;
+  if (p.pricing_mode === "mensuel") return t ? t("centre", "programsPerMonth", { amount }) : `${amount} / mois`;
   return amount;
 }
 
@@ -84,20 +88,20 @@ function fcfaExport(n: number | null | undefined) {
   return `${v < 0 ? "-" : ""}${grouped} FCFA`;
 }
 
-function priceLabelExport(p: ProgrammeCard) {
+function priceLabelExport(p: ProgrammeCard, locale: "fr" | "en") {
   const amount = fcfaExport(p.default_tuition_fee);
   if (p.type !== "formation_courte") return amount;
-  if (p.pricing_mode === "mensuel") return `${amount} / mois`;
+  if (p.pricing_mode === "mensuel") return `${amount} / ${locale === "en" ? "month" : "mois"}`;
   return amount;
 }
 
-function toExportRows(list: ProgrammeCard[]): ExportRow[] {
+function toExportRows(list: ProgrammeCard[], locale: "fr" | "en"): ExportRow[] {
   return list.map((p) => ({
     nom: displayProgrammeName(p.name),
-    type: p.type === "cursus" ? "Cursus" : "Formation courte",
-    statut: p.status === "published" ? "Publié" : "Brouillon",
-    prix: priceLabelExport(p),
-    structure: structureLabel(p),
+    type: p.type === "cursus" ? (locale === "en" ? "Curriculum" : "Cursus") : (locale === "en" ? "Short course" : "Formation courte"),
+    statut: p.status === "published" ? (locale === "en" ? "Published" : "Publié") : (locale === "en" ? "Draft" : "Brouillon"),
+    prix: priceLabelExport(p, locale),
+    structure: structureLabel(p, locale),
   }));
 }
 
@@ -106,34 +110,36 @@ function programmesFilterCaption(
   typeFilter: TypeFilter,
   query: string,
   count: number,
+  locale: "fr" | "en",
 ) {
+  const isEn = locale === "en";
   const status =
-    statusFilter === "all" ? "Tous programmes"
-    : statusFilter === "published" ? "Publiés"
-    : "Brouillons";
+    statusFilter === "all" ? (isEn ? "All programs" : "Tous programmes")
+    : statusFilter === "published" ? (isEn ? "Published" : "Publiés")
+    : (isEn ? "Drafts" : "Brouillons");
   const type =
-    typeFilter === "all" ? "Tous types"
-    : typeFilter === "cursus" ? "Cursus"
-    : "Formations courtes";
+    typeFilter === "all" ? (isEn ? "All types" : "Tous types")
+    : typeFilter === "cursus" ? (isEn ? "Curriculum" : "Cursus")
+    : (isEn ? "Short courses" : "Formations courtes");
   const parts = [status, type];
   const q = query.trim();
-  if (q) parts.push(`Recherche: ${q}`);
-  parts.push(`${count} ligne${count > 1 ? "s" : ""}`);
+  if (q) parts.push(`${isEn ? "Search" : "Recherche"}: ${q}`);
+  parts.push(isEn ? `${count} row${count === 1 ? "" : "s"}` : `${count} ligne${count > 1 ? "s" : ""}`);
   return parts.join(" · ");
 }
 
-function programmesCsvFilename() {
+function programmesCsvFilename(locale: "fr" | "en") {
   const d = new Date().toISOString().slice(0, 10);
-  return `programmes-${d}.csv`;
+  return `${locale === "en" ? "programs" : "programmes"}-${d}.csv`;
 }
 
-function programmesPdfFilename() {
+function programmesPdfFilename(locale: "fr" | "en") {
   const d = new Date().toISOString().slice(0, 10);
-  return `programmes-${d}.pdf`;
+  return `${locale === "en" ? "programs" : "programmes"}-${d}.pdf`;
 }
 
-function downloadProgrammesCsv(rows: ExportRow[]) {
-  const header = ["Nom", "Type", "Statut", "Prix", "Structure"];
+function downloadProgrammesCsv(rows: ExportRow[], locale: "fr" | "en") {
+  const header = locale === "en" ? ["Name", "Type", "Status", "Price", "Structure"] : ["Nom", "Type", "Statut", "Prix", "Structure"];
   const lines = [
     header,
     ...rows.map((r) => [r.nom, r.type, r.statut, r.prix, r.structure]),
@@ -145,7 +151,7 @@ function downloadProgrammesCsv(rows: ExportRow[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = programmesCsvFilename();
+  a.download = programmesCsvFilename(locale);
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -165,7 +171,8 @@ async function loadImageDataUrl(url: string): Promise<string | null> {
   }
 }
 
-async function buildProgrammesPdfDoc(rows: ExportRow[], filterCaption: string) {
+async function buildProgrammesPdfDoc(rows: ExportRow[], filterCaption: string, locale: "fr" | "en") {
+  const isEn = locale === "en";
   const { default: jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -204,18 +211,18 @@ async function buildProgrammesPdfDoc(rows: ExportRow[], filterCaption: string) {
   doc.setTextColor(...blueRgb);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text(cfg?.legalName || "CENTRE D'ENSEIGNEMENT", headerX, 18);
+  doc.text(cfg?.legalName || (isEn ? "EDUCATION CENTER" : "CENTRE D'ENSEIGNEMENT"), headerX, 18);
 
   doc.setTextColor(...accentRgb);
   doc.setFontSize(9);
-  doc.text((cfg?.title || "LISTE DES PROGRAMMES").toUpperCase(), headerX, 24);
+  doc.text((cfg?.title || (isEn ? "PROGRAM LIST" : "LISTE DES PROGRAMMES")).toUpperCase(), headerX, 24);
 
   const metaLines: string[] = [];
   if (cfg?.showAddress && cfg?.address) metaLines.push(cfg.address);
-  if (cfg?.showPhone && cfg?.phone) metaLines.push(`Tél : ${cfg.phone}`);
+  if (cfg?.showPhone && cfg?.phone) metaLines.push(`${isEn ? "Phone" : "Tél"} : ${cfg.phone}`);
   if (cfg?.showRccm && cfg?.rccmNumber) metaLines.push(`RCCM : ${cfg.rccmNumber}`);
   if (cfg?.showNiu && cfg?.niuNumber) metaLines.push(`NIU : ${cfg.niuNumber}`);
-  metaLines.push(`Généré le ${new Date().toLocaleString("fr-FR")}`);
+  metaLines.push(`${isEn ? "Generated on" : "Généré le"} ${new Date().toLocaleString(isEn ? "en-GB" : "fr-FR")}`);
 
   let metaY = 14;
   doc.setFont("helvetica", "normal");
@@ -234,11 +241,11 @@ async function buildProgrammesPdfDoc(rows: ExportRow[], filterCaption: string) {
   doc.setTextColor(80, 80, 80);
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text(`Filtres : ${filterCaption}`, 14, ruleY + 6, { maxWidth: pageWidth - 28 });
+  doc.text(`${isEn ? "Filters" : "Filtres"} : ${filterCaption}`, 14, ruleY + 6, { maxWidth: pageWidth - 28 });
 
   autoTable(doc, {
     startY: ruleY + 10,
-    head: [["Nom", "Type", "Statut", "Prix", "Structure"]],
+    head: [isEn ? ["Name", "Type", "Status", "Price", "Structure"] : ["Nom", "Type", "Statut", "Prix", "Structure"]],
     body: rows.map((r) => [r.nom, r.type, r.statut, r.prix, r.structure]),
     styles: { font: "helvetica", fontSize: 8, cellPadding: 2.5, overflow: "linebreak", textColor: [40, 40, 40] },
     headStyles: { fillColor: blueRgb, textColor: 255, fontStyle: "bold" },
@@ -257,15 +264,15 @@ async function buildProgrammesPdfDoc(rows: ExportRow[], filterCaption: string) {
   return doc;
 }
 
-async function downloadProgrammesPdf(rows: ExportRow[], filterCaption: string) {
-  const doc = await buildProgrammesPdfDoc(rows, filterCaption);
-  doc.save(programmesPdfFilename());
+async function downloadProgrammesPdf(rows: ExportRow[], filterCaption: string, locale: "fr" | "en") {
+  const doc = await buildProgrammesPdfDoc(rows, filterCaption, locale);
+  doc.save(programmesPdfFilename(locale));
 }
 
 /** Téléchargement discret (sans focus UI) puis retourne le nom de fichier. */
-async function silentDownloadProgrammesPdf(rows: ExportRow[], filterCaption: string) {
-  const doc = await buildProgrammesPdfDoc(rows, filterCaption);
-  const filename = programmesPdfFilename();
+async function silentDownloadProgrammesPdf(rows: ExportRow[], filterCaption: string, locale: "fr" | "en") {
+  const doc = await buildProgrammesPdfDoc(rows, filterCaption, locale);
+  const filename = programmesPdfFilename(locale);
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -289,6 +296,7 @@ function openWhatsApp(text: string, phone?: string) {
 }
 
 export default function CenterFilieresPage() {
+  const { locale, t } = useI18n();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [programmes, setProgrammes] = useState<ProgrammeCard[]>([]);
@@ -364,13 +372,13 @@ export default function CenterFilieresPage() {
   const togglePublish = async (prog: ProgrammeCard) => {
     const next = prog.status === "published" ? "draft" : "published";
     if (next === "published" && !prog.default_tuition_fee) {
-      if (!window.confirm("Ce programme n'a pas de prix défini. Le publier quand même ?")) return;
+      if (!window.confirm(t("centre", "programsNoPriceConfirm"))) return;
     }
     setProgrammes((prev) => prev.map((p) => (p.id === prog.id ? { ...p, status: next } : p)));
     const { error } = await supabase.from("filieres").update({ status: next }).eq("id", prog.id);
     if (error) {
       setProgrammes((prev) => prev.map((p) => (p.id === prog.id ? { ...p, status: prog.status } : p)));
-      alert("Changement de statut impossible : " + error.message);
+      alert(t("centre", "programsStatusError", { message: error.message }));
       return;
     }
     if (next === "published") {
@@ -380,17 +388,17 @@ export default function CenterFilieresPage() {
 
   if (loading) return <CenterPageLoading className="bg-[#FFFBF7]" />;
 
-  const exportRows = toExportRows(filtered);
+  const exportRows = toExportRows(filtered, locale);
   const canExport = exportRows.length > 0;
-  const filterCaption = programmesFilterCaption(statusFilter, typeFilter, query, exportRows.length);
+  const filterCaption = programmesFilterCaption(statusFilter, typeFilter, query, exportRows.length, locale);
 
   const sendWhatsAppPdf = async () => {
     if (!canExport) return;
     setShareBusy(true);
     try {
-      const filename = await silentDownloadProgrammesPdf(exportRows, filterCaption);
+      const filename = await silentDownloadProgrammesPdf(exportRows, filterCaption, locale);
       openWhatsApp(
-        `Liste des programmes Nexa (${exportRows.length}). PDF pret a joindre: ${filename}`,
+        t("centre", "programsWhatsAppMessage", { count: exportRows.length, filename }),
         waPhone,
       );
       setWaPhoneOpen(false);
@@ -404,7 +412,7 @@ export default function CenterFilieresPage() {
     <CenterPageLayout
       header={
         <CenterPageHeader
-          title="Programmes"
+          title={t("centre", "programsTitle")}
           actions={
             <>
               <ProgrammesShareMenu
@@ -412,13 +420,13 @@ export default function CenterFilieresPage() {
                 busy={shareBusy}
                 onCsv={() => {
                   if (!canExport) return;
-                  downloadProgrammesCsv(exportRows);
+                  downloadProgrammesCsv(exportRows, locale);
                 }}
                 onPdf={async () => {
                   if (!canExport) return;
                   setShareBusy(true);
                   try {
-                    await downloadProgrammesPdf(exportRows, filterCaption);
+                    await downloadProgrammesPdf(exportRows, filterCaption, locale);
                   } finally {
                     setShareBusy(false);
                   }
@@ -431,8 +439,8 @@ export default function CenterFilieresPage() {
               <AgentIaComingSoonButton />
               <OutlineHeaderButton className="print:hidden" onClick={() => router.push("/centre/filieres/nouveau")}>
                 <Plus size={15} strokeWidth={2.25} />
-                <span className="hidden sm:inline">Créer un programme</span>
-                <span className="sm:hidden">Créer</span>
+                <span className="hidden sm:inline">{t("centre", "programsCreate")}</span>
+                <span className="sm:hidden">{t("centre", "programsCreateShort")}</span>
               </OutlineHeaderButton>
             </>
           }
@@ -447,13 +455,13 @@ export default function CenterFilieresPage() {
                 className="inline-flex flex-wrap items-center rounded-lg border border-black/[0.06] px-3 py-1.5"
                 style={{ backgroundColor: SURFACE }}
               >
-                <span className="font-bold">{counts.total}</span> programme{counts.total > 1 ? "s" : ""}
+                <span className="font-bold">{t("centre", counts.total > 1 ? "programsCountMany" : "programsCountOne", { count: counts.total })}</span>
                 <StatSep />
-                <span className="font-semibold">{counts.published} publié{counts.published > 1 ? "s" : ""}</span>
+                <span className="font-semibold">{t("centre", counts.published > 1 ? "programsPublishedMany" : "programsPublishedOne", { count: counts.published })}</span>
                 <StatSep />
-                <span className="font-semibold text-red-600">{counts.draft} brouillon{counts.draft > 1 ? "s" : ""}</span>
+                <span className="font-semibold text-red-600">{t("centre", counts.draft > 1 ? "programsDraftMany" : "programsDraftOne", { count: counts.draft })}</span>
                 <StatSep />
-                <span className="font-semibold">{counts.matieres} matière{counts.matieres > 1 ? "s" : ""} distincte{counts.matieres > 1 ? "s" : ""}</span>
+                <span className="font-semibold">{t("centre", counts.matieres > 1 ? "programsSubjectMany" : "programsSubjectOne", { count: counts.matieres })}</span>
               </span>
             }
           >
@@ -470,27 +478,27 @@ export default function CenterFilieresPage() {
 
         {programmes.length === 0 ? (
           <EmptyState
-            title="Aucun programme pour le moment"
-            hint="Créez votre première filière — cursus ou formation courte — pour structurer l'offre du centre."
+            title={t("centre", "programsNone")}
+            hint={t("centre", "programsNoneHelp")}
             action={
               <OutlineHeaderButton onClick={() => router.push("/centre/filieres/nouveau")}>
-                Créer un programme
+                {t("centre", "programsCreate")}
               </OutlineHeaderButton>
             }
           />
         ) : filtered.length === 0 ? (
           <EmptyState
-            title="Aucun résultat"
-            hint="Modifiez la recherche ou les filtres."
+            title={t("centre", "programsNoResult")}
+            hint={t("centre", "programsChangeSearch")}
             action={
               <OutlineHeaderButton onClick={() => { setQuery(""); setStatusFilter("all"); setTypeFilter("all"); }}>
-                Réinitialiser
+                {t("centre", "programsReset")}
               </OutlineHeaderButton>
             }
           />
         ) : (
           <CenterDataTable
-            columns={["Nom", "Type", "Statut", "Prix", "Actions"]}
+            columns={[t("centre", "programsName"), t("centre", "programsType"), t("centre", "programsStatus"), t("centre", "programsPrice"), t("centre", "programsActions")]}
             columnWidths={[undefined, "15%", "14%", "16%", "15rem"]}
             minWidth="750px"
           >
@@ -501,17 +509,17 @@ export default function CenterFilieresPage() {
                     {displayProgrammeName(prog.name)}
                   </p>
                   <p className="text-[11px] text-neutral-400 font-medium mt-0.5 truncate">
-                    {structureLabel(prog)}
+                    {structureLabel(prog, locale, t)}
                   </p>
                 </td>
                 <td className="px-4 py-3.5 text-[12px] font-medium text-neutral-600">
-                  {prog.type === "cursus" ? "Cursus" : "Formation courte"}
+                  {prog.type === "cursus" ? t("centre", "programsCourse") : t("centre", "programsShortCourse")}
                 </td>
                 <td className="px-4 py-3.5">
                   <StatusBadge status={prog.status} />
                 </td>
                 <td className="px-4 py-3.5 text-[12px] font-medium text-neutral-700 tabular-nums">
-                  {priceLabel(prog)}
+                  {priceLabel(prog, locale, t)}
                 </td>
                 <TableActions>
                   <span className="print:hidden inline-flex items-center justify-end gap-2 shrink-0">
@@ -525,7 +533,7 @@ export default function CenterFilieresPage() {
                       type="button"
                       onClick={() => setDeleting(prog)}
                       className="h-7 w-7 rounded-md border border-black/[0.08] text-neutral-400 flex items-center justify-center hover:text-red-600 hover:border-red-200 transition-colors shrink-0"
-                      aria-label="Supprimer"
+                      aria-label={t("centre", "programsDelete")}
                     >
                       <Trash2 size={13} />
                     </button>
@@ -565,14 +573,14 @@ export default function CenterFilieresPage() {
           >
             <div className="flex items-start justify-between gap-3 mb-3">
               <h3 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>WhatsApp (PDF)</h3>
-              <button type="button" onClick={() => setWaPhoneOpen(false)} className="text-neutral-400 hover:text-neutral-700" aria-label="Fermer">
+              <button type="button" onClick={() => setWaPhoneOpen(false)} className="text-neutral-400 hover:text-neutral-700" aria-label={t("centre", "programsClose")}>
                 <X size={18} />
               </button>
             </div>
             <p className="text-[12px] text-neutral-500 font-medium mb-3 leading-relaxed">
-              Le PDF de la liste filtrée est préparé dans l&apos;app, puis WhatsApp s&apos;ouvre pour ce numéro. Joignez ensuite le fichier téléchargé.
+              {t("centre", "financeWhatsappHelp")}
             </p>
-            <label className="block text-[11px] font-semibold text-neutral-500 mb-1.5">Numéro (indicatif pays)</label>
+            <label className="block text-[11px] font-semibold text-neutral-500 mb-1.5">{t("centre", "programsPhoneCountry")}</label>
             <input
               value={waPhone}
               onChange={(e) => setWaPhone(e.target.value)}
@@ -588,7 +596,7 @@ export default function CenterFilieresPage() {
                 disabled={shareBusy}
                 className="flex-1 h-10 rounded-lg text-xs font-semibold bg-neutral-100 text-neutral-600"
               >
-                Annuler
+                {t("centre", "identityCancel")}
               </button>
               <button
                 type="button"
@@ -598,7 +606,7 @@ export default function CenterFilieresPage() {
                 style={{ backgroundColor: BLUE }}
               >
                 {shareBusy ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
-                Ouvrir WhatsApp
+                {t("centre", "programsOpenWhatsApp")}
               </button>
             </div>
           </div>
@@ -621,6 +629,7 @@ function ProgrammesFilterMenu({
   onTypeChange: (v: TypeFilter) => void;
   onReset: () => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const activeCount =
@@ -628,10 +637,10 @@ function ProgrammesFilterMenu({
 
   const summary =
     activeCount === 0
-      ? "Filtres"
+      ? t("centre", "programsFilters")
       : [
-          statusFilter === "published" ? "Publiés" : statusFilter === "draft" ? "Brouillons" : null,
-          typeFilter === "cursus" ? "Cursus" : typeFilter === "formation_courte" ? "Form. courtes" : null,
+          statusFilter === "published" ? t("centre", "programsPublished") : statusFilter === "draft" ? t("centre", "programsDrafts") : null,
+          typeFilter === "cursus" ? t("centre", "programsCourse") : typeFilter === "formation_courte" ? t("centre", "programsShortCoursesAbbr") : null,
         ]
           .filter(Boolean)
           .join(" · ");
@@ -653,21 +662,21 @@ function ProgrammesFilterMenu({
   }, [open]);
 
   const statusOpts: { value: StatusFilter; label: string }[] = [
-    { value: "all", label: "Tous statuts" },
-    { value: "published", label: "Publiés" },
-    { value: "draft", label: "Brouillons" },
+    { value: "all", label: t("centre", "programsAllStatuses") },
+    { value: "published", label: t("centre", "programsPublished") },
+    { value: "draft", label: t("centre", "programsDrafts") },
   ];
   const typeOpts: { value: TypeFilter; label: string }[] = [
-    { value: "all", label: "Tous types" },
-    { value: "cursus", label: "Cursus" },
-    { value: "formation_courte", label: "Formations courtes" },
+    { value: "all", label: t("centre", "programsAllTypes") },
+    { value: "cursus", label: t("centre", "programsCourse") },
+    { value: "formation_courte", label: t("centre", "programsShortCourses") },
   ];
 
   return (
     <div ref={rootRef} className="relative shrink-0 z-30">
       <button
         type="button"
-        aria-label="Filtrer les programmes"
+        aria-label={t("centre", "programsFilterAria")}
         aria-expanded={open}
         aria-haspopup="menu"
         onClick={() => setOpen((v) => !v)}
@@ -699,7 +708,7 @@ function ProgrammesFilterMenu({
           role="menu"
         >
           <div className="px-3 pt-2.5 pb-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Statut</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "programsStatus")}</p>
           </div>
           {statusOpts.map((o) => {
             const active = statusFilter === o.value;
@@ -729,7 +738,7 @@ function ProgrammesFilterMenu({
           <div className="mx-3 border-t border-black/[0.06]" />
 
           <div className="px-3 pt-2.5 pb-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Type</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "programsType")}</p>
           </div>
           {typeOpts.map((o) => {
             const active = typeFilter === o.value;
@@ -769,7 +778,7 @@ function ProgrammesFilterMenu({
                 }}
                 className="w-full px-3 py-2.5 text-left text-[12px] font-semibold text-neutral-500 hover:bg-black/[0.04] hover:text-neutral-800 transition-colors cursor-pointer"
               >
-                Réinitialiser les filtres
+                {t("centre", "programsResetFilters")}
               </button>
             </>
           )}
@@ -792,6 +801,7 @@ function ProgrammesShareMenu({
   onPdf: () => void | Promise<void>;
   onWhatsAppPdf: () => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -824,7 +834,7 @@ function ProgrammesShareMenu({
         className="gap-1.5"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} strokeWidth={2.25} />}
-        <span className="hidden sm:inline">Partager</span>
+        <span className="hidden sm:inline">{t("centre", "programsShare")}</span>
       </OutlineHeaderButton>
       {open && (
         <div
@@ -898,21 +908,23 @@ function mapRow(f: any): ProgrammeCard {
 }
 
 function TypeBadge({ type }: { type: "cursus" | "formation_courte" }) {
+  const { t } = useI18n();
   return (
     <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold text-neutral-600 border border-black/[0.08] bg-neutral-50">
-      {type === "cursus" ? "Cursus" : "Formation courte"}
+      {type === "cursus" ? t("centre", "programsCourse") : t("centre", "programsShortCourse")}
     </span>
   );
 }
 
 function StatusBadge({ status }: { status: "draft" | "published" }) {
+  const { t } = useI18n();
   return status === "published" ? (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-neutral-600 border border-black/[0.08] bg-neutral-50">
-      Publié
+      {t("centre", "programsPublishedStatus")}
     </span>
   ) : (
     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-red-600 border border-red-200 bg-red-50">
-      Brouillon
+      {t("centre", "programsDraftStatus")}
     </span>
   );
 }
@@ -926,6 +938,7 @@ function PublishToggleSwitch({
   onChange: () => void;
   disabled?: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
@@ -933,7 +946,7 @@ function PublishToggleSwitch({
       aria-checked={published}
       onClick={onChange}
       disabled={disabled}
-      title={published ? "Programme publié — cliquer pour dépublier (brouillon)" : "Programme en brouillon — cliquer pour publier"}
+      title={t("centre", published ? "programsPublishedToggle" : "programsDraftToggle")}
       className="inline-flex items-center gap-1.5 group outline-none cursor-pointer disabled:opacity-50 select-none shrink-0 w-[6.5rem] text-left"
     >
       <div
@@ -948,7 +961,7 @@ function PublishToggleSwitch({
         />
       </div>
       <span className={`text-[11.5px] font-bold inline-block w-[3.6rem] truncate ${published ? "text-[#11224E]" : "text-red-600"}`}>
-        {published ? "Publié" : "Brouillon"}
+        {t("centre", published ? "programsPublishedStatus" : "programsDraftStatus")}
       </span>
     </button>
   );
@@ -1000,14 +1013,15 @@ function parsePlanPreview(plan: unknown): ParsedPlan {
 }
 
 function FeesPreviewList({ fees }: { fees: FeeRow[] }) {
+  const { locale, t } = useI18n();
   if (fees.length === 0) return null;
   return (
     <div className="mt-2 space-y-1">
-      <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Frais supplémentaires</p>
+      <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">{t("centre", "programsExtraFees")}</p>
       {fees.map((f) => (
         <div key={`${f.label}-${f.montant}`} className="flex items-center justify-between text-[11px]">
           <span className="font-medium text-neutral-500">{f.label}</span>
-          <span className="font-bold text-neutral-700">{fcfa(f.montant)}</span>
+          <span className="font-bold text-neutral-700">{fcfa(f.montant, locale)}</span>
         </div>
       ))}
     </div>
@@ -1015,17 +1029,18 @@ function FeesPreviewList({ fees }: { fees: FeeRow[] }) {
 }
 
 function InstallmentsPreviewList({ installments }: { installments: InstallmentRow[] }) {
+  const { locale, t } = useI18n();
   if (installments.length === 0) return null;
   return (
     <div className="mt-2.5 space-y-1">
-      <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">Échéancier</p>
+      <p className="text-[9px] font-black uppercase tracking-wider text-neutral-400">{t("centre", "programsSchedule")}</p>
       {installments.map((inst, idx) => (
         <div key={`${idx}-${inst.montant}-${inst.jours}`} className="flex items-center justify-between text-[11px]">
           <span className="font-medium text-neutral-500">
-            Échéance {idx + 1}
-            {inst.jours > 0 ? ` — J+${inst.jours}` : " — à l'inscription"}
+            {t("centre", "programsInstallment", { count: idx + 1 })}
+            {inst.jours > 0 ? ` — ${t("centre", "programsDayOffset", { count: inst.jours })}` : ` — ${t("centre", "programsUponEnrollment")}`}
           </span>
-          <span className="font-bold text-neutral-700">{fcfa(inst.montant)}</span>
+          <span className="font-bold text-neutral-700">{fcfa(inst.montant, locale)}</span>
         </div>
       ))}
     </div>
@@ -1033,6 +1048,7 @@ function InstallmentsPreviewList({ installments }: { installments: InstallmentRo
 }
 
 function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; onClose: () => void; onTogglePublish?: () => void }) {
+  const { locale, t } = useI18n();
   const [niveaux, setNiveaux] = useState<NiveauRow[]>([]);
   const [filiereFees, setFiliereFees] = useState<FeeRow[]>([]);
   const [filiereInstallments, setFiliereInstallments] = useState<InstallmentRow[]>([]);
@@ -1096,11 +1112,11 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
     prog.type === "formation_courte" || isUniforme;
   const filiereExtrasTotal = filiereFees.reduce((a, f) => a + f.montant, 0);
   const displayPrice = showFilierePlan && filiereExtrasTotal > 0
-    ? fcfa((Number(prog.default_tuition_fee) || 0) + filiereExtrasTotal)
-    : priceLabel(prog);
+    ? fcfa((Number(prog.default_tuition_fee) || 0) + filiereExtrasTotal, locale)
+    : priceLabel(prog, locale, t);
 
   return (
-    <Shell onClose={onClose} title="Aperçu du programme" wide>
+    <Shell onClose={onClose} title={t("centre", "programsPreview")} wide>
       <div className="space-y-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -1108,17 +1124,17 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
             <TypeBadge type={prog.type} />
             {prog.type === "formation_courte" && prog.pricing_mode && (
               <span className="text-[10px] font-bold uppercase text-neutral-400">
-                {prog.pricing_mode === "mensuel" ? "Tarif mensuel" : "Tarif forfaitaire"}
+                {prog.pricing_mode === "mensuel" ? t("centre", "programsMonthlyRate") : t("centre", "programsFlatRate")}
               </span>
             )}
             {isUniforme && (
-              <span className="text-[10px] font-bold uppercase text-neutral-400">Tarif uniforme</span>
+              <span className="text-[10px] font-bold uppercase text-neutral-400">{t("centre", "programsUniformRate")}</span>
             )}
             {prog.type === "cursus" && cursusFeeMode === "par_niveau" && (
-              <span className="text-[10px] font-bold uppercase text-neutral-400">Tarif par niveau</span>
+              <span className="text-[10px] font-bold uppercase text-neutral-400">{t("centre", "programsRatePerLevel")}</span>
             )}
             {prog.mode && MODE_LABEL[prog.mode] && (
-              <span className="text-[10px] font-bold uppercase text-neutral-400">{MODE_LABEL[prog.mode]}</span>
+              <span className="text-[10px] font-bold uppercase text-neutral-400">{t("centre", prog.mode === "presentiel" ? "programsInPerson" : prog.mode === "en_ligne" ? "programsOnline" : "programsHybrid")}</span>
             )}
           </div>
           {onTogglePublish && (
@@ -1130,19 +1146,19 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
         </div>
         <div>
           <h3 className="text-2xl font-black tracking-tight uppercase" style={{ color: BLUE }}>{displayProgrammeName(prog.name)}</h3>
-          <p className="text-sm text-neutral-500 mt-1.5 leading-relaxed">{prog.description || "Aucune description."}</p>
+          <p className="text-sm text-neutral-500 mt-1.5 leading-relaxed">{prog.description || t("centre", "programsNoDescription")}</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <InfoBox
             icon={Tag}
             label={
               prog.type === "formation_courte" && prog.pricing_mode === "mensuel"
-                ? (filiereExtrasTotal > 0 ? "Total catalogue / mois" : "Prix / mois")
-                : (filiereExtrasTotal > 0 && showFilierePlan ? "Total du programme" : "Prix du programme")
+                ? (filiereExtrasTotal > 0 ? t("centre", "programsCatalogTotalMonth") : t("centre", "programsPriceMonth"))
+                : (filiereExtrasTotal > 0 && showFilierePlan ? t("centre", "programsTotalProgram") : t("centre", "programsProgramPrice"))
             }
             value={displayPrice}
           />
-          <InfoBox icon={Clock} label="Structure" value={structureLabel(prog)} />
+          <InfoBox icon={Clock} label={t("centre", "programsStructure")} value={structureLabel(prog, locale, t)} />
         </div>
         {prog.campus_names.length > 0 && (
           <div>
@@ -1154,7 +1170,7 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
         )}
         <div>
           <p className="text-[10px] font-black uppercase tracking-wider text-neutral-400 mb-2.5 flex items-center gap-1.5">
-            <BookOpen size={12} /> Matières ({prog.matiere_names.length || prog.matieres_count})
+            <BookOpen size={12} /> {t("centre", "programsSubjectsCount", { count: prog.matiere_names.length || prog.matieres_count })}
           </p>
           {prog.matiere_names.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
@@ -1165,35 +1181,35 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
               ))}
             </div>
           ) : (
-            <p className="text-xs text-neutral-400 font-medium">Aucune matière renseignée.</p>
+            <p className="text-xs text-neutral-400 font-medium">{t("centre", "programsNoSubject")}</p>
           )}
         </div>
 
         {loadingDetail ? (
           <div className="flex items-center gap-2 text-xs text-neutral-400 font-medium py-2">
-            <Loader2 size={14} className="animate-spin" /> Chargement de la tarification…
+            <Loader2 size={14} className="animate-spin" /> {t("centre", "programsPricingLoading")}
           </div>
         ) : (
           <>
             {showFilierePlan && (filiereFees.length > 0 || filiereInstallments.length > 0) && (
               <div className="border border-neutral-200 rounded-2xl p-4">
                 <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2.5 flex items-center gap-1.5">
-                  <Tag size={12} /> Tarification
+                  <Tag size={12} /> {t("centre", "programsPricing")}
                 </p>
                 <div className="flex items-center justify-between text-xs mb-1">
                   <span className="font-bold text-neutral-700">
                     {prog.type === "formation_courte" && prog.pricing_mode === "mensuel"
-                      ? "Prix / mois"
-                      : "Prix de formation"}
+                      ? t("centre", "programsPriceMonth")
+                      : t("centre", "programsTrainingPrice")}
                   </span>
-                  <span className="font-black text-neutral-700">{fcfa(prog.default_tuition_fee)}</span>
+                  <span className="font-black text-neutral-700">{fcfa(prog.default_tuition_fee, locale)}</span>
                 </div>
                 <FeesPreviewList fees={filiereFees} />
                 {filiereFees.length > 0 && (
                   <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-neutral-100">
-                    <span className="font-black text-neutral-800">Total</span>
+                    <span className="font-black text-neutral-800">{t("centre", "programsTotal")}</span>
                     <span className="font-black" style={{ color: BLUE }}>
-                      {fcfa((Number(prog.default_tuition_fee) || 0) + filiereExtrasTotal)}
+                      {fcfa((Number(prog.default_tuition_fee) || 0) + filiereExtrasTotal, locale)}
                     </span>
                   </div>
                 )}
@@ -1204,7 +1220,7 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
             {prog.type === "cursus" && !isUniforme && niveaux.length > 0 && (
               <div className="border border-neutral-200 rounded-2xl p-4">
                 <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2.5 flex items-center gap-1.5">
-                  <Layers size={12} /> Niveaux &amp; échéanciers
+                  <Layers size={12} /> {t("centre", "programsLevelsSchedules")}
                 </p>
                 <div className="space-y-3">
                   {niveaux.map((n) => {
@@ -1213,14 +1229,14 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
                     return (
                       <div key={n.id} className="rounded-xl bg-neutral-50 border border-neutral-100 p-3">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-neutral-700">{n.nom || `Niveau ${n.annee}`}</span>
+                          <span className="font-bold text-neutral-700">{n.nom || t("centre", "programsLevel", { year: n.annee })}</span>
                           <span className="font-black text-neutral-700">
-                            {extras > 0 ? fcfa(base + extras) : fcfa(base)}
+                            {extras > 0 ? fcfa(base + extras, locale) : fcfa(base, locale)}
                           </span>
                         </div>
                         {n.tuition_fee != null && extras > 0 && (
                           <p className="text-[10px] text-neutral-400 mt-0.5">
-                            Formation {fcfa(base)} + frais {fcfa(extras)}
+                            {t("centre", "programsTrainingFeesBreakdown", { base: fcfa(base, locale), fees: fcfa(extras, locale) })}
                           </p>
                         )}
                         <FeesPreviewList fees={n.fees} />
@@ -1235,13 +1251,13 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
             {prog.type === "cursus" && isUniforme && niveaux.length > 0 && (
               <div className="border border-neutral-200 rounded-2xl p-4">
                 <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500 mb-2.5 flex items-center gap-1.5">
-                  <Layers size={12} /> Niveaux
+                  <Layers size={12} /> {t("centre", "programsLevels")}
                 </p>
                 <div className="space-y-1.5">
                   {niveaux.map((n) => (
                     <div key={n.id} className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-neutral-700">{n.nom || `Niveau ${n.annee}`}</span>
-                      <span className="font-medium text-neutral-400">tarif uniforme</span>
+                      <span className="font-bold text-neutral-700">{n.nom || t("centre", "programsLevel", { year: n.annee })}</span>
+                      <span className="font-medium text-neutral-400">{t("centre", "programsUniformRateLower")}</span>
                     </div>
                   ))}
                 </div>
@@ -1266,6 +1282,7 @@ function InfoBox({ icon: Icon, label, value }: { icon: React.ElementType; label:
 }
 
 function PublishSuccessModal({ prog, onClose }: { prog: ProgrammeCard; onClose: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="fixed inset-0 z-50 bg-black/55 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div
@@ -1285,13 +1302,13 @@ function PublishSuccessModal({ prog, onClose }: { prog: ProgrammeCard; onClose: 
             </span>
           </div>
         </div>
-        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2">Félicitations</p>
+        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-2">{t("centre", "programsCongrats")}</p>
         <h3 className="text-xl font-black tracking-tight mb-2" style={{ color: BLUE }}>
-          Votre programme a été publié
+          {t("centre", "programsPublishedSuccess")}
         </h3>
         <p className="text-sm font-bold text-neutral-700 mb-1">« {displayProgrammeName(prog.name)} »</p>
         <p className="text-[12px] text-neutral-500 font-medium leading-relaxed mb-6">
-          Il peut désormais accueillir des inscriptions. Vous pouvez le repasser en brouillon à tout moment via le statut.
+          {t("centre", "programsPublishedHelp")}
         </p>
         <button
           type="button"
@@ -1299,7 +1316,7 @@ function PublishSuccessModal({ prog, onClose }: { prog: ProgrammeCard; onClose: 
           className="w-full h-11 rounded-xl text-xs font-black uppercase tracking-wider text-white"
           style={{ backgroundColor: BLUE }}
         >
-          Continuer
+          {t("centre", "programsContinue")}
         </button>
       </div>
     </div>
@@ -1307,6 +1324,7 @@ function PublishSuccessModal({ prog, onClose }: { prog: ProgrammeCard; onClose: 
 }
 
 function DeleteModal({ prog, onClose, onDeleted }: { prog: ProgrammeCard; onClose: () => void; onDeleted: () => void }) {
+  const { t } = useI18n();
   const [checking, setChecking] = useState(true);
   const [enrollCount, setEnrollCount] = useState(0);
   const [deleting, setDeleting] = useState(false);
@@ -1329,39 +1347,39 @@ function DeleteModal({ prog, onClose, onDeleted }: { prog: ProgrammeCard; onClos
   };
 
   return (
-    <Shell onClose={onClose} title="Supprimer le programme">
+    <Shell onClose={onClose} title={t("centre", "programsDeleteTitle")}>
       {checking ? (
-        <p className="text-sm text-neutral-400">Vérification...</p>
+        <p className="text-sm text-neutral-400">{t("centre", "programsChecking")}</p>
       ) : enrollCount > 0 ? (
         <div className="space-y-3">
           <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
             <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
             <div>
-              <p className="text-sm font-black text-red-700">Suppression impossible</p>
+              <p className="text-sm font-black text-red-700">{t("centre", "programsDeleteImpossible")}</p>
               <p className="text-xs text-red-600 mt-1">
-                {enrollCount} étudiant{enrollCount > 1 ? "s sont inscrits" : " est inscrit"}. Impossible de supprimer tant qu&apos;ils y sont rattachés.
+                {t("centre", enrollCount > 1 ? "programsEnrolledMany" : "programsEnrolledOne", { count: enrollCount })}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="w-full h-11 rounded-xl text-xs font-black uppercase bg-neutral-100">Fermer</button>
+          <button onClick={onClose} className="w-full h-11 rounded-xl text-xs font-black uppercase bg-neutral-100">{t("centre", "programsClose")}</button>
         </div>
       ) : (
         <div className="space-y-4">
           <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
             <AlertTriangle size={20} className="text-amber-500 shrink-0 mt-0.5" />
             <p className="text-xs text-amber-800">
-              Supprimer <b>« {displayProgrammeName(prog.name)} »</b> et ses niveaux, classes et matières. Action définitive.
+              {t("centre", "programsDeleteWarning", { name: displayProgrammeName(prog.name) })}
             </p>
           </div>
           {error && <p className="text-xs font-bold text-red-500">{error}</p>}
           <div className="flex gap-2">
-            <button onClick={onClose} className="flex-1 h-11 rounded-xl text-xs font-black uppercase bg-neutral-100">Annuler</button>
+            <button onClick={onClose} className="flex-1 h-11 rounded-xl text-xs font-black uppercase bg-neutral-100">{t("centre", "identityCancel")}</button>
             <button
               onClick={confirmDelete}
               disabled={deleting}
               className="flex-1 h-11 rounded-xl text-xs font-black uppercase text-white bg-red-600 disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Supprimer
+              {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} {t("centre", "programsDelete")}
             </button>
           </div>
         </div>

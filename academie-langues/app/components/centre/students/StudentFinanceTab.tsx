@@ -9,6 +9,7 @@ import {
 import { supabase } from "@/app/utils/supabase";
 import { downloadStatementPdf } from "@/app/utils/centerPdfExport";
 import { fetchDocumentExportConfig } from "@/app/utils/documentConfig";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -69,17 +70,17 @@ type Props = {
   onPaid: () => void;
 };
 
-function fmtDate(iso: string | null | undefined) {
+function fmtDate(iso: string | null | undefined, locale: "fr" | "en") {
   if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("fr-FR", {
+  return new Date(iso).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-GB", {
     day: "2-digit",
     month: "short",
     year: "numeric",
   });
 }
 
-function fmtFCFA(n: number) {
-  return Math.round(n).toLocaleString("fr-FR");
+function fmtFCFA(n: number, locale: "fr" | "en") {
+  return Math.round(n).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB");
 }
 
 function FinanceSection({
@@ -195,6 +196,7 @@ export default function StudentFinanceTab({
   filiereName,
   onPaid,
 }: Props) {
+  const { locale, t } = useI18n();
   const router = useRouter();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [installments, setInstallments] = useState<Installment[]>([]);
@@ -243,7 +245,7 @@ export default function StudentFinanceTab({
         { headers: { Authorization: `Bearer ${session.access_token}` } },
       );
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Chargement impossible.");
+      if (!res.ok) throw new Error(json.error || t("centre", "studentFinanceLoadError"));
 
       const s = json.summary || {};
       setSummary({
@@ -305,7 +307,7 @@ export default function StudentFinanceTab({
     } finally {
       setLoading(false);
     }
-  }, [enrollmentId, tuitionFee]);
+  }, [centerId, enrollmentId, tuitionFee, t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -324,11 +326,11 @@ export default function StudentFinanceTab({
     try {
       const config = await fetchDocumentExportConfig(supabase, centerId).catch(() => undefined);
       await downloadStatementPdf({
-        studentName: studentName.trim() || "Apprenant",
-        filiereName: filiereName.trim() || "Programme",
+        studentName: studentName.trim() || t("centre", "studentFinanceLearner"),
+        filiereName: filiereName.trim() || t("centre", "studentFinanceProgram"),
         resteAPayer: remaining,
         installments: installments.map((i) => ({
-          label: i.label || "Échéance",
+          label: i.label || t("centre", "studentFinanceInstallment"),
           due_date: i.due_date || "",
           amount: i.amount,
           paid_amount: Number(i.paid_amount) || 0,
@@ -337,17 +339,18 @@ export default function StudentFinanceTab({
         payments: payments.map((p) => ({
           payment_date: p.payment_date || "",
           receipt_number: p.receipt_number,
-          payment_method: p.payment_method || "Paiement",
+          payment_method: p.payment_method || t("centre", "studentFinancePayment"),
           amount: p.amount,
           recorded_by_name: p.recorded_by_name,
         })),
         config: config
-          ? { ...config, title: config.title?.trim() || "Dossier financier" }
-          : { title: "Dossier financier" },
+          ? { ...config, title: config.title?.trim() || t("centre", "studentFinanceRecordTitle") }
+          : { title: t("centre", "studentFinanceRecordTitle") },
+        locale,
       });
     } catch (e: unknown) {
       console.error(e);
-      alert(e instanceof Error ? e.message : "Téléchargement impossible.");
+      alert(e instanceof Error ? e.message : t("centre", "studentFinanceDownloadError"));
     } finally {
       setPdfBusy(false);
     }
@@ -356,7 +359,7 @@ export default function StudentFinanceTab({
   const submitCoupon = async () => {
     const code = couponCode.trim();
     if (!code) {
-      setCouponError("Saisissez un code coupon.");
+      setCouponError(t("centre", "studentFinanceEnterCoupon"));
       return;
     }
     setCouponApplying(true);
@@ -364,7 +367,7 @@ export default function StudentFinanceTab({
     setCouponSuccess("");
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(t("centre", "passageSessionExpired"));
       const res = await fetch("/api/center/finance-actions", {
         method: "POST",
         headers: {
@@ -378,13 +381,13 @@ export default function StudentFinanceTab({
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Coupon inapplicable.");
+      if (!res.ok) throw new Error(json.error || t("centre", "studentFinanceCouponInvalid"));
       setCouponCode("");
-      setCouponSuccess(`Réduction de ${fmtFCFA(Number(json.discount_amount) || 0)} FCFA appliquée.`);
+      setCouponSuccess(t("centre", "studentFinanceCouponSuccess", { amount: fmtFCFA(Number(json.discount_amount) || 0, locale) }));
       await load();
       onPaid();
     } catch (e: unknown) {
-      setCouponError(e instanceof Error ? e.message : "Erreur.");
+      setCouponError(e instanceof Error ? e.message : t("centre", "passageError"));
     } finally {
       setCouponApplying(false);
     }
@@ -395,7 +398,7 @@ export default function StudentFinanceTab({
     setDeferSaving(true); setDeferError("");
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(t("centre", "passageSessionExpired"));
       const res = await fetch("/api/center/finance-actions", {
         method: "POST",
         headers: {
@@ -410,27 +413,27 @@ export default function StudentFinanceTab({
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Report impossible.");
+      if (!res.ok) throw new Error(json.error || t("centre", "studentFinanceDeferralError"));
       setDeferTarget(null);
       setDeferDate("");
       setDeferReason("");
       await load();
       onPaid();
     } catch (e: unknown) {
-      setDeferError(e instanceof Error ? e.message : "Erreur.");
+      setDeferError(e instanceof Error ? e.message : t("centre", "passageError"));
     } finally {
       setDeferSaving(false);
     }
   };
 
-  if (loading) return <p className="text-sm text-neutral-400 p-8">Chargement du dossier financier…</p>;
+  if (loading) return <p className="text-sm text-neutral-400 p-8">{t("centre", "studentFinanceLoading")}</p>;
 
   return (
     <div className="w-full">
       <FinanceSection
         icon={Wallet}
-        title="Situation financière"
-        description="Coût du programme, versements et solde restant."
+        title={t("centre", "studentFinanceSituation")}
+        description={t("centre", "studentFinanceSituationHelp")}
         actions={
           <>
             {!isPaid && (
@@ -440,7 +443,7 @@ export default function StudentFinanceTab({
                 className="h-9 px-3 rounded-lg text-xs font-semibold text-white inline-flex items-center gap-1.5 hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: ORANGE }}
               >
-                <ArrowDownCircle size={12} /> Encaisser
+                <ArrowDownCircle size={12} /> {t("centre", "studentFinanceCollect")}
               </button>
             )}
             <button
@@ -450,7 +453,7 @@ export default function StudentFinanceTab({
               className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors disabled:opacity-50"
             >
               {pdfBusy ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-              Télécharger
+              {t("centre", "studentFinanceDownload")}
             </button>
           </>
         }
@@ -459,22 +462,22 @@ export default function StudentFinanceTab({
           <div className="rounded-xl border border-black/[0.06] bg-white p-4">
             <div className="flex items-center gap-1.5 mb-2">
               <Lock size={14} className="text-neutral-400" />
-              <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Coût programme</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "studentFinanceProgramCost")}</p>
             </div>
-            <p className="text-xl font-extrabold tracking-tight" style={{ color: BLUE }}>{fmtFCFA(fee)}</p>
+            <p className="text-xl font-extrabold tracking-tight" style={{ color: BLUE }}>{fmtFCFA(fee, locale)}</p>
             <p className="text-xs font-medium text-neutral-400 mt-0.5">FCFA</p>
             {(summary?.discount_amount || 0) > 0 && (
               <p className="text-xs font-semibold text-amber-700 mt-1.5">
-                Réduction : −{fmtFCFA(summary!.discount_amount)} F
+                {t("centre", "studentFinanceDiscount")} −{fmtFCFA(summary!.discount_amount, locale)} F
               </p>
             )}
           </div>
           <div className="rounded-xl border border-black/[0.06] bg-white p-4">
             <div className="flex items-center gap-1.5 mb-2">
               <ArrowDownCircle size={14} className="text-emerald-600" />
-              <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Versé</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "studentFinancePaid")}</p>
             </div>
-            <p className="text-xl font-extrabold tracking-tight text-emerald-700">{fmtFCFA(paid)}</p>
+            <p className="text-xl font-extrabold tracking-tight text-emerald-700">{fmtFCFA(paid, locale)}</p>
             <p className="text-xs font-medium text-neutral-400 mt-0.5">FCFA</p>
           </div>
           <div className={`rounded-xl border p-4 ${
@@ -487,11 +490,11 @@ export default function StudentFinanceTab({
                 ? <CheckCircle2 size={14} className="text-emerald-600" />
                 : <TrendingDown size={14} className="text-red-500" />}
               <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
-                {isPaid ? "Soldé" : "Reste à payer"}
+                {isPaid ? t("centre", "studentFinanceSettled") : t("centre", "studentFinanceRemaining")}
               </p>
             </div>
             <p className={`text-xl font-extrabold tracking-tight ${isPaid ? "text-emerald-700" : "text-red-600"}`}>
-              {fmtFCFA(remaining)}
+              {fmtFCFA(remaining, locale)}
             </p>
             <p className="text-xs font-medium text-neutral-400 mt-0.5">FCFA</p>
           </div>
@@ -500,7 +503,7 @@ export default function StudentFinanceTab({
         {fee > 0 && (
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-neutral-600">Progression</span>
+              <span className="text-sm font-semibold text-neutral-600">{t("centre", "studentFinanceProgress")}</span>
               <span className="text-sm font-bold" style={{ color: isPaid ? "#059669" : ORANGE }}>
                 {progressPct.toFixed(0)}%
               </span>
@@ -516,9 +519,9 @@ export default function StudentFinanceTab({
 
         {summary && (summary.discount_amount || 0) > 0 && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-1">Réduction appliquée</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-1">{t("centre", "studentFinanceDiscountApplied")}</p>
             <p className="text-sm font-semibold text-amber-900">
-              −{fmtFCFA(summary.discount_amount)} FCFA
+              −{fmtFCFA(summary.discount_amount, locale)} FCFA
               {summary.discount_reason ? ` — ${summary.discount_reason}` : ""}
             </p>
           </div>
@@ -527,7 +530,7 @@ export default function StudentFinanceTab({
         {!isPaid && remaining > 0 && (
           <div className="rounded-xl border border-black/[0.06] bg-white p-4 space-y-3">
             <p className="text-sm font-semibold text-neutral-600 flex items-center gap-1.5">
-              <Tag size={14} style={{ color: ORANGE }} /> Appliquer un coupon (Finances)
+              <Tag size={14} style={{ color: ORANGE }} /> {t("centre", "studentFinanceApplyCouponTitle")}
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
               {availableCoupons.length > 0 ? (
@@ -540,10 +543,10 @@ export default function StudentFinanceTab({
                   }}
                   className={`${FIELD_INPUT} flex-1 uppercase text-sm`}
                 >
-                  <option value="">— Sélectionner un coupon du centre —</option>
+                  <option value="">{t("centre", "studentFinanceSelectCoupon")}</option>
                   {availableCoupons.map((c) => (
                     <option key={c.id} value={c.code}>
-                      {c.code} ({c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value)} FCFA`})
+                      {c.code} ({c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value, locale)} FCFA`})
                     </option>
                   ))}
                 </select>
@@ -556,7 +559,7 @@ export default function StudentFinanceTab({
                     setCouponError("");
                     setCouponSuccess("");
                   }}
-                  placeholder="CODE COUPON"
+                  placeholder={t("centre", "studentFinanceCouponPlaceholder")}
                   className={`${FIELD_INPUT} flex-1 uppercase`}
                 />
               )}
@@ -568,7 +571,7 @@ export default function StudentFinanceTab({
                 style={{ backgroundColor: BLUE }}
               >
                 {couponApplying ? <Loader2 size={14} className="animate-spin" /> : null}
-                Appliquer
+                {t("centre", "studentFinanceApply")}
               </button>
             </div>
             {couponError && <p className="text-sm font-semibold text-red-500">{couponError}</p>}
@@ -579,11 +582,11 @@ export default function StudentFinanceTab({
 
       <FinanceSection
         icon={CalendarClock}
-        title="Échéancier"
-        description="Échéances et dates fixées par le centre pour ce programme."
+        title={t("centre", "studentFinanceSchedule")}
+        description={t("centre", "studentFinanceScheduleHelp")}
       >
         {installments.length === 0 ? (
-          <p className="text-sm text-neutral-400 font-medium italic">Aucune échéance enregistrée.</p>
+          <p className="text-sm text-neutral-400 font-medium italic">{t("centre", "studentFinanceNoInstallment")}</p>
         ) : (
           <div className="divide-y divide-black/[0.06] -mx-1">
             {installments.map((inst) => {
@@ -594,28 +597,28 @@ export default function StudentFinanceTab({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-bold text-neutral-800">
-                        {inst.label || (inst.position ? `Échéance ${inst.position}` : "Échéance")}
+                        {inst.label || (inst.position ? `${t("centre", "studentFinanceInstallment")} ${inst.position}` : t("centre", "studentFinanceInstallment"))}
                       </p>
                       <span className="text-xs font-semibold text-neutral-500">
-                        — {fmtDate(inst.due_date)}
+                        — {fmtDate(inst.due_date, locale)}
                       </span>
                       {deferred && (
                         <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
-                          Reporté {inst.original_due_date ? `(init. ${fmtDate(inst.original_due_date)})` : ""}
+                          {t("centre", "studentFinanceDeferred")} {inst.original_due_date ? `(${t("centre", "studentFinanceInitial")} ${fmtDate(inst.original_due_date, locale)})` : ""}
                         </span>
                       )}
                       {sold && (
                         <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">
-                          Soldé
+                          {t("centre", "studentFinanceSettled")}
                         </span>
                       )}
                     </div>
                     {inst.deferral_reason && (
-                      <p className="text-xs text-blue-600 font-medium mt-0.5">Motif : {inst.deferral_reason}</p>
+                      <p className="text-xs text-blue-600 font-medium mt-0.5">{t("centre", "studentFinanceReason")} {inst.deferral_reason}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <p className="text-sm font-extrabold" style={{ color: BLUE }}>{fmtFCFA(inst.amount)} FCFA</p>
+                    <p className="text-sm font-extrabold" style={{ color: BLUE }}>{fmtFCFA(inst.amount, locale)} FCFA</p>
                     {!sold && (
                       <button
                         type="button"
@@ -627,7 +630,7 @@ export default function StudentFinanceTab({
                         }}
                         className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors"
                       >
-                        Report
+                        {t("centre", "studentFinanceDefer")}
                       </button>
                     )}
                   </div>
@@ -640,11 +643,11 @@ export default function StudentFinanceTab({
 
       <FinanceSection
         icon={Clock}
-        title="Historique des paiements"
-        description="Versements enregistrés sur cette inscription."
+        title={t("centre", "studentFinancePaymentHistory")}
+        description={t("centre", "studentFinancePaymentHistoryHelp")}
       >
         {payments.length === 0 ? (
-          <p className="text-sm text-neutral-400 font-medium italic">Aucun paiement enregistré.</p>
+          <p className="text-sm text-neutral-400 font-medium italic">{t("centre", "studentFinanceNoPayment")}</p>
         ) : (
           <div className="divide-y divide-black/[0.06] -mx-1">
             {payments.map((p) => (
@@ -654,15 +657,15 @@ export default function StudentFinanceTab({
                     <ArrowDownCircle size={14} className="text-emerald-600" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-bold" style={{ color: BLUE }}>{p.payment_method || "Paiement"}</p>
+                    <p className="text-sm font-bold" style={{ color: BLUE }}>{p.payment_method || t("centre", "studentFinancePayment")}</p>
                     <p className="text-xs text-neutral-500 font-medium">
-                      {fmtDate(p.payment_date)}
-                      {p.recorded_by_name && ` · par ${p.recorded_by_name}`}
+                      {fmtDate(p.payment_date, locale)}
+                      {p.recorded_by_name && ` · ${t("centre", "studentFinanceBy")} ${p.recorded_by_name}`}
                       {p.receipt_number && ` · ${p.receipt_number}`}
                     </p>
                   </div>
                 </div>
-                <p className="text-sm font-extrabold text-emerald-700 shrink-0">+{fmtFCFA(p.amount)} F</p>
+                <p className="text-sm font-extrabold text-emerald-700 shrink-0">+{fmtFCFA(p.amount, locale)} F</p>
               </div>
             ))}
           </div>
@@ -672,19 +675,19 @@ export default function StudentFinanceTab({
       {events.length > 0 && (
         <FinanceSection
           icon={Tag}
-          title="Journal"
-          description="Reports d’échéance et réductions appliquées."
+          title={t("centre", "studentFinanceJournal")}
+          description={t("centre", "studentFinanceJournalHelp")}
         >
           <div className="divide-y divide-black/[0.06] -mx-1">
             {events.map((ev) => (
               <div key={ev.id} className="py-3.5 px-1">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                  {ev.type === "deferral" ? "Report" : ev.type === "discount" ? "Réduction" : ev.type}
-                  {" · "}{fmtDate(ev.created_at)}
+                  {ev.type === "deferral" ? t("centre", "studentFinanceDefer") : ev.type === "discount" ? t("centre", "financeDiscount") : ev.type}
+                  {" · "}{fmtDate(ev.created_at, locale)}
                   {ev.created_by_name && ` · ${ev.created_by_name}`}
                 </p>
                 <p className="text-sm font-semibold mt-0.5" style={{ color: BLUE }}>
-                  {ev.type === "discount" && ev.amount != null ? `−${fmtFCFA(Number(ev.amount))} F — ` : ""}
+                  {ev.type === "discount" && ev.amount != null ? `−${fmtFCFA(Number(ev.amount), locale)} F — ` : ""}
                   {ev.reason || "—"}
                 </p>
               </div>
@@ -698,20 +701,20 @@ export default function StudentFinanceTab({
           <div className="bg-white rounded-2xl w-full max-w-md p-5 sm:p-6 space-y-4 shadow-xl border border-black/[0.06]">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>
-                Report — {deferTarget.label || "Échéance"}
+                {t("centre", "studentFinanceDefer")} — {deferTarget.label || t("centre", "studentFinanceInstallment")}
               </h3>
               <button
                 type="button"
                 onClick={() => setDeferTarget(null)}
                 className="p-2 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-500"
-                aria-label="Fermer"
+                aria-label={t("centre", "studentFinanceClose")}
               >
                 <X size={16} />
               </button>
             </div>
-            <p className="text-sm text-neutral-500 font-medium">Date actuelle : {fmtDate(deferTarget.due_date)}</p>
+            <p className="text-sm text-neutral-500 font-medium">{t("centre", "studentFinanceCurrentDate")} {fmtDate(deferTarget.due_date, locale)}</p>
             <div>
-              <label className={FIELD_LABEL}>Nouvelle date</label>
+              <label className={FIELD_LABEL}>{t("centre", "studentFinanceNewDate")}</label>
               <input
                 type="date"
                 value={deferDate}
@@ -720,12 +723,12 @@ export default function StudentFinanceTab({
               />
             </div>
             <div>
-              <label className={FIELD_LABEL}>Motif</label>
+              <label className={FIELD_LABEL}>{t("centre", "studentFinanceReasonLabel")}</label>
               <textarea
                 rows={3}
                 value={deferReason}
                 onChange={(e) => setDeferReason(e.target.value)}
-                placeholder="Ex. moratoire demandé par la famille…"
+                placeholder={t("centre", "studentFinanceReasonPlaceholder")}
                 className="w-full p-4 rounded-lg border border-black/[0.08] bg-white font-medium text-sm outline-none resize-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
               />
             </div>
@@ -740,7 +743,7 @@ export default function StudentFinanceTab({
               style={{ backgroundColor: BLUE }}
             >
               {deferSaving ? <Loader2 size={14} className="animate-spin" /> : null}
-              Valider le report
+              {t("centre", "studentFinanceValidateDeferral")}
             </button>
           </div>
         </div>

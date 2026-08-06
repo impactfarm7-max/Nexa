@@ -4,6 +4,7 @@ import type { CSSProperties, ElementType, ReactNode } from "react";
 import { Noto_Sans } from "next/font/google";
 import { Search } from "lucide-react";
 import { BRAND } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 /** UI Google-class — aligné page Programmes */
 export const centerNotoSans = Noto_Sans({
@@ -400,22 +401,23 @@ export function EmptyState({
 
 /** Placeholder produit — IA à venir (désactivé + cadenas). */
 export function AgentIaComingSoonButton({
-  title = "Agent IA NEXA — à venir",
+  title,
 }: {
   title?: string;
 }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
       disabled
-      title={title}
+      title={title || t("centre", "centerAiComingSoonTitle")}
       className="print:hidden flex h-9 sm:h-10 items-center justify-center gap-1.5 rounded-lg px-3 sm:px-3.5 text-xs font-semibold tracking-wide shrink-0 cursor-not-allowed opacity-55"
       style={{ color: BLUE, border: `1.5px solid ${BLUE}` }}
     >
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-      <span className="hidden md:inline">Agent IA NEXA</span>
-      <span className="md:hidden">IA</span>
-      <span className="hidden sm:inline text-[10px] font-medium opacity-70">À venir</span>
+      <span className="hidden md:inline">{t("centre", "centerAiAgent")}</span>
+      <span className="md:hidden">{t("centre", "centerAiShort")}</span>
+      <span className="hidden sm:inline text-[10px] font-medium opacity-70">{t("centre", "centerAiComingSoon")}</span>
     </button>
   );
 }

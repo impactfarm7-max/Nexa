@@ -24,6 +24,7 @@ import CenterPageLoading from "@/app/components/CenterPageLoading";
 import type { PinSettings } from "@/app/utils/pin-crypto";
 import { canManagePinProtectedZones } from "@/app/utils/student-routes";
 import { checkPasswordStrength, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -54,47 +55,32 @@ type CenterAccount = {
   };
 };
 
-const STAFF_ROLE_LABELS: Record<string, string> = {
-  admin: "Administrateur",
-  center_manager: "Directeur de centre",
-  campus_manager: "Directeur de campus",
-  trainer: "Formateur",
-  staff: "Agent administratif",
+const STAFF_ROLE_KEYS: Record<string, string> = {
+  admin: "profileRoleAdministrator", center_manager: "profileRoleCenterDirector", campus_manager: "profileRoleCampusDirector",
+  trainer: "accountRoleTrainer", staff: "profileRoleAdministrativeAgent",
 };
 
-const PIN_TOGGLES: { key: keyof PinSettings; label: string; description: string }[] = [
-  {
-    key: "secure_programme",
-    label: "Sécuriser mon programme",
-    description: "Demander le PIN pour accéder à la gestion du programme.",
-  },
-  {
-    key: "secure_etudiants",
-    label: "Sécuriser étudiants",
-    description: "Demander le PIN pour consulter ou modifier les dossiers étudiants.",
-  },
-  {
-    key: "block_downloads",
-    label: "Bloquer les téléchargements",
-    description: "Exiger le PIN avant tout téléchargement de documents.",
-  },
+const PIN_TOGGLES: { key: keyof PinSettings; labelKey: string; descriptionKey: string }[] = [
+  { key: "secure_programme", labelKey: "profileSecureProgram", descriptionKey: "profileSecureProgramHelp" },
+  { key: "secure_etudiants", labelKey: "profileSecureStudents", descriptionKey: "profileSecureStudentsHelp" },
+  { key: "block_downloads", labelKey: "profileBlockDownloads", descriptionKey: "profileBlockDownloadsHelp" },
 ];
 
-function staffRoleLabel(profileRole?: string | null, membershipRole?: string | null) {
-  if (profileRole && STAFF_ROLE_LABELS[profileRole]) return STAFF_ROLE_LABELS[profileRole];
-  if (membershipRole === "owner") return "Responsable principal";
-  if (membershipRole === "manager") return "Admin centre";
-  if (membershipRole === "staff") return "Formateur";
-  return "Personnel du centre";
-}
-
-function formatDate(value?: string | null) {
+function formatDate(value?: string | null, locale = "fr") {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+  return new Date(value).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
 export default function CenterProfilPage() {
   const router = useRouter();
+  const { t, locale } = useI18n();
+  const staffRoleLabel = (profileRole?: string | null, membershipRole?: string | null) => {
+    if (profileRole && STAFF_ROLE_KEYS[profileRole]) return t("centre", STAFF_ROLE_KEYS[profileRole]);
+    if (membershipRole === "owner") return t("centre", "accountRoleOwner");
+    if (membershipRole === "manager") return t("centre", "accountRoleAdmin");
+    if (membershipRole === "staff") return t("centre", "accountRoleTrainer");
+    return t("centre", "profileCenterStaff");
+  };
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [account, setAccount] = useState<CenterAccount | null>(null);
@@ -129,7 +115,7 @@ export default function CenterProfilPage() {
     try {
       return text ? JSON.parse(text) : {};
     } catch {
-      throw new Error(`Réponse non JSON (${res.status}) : ${text.slice(0, 160)}`);
+      throw new Error(t("centre", "profileNonJsonResponse", { status: res.status, text: text.slice(0, 160) }));
     }
   };
 
@@ -160,7 +146,7 @@ export default function CenterProfilPage() {
     ]);
     const json = await readJson(accountRes);
     if (!accountRes.ok) {
-      setLoadError(json.error || "Impossible d'ouvrir votre profil.");
+      setLoadError(json.error || t("centre", "profileOpenError"));
       setLoading(false);
       return;
     }
@@ -190,12 +176,12 @@ export default function CenterProfilPage() {
     if (prenom && nom) return `${prenom} ${nom}`;
     if (prenom) return prenom;
     if (nom) return nom;
-    return account?.profile?.email || account?.user.email || "Mon profil";
-  }, [account]);
+    return account?.profile?.email || account?.user.email || t("centre", "profileMyProfile");
+  }, [account, t]);
 
   const roleLabel = staffRoleLabel(account?.profile?.role, account?.membership?.role);
   const canManageProtectedZones = canManagePinProtectedZones(account?.profile?.role);
-  const statusLabel = account?.profile?.tag_status || (account?.center.status === "active" ? "Actif" : "Suspendu");
+  const statusLabel = account?.profile?.tag_status || (account?.center.status === "active" ? t("centre", "campusActive") : t("centre", "summarySuspended"));
 
   const startEditing = () => {
     setForm(savedForm);
@@ -218,7 +204,7 @@ export default function CenterProfilPage() {
         body: JSON.stringify(form),
       });
       const json = await readJson(res);
-      if (!res.ok) throw new Error(json.error || "Mise à jour impossible.");
+      if (!res.ok) throw new Error(json.error || t("centre", "accountUpdateError"));
       setAccount((current) => current ? { ...current, profile: json.profile } : current);
       const nextForm = {
         prenom: json.profile?.prenom || "",
@@ -230,7 +216,7 @@ export default function CenterProfilPage() {
       setForm(nextForm);
       setIsEditing(false);
     } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : "Mise à jour impossible.");
+      alert(error instanceof Error ? error.message : t("centre", "accountUpdateError"));
     } finally {
       setSaving(false);
     }
@@ -241,11 +227,11 @@ export default function CenterProfilPage() {
     setPasswordMessage(null);
     const pwdCheck = checkPasswordStrength(passwordForm.password);
     if (!pwdCheck.ok) {
-      setPasswordError(pwdCheck.message || PASSWORD_POLICY_HINT);
+      setPasswordError(locale === "en" ? t("centre", "profileWeakPassword") : (pwdCheck.message || PASSWORD_POLICY_HINT));
       return;
     }
     if (passwordForm.password !== passwordForm.confirm) {
-      setPasswordError("Les deux mots de passe ne correspondent pas.");
+      setPasswordError(t("centre", "profilePasswordsMismatch"));
       return;
     }
 
@@ -254,10 +240,10 @@ export default function CenterProfilPage() {
       const { error } = await supabase.auth.updateUser({ password: passwordForm.password });
       if (error) throw error;
       setPasswordForm({ password: "", confirm: "" });
-      setPasswordMessage("Mot de passe mis a jour avec succes.");
+      setPasswordMessage(t("centre", "profilePasswordUpdated"));
       setPasswordOpen(false);
     } catch (error: unknown) {
-      setPasswordError(error instanceof Error ? error.message : "Impossible de modifier le mot de passe.");
+      setPasswordError(error instanceof Error ? error.message : t("centre", "profilePasswordUpdateError"));
     } finally {
       setPasswordSaving(false);
     }
@@ -268,11 +254,11 @@ export default function CenterProfilPage() {
     if (!file || !account?.user.id) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("Image trop lourde. Maximum 2 Mo.");
+      alert(t("centre", "profileImageTooLarge"));
       return;
     }
     if (!file.type.startsWith("image/")) {
-      alert("Fichier non supporté. Choisissez une image.");
+      alert(t("centre", "profileUnsupportedFile"));
       return;
     }
 
@@ -298,13 +284,13 @@ export default function CenterProfilPage() {
         body: JSON.stringify({ avatar_url: urlData.publicUrl }),
       });
       const json = await readJson(res);
-      if (!res.ok) throw new Error(json.error || "Mise à jour impossible.");
+      if (!res.ok) throw new Error(json.error || t("centre", "accountUpdateError"));
 
       setAccount((current) =>
         current ? { ...current, profile: { ...current.profile!, ...json.profile, avatar_url: publicUrl } } : current
       );
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Erreur lors de l'upload.");
+      alert(err instanceof Error ? err.message : t("centre", "profileUploadError"));
     } finally {
       setAvatarUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -315,11 +301,11 @@ export default function CenterProfilPage() {
     setPinError(null);
     setPinMessage(null);
     if (!/^\d{4}$/.test(createPin.pin)) {
-      setPinError("Le code doit contenir exactement 4 chiffres.");
+      setPinError(t("centre", "profilePinFourDigits"));
       return;
     }
     if (createPin.pin !== createPin.confirm) {
-      setPinError("Les deux codes ne correspondent pas.");
+      setPinError(t("centre", "profilePinsMismatch"));
       return;
     }
 
@@ -333,17 +319,17 @@ export default function CenterProfilPage() {
         body: JSON.stringify({ action: "create", pin: createPin.pin, confirmPin: createPin.confirm }),
       });
       const json = await readJson(res);
-      if (!res.ok) throw new Error(json.error || "Impossible de créer le PIN.");
+      if (!res.ok) throw new Error(json.error || t("centre", "profilePinCreateError"));
       setHasPin(true);
       setCreatePin({ pin: "", confirm: "" });
-      setPinMessage("Code PIN créé avec succès.");
+      setPinMessage(t("centre", "profilePinCreated"));
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Erreur PIN.";
+      const msg = err instanceof Error ? err.message : t("centre", "profilePinError");
       if (/existe d[eé]j[aà]/i.test(msg)) {
         setHasPin(true);
         setCreatePin({ pin: "", confirm: "" });
         setPinError(null);
-        setPinMessage("Vous avez déjà un code PIN (celui créé à votre première connexion). Utilisez « Changer le PIN ».");
+        setPinMessage(t("centre", "profilePinAlreadyExists"));
       } else {
         setPinError(msg);
       }
@@ -356,11 +342,11 @@ export default function CenterProfilPage() {
     setPinError(null);
     setPinMessage(null);
     if (!/^\d{4}$/.test(changePin.oldPin) || !/^\d{4}$/.test(changePin.newPin)) {
-      setPinError("Chaque code doit contenir exactement 4 chiffres.");
+      setPinError(t("centre", "profileEachPinFourDigits"));
       return;
     }
     if (changePin.newPin !== changePin.confirm) {
-      setPinError("Les nouveaux codes ne correspondent pas.");
+      setPinError(t("centre", "profileNewPinsMismatch"));
       return;
     }
 
@@ -379,12 +365,12 @@ export default function CenterProfilPage() {
         }),
       });
       const json = await readJson(res);
-      if (!res.ok) throw new Error(json.error || "Impossible de modifier le PIN.");
+      if (!res.ok) throw new Error(json.error || t("centre", "profilePinChangeError"));
       setChangePin({ oldPin: "", newPin: "", confirm: "" });
       setShowChangePin(false);
-      setPinMessage("Code PIN modifié avec succès.");
+      setPinMessage(t("centre", "profilePinChanged"));
     } catch (err: unknown) {
-      setPinError(err instanceof Error ? err.message : "Erreur PIN.");
+      setPinError(err instanceof Error ? err.message : t("centre", "profilePinError"));
     } finally {
       setPinSaving(false);
     }
@@ -403,11 +389,11 @@ export default function CenterProfilPage() {
         body: JSON.stringify({ pinSettings: next }),
       });
       const json = await readJson(res);
-      if (!res.ok) throw new Error(json.error || "Impossible d'enregistrer les réglages.");
+      if (!res.ok) throw new Error(json.error || t("centre", "profileSettingsSaveError"));
       setPinSettings(json.pinSettings || next);
-      setPinMessage("Réglages de sécurité enregistrés.");
+      setPinMessage(t("centre", "profileSecuritySaved"));
     } catch (err: unknown) {
-      setPinError(err instanceof Error ? err.message : "Erreur réglages.");
+      setPinError(err instanceof Error ? err.message : t("centre", "profileSettingsError"));
       await loadPinState(headers);
     } finally {
       setPinSaving(false);
@@ -434,10 +420,10 @@ export default function CenterProfilPage() {
     return (
       <div className="min-h-[100dvh] bg-white flex items-center justify-center px-4">
           <div className="w-full max-w-md rounded-[2rem] border border-red-100 bg-white p-6 text-center shadow-sm">
-            <p className="text-xl font-black" style={{ color: BLUE }}>Profil indisponible</p>
-            <p className="mt-2 text-sm font-bold text-slate-500">{loadError || "Compte introuvable."}</p>
+            <p className="text-xl font-black" style={{ color: BLUE }}>{t("centre", "profileUnavailable")}</p>
+            <p className="mt-2 text-sm font-bold text-slate-500">{loadError || t("centre", "profileAccountNotFound")}</p>
             <Link href="/centre/dashboard" className="mt-5 inline-flex h-12 items-center justify-center rounded-2xl px-5 text-xs font-black uppercase tracking-widest text-white hover:opacity-90" style={{ backgroundColor: ORANGE }}>
-              Retour dashboard
+              {t("centre", "accountBackDashboardShort")}
             </Link>
           </div>
       </div>
@@ -453,7 +439,7 @@ export default function CenterProfilPage() {
             </Link>
             <div className="min-w-0 flex-1 text-center md:text-left">
               <span className="rounded-full bg-orange-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-orange-600">
-                Mon profil
+                {t("centre", "profileMyProfile")}
               </span>
               <h1 className="mt-2 truncate text-2xl font-black tracking-tight md:text-3xl">{displayName}</h1>
             </div>
@@ -464,7 +450,7 @@ export default function CenterProfilPage() {
                   className="hidden h-11 items-center gap-2 rounded-full border border-orange-100 bg-orange-50 px-4 text-xs font-black uppercase tracking-widest text-orange-600 hover:bg-orange-100 sm:flex"
                 >
                   <Edit2 className="h-4 w-4" />
-                  Modifier
+                  {t("centre", "profileEdit")}
                 </button>
               ) : (
                 <>
@@ -472,7 +458,7 @@ export default function CenterProfilPage() {
                     onClick={cancelEditing}
                     className="hidden h-11 items-center rounded-full border border-neutral-200 bg-neutral-50 px-4 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-neutral-100 sm:flex"
                   >
-                    Annuler
+                    {t("centre", "periodCancel")}
                   </button>
                   <button
                     onClick={saveProfile}
@@ -481,13 +467,13 @@ export default function CenterProfilPage() {
                     style={{ backgroundColor: BLUE }}
                   >
                     <Save className="h-4 w-4" />
-                    {saving ? "..." : "Enregistrer"}
+                    {saving ? "..." : t("centre", "accountSave")}
                   </button>
                 </>
               )}
               <button onClick={signOut} className="flex h-11 items-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-100">
                 <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Déconnexion</span>
+                <span className="hidden sm:inline">{t("centre", "profileLogout")}</span>
               </button>
             </div>
           </div>
@@ -521,7 +507,7 @@ export default function CenterProfilPage() {
                   onClick={() => fileInputRef.current?.click()}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-neutral-600 transition-colors hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600"
                 >
-                  <Camera size={11} /> Modifier la photo
+                  <Camera size={11} /> {t("centre", "profileChangePhoto")}
                 </button>
               )}
 
@@ -541,38 +527,38 @@ export default function CenterProfilPage() {
               <div className="mt-6 border-t border-neutral-100 pt-5 text-left">
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-black text-slate-900">Informations personnelles</p>
+                    <p className="text-sm font-black text-slate-900">{t("centre", "accountPersonalInfo")}</p>
                     <p className="mt-0.5 text-[10px] font-bold text-slate-400">
-                      {isEditing ? "Modifiez vos informations." : "Vos informations de profil."}
+                      {isEditing ? t("centre", "profileEditInfoHelp") : t("centre", "profileInfoHelp")}
                     </p>
                   </div>
                   {isEditing && (
                     <span className="rounded-full bg-orange-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-orange-600">
-                      Edition
+                      {t("centre", "profileEditingBadge")}
                     </span>
                   )}
                 </div>
 
                 {isEditing && (
                   <div className="mb-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                    <Field label="Prénom" value={form.prenom} onChange={(value) => setForm((c) => ({ ...c, prenom: value }))} />
-                    <Field label="Nom" value={form.nom} onChange={(value) => setForm((c) => ({ ...c, nom: value }))} />
+                    <Field label={t("centre", "enrollmentFirstName")} value={form.prenom} onChange={(value) => setForm((c) => ({ ...c, prenom: value }))} />
+                    <Field label={t("centre", "enrollmentLastName")} value={form.nom} onChange={(value) => setForm((c) => ({ ...c, nom: value }))} />
                   </div>
                 )}
 
                 <div className="grid gap-3 text-sm font-semibold text-slate-500 sm:grid-cols-2 lg:grid-cols-1">
-                  <InfoLine icon={Mail} label="Email" value={account.profile?.email || account.user.email || "—"} />
+                  <InfoLine icon={Mail} label={t("centre", "accountEmail")} value={account.profile?.email || account.user.email || "—"} />
                   {isEditing ? (
-                    <Field label="Téléphone / WhatsApp" value={form.phone} onChange={(value) => setForm((c) => ({ ...c, phone: value }))} />
+                    <Field label={t("centre", "accountPhoneWhatsapp")} value={form.phone} onChange={(value) => setForm((c) => ({ ...c, phone: value }))} />
                   ) : (
-                    <InfoLine icon={Phone} label="Téléphone / WhatsApp" value={savedForm.phone || "—"} />
+                    <InfoLine icon={Phone} label={t("centre", "accountPhoneWhatsapp")} value={savedForm.phone || "—"} />
                   )}
                   {isEditing ? (
-                    <Field label="Ville" value={form.ville} onChange={(value) => setForm((c) => ({ ...c, ville: value }))} />
+                    <Field label={t("centre", "settingsCity")} value={form.ville} onChange={(value) => setForm((c) => ({ ...c, ville: value }))} />
                   ) : (
-                    <InfoLine icon={MapPin} label="Ville" value={savedForm.ville || "—"} />
+                    <InfoLine icon={MapPin} label={t("centre", "settingsCity")} value={savedForm.ville || "—"} />
                   )}
-                  <InfoLine icon={Calendar} label="Membre depuis" value={formatDate(account.profile?.created_at || account.user.created_at)} />
+                  <InfoLine icon={Calendar} label={t("centre", "profileMemberSince")} value={formatDate(account.profile?.created_at || account.user.created_at, locale)} />
                 </div>
 
                 <div className="mt-5 flex flex-col gap-3 sm:hidden">
@@ -582,7 +568,7 @@ export default function CenterProfilPage() {
                       className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-orange-100 bg-orange-50 text-sm font-black uppercase tracking-widest text-orange-600"
                     >
                       <Edit2 className="h-4 w-4" />
-                      Modifier
+                      {t("centre", "profileEdit")}
                     </button>
                   ) : (
                     <>
@@ -593,13 +579,13 @@ export default function CenterProfilPage() {
                         style={{ backgroundColor: BLUE }}
                       >
                         <Save className="h-4 w-4" />
-                        {saving ? "Enregistrement..." : "Enregistrer"}
+                        {saving ? t("centre", "accountSaving") : t("centre", "accountSave")}
                       </button>
                       <button
                         onClick={cancelEditing}
                         className="flex h-11 w-full items-center justify-center rounded-2xl bg-neutral-100 text-sm font-black uppercase tracking-widest text-slate-500"
                       >
-                        Annuler
+                        {t("centre", "periodCancel")}
                       </button>
                     </>
                   )}
@@ -612,7 +598,7 @@ export default function CenterProfilPage() {
               className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-neutral-900 text-sm font-black uppercase tracking-widest text-white transition hover:bg-orange-600 lg:hidden"
             >
               <LogOut className="h-4 w-4" />
-              Se déconnecter
+              {t("centre", "profileSignOut")}
             </button>
           </aside>
 
@@ -623,8 +609,8 @@ export default function CenterProfilPage() {
                   <Lock className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-base font-black">Mot de passe</p>
-                  <p className="truncate text-[11px] font-bold text-slate-400">Securisez votre compte centre.</p>
+                  <p className="text-base font-black">{t("centre", "profilePassword")}</p>
+                  <p className="truncate text-[11px] font-bold text-slate-400">{t("centre", "profilePasswordHelp")}</p>
                 </div>
                 {!passwordOpen && (
                   <button
@@ -636,7 +622,7 @@ export default function CenterProfilPage() {
                     }}
                     className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-orange-100 bg-orange-50 px-3 text-[10px] font-black uppercase tracking-wider text-orange-600 hover:bg-orange-100"
                   >
-                    <Edit2 className="h-3.5 w-3.5" /> Modifier
+                    <Edit2 className="h-3.5 w-3.5" /> {t("centre", "profileEdit")}
                   </button>
                 )}
               </div>
@@ -648,15 +634,15 @@ export default function CenterProfilPage() {
               {passwordOpen && (
                 <div className="mt-5 border-t border-neutral-100 pt-5">
                   <div className="mb-4">
-                    <p className="text-sm font-black text-slate-900">Definir un nouveau mot de passe</p>
-                    <p className="mt-1 text-xs font-medium text-slate-400">{PASSWORD_POLICY_HINT}</p>
+                    <p className="text-sm font-black text-slate-900">{t("centre", "profileSetNewPassword")}</p>
+                    <p className="mt-1 text-xs font-medium text-slate-400">{locale === "en" ? t("centre", "profilePasswordPolicy") : PASSWORD_POLICY_HINT}</p>
                   </div>
                   {passwordError && (
                     <p className="mb-4 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-600">{passwordError}</p>
                   )}
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Nouveau mot de passe" value={passwordForm.password} onChange={(value) => setPasswordForm((c) => ({ ...c, password: value }))} type="password" />
-                    <Field label="Confirmer le mot de passe" value={passwordForm.confirm} onChange={(value) => setPasswordForm((c) => ({ ...c, confirm: value }))} type="password" />
+                    <Field label={t("centre", "profileNewPassword")} value={passwordForm.password} onChange={(value) => setPasswordForm((c) => ({ ...c, password: value }))} type="password" />
+                    <Field label={t("centre", "profileConfirmPassword")} value={passwordForm.confirm} onChange={(value) => setPasswordForm((c) => ({ ...c, confirm: value }))} type="password" />
                   </div>
                   <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                     <button
@@ -669,7 +655,7 @@ export default function CenterProfilPage() {
                       disabled={passwordSaving}
                       className="h-11 rounded-xl bg-neutral-100 px-5 text-xs font-black uppercase tracking-wider text-slate-500 hover:bg-neutral-200 disabled:opacity-50"
                     >
-                      Annuler
+                      {t("centre", "periodCancel")}
                     </button>
                     <button
                       type="button"
@@ -679,7 +665,7 @@ export default function CenterProfilPage() {
                       style={{ backgroundColor: ORANGE }}
                     >
                       <ShieldCheck className="h-4 w-4" />
-                      {passwordSaving ? "Mise a jour..." : "Confirmer"}
+                      {passwordSaving ? t("centre", "profileUpdating") : t("centre", "membersConfirm")}
                     </button>
                   </div>
                 </div>
@@ -692,9 +678,9 @@ export default function CenterProfilPage() {
                   <KeyRound className="h-5 w-5" />
                 </div>
                 <div>
-                  <p className="text-xl font-black">Code PIN personnel</p>
+                  <p className="text-xl font-black">{t("centre", "profilePersonalPin")}</p>
                   <p className="text-xs font-bold text-slate-400">
-                    Même code à 4 chiffres que celui défini à votre première connexion — distinct du mot de passe.
+                    {t("centre", "profilePinDescription")}
                   </p>
                 </div>
               </div>
@@ -713,18 +699,18 @@ export default function CenterProfilPage() {
               {!hasPin ? (
                 <div className="space-y-4 rounded-2xl border border-dashed border-orange-200 bg-orange-50/50 p-5">
                   <p className="text-sm font-bold text-slate-600">
-                    Aucun PIN enregistré. Configurez-le depuis la page de première connexion, ou créez-en un ici.
+                    {t("centre", "profileNoPin")}
                   </p>
                   <Link
                     href="/pin/setup"
                     className="inline-flex h-11 items-center gap-2 rounded-2xl border border-orange-200 bg-white px-5 text-xs font-black uppercase tracking-widest text-orange-600 hover:bg-orange-50"
                   >
                     <KeyRound className="h-4 w-4" />
-                    Configurer mon PIN
+                    {t("centre", "profileConfigurePin")}
                   </Link>
                   <div className="grid gap-4 md:grid-cols-2">
-                    <PinField label="Nouveau PIN" value={createPin.pin} onChange={(v) => setCreatePin((c) => ({ ...c, pin: v }))} />
-                    <PinField label="Confirmer le PIN" value={createPin.confirm} onChange={(v) => setCreatePin((c) => ({ ...c, confirm: v }))} />
+                    <PinField label={t("centre", "profileNewPin")} value={createPin.pin} onChange={(v) => setCreatePin((c) => ({ ...c, pin: v }))} />
+                    <PinField label={t("centre", "profileConfirmPin")} value={createPin.confirm} onChange={(v) => setCreatePin((c) => ({ ...c, confirm: v }))} />
                   </div>
                   <button
                     onClick={handleCreatePin}
@@ -733,14 +719,14 @@ export default function CenterProfilPage() {
                     style={{ backgroundColor: ORANGE }}
                   >
                     <ShieldCheck className="h-4 w-4" />
-                    {pinSaving ? "Création..." : "Créer mon PIN"}
+                    {pinSaving ? t("centre", "profilePinCreating") : t("centre", "profileCreateMyPin")}
                   </button>
                 </div>
               ) : (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3">
                     <Lock className="h-4 w-4 text-emerald-600" />
-                    <p className="text-sm font-bold text-emerald-700">PIN actif — même code que votre connexion initiale.</p>
+                    <p className="text-sm font-bold text-emerald-700">{t("centre", "profilePinActive")}</p>
                   </div>
 
                   {!showChangePin ? (
@@ -749,14 +735,14 @@ export default function CenterProfilPage() {
                       className="flex h-11 items-center gap-2 rounded-2xl border border-neutral-200 bg-neutral-50 px-4 text-xs font-black uppercase tracking-widest text-slate-600 hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600"
                     >
                       <KeyRound className="h-4 w-4" />
-                      Changer le PIN
+                      {t("centre", "profileChangePin")}
                     </button>
                   ) : (
                     <div className="space-y-4 rounded-2xl border border-neutral-200 bg-neutral-50 p-5">
-                      <PinField label="Ancien PIN" value={changePin.oldPin} onChange={(v) => setChangePin((c) => ({ ...c, oldPin: v }))} />
+                      <PinField label={t("centre", "profileOldPin")} value={changePin.oldPin} onChange={(v) => setChangePin((c) => ({ ...c, oldPin: v }))} />
                       <div className="grid gap-4 md:grid-cols-2">
-                        <PinField label="Nouveau PIN" value={changePin.newPin} onChange={(v) => setChangePin((c) => ({ ...c, newPin: v }))} />
-                        <PinField label="Confirmer le nouveau PIN" value={changePin.confirm} onChange={(v) => setChangePin((c) => ({ ...c, confirm: v }))} />
+                        <PinField label={t("centre", "profileNewPin")} value={changePin.newPin} onChange={(v) => setChangePin((c) => ({ ...c, newPin: v }))} />
+                        <PinField label={t("centre", "profileConfirmNewPin")} value={changePin.confirm} onChange={(v) => setChangePin((c) => ({ ...c, confirm: v }))} />
                       </div>
                       <div className="flex flex-wrap gap-3">
                         <button
@@ -765,13 +751,13 @@ export default function CenterProfilPage() {
                           className="flex h-11 items-center gap-2 rounded-2xl px-5 text-xs font-black uppercase tracking-widest text-white disabled:opacity-50"
                           style={{ backgroundColor: BLUE }}
                         >
-                          {pinSaving ? "..." : "Enregistrer le nouveau PIN"}
+                          {pinSaving ? "..." : t("centre", "profileSaveNewPin")}
                         </button>
                         <button
                           onClick={() => { setShowChangePin(false); setChangePin({ oldPin: "", newPin: "", confirm: "" }); }}
                           className="flex h-11 items-center rounded-2xl border border-neutral-200 bg-white px-5 text-xs font-black uppercase tracking-widest text-slate-500"
                         >
-                          Annuler
+                          {t("centre", "periodCancel")}
                         </button>
                       </div>
                     </div>
@@ -787,9 +773,9 @@ export default function CenterProfilPage() {
                     <ShieldCheck className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-xl font-black">Zones protégées</p>
+                    <p className="text-xl font-black">{t("centre", "profileProtectedZones")}</p>
                     <p className="text-xs font-bold text-slate-400">
-                      Activez une protection pour exiger votre PIN dans ces sections.
+                      {t("centre", "profileProtectedZonesHelp")}
                     </p>
                   </div>
                 </div>
@@ -812,15 +798,15 @@ export default function CenterProfilPage() {
                         className="mt-1 h-4 w-4 rounded accent-[#eb670e]"
                       />
                       <span>
-                        <span className="block text-sm font-black text-slate-900">{toggle.label}</span>
-                        <span className="mt-1 block text-xs font-bold text-slate-500">{toggle.description}</span>
+                        <span className="block text-sm font-black text-slate-900">{t("centre", toggle.labelKey)}</span>
+                        <span className="mt-1 block text-xs font-bold text-slate-500">{t("centre", toggle.descriptionKey)}</span>
                       </span>
                     </label>
                   ))}
                 </div>
                 {!hasPin && (
                   <p className="mt-4 text-xs font-bold text-orange-600">
-                    Créez d&apos;abord un code PIN pour activer ces options.
+                    {t("centre", "profileCreatePinFirst")}
                   </p>
                 )}
               </section>

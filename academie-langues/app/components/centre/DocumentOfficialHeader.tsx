@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { DocumentExportConfig } from "@/app/utils/documentConfig";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -34,8 +35,8 @@ type Props = {
  */
 export default function DocumentOfficialHeader({
   config,
-  fallbackName = "Établissement",
-  fallbackTitle = "Document officiel",
+  fallbackName,
+  fallbackTitle,
   rightExtra,
   hideMeta = false,
   logoSize = 64,
@@ -44,9 +45,10 @@ export default function DocumentOfficialHeader({
   nameClassName = "text-base sm:text-lg",
   titleClassName = "text-[10px] sm:text-[11px]",
 }: Props) {
+  const { t } = useI18n();
   const accent = config?.accentColor || ORANGE;
-  const name = config?.legalName?.trim() || fallbackName;
-  const title = config?.title?.trim() || fallbackTitle;
+  const name = config?.legalName?.trim() || fallbackName || t("centre", "documentInstitution");
+  const title = config?.title?.trim() || fallbackTitle || t("centre", "documentOfficial");
   const logoUrl = config?.logoUrl || null;
   const showLogo = config?.showLogo !== false && !!logoUrl;
 
@@ -91,7 +93,7 @@ export default function DocumentOfficialHeader({
           className={`sm:text-right text-[10px] text-neutral-500 font-medium space-y-0.5 break-words ${metaClassName}`}
         >
           {showAddress && <p>{config!.address}</p>}
-          {showPhone && <p>Tél : {config!.phone}</p>}
+          {showPhone && <p>{t("centre", "documentPhoneShort")} : {config!.phone}</p>}
           {showRccm && <p>RCCM : {config!.rccmNumber}</p>}
           {showNiu && <p>NIU : {config!.niuNumber}</p>}
           {rightExtra}

@@ -7,9 +7,9 @@ import {
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
+import { useI18n } from "@/app/i18n/I18nProvider";
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
-const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
 
 type WeekSlot = {
   slot_id: string;
@@ -28,11 +28,11 @@ type WeekSlot = {
   exception_id: string | null;
 };
 
-const STATUS_CONFIG: Record<string, { label: string; icon: typeof Ban; bg: string; text: string; border: string }> = {
-  normal: { label: "Confirmé", icon: BookOpen, bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-  cancelled: { label: "Annulé", icon: Ban, bg: "bg-red-50", text: "text-red-600", border: "border-red-200" },
-  rescheduled: { label: "Reporté", icon: RefreshCw, bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
-  substituted: { label: "Remplacement", icon: UserCheck, bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
+const STATUS_CONFIG: Record<string, { labelKey: string; icon: typeof Ban; bg: string; text: string; border: string }> = {
+  normal: { labelKey: "scheduleConfirmed", icon: BookOpen, bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+  cancelled: { labelKey: "scheduleCancelled", icon: Ban, bg: "bg-red-50", text: "text-red-600", border: "border-red-200" },
+  rescheduled: { labelKey: "scheduleRescheduled", icon: RefreshCw, bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
+  substituted: { labelKey: "scheduleReplacement", icon: UserCheck, bg: "bg-blue-50", text: "text-blue-700", border: "border-blue-200" },
 };
 
 function getMonday(d: Date): Date {
@@ -57,6 +57,8 @@ function isPastDay(d: Date): boolean {
 }
 
 export default function TrainerSchedulePage() {
+  const { locale, t } = useI18n();
+  const days = ["scheduleMonday", "scheduleTuesday", "scheduleWednesday", "scheduleThursday", "scheduleFriday", "scheduleSaturday"].map((key) => t("centre", key));
   const [loading, setLoading] = useState(true);
   const [centerId, setCenterId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -152,10 +154,10 @@ export default function TrainerSchedulePage() {
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Calendar size={16} style={{ color: ORANGE }} />
-                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Mon emploi du temps</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{t("centre", "scheduleTitle")}</span>
               </div>
               <h1 className="text-2xl font-black tracking-tight" style={{ color: BLUE }}>
-                Bonjour {trainerName.split(" ")[0] || "Formateur"}
+                {t("centre", "scheduleHello", { name: trainerName.split(" ")[0] || t("centre", "scheduleTrainer") })}
               </h1>
             </div>
 
@@ -163,7 +165,7 @@ export default function TrainerSchedulePage() {
             <div className="flex items-center gap-1 bg-neutral-100 rounded-xl p-0.5 border">
               <button onClick={() => navigateWeek("prev")} className="p-2 rounded-lg hover:bg-white text-neutral-500 transition-colors"><ChevronLeft size={14} /></button>
               <button onClick={goToday} className="text-[10px] font-black uppercase px-3 tracking-wider hover:text-orange-600 transition-colors">
-                Sem. du {weekStart.toLocaleDateString("fr-FR", { day: "2-digit", month: "long" })}
+                {t("centre", "scheduleWeekOf", { date: weekStart.toLocaleDateString(locale === "fr" ? "fr-FR" : "en-GB", { day: "2-digit", month: "long" }) })}
               </button>
               <button onClick={() => navigateWeek("next")} className="p-2 rounded-lg hover:bg-white text-neutral-500 transition-colors"><ChevronRight size={14} /></button>
             </div>
@@ -173,16 +175,16 @@ export default function TrainerSchedulePage() {
           <div className="flex gap-3">
             <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-1.5">
               <BookOpen size={13} className="text-emerald-600" />
-              <span className="text-[10px] font-black text-emerald-700">{activeCount} cours</span>
+              <span className="text-[10px] font-black text-emerald-700">{t("centre", "scheduleCourses", { count: activeCount })}</span>
             </div>
             <div className="flex items-center gap-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-1.5">
               <Clock size={13} className="text-blue-600" />
-              <span className="text-[10px] font-black text-blue-700">{totalHours.toFixed(0)}h cette semaine</span>
+              <span className="text-[10px] font-black text-blue-700">{t("centre", "scheduleHoursWeek", { count: totalHours.toFixed(0) })}</span>
             </div>
             {cancelledCount > 0 && (
               <div className="flex items-center gap-2 bg-red-50 border border-red-100 rounded-xl px-3 py-1.5">
                 <Ban size={13} className="text-red-500" />
-                <span className="text-[10px] font-black text-red-600">{cancelledCount} annulé{cancelledCount > 1 ? "s" : ""}</span>
+                <span className="text-[10px] font-black text-red-600">{t("centre", cancelledCount > 1 ? "scheduleCancelledMany" : "scheduleCancelledOne", { count: cancelledCount })}</span>
               </div>
             )}
           </div>
@@ -197,15 +199,15 @@ export default function TrainerSchedulePage() {
           ) : totalSlots === 0 ? (
             <div className="max-w-md mx-auto mt-20 text-center">
               <Calendar size={48} className="text-neutral-200 mx-auto mb-4" />
-              <p className="text-lg font-black" style={{ color: BLUE }}>Aucun cours cette semaine</p>
-              <p className="text-sm text-neutral-400 mt-2">Votre emploi du temps est libre. Profitez-en pour préparer vos supports de cours.</p>
+              <p className="text-lg font-black" style={{ color: BLUE }}>{t("centre", "scheduleNoCourse")}</p>
+              <p className="text-sm text-neutral-400 mt-2">{t("centre", "scheduleNoCourseHelp")}</p>
             </div>
           ) : (
             /* GRILLE HEBDOMADAIRE */
             <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
               {/* En-tête des jours */}
               <div className="grid grid-cols-6 border-b bg-neutral-50">
-                {DAYS.map((day, i) => {
+                {days.map((day, i) => {
                   const dayDate = new Date(weekStart);
                   dayDate.setDate(dayDate.getDate() + i);
                   const isToday = dayDate.toDateString() === new Date().toDateString();
@@ -242,7 +244,7 @@ export default function TrainerSchedulePage() {
 
               {/* Corps */}
               <div className="grid grid-cols-6 divide-x divide-neutral-100 min-h-[450px]">
-                {DAYS.map((_, dayIdx) => {
+                {days.map((_, dayIdx) => {
                   const dayNum = dayIdx + 1;
                   const daySlots = (slotsByDay[dayNum] || []).sort((a, b) => a.start_time.localeCompare(b.start_time));
                   const dayDate = new Date(weekStart);
@@ -294,7 +296,7 @@ export default function TrainerSchedulePage() {
                             {/* Badge remplacement */}
                             {slot.status === "substituted" && (
                               <p className="text-[9px] font-bold text-blue-600 mt-1 flex items-center gap-0.5">
-                                <UserCheck size={9} /> Vous remplacez
+                                <UserCheck size={9} /> {t("centre", "scheduleYouReplace")}
                               </p>
                             )}
                           </button>
@@ -304,7 +306,7 @@ export default function TrainerSchedulePage() {
                       {daySlots.length === 0 && (
                         <div className="h-full flex items-center justify-center py-12">
                           <span className={`text-[10px] font-bold uppercase tracking-wider ${isPast ? "text-neutral-200" : "text-neutral-200"}`}>
-                            {isPast ? "Passé" : "Libre"}
+                            {isPast ? t("centre", "schedulePast") : t("centre", "scheduleFree")}
                           </span>
                         </div>
                       )}
@@ -320,7 +322,7 @@ export default function TrainerSchedulePage() {
       {selectedSlot && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setSelectedSlot(null)}>
           <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 relative" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => setSelectedSlot(null)} className="absolute top-4 right-4 text-neutral-400 hover:text-black">✕</button>
+            <button onClick={() => setSelectedSlot(null)} className="absolute top-4 right-4 text-neutral-400 hover:text-black" aria-label={t("centre", "scheduleClose")}>✕</button>
 
             {/* Statut */}
             {(() => {
@@ -328,7 +330,7 @@ export default function TrainerSchedulePage() {
               const StatusIcon = cfg.icon;
               return (
                 <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase border ${cfg.bg} ${cfg.text} ${cfg.border} mb-4`}>
-                  <StatusIcon size={12} /> {cfg.label}
+                  <StatusIcon size={12} /> {t("centre", cfg.labelKey)}
                 </div>
               );
             })()}
@@ -337,7 +339,7 @@ export default function TrainerSchedulePage() {
             <h3 className="text-lg font-black" style={{ color: BLUE }}>{selectedSlot.title}</h3>
             <p className="text-sm text-neutral-500 font-bold mt-1 flex items-center gap-1.5">
               <Clock size={14} />
-              {DAYS[selectedSlot.day_of_week - 1]} {formatTime(selectedSlot.start_time)} — {formatTime(selectedSlot.end_time)}
+              {days[selectedSlot.day_of_week - 1]} {formatTime(selectedSlot.start_time)} — {formatTime(selectedSlot.end_time)}
             </p>
 
             {/* Infos */}
@@ -358,7 +360,7 @@ export default function TrainerSchedulePage() {
               {selectedSlot.discipline_name && (
                 <div className="flex items-center gap-2 bg-neutral-50 rounded-xl px-3 py-2.5 border">
                   <BookOpen size={14} className="text-neutral-400" />
-                  <span className="font-bold text-neutral-600">Matière : {selectedSlot.discipline_name}</span>
+                  <span className="font-bold text-neutral-600">{t("centre", "scheduleSubject")} {selectedSlot.discipline_name}</span>
                 </div>
               )}
             </div>
@@ -375,13 +377,13 @@ export default function TrainerSchedulePage() {
             {selectedSlot.status === "substituted" && selectedSlot.formateur_prenom && (
               <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-center gap-2">
                 <UserCheck size={14} className="text-blue-600" />
-                <p className="text-xs font-bold text-blue-700">Vous assurez ce cours en remplacement</p>
+                <p className="text-xs font-bold text-blue-700">{t("centre", "scheduleReplacementHelp")}</p>
               </div>
             )}
 
             {/* Date précise */}
             <p className="text-[10px] text-neutral-400 font-bold mt-4 text-center uppercase tracking-wider">
-              {new Date(selectedSlot.actual_date).toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+              {new Date(selectedSlot.actual_date).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-GB", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
             </p>
           </div>
         </div>

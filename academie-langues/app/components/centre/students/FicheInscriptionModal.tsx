@@ -5,6 +5,7 @@ import { Download, Loader2, ArrowLeft, Printer } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHeader";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -57,6 +58,11 @@ const ID_TYPE_LABELS: Record<string, string> = {
   carte_sejour: "Carte de Séjour",
   autre: "Autre Document",
 };
+
+function guardianRelationLabel(value: string | null, locale: "fr" | "en") {
+  if (!value || locale === "fr") return value || "—";
+  return ({ "Père": "Father", "Mère": "Mother", Tuteur: "Guardian", Oncle: "Uncle", Tante: "Aunt", "Frère": "Brother", "Sœur": "Sister", Autre: "Other" } as Record<string, string>)[value] || value;
+}
 
 type InstallmentItem = {
   id?: string;
@@ -130,7 +136,8 @@ function fmtPdfFCFA(n: number | null | undefined): string {
   return `${formatted} FCFA`;
 }
 
-function formatFicheModalitesLines(enr: any, instRows: any[] | null): string[] {
+function formatFicheModalitesLines(enr: any, instRows: any[] | null, locale: "fr" | "en"): string[] {
+  const isEn = locale === "en";
   const deduped = dedupeInstallments(
     (instRows || []).map((r) => ({
       ...r,
@@ -140,13 +147,13 @@ function formatFicheModalitesLines(enr: any, instRows: any[] | null): string[] {
 
   if (deduped && deduped.length > 0) {
     return deduped.map((inst, idx) => {
-      const posName = inst.position ? `Échéance ${inst.position}` : `Échéance ${idx + 1}`;
+      const posName = `${isEn ? "Installment" : "Échéance"} ${inst.position || idx + 1}`;
       const label = inst.label && inst.label.trim() && !/^échéance \d+$/i.test(inst.label.trim())
         ? inst.label.trim()
         : posName;
       const amtStr = fmtPdfFCFA(inst.amount);
       const dateStr = inst.due_date
-        ? new Date(inst.due_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
+        ? new Date(inst.due_date).toLocaleDateString(isEn ? "en-GB" : "fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" })
         : "";
       if (dateStr && amtStr) return `${label} : ${amtStr} (${dateStr})`;
       if (amtStr) return `${label} : ${amtStr}`;
@@ -163,11 +170,11 @@ function formatFicheModalitesLines(enr: any, instRows: any[] | null): string[] {
       const obj = plan as any;
       if (Array.isArray(obj.installments) && obj.installments.length > 0) {
         return obj.installments.map((item: any, idx: number) => {
-          const lbl = item.label || (idx === 0 ? "Échéance 1 (Acompte)" : `Échéance ${idx + 1}`);
+          const lbl = item.label || (idx === 0 ? (isEn ? "Installment 1 (Deposit)" : "Échéance 1 (Acompte)") : `${isEn ? "Installment" : "Échéance"} ${idx + 1}`);
           const amt = Number(item.montant || item.amount) || 0;
           const amtFormatted = amt > 0 ? fmtPdfFCFA(amt) : "";
           const jours = Number(item.jours) || 0;
-          const delayStr = jours > 0 ? `+${jours} jours` : "À l'inscription";
+          const delayStr = jours > 0 ? `+${jours} ${isEn ? "days" : "jours"}` : (isEn ? "Upon enrollment" : "À l'inscription");
           return `${lbl}${amtFormatted ? ` : ${amtFormatted}` : ""}${delayStr ? ` (${delayStr})` : ""}`;
         });
       }
@@ -177,10 +184,10 @@ function formatFicheModalitesLines(enr: any, instRows: any[] | null): string[] {
 
   const fee = Number(enr?.tuition_fee) || 0;
   if (fee > 0) {
-    return [`Frais de formation : ${fmtPdfFCFA(fee)} (Échéances selon programme)`];
+    return [`${isEn ? "Training fees" : "Frais de formation"} : ${fmtPdfFCFA(fee)} (${isEn ? "Installments according to the program" : "Échéances selon programme"})`];
   }
 
-  return ["Paiement en tranches selon le programme"];
+  return [isEn ? "Payment in installments according to the program" : "Paiement en tranches selon le programme"];
 }
 
 async function loadImageDataUrl(url: string): Promise<string | null> {
@@ -198,7 +205,21 @@ async function loadImageDataUrl(url: string): Promise<string | null> {
   }
 }
 
-async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExportConfig | null) {
+async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExportConfig | null, locale: "fr" | "en") {
+  const isEn = locale === "en";
+  const labels = isEn ? {
+    institution: "INSTITUTION", title: "ACADEMIC ENROLLMENT FORM", phone: "Phone", issued: "Issued on",
+    identity: "1. LEARNER IDENTITY", lastName: "Last name:", firstName: "First name:", email: "Email:", country: "Country:", region: "Region:",
+    documentGuardian: "2. IDENTITY DOCUMENT & GUARDIAN", documentType: "Document type:", documentNumber: "Document No.:", guardian: "Guardian:", relationshipPhone: "Relationship / Phone:", notProvided: "Not provided",
+    enrollmentFinance: "3. ACADEMIC ENROLLMENT & FINANCIAL COMMITMENT", program: "Program:", levelDuration: "Level/Duration:", campus: "Campus:", classroom: "Class:", totalAmount: "Total Amount:", enrollmentStatus: "Enrollment Status:", terms: "Payment terms:", active: "Active", pending: "Pending", year: "Year",
+    learner: "The Learner", guardianSignature: "The Guardian", director: "The Director", signature: "Signature", stampSignature: "Stamp & Signature",
+  } : {
+    institution: "ÉTABLISSEMENT", title: "FICHE D'INSCRIPTION ACADÉMIQUE", phone: "Tél", issued: "Édité le",
+    identity: "1. IDENTITÉ DE L'APPRENANT", lastName: "Nom :", firstName: "Prénom :", email: "Email :", country: "Pays :", region: "Région :",
+    documentGuardian: "2. PIÈCE D'IDENTITÉ & TUTEUR", documentType: "Type pièce :", documentNumber: "N° Pièce :", guardian: "Tuteur :", relationshipPhone: "Lien / Tél :", notProvided: "Non renseigné",
+    enrollmentFinance: "3. INSCRIPTION ACADÉMIQUE & ENGAGEMENT FINANCIER", program: "Programme :", levelDuration: "Niveau/Durée :", campus: "Campus :", classroom: "Classe :", totalAmount: "Montant Total :", enrollmentStatus: "Statut Inscription :", terms: "Modalités :", active: "Actif", pending: "En attente", year: "Année",
+    learner: "L'Apprenant", guardianSignature: "Le Tuteur", director: "Le Directeur", signature: "Signature", stampSignature: "Cachet & Signature",
+  };
   const { default: jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -220,18 +241,18 @@ async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExpo
   doc.setTextColor(...blueRgb);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text(config?.legalName || data.center_name || "ÉTABLISSEMENT", headerX, 18);
+  doc.text(config?.legalName || data.center_name || labels.institution, headerX, 18);
 
   doc.setTextColor(...accentRgb);
   doc.setFontSize(9);
-  doc.text("FICHE D'INSCRIPTION ACADÉMIQUE", headerX, 24);
+  doc.text(labels.title, headerX, 24);
 
   const metaLines: string[] = [];
   if (config?.showAddress && config?.address) metaLines.push(config.address);
-  if (config?.showPhone && config?.phone) metaLines.push(`Tél : ${config.phone}`);
+  if (config?.showPhone && config?.phone) metaLines.push(`${labels.phone} : ${config.phone}`);
   if (config?.showRccm && config?.rccmNumber) metaLines.push(`RCCM : ${config.rccmNumber}`);
   if (config?.showNiu && config?.niuNumber) metaLines.push(`NIU : ${config.niuNumber}`);
-  metaLines.push(`Édité le ${new Date().toLocaleDateString("fr-FR")}`);
+  metaLines.push(`${labels.issued} ${new Date().toLocaleDateString(isEn ? "en-GB" : "fr-FR")}`);
 
   let metaY = 14;
   doc.setFont("helvetica", "normal");
@@ -253,16 +274,16 @@ async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExpo
   doc.setTextColor(...blueRgb);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.text("1. IDENTITÉ DE L'APPRENANT", 14, currentY);
+  doc.text(labels.identity, 14, currentY);
   currentY += 4;
 
   autoTable(doc, {
     startY: currentY,
     head: [],
     body: [
-      ["Nom :", (data.nom || "").toUpperCase(), "Prénom :", (data.prenom || "").toUpperCase()],
-      ["Email :", data.email || "", "Téléphone :", data.phone ? `${data.country_code ?? ""} ${data.phone}` : "—"],
-      ["Pays :", data.country || "—", "Région :", data.region || "—"],
+      [labels.lastName, (data.nom || "").toUpperCase(), labels.firstName, (data.prenom || "").toUpperCase()],
+      [labels.email, data.email || "", `${labels.phone} :`, data.phone ? `${data.country_code ?? ""} ${data.phone}` : "—"],
+      [labels.country, data.country || "—", labels.region, data.region || "—"],
     ],
     styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2 },
     columnStyles: {
@@ -281,17 +302,17 @@ async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExpo
   doc.setTextColor(...blueRgb);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.text("2. PIÈCE D'IDENTITÉ & TUTEUR", 14, currentY);
+  doc.text(labels.documentGuardian, 14, currentY);
   currentY += 4;
 
-  const idTypeLabel = data.id_type === "cni" ? "Carte Nationale d'Identité" : data.id_type === "passeport" ? "Passeport" : data.id_type || "Non renseigné";
+  const idTypeLabel = data.id_type === "cni" ? (isEn ? "National Identity Card" : "Carte Nationale d'Identité") : data.id_type === "passeport" ? (isEn ? "Passport" : "Passeport") : data.id_type || labels.notProvided;
 
   autoTable(doc, {
     startY: currentY,
     head: [],
     body: [
-      ["Type pièce :", idTypeLabel, "N° Pièce :", data.id_number || "Non renseigné"],
-      ["Tuteur :", data.guardian_name || "—", "Lien / Tél :", `${data.guardian_relation || "—"} (${data.guardian_phone || "—"})`],
+      [labels.documentType, idTypeLabel, labels.documentNumber, data.id_number || labels.notProvided],
+      [labels.guardian, data.guardian_name || "—", labels.relationshipPhone, `${guardianRelationLabel(data.guardian_relation, locale)} (${data.guardian_phone || "—"})`],
     ],
     styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2 },
     columnStyles: {
@@ -310,11 +331,11 @@ async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExpo
   doc.setTextColor(...blueRgb);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.text("3. INSCRIPTION ACADÉMIQUE & ENGAGEMENT FINANCIER", 14, currentY);
+  doc.text(labels.enrollmentFinance, 14, currentY);
   currentY += 4;
 
-  const statusLabel = data.enrollment_status === "active" ? "Actif" : data.enrollment_status === "draft" ? "En attente" : data.enrollment_status;
-  const niveauOrDuree = data.niveau_annee ? `Année ${data.niveau_annee}` : (data.duration_label || "—");
+  const statusLabel = data.enrollment_status === "active" ? labels.active : data.enrollment_status === "draft" ? labels.pending : data.enrollment_status;
+  const niveauOrDuree = data.niveau_annee ? `${labels.year} ${data.niveau_annee}` : (data.duration_label || "—");
 
   const modalitesFormatted = data.modalitesLines.join("\n");
 
@@ -322,10 +343,10 @@ async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExpo
     startY: currentY,
     head: [],
     body: [
-      ["Programme :", data.filiere_name.toUpperCase(), "Niveau/Durée :", niveauOrDuree],
-      ["Campus :", data.campus_name || "—", "Classe :", data.groupe_nom || "—"],
-      ["Montant Total :", fmtPdfFCFA(data.tuition_fee), "Statut Inscription :", statusLabel],
-      ["Modalités :", modalitesFormatted, "", ""],
+      [labels.program, data.filiere_name.toUpperCase(), labels.levelDuration, niveauOrDuree],
+      [labels.campus, data.campus_name || "—", labels.classroom, data.groupe_nom || "—"],
+      [labels.totalAmount, fmtPdfFCFA(data.tuition_fee), labels.enrollmentStatus, statusLabel],
+      [labels.terms, modalitesFormatted, "", ""],
     ],
     styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2, textColor: [20, 20, 20] },
     columnStyles: {
@@ -344,7 +365,9 @@ async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExpo
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   doc.setTextColor(100, 100, 100);
-  const clause = `Je soussigné(e), ${(data.prenom || "").toUpperCase()} ${(data.nom || "").toUpperCase()}, déclare avoir pris connaissance du règlement intérieur de l'établissement et m'engage à respecter les conditions d'inscription, de scolarité et de paiement définies par ${data.center_name}. Les informations fournies ci-dessus sont exactes et complètes.`;
+  const clause = isEn
+    ? `I, the undersigned, ${(data.prenom || "").toUpperCase()} ${(data.nom || "").toUpperCase()}, declare that I have read the institution's internal regulations and agree to comply with the enrollment, education and payment conditions defined by ${data.center_name}. The information provided above is accurate and complete.`
+    : `Je soussigné(e), ${(data.prenom || "").toUpperCase()} ${(data.nom || "").toUpperCase()}, déclare avoir pris connaissance du règlement intérieur de l'établissement et m'engage à respecter les conditions d'inscription, de scolarité et de paiement définies par ${data.center_name}. Les informations fournies ci-dessus sont exactes et complètes.`;
   doc.text(clause, 14, currentY, { maxWidth: pageWidth - 28 });
 
   currentY += 12;
@@ -354,24 +377,24 @@ async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExpo
   doc.setFontSize(8);
   doc.setTextColor(...blueRgb);
 
-  doc.text("L'Apprenant", 25, currentY);
-  if (data.guardian_name) doc.text("Le Tuteur", 95, currentY);
-  doc.text("Le Directeur", 160, currentY);
+  doc.text(labels.learner, 25, currentY);
+  if (data.guardian_name) doc.text(labels.guardianSignature, 95, currentY);
+  doc.text(labels.director, 160, currentY);
 
   currentY += 18;
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7);
   doc.setTextColor(150, 150, 150);
-  doc.text("Signature", 25, currentY);
-  if (data.guardian_name) doc.text("Signature", 95, currentY);
-  doc.text("Cachet & Signature", 160, currentY);
+  doc.text(labels.signature, 25, currentY);
+  if (data.guardian_name) doc.text(labels.signature, 95, currentY);
+  doc.text(labels.stampSignature, 160, currentY);
 
   currentY += 10;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(100, 100, 100);
-  const todayStr = new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
-  doc.text(`Fait à __________________, le ${todayStr}`, pageWidth - 14, currentY, { align: "right" });
+  const todayStr = new Date().toLocaleDateString(isEn ? "en-GB" : "fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+  doc.text(isEn ? `Signed at __________________, on ${todayStr}` : `Fait à __________________, le ${todayStr}`, pageWidth - 14, currentY, { align: "right" });
 
   if (config?.footerText) {
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -383,10 +406,11 @@ async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExpo
 
   const safeNom = (data.nom || "").replace(/[^a-zA-Z0-9_-]/g, "_");
   const safePrenom = (data.prenom || "").replace(/[^a-zA-Z0-9_-]/g, "_");
-  doc.save(`fiche-inscription-${safeNom}-${safePrenom}.pdf`);
+  doc.save(`${isEn ? "enrollment-form" : "fiche-inscription"}-${safeNom}-${safePrenom}.pdf`);
 }
 
 export default function FicheInscriptionModal({ studentId, enrollmentId, onClose }: Props) {
+  const { locale, t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<FicheData | null>(null);
   const [docConfig, setDocConfig] = useState<DocumentExportConfig | null>(null);
@@ -438,17 +462,17 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
       const nivAnnee = enr?.niveaux?.annee ?? null;
       let durationLabel: string | null = null;
       if (!nivAnnee) {
-        if (enr?.duration_months) durationLabel = `${enr.duration_months} mois`;
-        else if (enr?.duration_value && enr?.duration_unit === "month") durationLabel = `${enr.duration_value} mois`;
-        else if (enr?.duration_value && enr?.duration_unit === "week") durationLabel = `${enr.duration_value} sem.`;
-        else if (enr?.duration_value && enr?.duration_unit === "day") durationLabel = `${enr.duration_value} j`;
+        if (enr?.duration_months) durationLabel = `${enr.duration_months} ${locale === "en" ? "months" : "mois"}`;
+        else if (enr?.duration_value && enr?.duration_unit === "month") durationLabel = `${enr.duration_value} ${locale === "en" ? "months" : "mois"}`;
+        else if (enr?.duration_value && enr?.duration_unit === "week") durationLabel = `${enr.duration_value} ${locale === "en" ? "weeks" : "sem."}`;
+        else if (enr?.duration_value && enr?.duration_unit === "day") durationLabel = `${enr.duration_value} ${locale === "en" ? "days" : "j"}`;
         else if (enr?.filieres?.duree_valeur && enr?.filieres?.duree_unite) {
           const u = enr.filieres.duree_unite;
-          durationLabel = `${enr.filieres.duree_valeur} ${u === "mois" ? "mois" : u === "semaines" ? "sem." : "j"}`;
-        } else if (enr?.niveaux?.mois) durationLabel = `${enr.niveaux.mois} mois`;
+          durationLabel = `${enr.filieres.duree_valeur} ${locale === "en" ? (u === "mois" ? "months" : u === "semaines" ? "weeks" : "days") : (u === "mois" ? "mois" : u === "semaines" ? "sem." : "j")}`;
+        } else if (enr?.niveaux?.mois) durationLabel = `${enr.niveaux.mois} ${locale === "en" ? "months" : "mois"}`;
       }
 
-      const modalitesLines = formatFicheModalitesLines(enr, instRows || []);
+      const modalitesLines = formatFicheModalitesLines(enr, instRows || [], locale);
 
       setData({
         prenom: profile.prenom,
@@ -478,7 +502,7 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
 
         modalitesLines: modalitesLines,
 
-        center_name: exportConfig.legalName ?? center?.name ?? "Établissement",
+        center_name: exportConfig.legalName ?? center?.name ?? t("centre", "bulletinInstitution"),
         center_address: exportConfig.address ?? null,
         center_phone: exportConfig.phone ?? null,
         center_logo: exportConfig.logoUrl ?? null,
@@ -488,13 +512,13 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
 
       setLoading(false);
     })();
-  }, [studentId, enrollmentId]);
+  }, [studentId, enrollmentId, locale, t]);
 
   const handleDownloadPdf = async () => {
     if (!data) return;
     setDownloadingPdf(true);
     try {
-      await downloadFicheInscriptionPdf(data, docConfig);
+      await downloadFicheInscriptionPdf(data, docConfig, locale);
     } catch (err) {
       console.error("PDF download error:", err);
     } finally {
@@ -514,7 +538,7 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
 
   const formatDate = (iso: string | null) => {
     if (!iso) return "—";
-    return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+    return new Date(iso).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-GB", { day: "2-digit", month: "long", year: "numeric" });
   };
 
   return (
@@ -527,20 +551,20 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
           className="flex items-center gap-2 h-9 px-3 rounded-xl border border-neutral-200 text-[11px] font-bold text-neutral-700 hover:bg-neutral-50 transition-colors"
         >
           <ArrowLeft size={15} />
-          <span className="hidden sm:inline">Retour</span>
+          <span className="hidden sm:inline">{t("centre", "enrollmentFormBack")}</span>
         </button>
         <p className="text-[11px] font-black uppercase tracking-wider text-neutral-400 truncate min-w-0">
-          Aperçu — Fiche d&apos;inscription
+          {t("centre", "enrollmentFormPreview")}
         </p>
         <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => window.print()}
             className="flex items-center gap-1.5 h-9 px-3 rounded-xl border border-neutral-200 text-[11px] font-bold text-neutral-700 hover:bg-neutral-50 transition-colors"
-            title="Imprimer le document"
+            title={t("centre", "enrollmentFormPrintTitle")}
           >
             <Printer size={14} />
-            <span className="hidden sm:inline">Imprimer</span>
+            <span className="hidden sm:inline">{t("centre", "enrollmentFormPrint")}</span>
           </button>
           <button
             type="button"
@@ -548,10 +572,10 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
             disabled={downloadingPdf}
             className="flex items-center gap-2 h-9 px-3 sm:px-4 rounded-xl text-[11px] font-black uppercase text-white shrink-0 disabled:opacity-50 cursor-pointer"
             style={{ backgroundColor: ORANGE }}
-            title="Télécharger la fiche en fichier PDF"
+            title={t("centre", "enrollmentFormDownloadTitle")}
           >
             {downloadingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            <span>Télécharger (PDF)</span>
+            <span>{t("centre", "enrollmentFormDownloadPdf")}</span>
           </button>
         </div>
       </div>
@@ -566,7 +590,7 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
           <DocumentOfficialHeader
             config={docConfig}
             fallbackName={data.center_name}
-            fallbackTitle="Fiche d'Inscription"
+            fallbackTitle={t("centre", "enrollmentFormFallbackTitle")}
           />
 
           {/* PHOTO + IDENTITÉ */}
@@ -579,64 +603,64 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
                   <p className="text-3xl font-black" style={{ color: BLUE }}>
                     {data.prenom[0]}{data.nom[0]}
                   </p>
-                  <p className="text-[8px] text-neutral-400 mt-1">PHOTO</p>
+                  <p className="text-[8px] text-neutral-400 mt-1">{t("centre", "enrollmentFormPhoto")}</p>
                 </div>
               )}
             </div>
 
             <div className="flex-1 min-w-0">
-              <SectionTitle title="Identité de l'Apprenant" />
+              <SectionTitle title={t("centre", "enrollmentFormLearnerIdentity")} />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 sm:gap-x-6 gap-y-2 mt-2">
-                <Field label="Nom" value={(data.nom || "").toUpperCase()} />
-                <Field label="Prénom" value={(data.prenom || "").toUpperCase()} />
-                <Field label="Email" value={data.email} />
-                <Field label="Téléphone" value={data.phone ? `${data.country_code ?? ""} ${data.phone}` : "—"} />
-                <Field label="Pays" value={data.country ?? "—"} />
-                <Field label="Région" value={data.region ?? "—"} />
+                <Field label={t("centre", "enrollmentFormLastName")} value={(data.nom || "").toUpperCase()} />
+                <Field label={t("centre", "enrollmentFormFirstName")} value={(data.prenom || "").toUpperCase()} />
+                <Field label={t("centre", "enrollmentFormEmail")} value={data.email} />
+                <Field label={t("centre", "enrollmentFormPhone")} value={data.phone ? `${data.country_code ?? ""} ${data.phone}` : "—"} />
+                <Field label={t("centre", "enrollmentFormCountry")} value={data.country ?? "—"} />
+                <Field label={t("centre", "enrollmentFormRegion")} value={data.region ?? "—"} />
               </div>
             </div>
           </div>
 
           {/* PIÈCE D'IDENTITÉ */}
           <div className="mb-5 sm:mb-6">
-            <SectionTitle title="Pièce d'Identité" />
+            <SectionTitle title={t("centre", "enrollmentFormIdentityDocument")} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-2">
-              <Field label="Type de document" value={data.id_type ? (ID_TYPE_LABELS[data.id_type] ?? data.id_type) : "Non renseigné"} />
-              <Field label="Numéro" value={data.id_number ?? "Non renseigné"} />
+              <Field label={t("centre", "enrollmentFormDocumentType")} value={data.id_type ? (locale === "fr" ? (ID_TYPE_LABELS[data.id_type] ?? data.id_type) : ({ cni: t("centre", "identityTypeNationalCard"), passeport: t("centre", "identityTypePassport"), carte_sejour: t("centre", "identityTypeResidenceCard"), autre: t("centre", "identityTypeOther") }[data.id_type] ?? data.id_type)) : t("centre", "enrollmentFormNotProvided")} />
+              <Field label={t("centre", "enrollmentFormNumber")} value={data.id_number ?? t("centre", "enrollmentFormNotProvided")} />
             </div>
           </div>
 
           {/* RESPONSABLE LÉGAL */}
           <div className="mb-5 sm:mb-6">
-            <SectionTitle title="Responsable Légal / Tuteur" />
+            <SectionTitle title={t("centre", "enrollmentFormGuardian")} />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 mt-2">
-              <Field label="Nom complet" value={data.guardian_name ?? "Non renseigné"} />
-              <Field label="Lien" value={data.guardian_relation ?? "—"} />
-              <Field label="Téléphone" value={data.guardian_phone ?? "—"} />
+              <Field label={t("centre", "enrollmentFormFullName")} value={data.guardian_name ?? t("centre", "enrollmentFormNotProvided")} />
+              <Field label={t("centre", "enrollmentFormRelationship")} value={guardianRelationLabel(data.guardian_relation, locale)} />
+              <Field label={t("centre", "enrollmentFormPhone")} value={data.guardian_phone ?? "—"} />
             </div>
           </div>
 
           {/* INSCRIPTION */}
           <div className="mb-5 sm:mb-6">
-            <SectionTitle title="Inscription Académique" />
+            <SectionTitle title={t("centre", "enrollmentFormAcademicEnrollment")} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 mt-2">
-              <Field label="Programme / Filière" value={data.filiere_name} bold />
+              <Field label={t("centre", "enrollmentFormProgramTrack")} value={data.filiere_name} bold />
               <Field
-                label={data.niveau_annee ? "Niveau" : "Durée"}
+                label={data.niveau_annee ? t("centre", "enrollmentFormLevel") : t("centre", "enrollmentFormDuration")}
                 value={
                   data.niveau_annee
-                    ? `Année ${data.niveau_annee}`
+                    ? t("centre", "enrollmentFormYear", { year: data.niveau_annee })
                     : (data.duration_label || "—")
                 }
               />
-              <Field label="Salle de classe" value={data.groupe_nom ?? "—"} />
-              <Field label="Campus" value={data.campus_name ?? "—"} />
-              <Field label="Date d'inscription" value={formatDate(data.enrolled_at)} />
+              <Field label={t("centre", "identityClassroom")} value={data.groupe_nom ?? "—"} />
+              <Field label={t("centre", "enrollmentFormCampus")} value={data.campus_name ?? "—"} />
+              <Field label={t("centre", "enrollmentFormEnrollmentDate")} value={formatDate(data.enrolled_at)} />
               <Field
-                label="Statut"
+                label={t("centre", "enrollmentFormStatus")}
                 value={
-                  data.enrollment_status === "active" ? "Actif"
-                  : data.enrollment_status === "draft" ? "En attente"
+                  data.enrollment_status === "active" ? t("centre", "identityActive")
+                  : data.enrollment_status === "draft" ? t("centre", "enrollmentFormPending")
                   : data.enrollment_status
                 }
               />
@@ -645,11 +669,11 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
 
           {/* FINANCES */}
           <div className="mb-6 sm:mb-8">
-            <SectionTitle title="Engagement Financier" />
+            <SectionTitle title={t("centre", "enrollmentFormFinancialCommitment")} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 mt-2">
-              <Field label="Montant de la formation" value={fmtPdfFCFA(data.tuition_fee)} bold />
+              <Field label={t("centre", "enrollmentFormTrainingAmount")} value={fmtPdfFCFA(data.tuition_fee)} bold />
               <div className="min-w-0">
-                <p className="text-[9px] font-bold uppercase text-neutral-400 tracking-wider">Modalités de paiement</p>
+                <p className="text-[9px] font-bold uppercase text-neutral-400 tracking-wider">{t("centre", "enrollmentFormPaymentTerms")}</p>
                 <div className="space-y-1 mt-1">
                   {data.modalitesLines.map((line, idx) => (
                     <p key={idx} className="text-xs font-bold leading-snug" style={{ color: BLUE }}>
@@ -664,40 +688,36 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
           {/* CLAUSE */}
           <div className="border-t-2 pt-4 sm:pt-5 mb-6 sm:mb-8" style={{ borderColor: BLUE }}>
             <p className="text-[10px] text-neutral-600 leading-relaxed">
-              Je soussigné(e), <span className="font-bold">{(data.prenom || "").toUpperCase()} {(data.nom || "").toUpperCase()}</span>, déclare avoir pris
-              connaissance du règlement intérieur de l&apos;établissement et m&apos;engage à respecter les conditions
-              d&apos;inscription, de scolarité et de paiement définies par{" "}
-              <span className="font-bold">{data.center_name}</span>. Les informations fournies ci-dessus sont
-              exactes et complètes.
+              {t("centre", "enrollmentFormClauseStart")} <span className="font-bold">{(data.prenom || "").toUpperCase()} {(data.nom || "").toUpperCase()}</span>,{" "}
+              {t("centre", "enrollmentFormClauseBody", { center: data.center_name })}
             </p>
           </div>
 
           {/* SIGNATURES */}
           <div className="flex flex-wrap justify-between gap-6 sm:gap-4 items-end mt-8 sm:mt-12">
             <div className="w-[42%] sm:w-44 md:w-52 text-center min-w-[120px]">
-              <p className="text-[10px] font-black uppercase mb-1" style={{ color: BLUE }}>L&apos;Apprenant</p>
+              <p className="text-[10px] font-black uppercase mb-1" style={{ color: BLUE }}>{t("centre", "enrollmentFormLearner")}</p>
               <div className="h-14 sm:h-16 border-b border-dashed border-neutral-300" />
-              <p className="text-[9px] text-neutral-400 mt-1">Signature</p>
+              <p className="text-[9px] text-neutral-400 mt-1">{t("centre", "enrollmentFormSignature")}</p>
             </div>
             {data.guardian_name && (
               <div className="w-[42%] sm:w-44 md:w-52 text-center min-w-[120px]">
-                <p className="text-[10px] font-black uppercase mb-1" style={{ color: BLUE }}>Le Responsable</p>
+                <p className="text-[10px] font-black uppercase mb-1" style={{ color: BLUE }}>{t("centre", "enrollmentFormResponsible")}</p>
                 <div className="h-14 sm:h-16 border-b border-dashed border-neutral-300" />
-                <p className="text-[9px] text-neutral-400 mt-1">Signature</p>
+                <p className="text-[9px] text-neutral-400 mt-1">{t("centre", "enrollmentFormSignature")}</p>
               </div>
             )}
             <div className="w-[42%] sm:w-44 md:w-52 text-center min-w-[120px] sm:ml-auto">
-              <p className="text-[10px] font-black uppercase mb-1" style={{ color: BLUE }}>Le Directeur</p>
+              <p className="text-[10px] font-black uppercase mb-1" style={{ color: BLUE }}>{t("centre", "enrollmentFormDirector")}</p>
               <div className="h-14 sm:h-16 border-b border-dashed border-neutral-300" />
-              <p className="text-[9px] text-neutral-400 mt-1">Cachet & Signature</p>
+              <p className="text-[9px] text-neutral-400 mt-1">{t("centre", "enrollmentFormStampSignature")}</p>
             </div>
           </div>
 
           {/* DATE + LIEU */}
           <div className="mt-6 sm:mt-8 text-right">
             <p className="text-[10px] text-neutral-500">
-              Fait à __________________, le{" "}
-              {new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+              {t("centre", "enrollmentFormMadeAt", { date: new Date().toLocaleDateString(locale === "fr" ? "fr-FR" : "en-GB", { day: "2-digit", month: "long", year: "numeric" }) })}
             </p>
           </div>
         </div>

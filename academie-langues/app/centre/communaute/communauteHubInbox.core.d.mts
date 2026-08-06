@@ -31,6 +31,19 @@ export type BuildCommunauteInboxInput = {
   unreadCounts?: Record<string, number>;
   searchQuery?: string;
   filter?: HubFilterId;
+  labels?: Partial<{
+    center: string;
+    announcements: string;
+    program: string;
+    forum: string;
+    level: string;
+    classroom: string;
+    classSingular: string;
+    classPlural: string;
+    group: string;
+    freeGroups: string;
+    noMessage: string;
+  }>;
 };
 
 export type BuildCommunauteInboxResult = {

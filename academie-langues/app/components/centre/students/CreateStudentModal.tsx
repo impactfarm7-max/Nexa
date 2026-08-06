@@ -21,6 +21,7 @@ import {
   type CursusFeeMode,
 } from "@/app/utils/cursus-passage";
 import { isPluriannualCenter } from "@/app/data/center-types";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -57,6 +58,11 @@ type Props = {
 };
 
 export default function CreateStudentModal({ centerId, onClose, onCreated }: Props) {
+  const { locale, t } = useI18n();
+  const relationLabel = (relation: string) => {
+    const keys: Record<string, string> = { "Père": "identityRelationFather", "Mère": "identityRelationMother", Tuteur: "identityRelationGuardian", Oncle: "identityRelationUncle", Tante: "identityRelationAunt", "Frère": "identityRelationBrother", "Sœur": "identityRelationSister", Autre: "identityRelationOther" };
+    return keys[relation] ? t("centre", keys[relation]) : relation;
+  };
   const [step, setStep] = useState(1);
   /** Centres libres (generic) uniquement — ne pas imposer aux TCF / courte */
   const [isLibreCenter, setIsLibreCenter] = useState(false);
@@ -346,7 +352,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
     setError(""); setSaving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(t("centre", "passageSessionExpired"));
 
       const fullPhone = phone.trim() ? `${phoneCode} ${phone.trim()}` : null;
 
@@ -399,7 +405,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Erreur lors de la création.");
+      if (!res.ok) throw new Error(data.error || t("centre", "createStudentCreateError"));
 
       // Créer les détails complémentaires (pays, indicatif, responsable)
       if (data.studentId) {
@@ -431,17 +437,17 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
       <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl text-center border border-black/[0.06]">
           <CheckCircle2 size={48} className="text-emerald-500 mx-auto mb-4" />
-          <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>Compte créé</h3>
+          <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>{t("centre", "createStudentAccountCreated")}</h3>
           {result.emailSent ? (
-            <p className="text-sm text-neutral-500 mt-2">Les accès ont été envoyés par email à <span className="font-semibold">{email}</span>.</p>
+            <p className="text-sm text-neutral-500 mt-2">{t("centre", "createStudentAccessSent")} <span className="font-semibold">{email}</span>.</p>
           ) : (
             <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4 text-left">
-              <p className="text-sm font-semibold text-amber-700 flex items-center gap-1.5"><AlertTriangle size={14} /> L&apos;email n&apos;a pas pu être envoyé.</p>
-              <p className="text-sm text-amber-700 mt-2">Transmettez ce mot de passe manuellement :</p>
+              <p className="text-sm font-semibold text-amber-700 flex items-center gap-1.5"><AlertTriangle size={14} /> {t("centre", "createStudentEmailFailed")}</p>
+              <p className="text-sm text-amber-700 mt-2">{t("centre", "createStudentSharePassword")}</p>
               <p className="font-mono font-semibold text-sm bg-white border rounded-lg p-2 mt-2 text-center select-all">{result.temporaryPassword}</p>
             </div>
           )}
-          <button type="button" onClick={onCreated} className="w-full mt-6 h-12 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90" style={{ backgroundColor: BLUE }}>Terminé</button>
+          <button type="button" onClick={onCreated} className="w-full mt-6 h-12 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90" style={{ backgroundColor: BLUE }}>{t("centre", "createStudentDone")}</button>
         </div>
       </div>
     );
@@ -453,12 +459,12 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl p-5 sm:p-6 md:p-8 max-w-2xl w-full shadow-2xl relative max-h-[90vh] overflow-y-auto border border-black/[0.06]" onClick={(e) => e.stopPropagation()}>
-        <button type="button" onClick={onClose} className="absolute top-4 right-4 text-neutral-400 hover:text-black transition-colors" aria-label="Fermer"><X size={20} /></button>
+        <button type="button" onClick={onClose} className="absolute top-4 right-4 text-neutral-400 hover:text-black transition-colors" aria-label={t("centre", "bulletinClose")}><X size={20} /></button>
 
         {/* Header */}
         <div className="mb-6">
-          <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>Créer un apprenant</h3>
-          <p className="text-sm text-neutral-500 mt-1">Étape {step} sur 2 — {step === 1 ? "Informations personnelles" : "Programme & Scolarité"}</p>
+          <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>{t("centre", "createStudentTitle")}</h3>
+          <p className="text-sm text-neutral-500 mt-1">{t("centre", "createStudentStep", { step, label: step === 1 ? t("centre", "createStudentPersonalInfo") : t("centre", "createStudentProgramSchooling") })}</p>
         </div>
 
         {error && (
@@ -472,11 +478,11 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
           <div className="space-y-3.5">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={FIELD_LABEL}>Prénom *</label>
+                <label className={FIELD_LABEL}>{t("centre", "createStudentFirstName")}</label>
                 <input type="text" placeholder="ex. Jean" value={prenom} onChange={(e) => setPrenom(e.target.value)} className={FIELD_INPUT} />
               </div>
               <div>
-                <label className={FIELD_LABEL}>Nom *</label>
+                <label className={FIELD_LABEL}>{t("centre", "createStudentLastName")}</label>
                 <input type="text" placeholder="ex. Dupont" value={nom} onChange={(e) => setNom(e.target.value)} className={FIELD_INPUT} />
               </div>
             </div>
@@ -489,16 +495,16 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             {isLibreCenter && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className={FIELD_LABEL}>Genre *</label>
+                  <label className={FIELD_LABEL}>{t("centre", "createStudentGender")}</label>
                   <select value={genre} onChange={(e) => setGenre(e.target.value)} className={FIELD_INPUT}>
-                    <option value="">Choisir…</option>
-                    <option value="Homme">Garçon / Homme</option>
-                    <option value="Femme">Fille / Femme</option>
-                    <option value="Autre">Autre</option>
+                    <option value="">{t("centre", "identityChoose")}</option>
+                    <option value="Homme">{t("centre", "studentsBoyMan")}</option>
+                    <option value="Femme">{t("centre", "studentsGirlWoman")}</option>
+                    <option value="Autre">{t("centre", "studentsOther")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className={FIELD_LABEL}>Date de naissance *</label>
+                  <label className={FIELD_LABEL}>{t("centre", "createStudentBirthDate")}</label>
                   <input
                     type="date"
                     value={birthDate}
@@ -511,9 +517,9 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             )}
 
             <div>
-              <label className={FIELD_LABEL_INLINE}><Globe size={14} /> Pays</label>
+              <label className={FIELD_LABEL_INLINE}><Globe size={14} /> {t("centre", "identityCountry")}</label>
               <select value={countryCode} onChange={(e) => handleCountryChange(e.target.value)} className={FIELD_INPUT}>
-                <option value="">Sélectionner un pays...</option>
+                <option value="">{t("centre", "createStudentSelectCountry")}</option>
                 {AFRICA_54.map((c) => (
                   <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.dial})</option>
                 ))}
@@ -522,9 +528,9 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             {regions.length > 0 && (
               <div>
-                <label className={FIELD_LABEL_INLINE}><MapPin size={14} /> Région</label>
+                <label className={FIELD_LABEL_INLINE}><MapPin size={14} /> {t("centre", "identityRegion")}</label>
                 <select value={region} onChange={(e) => setRegion(e.target.value)} className={FIELD_INPUT}>
-                  <option value="">Sélectionner...</option>
+                  <option value="">{t("centre", "identitySelect")}</option>
                   {regions.map((r) => (
                     <option key={r} value={r}>{r}</option>
                   ))}
@@ -533,7 +539,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             )}
 
             <div>
-              <label className={FIELD_LABEL_INLINE}><Phone size={14} /> Téléphone</label>
+              <label className={FIELD_LABEL_INLINE}><Phone size={14} /> {t("centre", "accountPhone")}</label>
               <div className="flex gap-2">
                 <div className="h-12 px-3 rounded-lg border border-black/[0.08] bg-[#FFF5EE] flex items-center shrink-0">
                   <span className="text-sm font-semibold" style={{ color: BLUE }}>{phoneCode}</span>
@@ -544,25 +550,25 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             {/* Responsable légal / Tuteur — entièrement optionnel */}
             <div className="pt-3 border-t border-black/[0.06] space-y-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">Responsable légal / Tuteur (optionnel)</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">{t("centre", "createStudentLegalGuardian")}</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className={FIELD_LABEL}>Nom du responsable <span className="font-normal text-neutral-400">(optionnel)</span></label>
+                  <label className={FIELD_LABEL}>{t("centre", "identityGuardianName")} <span className="font-normal text-neutral-400">{t("centre", "createStudentOptional")}</span></label>
                   <input type="text" placeholder="ex. Jean Dupont" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} className={FIELD_INPUT} />
                 </div>
                 <div>
-                  <label className={FIELD_LABEL}>Lien <span className="font-normal text-neutral-400">(optionnel)</span></label>
+                  <label className={FIELD_LABEL}>{t("centre", "identityRelationship")} <span className="font-normal text-neutral-400">{t("centre", "createStudentOptional")}</span></label>
                   <select value={guardianRelation} onChange={(e) => setGuardianRelation(e.target.value)} className={FIELD_INPUT}>
-                    <option value="">Sélectionner...</option>
+                    <option value="">{t("centre", "identitySelect")}</option>
                     {["Père", "Mère", "Tuteur", "Oncle", "Tante", "Frère", "Sœur", "Autre"].map((r) => (
-                      <option key={r} value={r}>{r}</option>
+                      <option key={r} value={r}>{relationLabel(r)}</option>
                     ))}
                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className={FIELD_LABEL_INLINE}><Globe size={14} /> Pays du responsable</label>
+                  <label className={FIELD_LABEL_INLINE}><Globe size={14} /> {t("centre", "identityGuardianCountry")}</label>
                   <select value={guardianCountryCode} onChange={(e) => handleGuardianCountryChange(e.target.value)} className={FIELD_INPUT}>
                     {AFRICA_54.map((c) => (
                       <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.dial})</option>
@@ -570,7 +576,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                   </select>
                 </div>
                 <div>
-                  <label className={FIELD_LABEL_INLINE}><Phone size={14} /> Téléphone du responsable</label>
+                  <label className={FIELD_LABEL_INLINE}><Phone size={14} /> {t("centre", "identityGuardianPhone")}</label>
                   <div className="flex gap-2">
                     <div className="h-12 px-3 rounded-lg border border-black/[0.08] bg-[#FFF5EE] flex items-center shrink-0">
                       <span className="text-sm font-semibold" style={{ color: BLUE }}>{guardianPhoneCode}</span>
@@ -582,7 +588,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             </div>
 
             <button type="button" onClick={() => setStep(2)} disabled={!canGoStep2} className="w-full h-12 mt-2 rounded-lg text-sm font-semibold text-white disabled:opacity-40 transition-all flex items-center justify-center gap-2 hover:opacity-90" style={{ backgroundColor: BLUE }}>
-              Suivant <ChevronRight size={16} />
+              {t("centre", "createStudentNext")} <ChevronRight size={16} />
             </button>
           </div>
         )}
@@ -591,21 +597,21 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         {step === 2 && (
           <div className="space-y-3.5">
             <div>
-              <label className={FIELD_LABEL}>Programme *</label>
+              <label className={FIELD_LABEL}>{t("centre", "createStudentProgramRequired")}</label>
               <select value={filiereId} onChange={(e) => setFiliereId(e.target.value)} className={FIELD_INPUT}>
-                <option value="">Choisir un programme...</option>
+                <option value="">{t("centre", "createStudentChooseProgram")}</option>
                 {filieres.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
               {filieres.length === 0 && (
-                <p className="text-sm text-amber-600 font-medium mt-1.5">Aucun programme publié. Publiez d&apos;abord un programme.</p>
+                <p className="text-sm text-amber-600 font-medium mt-1.5">{t("centre", "createStudentNoPublishedProgram")}</p>
               )}
             </div>
 
             {campuses.length > 1 && (
               <div>
-                <label className={FIELD_LABEL_INLINE}><MapPin size={14} /> Campus *</label>
+                <label className={FIELD_LABEL_INLINE}><MapPin size={14} /> {t("centre", "createStudentCampusRequired")}</label>
                 <select value={campusId} onChange={(e) => setCampusId(e.target.value)} className={FIELD_INPUT}>
-                  <option value="">Choisir un campus...</option>
+                  <option value="">{t("centre", "createStudentChooseCampus")}</option>
                   {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}{c.city ? ` — ${c.city}` : ""}</option>)}
                 </select>
               </div>
@@ -614,23 +620,23 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             {campuses.length === 1 && (
               <div className="flex items-center gap-2 bg-[#FFF5EE] border border-[#eb670e]/20 rounded-lg px-3 py-2.5">
                 <MapPin size={14} className="text-[#eb670e]" />
-                <span className="text-sm font-semibold text-neutral-700">Campus : {campuses[0].name}</span>
+                <span className="text-sm font-semibold text-neutral-700">{t("centre", "createStudentCampus", { name: campuses[0].name })}</span>
               </div>
             )}
 
             {selectedFiliere?.type === "cursus" && niveaux.length > 0 && (
               <div>
-                <label className={FIELD_LABEL}>Niveau *</label>
+                <label className={FIELD_LABEL}>{t("centre", "createStudentLevelRequired")}</label>
                 <select value={niveauId} onChange={(e) => setNiveauId(e.target.value)} className={FIELD_INPUT}>
-                  <option value="">Choisir un niveau...</option>
-                  {niveaux.map((n) => <option key={n.id} value={n.id}>Niveau {n.annee}</option>)}
+                  <option value="">{t("centre", "createStudentChooseLevel")}</option>
+                  {niveaux.map((n) => <option key={n.id} value={n.id}>{t("centre", "identityLevel")} {n.annee}</option>)}
                 </select>
               </div>
             )}
 
             {selectedFiliere?.type === "cursus" && (
               <div>
-                <label className={FIELD_LABEL}>Année scolaire</label>
+                <label className={FIELD_LABEL}>{t("centre", "identityAcademicYear")}</label>
                 <input
                   value={academicYear}
                   onChange={(e) => setAcademicYear(e.target.value)}
@@ -642,7 +648,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             {isShort && shortMode === "mensuel" && (
               <div>
-                <label className={FIELD_LABEL}>Durée (mois) *</label>
+                <label className={FIELD_LABEL}>{t("centre", "createStudentDurationMonths")}</label>
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {MONTH_PRESETS.map((m) => (
                     <button
@@ -655,7 +661,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                           : "border-black/[0.08] text-neutral-500 hover:bg-black/[0.03]"
                       }`}
                     >
-                      {m} mois
+                      {t("centre", "createStudentMonths", { count: m })}
                     </button>
                   ))}
                 </div>
@@ -663,7 +669,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                   <input
                     type="text"
                     inputMode="numeric"
-                    placeholder="Autre…"
+                    placeholder={t("centre", "createStudentOtherDuration")}
                     value={customMonths}
                     onChange={(e) => {
                       const raw = e.target.value.replace(/[^0-9]/g, "");
@@ -673,21 +679,21 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                     }}
                     className="w-28 h-12 px-4 rounded-lg border border-black/[0.08] bg-white font-semibold text-base outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
                   />
-                  <span className="text-sm font-medium text-neutral-400">mois personnalisé</span>
+                  <span className="text-sm font-medium text-neutral-400">{t("centre", "createStudentCustomMonths")}</span>
                 </div>
                 <p className="text-sm text-neutral-500 font-medium mt-1.5">
-                  {(Number(selectedFiliere?.default_tuition_fee) || 0).toLocaleString("fr-FR")} FCFA/mois
+                  {(Number(selectedFiliere?.default_tuition_fee) || 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")} {t("centre", "createStudentPerMonth")}
                   {" × "}
                   {durationMonths}
                   {" = "}
                   <span className="font-semibold text-neutral-700">
                     {(
                       (Number(selectedFiliere?.default_tuition_fee) || 0) * durationMonths
-                    ).toLocaleString("fr-FR")}{" "}
+                    ).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")}{" "}
                     FCFA
                   </span>
                   {shortExtras > 0 && (
-                    <> + {shortExtras.toLocaleString("fr-FR")} FCFA frais</>
+                    <> + {shortExtras.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")} {t("centre", "createStudentFees")}</>
                   )}
                 </p>
               </div>
@@ -696,16 +702,16 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             {isShort && shortMode === "forfaitaire" && selectedFiliere?.duree_valeur && (
               <div className="flex items-center gap-2 bg-neutral-50 border border-black/[0.08] rounded-lg px-3 py-2.5">
                 <span className="text-sm font-medium text-neutral-600">
-                  Durée : {durationLabelShort(selectedFiliere.duree_valeur, selectedFiliere.duree_unite || "mois")}
+                  {t("centre", "createStudentDuration")} {locale === "fr" ? durationLabelShort(selectedFiliere.duree_valeur, selectedFiliere.duree_unite || "mois") : `${selectedFiliere.duree_valeur} ${selectedFiliere.duree_unite === "semaines" ? "weeks" : selectedFiliere.duree_unite === "jours" ? "days" : "months"}`}
                 </span>
               </div>
             )}
 
             {groupes.length > 1 && (
               <div>
-                <label className={FIELD_LABEL}>Salle de classe</label>
+                <label className={FIELD_LABEL}>{t("centre", "createStudentClassroom")}</label>
                 <select value={groupeId} onChange={(e) => setGroupeId(e.target.value)} className={FIELD_INPUT}>
-                  <option value="">Choisir une salle...</option>
+                  <option value="">{t("centre", "createStudentChooseClassroom")}</option>
                   {groupes.map((g) => <option key={g.id} value={g.id}>{g.nom}</option>)}
                 </select>
               </div>
@@ -713,22 +719,22 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             {groupes.length === 1 && (
               <div className="flex items-center gap-2 bg-neutral-50 border border-black/[0.08] rounded-lg px-3 py-2.5">
-                <span className="text-sm font-medium text-neutral-600">Salle : {groupes[0].nom} (auto-assignée)</span>
+                <span className="text-sm font-medium text-neutral-600">{t("centre", "createStudentAutoClassroom", { name: groupes[0].nom })}</span>
               </div>
             )}
 
             {filiereId && (
               <div>
-                <label className={FIELD_LABEL_INLINE}><Lock size={14} /> Montant de la formation</label>
+                <label className={FIELD_LABEL_INLINE}><Lock size={14} /> {t("centre", "createStudentTrainingAmount")}</label>
                 <div className="h-12 px-4 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Lock size={14} className="text-emerald-600" />
                     <span className="font-semibold text-base text-emerald-800">
-                      {Number(tuitionFee || 0).toLocaleString("fr-FR")} FCFA
+                      {Number(tuitionFee || 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")} FCFA
                     </span>
                   </div>
                   <span className="text-xs font-semibold text-emerald-600">
-                    {isShort && shortMode === "mensuel" ? "Calculé" : "Défini par le programme"}
+                    {isShort && shortMode === "mensuel" ? t("centre", "createStudentCalculated") : t("centre", "createStudentDefinedByProgram")}
                   </span>
                 </div>
               </div>
@@ -736,17 +742,17 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             {filiereId && (
               <div>
-                <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1">Code coupon (optionnel — Finances)</label>
+                <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "createStudentCouponCode")}</label>
                 {availableCoupons.length > 0 ? (
                   <select
                     value={couponCode}
                     onChange={(e) => setCouponCode(e.target.value)}
                     className="w-full h-11 px-3 bg-neutral-50 rounded-xl border text-xs font-black uppercase outline-none focus:border-blue-500 transition-colors"
                   >
-                    <option value="">— Aucun coupon —</option>
+                    <option value="">{t("centre", "createStudentNoCoupon")}</option>
                     {availableCoupons.map((c) => (
                       <option key={c.id} value={c.code}>
-                        {c.code} ({c.type === "percentage" ? `${c.value}%` : `${c.value.toLocaleString("fr-FR")} FCFA`})
+                        {c.code} ({c.type === "percentage" ? `${c.value}%` : `${c.value.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")} FCFA`})
                       </option>
                     ))}
                   </select>
@@ -769,10 +775,10 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             )}
 
             <div className="flex gap-2 pt-1">
-              <button type="button" onClick={() => setStep(1)} className="h-12 px-5 rounded-lg text-sm font-semibold bg-neutral-100 hover:bg-neutral-200 transition-colors">Retour</button>
+              <button type="button" onClick={() => setStep(1)} className="h-12 px-5 rounded-lg text-sm font-semibold bg-neutral-100 hover:bg-neutral-200 transition-colors">{t("centre", "createStudentBack")}</button>
               <button type="button" onClick={handleSubmit} disabled={!canSubmit || saving} className="flex-1 h-12 rounded-lg text-sm font-semibold text-white disabled:opacity-40 flex items-center justify-center gap-2 transition-all hover:opacity-90" style={{ backgroundColor: ORANGE }}>
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                Créer & envoyer les accès
+                {t("centre", "createStudentCreateSend")}
               </button>
             </div>
           </div>

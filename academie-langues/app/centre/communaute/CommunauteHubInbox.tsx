@@ -17,6 +17,7 @@ import {
   type InboxRow,
   type InboxSection,
 } from "./communauteHubInbox.core.mjs";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Props = {
   centerName: string;
@@ -92,13 +93,6 @@ function kindIcon(kind: InboxRow["kind"]) {
   return <UsersRound size={16} style={{ color }} />;
 }
 
-function kindLabel(kind: InboxRow["kind"]) {
-  if (kind === "announcement") return "Annonces";
-  if (kind === "forum") return "Forum";
-  if (kind === "classroom") return "Classe";
-  return "Groupe";
-}
-
 function RoomRow({
   row,
   onOpen,
@@ -110,6 +104,7 @@ function RoomRow({
   formatSidebarTime: (iso: string) => string;
   tone: SectionTone;
 }) {
+  const { t } = useI18n();
   const kindColor = KIND_COLORS[row.kind];
   return (
     <button
@@ -150,7 +145,7 @@ function RoomRow({
           className="hidden sm:inline text-[9px] font-black uppercase tracking-wider rounded-full px-2 py-0.5 border"
           style={{ color: kindColor, borderColor: `${kindColor}33`, backgroundColor: `${kindColor}12` }}
         >
-          {kindLabel(row.kind)}
+          {row.kind === "announcement" ? t("centre", "communityAnnouncements") : row.kind === "forum" ? t("centre", "communityForum") : row.kind === "classroom" ? t("centre", "communityClass") : t("centre", "communityGroup")}
         </span>
         <ChevronRight size={14} className="text-neutral-300" />
       </div>
@@ -237,6 +232,7 @@ function SectionBlock({
 }
 
 export default function CommunauteHubInbox(props: Props) {
+  const { t } = useI18n();
   const {
     centerName,
     totalUnread,
@@ -262,6 +258,12 @@ export default function CommunauteHubInbox(props: Props) {
     unreadCounts,
     searchQuery,
     filter,
+    labels: {
+      center: t("centre", "dashboardCenter"), announcements: t("centre", "communityAnnouncements"), program: t("centre", "enrollmentProgram"),
+      forum: t("centre", "communityForum"), level: t("centre", "enrollmentLevel"), classroom: t("centre", "communityClass"),
+      classSingular: t("centre", "communityClassLower"), classPlural: t("centre", "communityClassesLower"), group: t("centre", "communityGroup"),
+      freeGroups: t("centre", "communityFreeGroups"), noMessage: t("centre", "communityNoMessage"),
+    },
   });
 
   return (
@@ -270,15 +272,15 @@ export default function CommunauteHubInbox(props: Props) {
         <div className="nexa-center-shell h-full flex items-center justify-between gap-3">
           <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight truncate" style={{ color: BLUE }}>
-              Communauté
+              {t("centre", "communityTitle")}
             </h1>
             <p className="text-[11px] font-medium text-neutral-500 truncate">
               {centerName}
-              {totalUnread > 0 ? ` · ${totalUnread} non lu${totalUnread > 1 ? "s" : ""}` : ""}
+              {totalUnread > 0 ? ` · ${t("centre", "communityUnreadCount", { count: totalUnread })}` : ""}
             </p>
           </div>
           <OutlineHeaderButton onClick={onCreateGroup}>
-            <Plus size={14} /> Groupe
+            <Plus size={14} /> {t("centre", "communityGroup")}
           </OutlineHeaderButton>
         </div>
       </header>
@@ -301,7 +303,7 @@ export default function CommunauteHubInbox(props: Props) {
                     }`}
                     style={active ? { backgroundColor: BLUE } : undefined}
                   >
-                    {f.label}
+                    {t("centre", `communityFilter_${f.id}`)}
                   </button>
                 );
               })}
@@ -310,7 +312,7 @@ export default function CommunauteHubInbox(props: Props) {
               <ToolbarSearch
                 value={searchQuery}
                 onChange={onSearchChange}
-                placeholder="Rechercher…"
+                placeholder={t("centre", "financeSearch")}
               />
             </div>
           </div>
@@ -326,17 +328,17 @@ export default function CommunauteHubInbox(props: Props) {
 
           {emptyReason === "none" && (
             <p className="text-sm text-neutral-400 italic py-10 text-center bg-white rounded-2xl border border-dashed border-neutral-200">
-              Aucune salle disponible.
+              {t("centre", "communityNoRoom")}
             </p>
           )}
           {emptyReason === "search" && (
             <p className="text-sm text-neutral-400 italic py-10 text-center bg-white rounded-2xl border border-dashed border-neutral-200">
-              Aucun résultat pour « {searchQuery.trim()} ».
+              {t("centre", "communityNoSearchResult", { query: searchQuery.trim() })}
             </p>
           )}
           {emptyReason === "filter" && (
             <p className="text-sm text-neutral-400 italic py-10 text-center bg-white rounded-2xl border border-dashed border-neutral-200">
-              Aucune salle dans ce filtre.
+              {t("centre", "communityNoFilteredRoom")}
             </p>
           )}
         </div>

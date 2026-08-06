@@ -17,6 +17,7 @@ import {
 import { passageDecisionLabelFr } from "@/app/utils/cursus-passage";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 import { downloadAttestationReussitePdf } from "@/app/utils/centerPdfExport";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -102,13 +103,6 @@ type StudentDetails = {
   notes: string | null;
 };
 
-const ID_TYPE_LABELS: Record<string, string> = {
-  cni: "Carte nationale d'identité",
-  passeport: "Passeport",
-  carte_sejour: "Carte de séjour",
-  autre: "Autre document",
-};
-
 const RELATION_OPTIONS = ["Père", "Mère", "Tuteur", "Oncle", "Tante", "Frère", "Sœur", "Autre"];
 
 function parseGuardianPhone(fullPhone: string | null, countries: StudentCountryRef[]) {
@@ -134,6 +128,15 @@ export default function StudentIdentityTab({
   onAvatarUpdated,
   onEnrollmentUpdated,
 }: Props) {
+  const { locale, t } = useI18n();
+  const idTypeLabels: Record<string, string> = {
+    cni: t("centre", "identityTypeNationalCard"), passeport: t("centre", "identityTypePassport"),
+    carte_sejour: t("centre", "identityTypeResidenceCard"), autre: t("centre", "identityTypeOther"),
+  };
+  const relationLabel = (relation: string) => {
+    const keys: Record<string, string> = { "Père": "identityRelationFather", "Mère": "identityRelationMother", Tuteur: "identityRelationGuardian", Oncle: "identityRelationUncle", Tante: "identityRelationAunt", "Frère": "identityRelationBrother", "Sœur": "identityRelationSister", Autre: "identityRelationOther" };
+    return keys[relation] ? t("centre", keys[relation]) : relation;
+  };
   const [details, setDetails] = useState<StudentDetails>({
     country: null, country_code: null, region: null,
     id_type: null, id_number: null,
@@ -206,8 +209,8 @@ export default function StudentIdentityTab({
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { alert("Image trop lourde (max 2 Mo)."); return; }
-    if (!file.type.startsWith("image/")) { alert("Fichier non supporté."); return; }
+    if (file.size > 2 * 1024 * 1024) { alert(t("centre", "identityImageTooLarge")); return; }
+    if (!file.type.startsWith("image/")) { alert(t("centre", "identityUnsupportedFile")); return; }
 
     setAvatarUploading(true);
     try {
@@ -220,7 +223,7 @@ export default function StudentIdentityTab({
       await supabase.from("profiles").update({ avatar_url: urlData.publicUrl }).eq("id", studentId);
       onAvatarUpdated(`${urlData.publicUrl}?t=${Date.now()}`);
     } catch (err: any) {
-      alert("Erreur upload : " + err.message);
+      alert(t("centre", "identityUploadError", { message: err.message }));
     } finally {
       setAvatarUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -267,7 +270,7 @@ export default function StudentIdentityTab({
       updated_at: new Date().toISOString(),
     });
     if (error) {
-      alert("Erreur : " + error.message);
+      alert(t("centre", "identityGenericError", { message: error.message }));
     } else {
       setDetails(form);
       setEditing(false);
@@ -383,18 +386,18 @@ export default function StudentIdentityTab({
   const savePlacement = async () => {
     if (!enrollmentId) return;
     if (!placeFiliereId) {
-      setPlacementError("Choisissez un programme.");
+      setPlacementError(t("centre", "identityChooseProgram"));
       return;
     }
     if (needsNiveau && !placeNiveauId) {
-      setPlacementError("Choisissez un niveau.");
+      setPlacementError(t("centre", "identityChooseLevel"));
       return;
     }
     setPlacementSaving(true);
     setPlacementError("");
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(t("centre", "passageSessionExpired"));
       const res = await fetch("/api/center/enrollment-placement", {
         method: "POST",
         headers: {
@@ -409,11 +412,11 @@ export default function StudentIdentityTab({
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Modification impossible.");
+      if (!res.ok) throw new Error(json.error || t("centre", "identityUpdateError"));
       setEditingPlacement(false);
       onEnrollmentUpdated?.();
     } catch (e: unknown) {
-      setPlacementError(e instanceof Error ? e.message : "Erreur.");
+      setPlacementError(e instanceof Error ? e.message : t("centre", "passageError"));
     } finally {
       setPlacementSaving(false);
     }
@@ -438,16 +441,16 @@ export default function StudentIdentityTab({
       await downloadAttestationReussitePdf({
         studentName: studentName,
         programName: enrollmentInfo?.filiere_name || null,
-        niveauLabel: enrollmentInfo?.niveau_annee != null ? `Niveau ${enrollmentInfo.niveau_annee}` : null,
+        niveauLabel: enrollmentInfo?.niveau_annee != null ? `${t("centre", "identityLevel")} ${enrollmentInfo.niveau_annee}` : null,
         classeLabel: enrollmentInfo?.groupe_nom || null,
         academicYear: enrollmentInfo?.academic_year || null,
-        issuedAt: new Date().toLocaleDateString("fr-FR"),
+        issuedAt: new Date().toLocaleDateString(locale === "fr" ? "fr-FR" : "en-GB"),
         config,
         signatures,
         stampUrl: branding?.stamp_url || null,
       });
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Erreur lors de la génération de l'attestation.");
+      alert(e instanceof Error ? e.message : t("centre", "identityAttestationError"));
     } finally {
       setAttestationBusy(false);
     }
@@ -455,7 +458,7 @@ export default function StudentIdentityTab({
 
   const regions = getRegionsForCountry(COUNTRY_OPTIONS, selectedCountryCode);
 
-  if (loading) return <p className="text-sm text-neutral-400 p-8">Chargement du dossier...</p>;
+  if (loading) return <p className="text-sm text-neutral-400 p-8">{t("centre", "identityLoadingRecord")}</p>;
 
   return (
     <div className="w-full">
@@ -463,9 +466,9 @@ export default function StudentIdentityTab({
 
       {editing ? (
         <div className="flex flex-wrap items-center justify-end gap-1.5 mb-4">
-          <button type="button" onClick={() => setEditing(false)} className="px-3 h-9 rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 hover:bg-neutral-200 transition-colors">Annuler</button>
+          <button type="button" onClick={() => setEditing(false)} className="px-3 h-9 rounded-lg bg-neutral-100 text-xs font-semibold text-neutral-600 hover:bg-neutral-200 transition-colors">{t("centre", "identityCancel")}</button>
           <button type="button" onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50" style={{ backgroundColor: ORANGE }}>
-            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} Enregistrer
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />} {t("centre", "identitySave")}
           </button>
         </div>
       ) : (
@@ -475,15 +478,15 @@ export default function StudentIdentityTab({
             onClick={startEdit}
             className="flex items-center gap-1.5 px-3 h-9 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors"
           >
-            <Edit3 size={12} /> Modifier le dossier
+            <Edit3 size={12} /> {t("centre", "identityEditRecord")}
           </button>
         </div>
       )}
 
       <DossierSection
         icon={BookOpen}
-        title="Informations générales"
-        description="Photo, coordonnées et parcours d'inscription."
+        title={t("centre", "identityGeneralInfo")}
+        description={t("centre", "identityGeneralDescription")}
         actions={enrollmentId ? (
           <div className="flex flex-wrap items-center gap-2">
             <button
@@ -492,7 +495,7 @@ export default function StudentIdentityTab({
               className="inline-flex items-center gap-2 px-3 h-9 rounded-lg text-xs font-semibold text-white"
               style={{ backgroundColor: BLUE }}
             >
-              <FileText size={14} /> Fiche d&apos;inscription
+              <FileText size={14} /> {t("centre", "identityEnrollmentForm")}
             </button>
             <button
               type="button"
@@ -501,7 +504,7 @@ export default function StudentIdentityTab({
               className="inline-flex items-center gap-2 px-3 h-9 rounded-lg text-xs font-semibold border border-black/[0.08] bg-white text-neutral-700 hover:bg-black/[0.03] disabled:opacity-50"
             >
               {attestationBusy ? <Loader2 size={14} className="animate-spin" /> : <Award size={14} />}
-              Attestation de réussite
+              {t("centre", "identitySuccessCertificate")}
             </button>
           </div>
         ) : undefined}
@@ -512,14 +515,14 @@ export default function StudentIdentityTab({
               {avatarUploading ? (
                 <Loader2 size={24} className="text-orange-500 animate-spin" />
               ) : avatarUrl ? (
-                <img src={avatarUrl} alt="Photo" className="w-full h-full object-cover" />
+                <img src={avatarUrl} alt={t("centre", "identityPhoto")} className="w-full h-full object-cover" />
               ) : (
                 <span className="text-2xl font-black" style={{ color: ORANGE }}>
                   {studentName.split(" ").map((w) => w[0]).join("").substring(0, 2)}
                 </span>
               )}
             </div>
-            <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute -bottom-1 -right-1 w-7 h-7 bg-white border border-neutral-200 rounded-lg flex items-center justify-center shadow-sm hover:bg-orange-50 transition-colors" aria-label="Changer la photo">
+            <button type="button" onClick={() => fileInputRef.current?.click()} className="absolute -bottom-1 -right-1 w-7 h-7 bg-white border border-neutral-200 rounded-lg flex items-center justify-center shadow-sm hover:bg-orange-50 transition-colors" aria-label={t("centre", "identityChangePhoto")}>
               <Camera size={13} style={{ color: ORANGE }} />
             </button>
           </div>
@@ -539,14 +542,14 @@ export default function StudentIdentityTab({
         {enrollmentInfo && (
           <div className="pt-2 border-t border-black/[0.06]">
             <div className="flex items-center justify-between gap-2 mb-3">
-              <p className="text-sm font-semibold text-neutral-600">Parcours</p>
+              <p className="text-sm font-semibold text-neutral-600">{t("centre", "identityPath")}</p>
               {enrollmentId && !editingPlacement && (
                 <button
                   type="button"
                   onClick={startPlacementEdit}
                   className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-black/[0.08] text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors"
                 >
-                  <Edit3 size={12} /> Modifier parcours
+                  <Edit3 size={12} /> {t("centre", "identityEditPath")}
                 </button>
               )}
             </div>
@@ -554,7 +557,7 @@ export default function StudentIdentityTab({
             {editingPlacement ? (
               <div className="space-y-3">
                 <div>
-                  <label className={FIELD_LABEL}>Programme / Filière</label>
+                  <label className={FIELD_LABEL}>{t("centre", "identityProgramTrack")}</label>
                   <select
                     value={placeFiliereId}
                     onChange={(e) => {
@@ -564,7 +567,7 @@ export default function StudentIdentityTab({
                     }}
                     className={FIELD_INPUT}
                   >
-                    <option value="">Choisir…</option>
+                    <option value="">{t("centre", "identityChoose")}</option>
                     {filieres.map((f) => (
                       <option key={f.id} value={f.id}>{f.name}</option>
                     ))}
@@ -572,7 +575,7 @@ export default function StudentIdentityTab({
                 </div>
                 {(needsNiveau || niveaux.length > 0) && (
                   <div>
-                    <label className={FIELD_LABEL}>Niveau</label>
+                    <label className={FIELD_LABEL}>{t("centre", "identityLevel")}</label>
                     <select
                       value={placeNiveauId}
                       onChange={(e) => {
@@ -581,24 +584,24 @@ export default function StudentIdentityTab({
                       }}
                       className={FIELD_INPUT}
                     >
-                      <option value="">Choisir…</option>
+                      <option value="">{t("centre", "identityChoose")}</option>
                       {niveaux.map((n) => (
                         <option key={n.id} value={n.id}>
-                          {n.annee != null ? `Niveau ${n.annee}` : "Niveau"}
+                          {n.annee != null ? `${t("centre", "identityLevel")} ${n.annee}` : t("centre", "identityLevel")}
                         </option>
                       ))}
                     </select>
                   </div>
                 )}
                 <div>
-                  <label className={FIELD_LABEL}>Classe</label>
+                  <label className={FIELD_LABEL}>{t("centre", "identityClass")}</label>
                   <select
                     value={placeGroupeId}
                     onChange={(e) => setPlaceGroupeId(e.target.value)}
                     disabled={placeLoadingOpts}
                     className={`${FIELD_INPUT} disabled:opacity-50`}
                   >
-                    <option value="">Aucune / à définir</option>
+                    <option value="">{t("centre", "identityNoneDefine")}</option>
                     {groupes.map((g) => (
                       <option key={g.id} value={g.id}>{g.nom}</option>
                     ))}
@@ -615,7 +618,7 @@ export default function StudentIdentityTab({
                     onClick={() => { setEditingPlacement(false); setPlacementError(""); }}
                     className="px-3 h-10 rounded-lg bg-neutral-100 text-sm font-semibold text-neutral-600 hover:bg-neutral-200"
                   >
-                    Annuler
+                    {t("centre", "identityCancel")}
                   </button>
                   <button
                     type="button"
@@ -625,61 +628,61 @@ export default function StudentIdentityTab({
                     style={{ backgroundColor: ORANGE }}
                   >
                     {placementSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                    Enregistrer
+                    {t("centre", "identitySave")}
                   </button>
                 </div>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
-                  <p className="text-xs font-semibold text-neutral-400">Programme</p>
+                  <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityProgram")}</p>
                   <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.filiere_name}</p>
                 </div>
                 {enrollmentInfo.niveau_annee != null && (
                   <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
-                    <p className="text-xs font-semibold text-neutral-400">Niveau</p>
-                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>Année {enrollmentInfo.niveau_annee}</p>
+                    <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityLevel")}</p>
+                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{t("centre", "identityYear", { year: enrollmentInfo.niveau_annee })}</p>
                   </div>
                 )}
                 {!enrollmentInfo.niveau_annee && enrollmentInfo.duration_label && (
                   <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
-                    <p className="text-xs font-semibold text-neutral-400">Durée</p>
+                    <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityDuration")}</p>
                     <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.duration_label}</p>
                   </div>
                 )}
                 {enrollmentInfo.academic_year && (
                   <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
-                    <p className="text-xs font-semibold text-neutral-400">Année scolaire</p>
+                    <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityAcademicYear")}</p>
                     <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.academic_year}</p>
                   </div>
                 )}
                 {enrollmentInfo.passage_decision && (
                   <div className="bg-white rounded-lg p-3 border border-black/[0.06] col-span-2">
-                    <p className="text-xs font-semibold text-neutral-400">Décision de passage</p>
+                    <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityProgressionDecision")}</p>
                     <p className="font-semibold mt-0.5" style={{ color: BLUE }}>
-                      {passageDecisionLabelFr(enrollmentInfo.passage_decision)}
+                      {locale === "fr" ? passageDecisionLabelFr(enrollmentInfo.passage_decision) : enrollmentInfo.passage_decision === "admis" ? t("centre", "studentsPassed") : enrollmentInfo.passage_decision === "redouble" ? t("centre", "studentsRepeats") : t("centre", "studentsDeferred")}
                     </p>
                     {enrollmentInfo.passage_reason && (
                       <p className="text-sm font-medium text-neutral-600 mt-1">
-                        Motif : {enrollmentInfo.passage_reason}
+                        {t("centre", "passageReason")} {enrollmentInfo.passage_reason}
                       </p>
                     )}
                   </div>
                 )}
                 <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
-                  <p className="text-xs font-semibold text-neutral-400">Salle de classe</p>
+                  <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityClassroom")}</p>
                   <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.groupe_nom || "—"}</p>
                 </div>
                 <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
-                  <p className="text-xs font-semibold text-neutral-400">Statut</p>
+                  <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityStatus")}</p>
                   <p className="font-semibold mt-0.5" style={{ color: BLUE }}>
-                    {enrollmentInfo.status === "draft" ? "Brouillon" : enrollmentInfo.status === "active" ? "Actif" : enrollmentInfo.status}
+                    {enrollmentInfo.status === "draft" ? t("centre", "identityDraft") : enrollmentInfo.status === "active" ? t("centre", "identityActive") : enrollmentInfo.status}
                   </p>
                 </div>
                 {enrollmentInfo.enrolled_at && (
                   <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
-                    <p className="text-xs font-semibold text-neutral-400">Inscrit le</p>
-                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{new Date(enrollmentInfo.enrolled_at).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}</p>
+                    <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityEnrolledOn")}</p>
+                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{new Date(enrollmentInfo.enrolled_at).toLocaleDateString(locale === "fr" ? "fr-FR" : "en-GB", { day: "2-digit", month: "long", year: "numeric" })}</p>
                   </div>
                 )}
               </div>
@@ -690,55 +693,55 @@ export default function StudentIdentityTab({
 
       <DossierSection
         icon={CreditCard}
-        title="Identité"
-        description="Pièce d'identité et localisation."
+        title={t("centre", "identityTitle")}
+        description={t("centre", "identityDescription")}
       >
         <div>
-          <p className="text-sm font-semibold text-neutral-600 mb-3">Pièce d&apos;identité</p>
+          <p className="text-sm font-semibold text-neutral-600 mb-3">{t("centre", "identityDocument")}</p>
           {editing ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={FIELD_LABEL}>Type</label>
+                <label className={FIELD_LABEL}>{t("centre", "identityType")}</label>
                 <select value={form.id_type || ""} onChange={(e) => setForm((f) => ({ ...f, id_type: e.target.value || null }))} className={FIELD_INPUT}>
-                  <option value="">Sélectionner...</option>
-                  {Object.entries(ID_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  <option value="">{t("centre", "identitySelect")}</option>
+                  {Object.entries(idTypeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                 </select>
               </div>
               <div>
-                <label className={FIELD_LABEL}>Numéro</label>
-                <input value={form.id_number || ""} onChange={(e) => setForm((f) => ({ ...f, id_number: e.target.value || null }))} placeholder="Numéro du document" className={FIELD_INPUT} />
+                <label className={FIELD_LABEL}>{t("centre", "identityNumber")}</label>
+                <input value={form.id_number || ""} onChange={(e) => setForm((f) => ({ ...f, id_number: e.target.value || null }))} placeholder={t("centre", "identityDocumentNumber")} className={FIELD_INPUT} />
               </div>
             </div>
           ) : details.id_type ? (
             <div className="flex flex-wrap gap-4 text-sm">
-              <div><span className="text-neutral-400 font-medium">Type :</span> <span className="font-semibold" style={{ color: BLUE }}>{ID_TYPE_LABELS[details.id_type] || details.id_type}</span></div>
-              <div><span className="text-neutral-400 font-medium">N° :</span> <span className="font-semibold font-mono" style={{ color: BLUE }}>{details.id_number || "—"}</span></div>
+              <div><span className="text-neutral-400 font-medium">{t("centre", "identityType")} :</span> <span className="font-semibold" style={{ color: BLUE }}>{idTypeLabels[details.id_type] || details.id_type}</span></div>
+              <div><span className="text-neutral-400 font-medium">{t("centre", "identityNumber")} :</span> <span className="font-semibold font-mono" style={{ color: BLUE }}>{details.id_number || "—"}</span></div>
             </div>
           ) : (
-            <p className="text-sm text-neutral-400 italic">Non renseigné — cliquez sur Modifier.</p>
+            <p className="text-sm text-neutral-400 italic">{t("centre", "identityNotProvided")}</p>
           )}
         </div>
 
         <div className="pt-2 border-t border-black/[0.06]">
-          <p className="text-sm font-semibold text-neutral-600 mb-3 flex items-center gap-1.5"><Globe size={14} /> Localisation</p>
+          <p className="text-sm font-semibold text-neutral-600 mb-3 flex items-center gap-1.5"><Globe size={14} /> {t("centre", "identityLocation")}</p>
           {editing ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={FIELD_LABEL}>Pays</label>
+                <label className={FIELD_LABEL}>{t("centre", "identityCountry")}</label>
                 <select value={selectedCountryCode} onChange={(e) => handleFormCountryChange(e.target.value)} className={FIELD_INPUT}>
-                  <option value="">Sélectionner...</option>
+                  <option value="">{t("centre", "identitySelect")}</option>
                   {COUNTRY_OPTIONS.map((c) => <option key={c.code} value={c.code}>{c.name} ({c.phone_code})</option>)}
                 </select>
               </div>
               <div>
-                <label className={FIELD_LABEL}>Région</label>
+                <label className={FIELD_LABEL}>{t("centre", "identityRegion")}</label>
                 {regions.length > 0 ? (
                   <select value={form.region || ""} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value || null }))} className={FIELD_INPUT}>
-                    <option value="">Sélectionner...</option>
+                    <option value="">{t("centre", "identitySelect")}</option>
                     {regions.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
                 ) : (
-                  <input value={form.region || ""} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value || null }))} placeholder="Saisir la région" className={FIELD_INPUT} />
+                  <input value={form.region || ""} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value || null }))} placeholder={t("centre", "identityEnterRegion")} className={FIELD_INPUT} />
                 )}
               </div>
             </div>
@@ -747,35 +750,35 @@ export default function StudentIdentityTab({
               {details.country}{details.region ? ` · ${details.region}` : ""}
             </p>
           ) : (
-            <p className="text-sm text-neutral-400 italic">Non renseigné — cliquez sur Modifier.</p>
+            <p className="text-sm text-neutral-400 italic">{t("centre", "identityNotProvided")}</p>
           )}
         </div>
       </DossierSection>
 
       <DossierSection
         icon={Users}
-        title="Personne responsable"
-        description="Responsable légal ou tuteur de l'apprenant."
+        title={t("centre", "identityGuardian")}
+        description={t("centre", "identityGuardianDescription")}
       >
         {editing ? (
           <div className="space-y-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={FIELD_LABEL}>Nom complet</label>
-                <input value={form.guardian_name || ""} onChange={(e) => setForm((f) => ({ ...f, guardian_name: e.target.value || null }))} placeholder="Nom du responsable" className={FIELD_INPUT} />
+                <label className={FIELD_LABEL}>{t("centre", "identityFullName")}</label>
+                <input value={form.guardian_name || ""} onChange={(e) => setForm((f) => ({ ...f, guardian_name: e.target.value || null }))} placeholder={t("centre", "identityGuardianName")} className={FIELD_INPUT} />
               </div>
               <div>
-                <label className={FIELD_LABEL}>Lien</label>
+                <label className={FIELD_LABEL}>{t("centre", "identityRelationship")}</label>
                 <select value={form.guardian_relation || ""} onChange={(e) => setForm((f) => ({ ...f, guardian_relation: e.target.value || null }))} className={FIELD_INPUT}>
-                  <option value="">Sélectionner...</option>
-                  {RELATION_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                  <option value="">{t("centre", "identitySelect")}</option>
+                  {RELATION_OPTIONS.map((r) => <option key={r} value={r}>{relationLabel(r)}</option>)}
                 </select>
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={`${FIELD_LABEL} flex items-center gap-1.5`}><Globe size={14} /> Pays du responsable</label>
+                <label className={`${FIELD_LABEL} flex items-center gap-1.5`}><Globe size={14} /> {t("centre", "identityGuardianCountry")}</label>
                 <select value={guardianCountryCode} onChange={(e) => handleGuardianCountryChange(e.target.value)} className={FIELD_INPUT}>
                   {COUNTRY_OPTIONS.map((c) => (
                     <option key={c.code} value={c.code}>{c.name} ({c.phone_code})</option>
@@ -784,7 +787,7 @@ export default function StudentIdentityTab({
               </div>
 
               <div>
-                <label className={`${FIELD_LABEL} flex items-center gap-1.5`}><Phone size={14} /> Téléphone du responsable</label>
+                <label className={`${FIELD_LABEL} flex items-center gap-1.5`}><Phone size={14} /> {t("centre", "identityGuardianPhone")}</label>
                 <div className="flex gap-2">
                   <div className="h-12 px-3 rounded-lg border border-black/[0.08] bg-[#FFF5EE] flex items-center shrink-0">
                     <span className="text-sm font-semibold" style={{ color: BLUE }}>{guardianPhoneCode}</span>
@@ -802,25 +805,25 @@ export default function StudentIdentityTab({
           </div>
         ) : details.guardian_name || details.guardian_phone ? (
           <div className="text-sm space-y-1">
-            <div><span className="text-neutral-400 font-medium">Nom :</span> <span className="font-semibold" style={{ color: BLUE }}>{details.guardian_name || "—"}</span>{details.guardian_relation && <span className="text-neutral-400"> ({details.guardian_relation})</span>}</div>
-            {details.guardian_phone && <div><span className="text-neutral-400 font-medium">Tél :</span> <span className="font-semibold" style={{ color: BLUE }}>{details.guardian_phone}</span></div>}
+            <div><span className="text-neutral-400 font-medium">{t("centre", "identityNameShort")}</span> <span className="font-semibold" style={{ color: BLUE }}>{details.guardian_name || "—"}</span>{details.guardian_relation && <span className="text-neutral-400"> ({relationLabel(details.guardian_relation)})</span>}</div>
+            {details.guardian_phone && <div><span className="text-neutral-400 font-medium">{t("centre", "identityPhoneShort")}</span> <span className="font-semibold" style={{ color: BLUE }}>{details.guardian_phone}</span></div>}
           </div>
         ) : (
-          <p className="text-sm text-neutral-400 italic">Non renseigné — cliquez sur Modifier.</p>
+          <p className="text-sm text-neutral-400 italic">{t("centre", "identityNotProvided")}</p>
         )}
       </DossierSection>
 
       <DossierSection
         icon={FileText}
-        title="Notes"
-        description="Remarques internes visibles uniquement par le staff."
+        title={t("centre", "identityNotes")}
+        description={t("centre", "identityNotesDescription")}
       >
         {editing ? (
-          <textarea rows={4} value={form.notes || ""} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value || null }))} placeholder="Remarques visibles uniquement par le staff..." className="w-full p-3.5 rounded-lg border border-black/[0.08] bg-white text-base font-semibold outline-none resize-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10" />
+          <textarea rows={4} value={form.notes || ""} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value || null }))} placeholder={t("centre", "identityNotesPlaceholder")} className="w-full p-3.5 rounded-lg border border-black/[0.08] bg-white text-base font-semibold outline-none resize-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10" />
         ) : details.notes ? (
           <p className="text-sm text-neutral-700 whitespace-pre-wrap font-medium">{details.notes}</p>
         ) : (
-          <p className="text-sm text-neutral-400 italic">Aucune note.</p>
+          <p className="text-sm text-neutral-400 italic">{t("centre", "identityNoNote")}</p>
         )}
       </DossierSection>
 

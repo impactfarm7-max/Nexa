@@ -15,14 +15,14 @@ function matchesQuery(q, ...parts) {
   return parts.some((p) => norm(p).includes(q));
 }
 
-function niveauLabel(niveau) {
+function niveauLabel(niveau, levelLabel = "Niveau") {
   if (!niveau) return "";
   const nom = niveau.nom?.trim();
   if (nom) return nom;
-  return `Niveau ${niveau.annee}`;
+  return `${levelLabel} ${niveau.annee}`;
 }
 
-function rowFromRoom({ room, kind, title, meta, lastMessages, unreadCounts }) {
+function rowFromRoom({ room, kind, title, meta, lastMessages, unreadCounts, noMessage = "Aucun message" }) {
   const last = lastMessages[room.id];
   return {
     id: room.id,
@@ -30,7 +30,7 @@ function rowFromRoom({ room, kind, title, meta, lastMessages, unreadCounts }) {
     kind,
     title,
     meta: meta || null,
-    preview: last?.text?.trim() ? last.text : "Aucun message",
+    preview: last?.text?.trim() ? last.text : noMessage,
     time: last?.time || null,
     unread: unreadCounts[room.id] || 0,
   };
@@ -49,7 +49,15 @@ export function buildCommunauteInbox(input) {
     unreadCounts = {},
     searchQuery = "",
     filter = "all",
+    labels = {},
   } = input;
+  const text = {
+    center: labels.center || "Centre", announcements: labels.announcements || "Annonces",
+    program: labels.program || "Filière", forum: labels.forum || "Forum", level: labels.level || "Niveau",
+    classroom: labels.classroom || "Classe", classSingular: labels.classSingular || "classe",
+    classPlural: labels.classPlural || "classes", group: labels.group || "Groupe",
+    freeGroups: labels.freeGroups || "Groupes libres", noMessage: labels.noMessage || "Aucun message",
+  };
 
   const q = norm(searchQuery);
   const sections = [];
@@ -61,7 +69,7 @@ export function buildCommunauteInbox(input) {
 
   if (wantCenter) {
     const rows = centerAnnouncements
-      .filter((room) => matchesQuery(q, room.name, "Centre", "Annonces"))
+      .filter((room) => matchesQuery(q, room.name, text.center, text.announcements))
       .map((room) =>
         rowFromRoom({
           room,
@@ -69,12 +77,13 @@ export function buildCommunauteInbox(input) {
           title: room.name,
           lastMessages,
           unreadCounts,
+          noMessage: text.noMessage,
         }),
       );
     if (rows.length) {
       sections.push({
         id: "center",
-        title: "Centre",
+        title: text.center,
         summary: null,
         unread: rows.reduce((s, r) => s + r.unread, 0),
         rows,
@@ -86,12 +95,12 @@ export function buildCommunauteInbox(input) {
     if (!branch?.hasContent && !branch?.forum && !(branch?.niveaux?.length) && !(branch?.orphanClasses?.length)) {
       continue;
     }
-    const progName = branch.prog?.name || "Filière";
+    const progName = branch.prog?.name || text.program;
     const filiereMatches = matchesQuery(q, progName);
     const rows = [];
 
     if (wantForums && branch.forum) {
-      if (filiereMatches || matchesQuery(q, branch.forum.name, "Forum")) {
+      if (filiereMatches || matchesQuery(q, branch.forum.name, text.forum)) {
         rows.push(
           rowFromRoom({
             room: branch.forum,
@@ -99,6 +108,7 @@ export function buildCommunauteInbox(input) {
             title: branch.forum.name,
             lastMessages,
             unreadCounts,
+            noMessage: text.noMessage,
           }),
         );
       }
@@ -106,9 +116,9 @@ export function buildCommunauteInbox(input) {
 
     if (wantClasses) {
       for (const niv of branch.niveaux || []) {
-        const nLabel = niveauLabel(niv.niveau);
+        const nLabel = niveauLabel(niv.niveau, text.level);
         for (const leaf of niv.classes || []) {
-          const title = leaf.groupe?.nom || leaf.room?.name || "Classe";
+          const title = leaf.groupe?.nom || leaf.room?.name || text.classroom;
           if (filiereMatches || matchesQuery(q, title, nLabel, leaf.room?.name)) {
             rows.push(
               rowFromRoom({
@@ -118,13 +128,14 @@ export function buildCommunauteInbox(input) {
                 meta: nLabel,
                 lastMessages,
                 unreadCounts,
+                noMessage: text.noMessage,
               }),
             );
           }
         }
       }
       for (const leaf of branch.orphanClasses || []) {
-        const title = leaf.groupe?.nom || leaf.room?.name || "Classe";
+        const title = leaf.groupe?.nom || leaf.room?.name || text.classroom;
         if (filiereMatches || matchesQuery(q, title, leaf.room?.name)) {
           rows.push(
             rowFromRoom({
@@ -134,6 +145,7 @@ export function buildCommunauteInbox(input) {
               meta: null,
               lastMessages,
               unreadCounts,
+              noMessage: text.noMessage,
             }),
           );
         }
@@ -145,8 +157,8 @@ export function buildCommunauteInbox(input) {
     const classCount = rows.filter((r) => r.kind === "classroom").length;
     const hasForum = rows.some((r) => r.kind === "forum");
     const summaryParts = [
-      hasForum ? "Forum" : null,
-      classCount ? `${classCount} classe${classCount > 1 ? "s" : ""}` : null,
+      hasForum ? text.forum : null,
+      classCount ? `${classCount} ${classCount > 1 ? text.classPlural : text.classSingular}` : null,
     ].filter(Boolean);
 
     sections.push({
@@ -160,7 +172,7 @@ export function buildCommunauteInbox(input) {
 
   if (wantGroups) {
     const rows = freeGroups
-      .filter((room) => matchesQuery(q, room.name, "Groupe"))
+      .filter((room) => matchesQuery(q, room.name, text.group))
       .map((room) =>
         rowFromRoom({
           room,
@@ -168,12 +180,13 @@ export function buildCommunauteInbox(input) {
           title: room.name,
           lastMessages,
           unreadCounts,
+          noMessage: text.noMessage,
         }),
       );
     if (rows.length) {
       sections.push({
         id: "groups",
-        title: "Groupes libres",
+        title: text.freeGroups,
         summary: null,
         unread: rows.reduce((s, r) => s + r.unread, 0),
         rows,

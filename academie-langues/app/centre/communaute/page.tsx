@@ -12,6 +12,7 @@ import { useCenterRooms } from "./useCenterRooms";
 import MembersDrawer from "./MembersDrawer";
 import CommunauteHubInbox from "./CommunauteHubInbox";
 import type { HubFilterId } from "./communauteHubInbox.core.mjs";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import {
   BLUE,
   ORANGE,
@@ -22,25 +23,25 @@ type NiveauInfo = { id: string; annee: number; nom: string | null };
 type MsgParsed = { type: "text" | "image" | "file"; content: string; filename?: string };
 
 /* ── helpers ── */
-function formatTime(d: string) {
-  return new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function formatTime(d: string, locale = "fr") {
+  return new Date(d).toLocaleTimeString(locale === "en" ? "en-US" : "fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
-function formatDateSep(d: string) {
+function formatDateSep(d: string, locale = "fr", today = "Aujourd'hui", yesterday = "Hier") {
   const dt = new Date(d);
   const now = new Date();
   const yest = new Date(); yest.setDate(yest.getDate() - 1);
-  if (dt.toDateString() === now.toDateString()) return "Aujourd'hui";
-  if (dt.toDateString() === yest.toDateString()) return "Hier";
-  return dt.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  if (dt.toDateString() === now.toDateString()) return today;
+  if (dt.toDateString() === yest.toDateString()) return yesterday;
+  return dt.toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { weekday: "long", day: "numeric", month: "long" });
 }
-function formatSidebarTime(d: string) {
+function formatSidebarTime(d: string, locale = "fr") {
   const dt = new Date(d);
   const now = new Date();
   if (dt.toDateString() === now.toDateString())
-    return dt.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return dt.toLocaleTimeString(locale === "en" ? "en-US" : "fr-FR", { hour: "2-digit", minute: "2-digit" });
   const diff = (now.getTime() - dt.getTime()) / 86400000;
-  if (diff < 7) return dt.toLocaleDateString("fr-FR", { weekday: "short" });
-  return dt.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  if (diff < 7) return dt.toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { weekday: "short" });
+  return dt.toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "2-digit" });
 }
 function parseMsg(raw: string): MsgParsed {
   if (raw.startsWith("__img__:")) return { type: "image", content: raw.slice(8) };
@@ -64,9 +65,10 @@ function Avatar({ url, name, role, size = "w-8 h-8" }: { url?: string | null; na
 
 /* ════════════════════════════════════════════════════════ */
 function CommunauteCenterContent() {
+  const { t, locale } = useI18n();
   const [userId,    setUserId]    = useState<string | null>(null);
   const [centerId,  setCenterId]  = useState<string | null>(null);
-  const [centerName, setCenterName] = useState("Communauté");
+  const [centerName, setCenterName] = useState(t("centre", "communityTitle"));
   const [userRole,  setUserRole]  = useState("");
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [userInitial, setUserInitial] = useState("M");
@@ -198,7 +200,7 @@ function CommunauteCenterContent() {
             seenRooms.add(m.room_id);
             const parsed = parseMsg(m.message);
             lastMsgs[m.room_id] = {
-              text: parsed.type === "image" ? "📷 Photo" : parsed.type === "file" ? `📎 ${parsed.filename}` : parsed.content,
+              text: parsed.type === "image" ? `📷 ${t("centre", "communityPhoto")}` : parsed.type === "file" ? `📎 ${parsed.filename || t("centre", "communityFile")}` : parsed.content,
               time: m.created_at,
               sender: (m.profiles as any)?.prenom || "",
             };
@@ -230,7 +232,7 @@ function CommunauteCenterContent() {
             setLastMessages(prev => ({
               ...prev,
               [room.id]: {
-                text: parsed.type === "image" ? "📷 Photo" : parsed.type === "file" ? `📎 ${parsed.filename || "Fichier"}` : parsed.content,
+                text: parsed.type === "image" ? `📷 ${t("centre", "communityPhoto")}` : parsed.type === "file" ? `📎 ${parsed.filename || t("centre", "communityFile")}` : parsed.content,
                 time: (payload.new as any).created_at,
               },
             }));
@@ -318,16 +320,16 @@ function CommunauteCenterContent() {
   const activeRoomContext = useMemo(() => {
     if (!activeRoom) return null;
     if (activeRoom.type === "announcement" && !activeRoom.filiere_id) {
-      return { crumbs: ["Centre", "Annonces"], kind: "Forum général" };
+      return { crumbs: [t("centre", "dashboardCenter"), t("centre", "communityAnnouncements")], kind: t("centre", "communityGeneralForum") };
     }
     if (activeRoom.type === "study_group") {
-      return { crumbs: ["Groupes", activeRoom.name], kind: "Groupe" };
+      return { crumbs: [t("centre", "communityGroups"), activeRoom.name], kind: t("centre", "communityGroup") };
     }
     const prog = programmes.find((p) => p.id === activeRoom.filiere_id);
     if (activeRoom.type === "announcement" && activeRoom.filiere_id) {
       return {
-        crumbs: [prog?.name || "Filière", "Forum"],
-        kind: "Forum filière",
+        crumbs: [prog?.name || t("centre", "enrollmentProgram"), t("centre", "communityForum")],
+        kind: t("centre", "communityProgramForum"),
       };
     }
     if (activeRoom.type === "classroom" && activeRoom.groupe_id) {
@@ -344,16 +346,16 @@ function CommunauteCenterContent() {
         if (g.niveau_id) {
           for (const nivs of Object.values(niveauxMap)) {
             const n = nivs.find((x) => x.id === g.niveau_id);
-            if (n) { niveauName = n.nom?.trim() || `Niveau ${n.annee}`; break; }
+            if (n) { niveauName = n.nom?.trim() || `${t("centre", "enrollmentLevel")} ${n.annee}`; break; }
           }
         }
         break;
       }
       const crumbs = [filiereName, niveauName, groupeName || activeRoom.name].filter(Boolean) as string[];
-      return { crumbs, kind: "Salle de classe" };
+      return { crumbs, kind: t("centre", "communityClassroom") };
     }
-    return { crumbs: [activeRoom.name], kind: "Conversation" };
-  }, [activeRoom, programmes, groupesMap, niveauxMap]);
+    return { crumbs: [activeRoom.name], kind: t("centre", "communityConversation") };
+  }, [activeRoom, programmes, groupesMap, niveauxMap, t]);
 
   /* ── Fetch messages for active room ── */
   const fetchMessages = useCallback(async (roomId: string) => {
@@ -381,11 +383,11 @@ function CommunauteCenterContent() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_messages", filter: `room_id=eq.${activeRoom.id}` },
         async (payload) => {
           const { data: pd } = await supabase.from("profiles").select("prenom, nom, role, avatar_url").eq("id", (payload.new as any).user_id).single();
-          setMessages(prev => [...prev, { ...payload.new, profiles: pd || { prenom: "Inconnu", nom: "", role: "student", avatar_url: null } }]);
+          setMessages(prev => [...prev, { ...payload.new, profiles: pd || { prenom: t("centre", "communityUnknown"), nom: "", role: "student", avatar_url: null } }]);
           const parsed = parseMsg((payload.new as any).message);
           setLastMessages(prev => ({
             ...prev,
-            [activeRoom.id]: { text: parsed.type === "image" ? "📷 Photo" : parsed.type === "file" ? `📎 ${parsed.filename}` : parsed.content, time: (payload.new as any).created_at, sender: (pd as any)?.prenom || "" },
+            [activeRoom.id]: { text: parsed.type === "image" ? `📷 ${t("centre", "communityPhoto")}` : parsed.type === "file" ? `📎 ${parsed.filename || t("centre", "communityFile")}` : parsed.content, time: (payload.new as any).created_at, sender: (pd as any)?.prenom || "" },
           }));
           markSeen(activeRoom.id);
           setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
@@ -432,11 +434,11 @@ function CommunauteCenterContent() {
 
   const uploadFile = async (file: File) => {
     if (!userId || !activeRoom || !centerId) {
-      setUploadError("Impossible d'envoyer le fichier : session ou salle invalide.");
+      setUploadError(t("centre", "communityInvalidUploadContext"));
       return;
     }
     if (file.size > 15 * 1024 * 1024) {
-      setUploadError("Fichier trop volumineux (max. 15 Mo).");
+      setUploadError(t("centre", "communityFileTooLarge"));
       return;
     }
     setUploadError("");
@@ -463,12 +465,12 @@ function CommunauteCenterContent() {
       if (msgErr) throw msgErr;
     } catch (err: any) {
       console.error("Upload error:", err);
-      setUploadError(err?.message || "Échec de l'import du fichier. Vérifiez le bucket community-files.");
+      setUploadError(err?.message || t("centre", "communityUploadFailed"));
     } finally { setFileUploading(false); }
   };
 
   const deleteMessage = async (id: string) => {
-    if (!window.confirm("Supprimer ce message ?")) return;
+    if (!window.confirm(t("centre", "communityDeleteConfirm"))) return;
     setMessages(prev => prev.filter(m => m.id !== id));
     await supabase.from("community_messages").delete().eq("id", id);
   };
@@ -500,7 +502,7 @@ function CommunauteCenterContent() {
     const parsed = parseMsg(msg.message);
     if (parsed.type === "image") {
       return (
-        <img src={parsed.content} alt="Photo" className="max-w-[220px] max-h-[200px] object-cover rounded-xl cursor-pointer hover:opacity-95 transition-opacity"
+        <img src={parsed.content} alt={t("centre", "communityPhoto")} className="max-w-[220px] max-h-[200px] object-cover rounded-xl cursor-pointer hover:opacity-95 transition-opacity"
           onClick={() => window.open(parsed.content, "_blank")} />
       );
     }
@@ -538,13 +540,13 @@ function CommunauteCenterContent() {
           unreadCounts={unreadCounts}
           onOpenRoom={openRoom}
           onCreateGroup={() => setShowCreateGroup(true)}
-          formatSidebarTime={formatSidebarTime}
+          formatSidebarTime={(date) => formatSidebarTime(date, locale)}
         />
         {showCreateGroup && (
           <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl border border-neutral-200 p-6 max-w-sm w-full shadow-lg">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium tracking-tight" style={{ color: BLUE }}>Nouveau groupe</h3>
+                <h3 className="text-lg font-medium tracking-tight" style={{ color: BLUE }}>{t("centre", "communityNewGroup")}</h3>
                 <button type="button" onClick={() => setShowCreateGroup(false)} className="h-8 w-8 rounded-lg hover:bg-neutral-100 flex items-center justify-center text-neutral-400"><X size={16} /></button>
               </div>
               <input
@@ -562,7 +564,7 @@ function CommunauteCenterContent() {
                 className="w-full h-10 rounded-full text-sm text-white disabled:opacity-40 inline-flex items-center justify-center gap-1.5 hover:opacity-90"
                 style={{ backgroundColor: BLUE }}
               >
-                {creatingGroup ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Créer
+                {creatingGroup ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} {t("centre", "financeCreate")}
               </button>
             </div>
           </div>
@@ -582,7 +584,7 @@ function CommunauteCenterContent() {
                   type="button"
                   onClick={closeRoom}
                   className="h-9 w-9 rounded-xl border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 flex items-center justify-center shrink-0"
-                  aria-label="Retour à la communauté"
+                  aria-label={t("centre", "communityBack")}
                 >
                   <ArrowLeft size={16} />
                 </button>
@@ -605,8 +607,8 @@ function CommunauteCenterContent() {
                   <h3 className="text-base font-black tracking-tight truncate" style={{ color: BLUE }}>{activeRoom.name}</h3>
                   <p className="text-xs text-neutral-500">
                     {activeRoomContext?.kind
-                      || (activeRoom.type === "announcement" ? "Forum général" : activeRoom.type === "classroom" ? "Salle de classe" : "Groupe")}
-                    {memberCounts[activeRoom.id] ? ` · ${memberCounts[activeRoom.id]} membres` : ""}
+                      || (activeRoom.type === "announcement" ? t("centre", "communityGeneralForum") : activeRoom.type === "classroom" ? t("centre", "communityClassroom") : t("centre", "communityGroup"))}
+                    {memberCounts[activeRoom.id] ? ` · ${t("centre", "communityMemberCount", { count: memberCounts[activeRoom.id] })}` : ""}
                   </p>
                 </div>
                 <button
@@ -614,7 +616,7 @@ function CommunauteCenterContent() {
                   onClick={() => setShowMembers(true)}
                   className="h-9 px-3 rounded-lg border border-neutral-200 bg-white text-neutral-700 text-sm hover:bg-neutral-50 inline-flex items-center gap-1.5 shrink-0 transition-colors"
                 >
-                  <Users size={14} /> Membres
+                  <Users size={14} /> {t("centre", "communityMembers")}
                 </button>
               </div>
 
@@ -627,10 +629,10 @@ function CommunauteCenterContent() {
                   <div className="w-1 h-8 rounded-full shrink-0 bg-neutral-300" />
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-neutral-500 mb-0.5 inline-flex items-center gap-1">
-                      <Pin size={11} /> Message épinglé
+                      <Pin size={11} /> {t("centre", "communityPinnedMessage")}
                     </p>
                     <p className="text-sm text-neutral-800 truncate">
-                      {parseMsg(pinnedMsg.message).content || "Fichier"}
+                      {parseMsg(pinnedMsg.message).content || t("centre", "communityFile")}
                     </p>
                   </div>
                   {isAdminRole && (
@@ -649,15 +651,15 @@ function CommunauteCenterContent() {
               <div className="flex-1 overflow-y-auto px-5 py-4">
                 {messagesLoading ? (
                   <div className="flex justify-center py-20 text-neutral-400 gap-2 text-sm">
-                    <Loader2 className="w-5 h-5 animate-spin" /> Chargement…
+                    <Loader2 className="w-5 h-5 animate-spin" /> {t("centre", "communityLoading")}
                   </div>
                 ) : messages.length === 0 ? (
                   <div className="text-center py-20">
                     <div className="w-14 h-14 rounded-2xl bg-white border border-dashed border-neutral-200 flex items-center justify-center mx-auto mb-4">
                       <MessageCircle size={22} className="text-neutral-300" />
                     </div>
-                    <p className="text-sm font-medium text-neutral-500">Aucun message</p>
-                    <p className="text-xs text-neutral-400 mt-1">Soyez le premier à écrire</p>
+                    <p className="text-sm font-medium text-neutral-500">{t("centre", "communityNoMessage")}</p>
+                    <p className="text-xs text-neutral-400 mt-1">{t("centre", "communityBeFirst")}</p>
                   </div>
                 ) : (() => {
                   let lastDate = "";
@@ -666,7 +668,7 @@ function CommunauteCenterContent() {
                     const showDate = date !== lastDate;
                     if (showDate) lastDate = date;
                     const isMe = msg.user_id === userId;
-                    const authorName = msg.profiles?.prenom ? `${msg.profiles.prenom}${msg.profiles.nom ? " " + msg.profiles.nom : ""}` : "Membre";
+                    const authorName = msg.profiles?.prenom ? `${msg.profiles.prenom}${msg.profiles.nom ? " " + msg.profiles.nom : ""}` : t("centre", "communityMember");
                     const authorRole = msg.profiles?.role || "student";
                     const isStaffMsg = ["admin", "center_manager", "trainer", "staff", "campus_manager"].includes(authorRole);
                     const isPinned = pinnedMsg?.id === msg.id;
@@ -676,7 +678,7 @@ function CommunauteCenterContent() {
                         {showDate && (
                           <div className="flex justify-center my-5">
                             <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400 bg-white/90 backdrop-blur-sm px-4 py-1.5 rounded-full border border-neutral-200 shadow-sm">
-                              {formatDateSep(msg.created_at)}
+                              {formatDateSep(msg.created_at, locale, t("centre", "financeToday"), t("centre", "communityYesterday"))}
                             </span>
                           </div>
                         )}
@@ -707,8 +709,8 @@ function CommunauteCenterContent() {
                                 style={isMe ? { backgroundColor: BLUE } : isStaffMsg ? { borderColor: BLUE } : {}}>
                                 {renderMsgContent(msg, isMe)}
                                 <div className={`flex items-center gap-1 mt-1.5 ${isMe ? "justify-end" : "justify-start"}`}>
-                                  <span className={`text-[9px] ${isMe ? "text-white/50" : "text-neutral-300"}`}>{formatTime(msg.created_at)}</span>
-                                  {msg.edited && <span className={`text-[9px] italic ${isMe ? "text-white/40" : "text-neutral-300"}`}>modifié</span>}
+                                  <span className={`text-[9px] ${isMe ? "text-white/50" : "text-neutral-300"}`}>{formatTime(msg.created_at, locale)}</span>
+                                  {msg.edited && <span className={`text-[9px] italic ${isMe ? "text-white/40" : "text-neutral-300"}`}>{t("centre", "communityEdited")}</span>}
                                   {isPinned && <Pin size={9} className={isMe ? "text-white/40" : "text-orange-400"} />}
                                 </div>
                               </div>
@@ -718,7 +720,7 @@ function CommunauteCenterContent() {
                                 {isAdminRole && (
                                   <button onClick={() => togglePin(msg)}
                                     className="w-7 h-7 rounded-full bg-white border border-neutral-200 flex items-center justify-center hover:bg-orange-50 shadow-sm transition-colors"
-                                    title={isPinned ? "Désépingler" : "Épingler"}>
+                                    title={isPinned ? t("centre", "communityUnpin") : t("centre", "communityPin")}>
                                     <Pin size={11} className={isPinned ? "text-orange-500" : "text-neutral-400"} />
                                   </button>
                                 )}
@@ -741,7 +743,7 @@ function CommunauteCenterContent() {
                           {/* Avatar droite (moi) */}
                           {isMe && (
                             userAvatar
-                              ? <img src={userAvatar} className="w-8 h-8 rounded-full object-cover shrink-0" alt="Moi" />
+                              ? <img src={userAvatar} className="w-8 h-8 rounded-full object-cover shrink-0" alt={t("centre", "communityMe")} />
                               : <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black shrink-0" style={{ backgroundColor: BLUE, color: ORANGE }}>
                                   {userInitial}
                                 </div>
@@ -764,7 +766,7 @@ function CommunauteCenterContent() {
                 {editingId && (
                   <div className="flex items-center justify-between rounded-xl px-3 py-2 mb-2 border border-neutral-200 bg-neutral-50">
                     <span className="text-sm text-neutral-700 inline-flex items-center gap-1.5">
-                      <Pencil size={12} /> Modification en cours
+                      <Pencil size={12} /> {t("centre", "communityEditing")}
                     </span>
                     <button type="button" onClick={() => { setEditingId(null); setNewMessage(""); }} className="text-neutral-400 hover:text-neutral-600">
                       <X size={14} />
@@ -794,7 +796,7 @@ function CommunauteCenterContent() {
                         setNewMessage(e.target.value);
                         if (inputRef.current) { inputRef.current.style.height = "auto"; inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 120) + "px"; }
                       }}
-                      placeholder={`Message dans ${activeRoom.name}…`}
+                      placeholder={t("centre", "communityMessageIn", { room: activeRoom.name })}
                       className="flex-1 rounded-2xl px-4 py-2.5 text-sm outline-none resize-none bg-white border border-neutral-200 focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400 transition-all"
                       style={{ maxHeight: "120px", minHeight: "42px" }}
                       onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(e as any); } }}
@@ -814,7 +816,7 @@ function CommunauteCenterContent() {
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl border border-neutral-200 p-6 max-w-sm w-full shadow-lg">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-medium tracking-tight" style={{ color: BLUE }}>Nouveau groupe</h3>
+              <h3 className="text-lg font-medium tracking-tight" style={{ color: BLUE }}>{t("centre", "communityNewGroup")}</h3>
               <button type="button" onClick={() => setShowCreateGroup(false)} className="h-8 w-8 rounded-lg hover:bg-neutral-100 flex items-center justify-center text-neutral-400"><X size={16} /></button>
             </div>
             <input
@@ -832,7 +834,7 @@ function CommunauteCenterContent() {
               className="w-full h-10 rounded-full text-sm text-white disabled:opacity-40 inline-flex items-center justify-center gap-1.5 hover:opacity-90"
               style={{ backgroundColor: BLUE }}
             >
-              {creatingGroup ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Créer
+              {creatingGroup ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} {t("centre", "financeCreate")}
             </button>
           </div>
         </div>

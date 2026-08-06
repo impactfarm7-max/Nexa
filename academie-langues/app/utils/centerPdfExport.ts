@@ -22,14 +22,14 @@ function fmtFCFA(n: number) {
   return neg ? `-${grouped}` : grouped;
 }
 
-function fmtDate(iso: string | null) {
+function fmtDate(iso: string | null, locale = "fr") {
   return iso
-    ? new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" })
+    ? new Date(iso).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "short", year: "numeric" })
     : "—";
 }
 
-function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString("fr-FR", {
+function fmtDateTime(iso: string, locale = "fr") {
+  return new Date(iso).toLocaleString(locale === "en" ? "en-US" : "fr-FR", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -84,7 +84,7 @@ async function addPdfLogo(doc: any, logoUrl: string | null, x: number, y: number
   doc.addImage(dataUrl, format, x, y, size, size);
 }
 
-async function createDoc(subtitle: string, config?: Partial<DocumentExportConfig>) {
+async function createDoc(subtitle: string, config?: Partial<DocumentExportConfig>, locale = "fr") {
   const cfg = resolveConfig(config);
   const { default: jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
@@ -109,10 +109,10 @@ async function createDoc(subtitle: string, config?: Partial<DocumentExportConfig
 
   const metaLines: string[] = [];
   if (cfg.showAddress && cfg.address) metaLines.push(cfg.address);
-  if (cfg.showPhone && cfg.phone) metaLines.push(`Tél : ${cfg.phone}`);
+  if (cfg.showPhone && cfg.phone) metaLines.push(`${locale === "en" ? "Phone" : "Tél"} : ${cfg.phone}`);
   if (cfg.showRccm && cfg.rccmNumber) metaLines.push(`RCCM : ${cfg.rccmNumber}`);
   if (cfg.showNiu && cfg.niuNumber) metaLines.push(`NIU : ${cfg.niuNumber}`);
-  metaLines.push(`Généré le ${new Date().toLocaleString("fr-FR")}`);
+  metaLines.push(`${locale === "en" ? "Generated on" : "Généré le"} ${new Date().toLocaleString(locale === "en" ? "en-US" : "fr-FR")}`);
 
   let metaY = 14;
   doc.setFont("helvetica", "normal");
@@ -163,26 +163,28 @@ export async function downloadJournalPdf(
   payments: JournalPayment[],
   dateFrom: string,
   dateTo: string,
-  config?: Partial<DocumentExportConfig>
+  config?: Partial<DocumentExportConfig>,
+  locale = "fr",
 ) {
   const total = payments.reduce((s, p) => s + p.amount, 0);
-  const { doc, autoTable, startY, cfg } = await createDoc("Journal des encaissements", config);
+  const isEn = locale === "en";
+  const { doc, autoTable, startY, cfg } = await createDoc(isEn ? "Collection journal" : "Journal des encaissements", config, locale);
 
   doc.setFontSize(10);
   doc.setTextColor(...cfg.blueRgb);
-  doc.text(`Période : ${dateFrom || "—"} → ${dateTo || "—"}`, 14, startY);
+  doc.text(`${isEn ? "Period" : "Période"} : ${dateFrom || "—"} → ${dateTo || "—"}`, 14, startY);
   doc.setFont("helvetica", "bold");
   doc.text(`Total : ${fmtFCFA(total)} FCFA`, 14, startY + 6);
 
   autoTable(doc, {
     startY: startY + 12,
-    head: [["Date", "N° Reçu", "Apprenant", "Programme", "Mode", "Montant"]],
+    head: [["Date", isEn ? "Receipt no." : "N° Reçu", isEn ? "Learner" : "Apprenant", isEn ? "Program" : "Programme", isEn ? "Method" : "Mode", isEn ? "Amount" : "Montant"]],
     body: payments.map((p) => [
-      fmtDateTime(p.payment_date),
+      fmtDateTime(p.payment_date, locale),
       p.receipt_number || "—",
       p.student_name,
       p.filiere_name,
-      p.payment_method,
+      isEn ? ({ "Espèces": "Cash", "Virement": "Bank transfer", "Chèque": "Check", "Carte": "Card" }[p.payment_method] || p.payment_method) : p.payment_method,
       `${fmtFCFA(p.amount)} F`,
     ]),
     styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
@@ -223,6 +225,7 @@ export type StatementPdfParams = {
   config?: Partial<DocumentExportConfig>;
   signatures?: { id: string; label: string; signatureUrl?: string | null }[];
   stampUrl?: string | null;
+  locale?: "fr" | "en";
 };
 
 async function addPdfSignatures(
@@ -276,8 +279,10 @@ async function addPdfSignatures(
 
 /** Construit le relevé PDF sans le télécharger (pour partage natif). */
 export async function buildStatementPdf(params: StatementPdfParams): Promise<{ blob: Blob; filename: string }> {
-  const docTitle = params.config?.title?.trim() || "Relevé de compte";
-  const { doc, autoTable, startY, cfg } = await createDoc(docTitle, params.config);
+  const locale = params.locale || "fr";
+  const isEn = locale === "en";
+  const docTitle = params.config?.title?.trim() || (isEn ? "Account statement" : "Relevé de compte");
+  const { doc, autoTable, startY, cfg } = await createDoc(docTitle, params.config, locale);
 
   let y = startY;
   doc.setFont("helvetica", "bold");
@@ -293,12 +298,12 @@ export async function buildStatementPdf(params: StatementPdfParams): Promise<{ b
   doc.setFont("helvetica", "bold");
   doc.setTextColor(params.resteAPayer > 0 ? 220 : 5, params.resteAPayer > 0 ? 38 : 150, params.resteAPayer > 0 ? 38 : 105);
   doc.text(
-    params.resteAPayer > 0 ? `Solde restant : ${fmtFCFA(params.resteAPayer)} FCFA` : "Compte soldé",
+    params.resteAPayer > 0 ? `${isEn ? "Remaining balance" : "Solde restant"} : ${fmtFCFA(params.resteAPayer)} FCFA` : (isEn ? "Account settled" : "Compte soldé"),
     14,
     y
   );
 
-  if (params.resteAPayer > 0) {
+  if (params.resteAPayer > 0 && !isEn) {
     const pageWidth = doc.internal.pageSize.getWidth();
     y += 5;
     doc.setFont("helvetica", "italic");
@@ -316,13 +321,13 @@ export async function buildStatementPdf(params: StatementPdfParams): Promise<{ b
   if (params.installments.length > 0) {
     autoTable(doc, {
       startY: y + 8,
-      head: [["Échéance", "Date", "Dû", "Payé", "Statut"]],
+      head: [[isEn ? "Installment" : "Échéance", "Date", isEn ? "Due" : "Dû", isEn ? "Paid" : "Payé", isEn ? "Status" : "Statut"]],
       body: params.installments.map((inst) => [
         inst.label,
-        fmtDate(inst.due_date),
+        fmtDate(inst.due_date, locale),
         `${fmtFCFA(inst.amount)} F`,
         `${fmtFCFA(inst.paid_amount)} F`,
-        inst.status === "paid" ? "Soldé" : inst.status === "late" ? "Retard" : inst.status === "partial" ? "Partiel" : "En attente",
+        inst.status === "paid" ? (isEn ? "Settled" : "Soldé") : inst.status === "late" ? (isEn ? "Overdue" : "Retard") : inst.status === "partial" ? (isEn ? "Partial" : "Partiel") : (isEn ? "Pending" : "En attente"),
       ]),
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: cfg.blueRgb, textColor: 255 },
@@ -338,26 +343,26 @@ export async function buildStatementPdf(params: StatementPdfParams): Promise<{ b
   autoTable(doc, {
     startY: y,
     head: showAgent
-      ? [["Date", "N° Reçu", "Mode", "Par", "Montant"]]
-      : [["Date", "N° Reçu", "Mode", "Montant"]],
+      ? [["Date", isEn ? "Receipt no." : "N° Reçu", isEn ? "Method" : "Mode", isEn ? "By" : "Par", isEn ? "Amount" : "Montant"]]
+      : [["Date", isEn ? "Receipt no." : "N° Reçu", isEn ? "Method" : "Mode", isEn ? "Amount" : "Montant"]],
     body: [
       ...params.payments.map((p) => showAgent
         ? [
-            fmtDate(p.payment_date),
+            fmtDate(p.payment_date, locale),
             p.receipt_number || "—",
-            p.payment_method,
+            isEn ? ({ "Espèces": "Cash", "Virement": "Bank transfer", "Chèque": "Check", "Carte": "Card" }[p.payment_method] || p.payment_method) : p.payment_method,
             p.recorded_by_name || "—",
             `+${fmtFCFA(p.amount)} F`,
           ]
         : [
-            fmtDate(p.payment_date),
+            fmtDate(p.payment_date, locale),
             p.receipt_number || "—",
-            p.payment_method,
+            isEn ? ({ "Espèces": "Cash", "Virement": "Bank transfer", "Chèque": "Check", "Carte": "Card" }[p.payment_method] || p.payment_method) : p.payment_method,
             `+${fmtFCFA(p.amount)} F`,
           ]),
       ...(showAgent
-        ? [["", "", "Total versé", "", `${fmtFCFA(totalPaid)} F`], ["", "", "Solde restant", "", `${fmtFCFA(params.resteAPayer)} F`]]
-        : [["", "", "Total versé", `${fmtFCFA(totalPaid)} F`], ["", "", "Solde restant", `${fmtFCFA(params.resteAPayer)} F`]]),
+        ? [["", "", isEn ? "Total paid" : "Total versé", "", `${fmtFCFA(totalPaid)} F`], ["", "", isEn ? "Remaining balance" : "Solde restant", "", `${fmtFCFA(params.resteAPayer)} F`]]
+        : [["", "", isEn ? "Total paid" : "Total versé", `${fmtFCFA(totalPaid)} F`], ["", "", isEn ? "Remaining balance" : "Solde restant", `${fmtFCFA(params.resteAPayer)} F`]]),
     ],
     styles: { fontSize: 8, cellPadding: 2 },
     headStyles: { fillColor: cfg.blueRgb, textColor: 255 },
@@ -368,8 +373,8 @@ export async function buildStatementPdf(params: StatementPdfParams): Promise<{ b
 
   await addPdfSignatures(doc, cfg, params.signatures, params.stampUrl);
   addPdfFooter(doc, cfg);
-  const safeName = params.studentName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || "apprenant";
-  const filename = `releve_${safeName}.pdf`;
+  const safeName = params.studentName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || (isEn ? "learner" : "apprenant");
+  const filename = `${isEn ? "statement" : "releve"}_${safeName}.pdf`;
   const blob = doc.output("blob") as Blob;
   return { blob, filename };
 }
@@ -930,6 +935,7 @@ export async function downloadPayslipPdf(params: PayslipPdfParams) {
 // ── Bulletin / relevé de notes (modèle Paramètres → Documents) ───────────────
 
 export type BulletinNotesPdfParams = {
+  locale?: "fr" | "en";
   studentName: string;
   enrollmentLabel: string;
   niveauLabel?: string | null;
@@ -948,8 +954,9 @@ export type BulletinNotesPdfParams = {
 };
 
 export async function downloadBulletinNotesPdf(params: BulletinNotesPdfParams) {
+  const isEn = params.locale === "en";
   const { doc, autoTable, startY, cfg } = await createDoc(
-    params.config?.title || "Bulletin de notes",
+    params.config?.title || (isEn ? "Report card" : "Bulletin de notes"),
     params.config,
   );
 
@@ -957,7 +964,7 @@ export async function downloadBulletinNotesPdf(params: BulletinNotesPdfParams) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
   doc.setTextColor(...cfg.blueRgb);
-  doc.text(params.studentName || "Apprenant", 14, y);
+  doc.text(params.studentName || (isEn ? "Learner" : "Apprenant"), 14, y);
   y += 5;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
@@ -973,12 +980,12 @@ export async function downloadBulletinNotesPdf(params: BulletinNotesPdfParams) {
   }
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...cfg.blueRgb);
-  doc.text(`Moyenne générale (/20) : ${params.moyenneGenerale}`, 14, y);
+  doc.text(`${isEn ? "Overall average" : "Moyenne générale"} (/20) : ${params.moyenneGenerale}`, 14, y);
   y += 8;
 
   autoTable(doc, {
     startY: y,
-    head: [["Matière", ...params.columnHeaders]],
+    head: [[isEn ? "Subject" : "Matière", ...params.columnHeaders]],
     body: params.rows.map((r) => [
       `${r.matiereName}${r.coeffLabel ? `\n${r.coeffLabel}` : ""}`,
       ...r.cells,
@@ -990,8 +997,8 @@ export async function downloadBulletinNotesPdf(params: BulletinNotesPdfParams) {
 
   await addPdfSignatures(doc, cfg, params.signatures, params.stampUrl);
   addPdfFooter(doc, cfg);
-  const safe = params.studentName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || "apprenant";
-  doc.save(`releve_notes_${safe}.pdf`);
+  const safe = params.studentName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || (isEn ? "learner" : "apprenant");
+  doc.save(`${isEn ? "grade_report" : "releve_notes"}_${safe}.pdf`);
 }
 
 // ── Fiche générale de classe (matière + période) ─────────────────────────────

@@ -17,6 +17,7 @@ import type { DocumentExportConfig } from "@/app/utils/documentConfig";
 import { buildDocumentFooterLines } from "@/app/utils/documentConfig";
 import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHeader";
 import { AmountInWords } from "@/app/components/AmountInWords";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import {
   CenterPageLayout,
   CenterPageHeader,
@@ -221,8 +222,8 @@ function fmtFCFA(n: number) {
   const grouped = abs.replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0");
   return neg ? `-${grouped}` : grouped;
 }
-function fmtDate(iso: string | null) { return iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—"; }
-function fmtDateShort(iso: string | null) { return iso ? new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—"; }
+function fmtDate(iso: string | null, locale = "fr") { return iso ? new Date(iso).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "short", year: "numeric" }) : "—"; }
+function fmtDateShort(iso: string | null, locale = "fr") { return iso ? new Date(iso).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "short" }) : "—"; }
 
 /** Extrait le code coupon depuis discount_reason (« Coupon RENTREE25 »). */
 function couponCodeFromReason(reason?: string | null): string | null {
@@ -245,26 +246,33 @@ function openWhatsApp(text: string, phone?: string | null) {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-function financeStatusLabel(st: string) {
-  return st === "paid" ? "Soldé"
-    : st === "late" ? "Retard"
-    : st === "exempt" ? "Exempt"
-    : "En cours";
+type FinanceExportLabels = {
+  title: string; lastName: string; firstName: string; program: string; status: string;
+  total: string; paid: string; balance: string; discount: string; coupon: string;
+  nextInstallment: string; generatedOn: string; settled: string; late: string;
+  exempt: string; inProgress: string;
+};
+
+function financeStatusLabel(st: string, labels: FinanceExportLabels) {
+  return st === "paid" ? labels.settled
+    : st === "late" ? labels.late
+    : st === "exempt" ? labels.exempt
+    : labels.inProgress;
 }
 
 function toIsoDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
-function downloadFinanceLedgerCsv(rows: FinanceRow[]) {
-  const header = ["Nom", "Prénom", "Programme", "Statut", "Total", "Payé", "Reste", "Réduction", "Coupon", "Prochaine échéance"];
+function downloadFinanceLedgerCsv(rows: FinanceRow[], labels: FinanceExportLabels) {
+  const header = [labels.lastName, labels.firstName, labels.program, labels.status, labels.total, labels.paid, labels.balance, labels.discount, labels.coupon, labels.nextInstallment];
   const lines = [
     header,
     ...rows.map((r) => [
       r.nom,
       r.prenom,
       r.filiere_name,
-      financeStatusLabel(r.financial_status),
+      financeStatusLabel(r.financial_status, labels),
       String(Math.round(r.tuition_fee)),
       String(Math.round(r.tuition_paid)),
       String(Math.round(r.reste_a_payer)),
@@ -285,7 +293,7 @@ function downloadFinanceLedgerCsv(rows: FinanceRow[]) {
   URL.revokeObjectURL(url);
 }
 
-async function buildFinanceLedgerPdf(rows: FinanceRow[], caption: string) {
+async function buildFinanceLedgerPdf(rows: FinanceRow[], caption: string, labels: FinanceExportLabels, locale: string) {
   const { default: jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -294,25 +302,25 @@ async function buildFinanceLedgerPdf(rows: FinanceRow[], caption: string) {
   doc.setTextColor(...blue);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text("Finances", 14, 16);
+  doc.text(labels.title, 14, 16);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
   doc.text(caption, 14, 22, { maxWidth: pageWidth - 28 });
-  doc.text(`Genere le ${new Date().toLocaleString("fr-FR")}`, 14, 28);
+  doc.text(`${labels.generatedOn} ${new Date().toLocaleString(locale === "en" ? "en-US" : "fr-FR")}`, 14, 28);
   autoTable(doc, {
     startY: 32,
-    head: [["Nom", "Prenom", "Programme", "Statut", "Total", "Paye", "Reste", "Coupon"]],
+    head: [[labels.lastName, labels.firstName, labels.program, labels.status, labels.total, labels.paid, labels.balance, labels.coupon]],
     body: rows.map((r) => [
       r.nom,
       r.prenom,
       r.filiere_name,
-      financeStatusLabel(r.financial_status),
+      financeStatusLabel(r.financial_status, labels),
       fmtFCFA(r.tuition_fee),
       fmtFCFA(r.tuition_paid),
       fmtFCFA(r.reste_a_payer),
       appliedDiscount(r) > 0
-        ? `${couponCodeFromReason(r.discount_reason) || "Réduc."} (−${fmtFCFA(appliedDiscount(r))})`
+          ? `${couponCodeFromReason(r.discount_reason) || labels.discount} (−${fmtFCFA(appliedDiscount(r))})`
         : "—",
     ]),
     styles: { font: "helvetica", fontSize: 8, cellPadding: 2, overflow: "linebreak", textColor: [40, 40, 40] },
@@ -323,13 +331,13 @@ async function buildFinanceLedgerPdf(rows: FinanceRow[], caption: string) {
   return doc;
 }
 
-async function downloadFinanceLedgerPdf(rows: FinanceRow[], caption: string) {
-  const doc = await buildFinanceLedgerPdf(rows, caption);
+async function downloadFinanceLedgerPdf(rows: FinanceRow[], caption: string, labels: FinanceExportLabels, locale: string) {
+  const doc = await buildFinanceLedgerPdf(rows, caption, labels, locale);
   doc.save(`finances-${toIsoDate(new Date())}.pdf`);
 }
 
-async function silentDownloadFinanceLedgerPdf(rows: FinanceRow[], caption: string) {
-  const doc = await buildFinanceLedgerPdf(rows, caption);
+async function silentDownloadFinanceLedgerPdf(rows: FinanceRow[], caption: string, labels: FinanceExportLabels, locale: string) {
+  const doc = await buildFinanceLedgerPdf(rows, caption, labels, locale);
   const filename = `finances-${toIsoDate(new Date())}.pdf`;
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);
@@ -378,6 +386,21 @@ function FinanceKpiCard({
 }
 
 export default function CenterFinancePage() {
+  const { t, locale } = useI18n();
+  const paymentMethodLabel = (method: string) => {
+    if (method === "Espèces") return t("centre", "collectionsMethodCash");
+    if (method === "Virement") return t("centre", "collectionsMethodTransfer");
+    if (method === "Carte") return t("centre", "collectionsMethodCard");
+    if (method === "Chèque") return t("centre", "financeMethodCheck");
+    return method;
+  };
+  const exportLabels: FinanceExportLabels = {
+    title: t("centre", "managerFinances"), lastName: t("centre", "enrollmentLastName"), firstName: t("centre", "enrollmentFirstName"),
+    program: t("centre", "enrollmentProgram"), status: t("centre", "settingsStatus"), total: t("centre", "enrollmentTotal"),
+    paid: t("centre", "financePaid"), balance: t("centre", "summaryBalance"), discount: t("centre", "financeDiscount"),
+    coupon: t("centre", "financeCoupon"), nextInstallment: t("centre", "financeNextInstallment"), generatedOn: t("centre", "financeGeneratedOn"),
+    settled: t("centre", "recoveryStatusPaid"), late: t("centre", "financeLate"), exempt: t("centre", "financeExempt"), inProgress: t("centre", "financeInProgress"),
+  };
   const [centerId, setCenterId] = useState("");
   const [shellLoading, setShellLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(true);
@@ -552,7 +575,7 @@ export default function CenterFinancePage() {
   useEffect(() => { if (activeTab === "coupons") loadCoupons(); }, [activeTab, loadCoupons]);
 
   const createCoupon = async () => {
-    if (!couponForm.code.trim() || !couponForm.value.trim()) { setCouponError("Code et valeur requis."); return; }
+    if (!couponForm.code.trim() || !couponForm.value.trim()) { setCouponError(t("centre", "financeCouponRequired")); return; }
     setCouponSaving(true); setCouponError("");
     const { data: { session } } = await supabase.auth.getSession();
     const { error } = await supabase.from("coupons").insert({
@@ -608,9 +631,9 @@ export default function CenterFinancePage() {
 
   const submitPayment = async () => {
     const num = parseInt(payAmount, 10);
-    if (!num || num <= 0) { setPayError("Montant invalide."); return; }
+    if (!num || num <= 0) { setPayError(t("centre", "financeInvalidAmount")); return; }
     if (!payModal) return;
-    if (num > payModal.reste_a_payer) { setPayError(`Dépasse le solde (${fmtFCFA(payModal.reste_a_payer)} F).`); return; }
+    if (num > payModal.reste_a_payer) { setPayError(t("centre", "financeExceedsBalance", { balance: `${fmtFCFA(payModal.reste_a_payer)} F` })); return; }
 
     setPaySaving(true); setPayError("");
     const { data, error } = await supabase.rpc("record_payment", {
@@ -781,10 +804,10 @@ export default function CenterFinancePage() {
           onClick={onBack}
           className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] inline-flex items-center gap-1.5 shrink-0"
         >
-          <ArrowLeft size={14} /> Retour
+          <ArrowLeft size={14} /> {t("centre", "financeBack")}
         </button>
         <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-400 leading-none mb-0.5">Aperçu</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-400 leading-none mb-0.5">{t("centre", "financePreview")}</p>
           <span className="text-sm font-extrabold tracking-tight truncate block" style={{ color: BLUE }}>{title}</span>
         </div>
       </div>
@@ -813,34 +836,34 @@ export default function CenterFinancePage() {
           className="h-8 px-3 rounded-lg text-xs font-semibold text-white inline-flex items-center gap-1.5 hover:opacity-90"
           style={{ backgroundColor: BLUE }}
         >
-          <Printer size={13} /> Imprimer
+          <Printer size={13} /> {t("centre", "financePrint")}
         </button>
       </div>
     </div>
   );
 
   const buildInvoiceWhatsAppText = (invoice: FinanceRow) => {
-    const centerName = docConfig?.legalName || branding?.legal_name || "votre centre";
+    const centerName = docConfig?.legalName || branding?.legal_name || t("centre", "financeYourCenter");
     const totalPaid = invoicePayments.reduce((s, p) => s + p.amount, 0);
 
     return [
-      `Bonjour ${invoice.prenom || ""},`.trim(),
+      t("centre", "financeHello", { name: invoice.prenom || "" }).trim(),
       "",
-      `Voici le point sur votre compte auprès de ${centerName}.`,
+      t("centre", "financeAccountSummaryMessage", { center: centerName }),
       "",
-      `Formation : ${invoice.filiere_name}`,
-      `Montant déjà réglé : ${fmtFCFA(totalPaid)} FCFA`,
-      `Solde restant à payer : ${fmtFCFA(invoice.reste_a_payer)} FCFA`,
+      `${t("centre", "navFormation")} : ${invoice.filiere_name}`,
+      `${t("centre", "financeAmountAlreadyPaid")} : ${fmtFCFA(totalPaid)} FCFA`,
+      `${t("centre", "financeRemainingBalance")} : ${fmtFCFA(invoice.reste_a_payer)} FCFA`,
       "",
-      "Nous restons disponibles pour toute question.",
+      t("centre", "financeAvailableForQuestions"),
       "",
-      "Cordialement,",
+      t("centre", "financeRegards"),
       centerName,
     ].join("\n");
   };
 
   const downloadJournal = () => {
-    void downloadJournalPdf(payments, dateFrom, dateTo, docConfig || undefined);
+    void downloadJournalPdf(payments, dateFrom, dateTo, docConfig || undefined, locale);
   };
 
   const printJournal = () => {
@@ -858,6 +881,7 @@ export default function CenterFinancePage() {
       payments: invoicePayments,
       signatures,
       stampUrl: (branding?.stamp_url as string | null) || null,
+      locale,
     };
   };
 
@@ -865,7 +889,7 @@ export default function CenterFinancePage() {
 
   if (dataLoading) {
     return (
-      <CenterPageLayout header={<CenterPageHeader title="Finances" />}>
+      <CenterPageLayout header={<CenterPageHeader title={t("centre", "managerFinances")} />}>
         <CenterContentSkeleton variant="finance-body" />
       </CenterPageLayout>
     );
@@ -887,7 +911,7 @@ export default function CenterFinancePage() {
       student: `${(r.prenom || "").toUpperCase()} ${(r.nom || "").toUpperCase()}`.trim(),
       filiere: r.filiere_name,
       amount: appliedDiscount(r),
-      reason: r.discount_reason || "Réduction",
+      reason: r.discount_reason || t("centre", "financeDiscount"),
       code: couponCodeFromReason(r.discount_reason),
     }))
     .sort((a, b) => b.amount - a.amount);
@@ -921,8 +945,8 @@ export default function CenterFinancePage() {
       : exportRows.length > 0;
   const exportCaption =
     activeTab === "overdue"
-      ? `Impayés · ${exportRows.length} dossier${exportRows.length > 1 ? "s" : ""}`
-      : `Grand livre · ${exportRows.length} ligne${exportRows.length > 1 ? "s" : ""}${search.trim() ? ` · Recherche: ${search.trim()}` : ""}`;
+      ? `${t("centre", "financeUnpaid")} · ${t("centre", "financeRecordCount", { count: exportRows.length })}`
+      : `${t("centre", "financeLedger")} · ${t("centre", "financeLineCount", { count: exportRows.length })}${search.trim() ? ` · ${t("centre", "financeSearchLabel")}: ${search.trim()}` : ""}`;
 
   const applyDatePreset = (preset: "today" | "7d" | "month" | "year") => {
     const now = new Date();
@@ -957,15 +981,15 @@ export default function CenterFinancePage() {
       if (activeTab === "journal") {
         downloadJournal();
         openWhatsApp(
-          `Journal des encaissements Nexa (${payments.length}). PDF pret a joindre.`,
+          t("centre", "financeJournalWhatsapp", { count: payments.length }),
           waPhone,
         );
       } else if (activeTab === "coupons") {
-        openWhatsApp(`Coupons Nexa (${coupons.length}).`, waPhone);
+        openWhatsApp(t("centre", "financeCouponsWhatsapp", { count: coupons.length }), waPhone);
       } else {
-        const filename = await silentDownloadFinanceLedgerPdf(exportRows, exportCaption);
+        const filename = await silentDownloadFinanceLedgerPdf(exportRows, exportCaption, exportLabels, locale);
         openWhatsApp(
-          `Liste finances Nexa (${exportRows.length}). PDF pret a joindre: ${filename}`,
+          t("centre", "financeListWhatsapp", { count: exportRows.length, filename }),
           waPhone,
         );
       }
@@ -983,7 +1007,7 @@ export default function CenterFinancePage() {
     <CenterPageLayout
       header={
         <CenterPageHeader
-          title="Finances"
+          title={t("centre", "managerFinances")}
           actions={
             <>
               <FinanceShareMenu
@@ -993,7 +1017,7 @@ export default function CenterFinancePage() {
                   if (!canExport) return;
                   if (activeTab === "coupons") return;
                   if (activeTab === "journal") {
-                    const header = ["Date", "Reçu", "Apprenant", "Mode", "Montant"];
+                    const header = [t("centre", "reportsDate"), t("centre", "financeReceipt"), t("centre", "enrollmentLearner"), t("centre", "collectionsMethod"), t("centre", "collectionsAmount")];
                     const lines = [
                       header,
                       ...payments.map((p) => [
@@ -1016,7 +1040,7 @@ export default function CenterFinancePage() {
                     URL.revokeObjectURL(url);
                     return;
                   }
-                  downloadFinanceLedgerCsv(exportRows);
+                  downloadFinanceLedgerCsv(exportRows, exportLabels);
                 }}
                 onPdf={async () => {
                   if (!canExport) return;
@@ -1025,7 +1049,7 @@ export default function CenterFinancePage() {
                     if (activeTab === "journal") {
                       downloadJournal();
                     } else if (activeTab !== "coupons") {
-                      await downloadFinanceLedgerPdf(exportRows, exportCaption);
+                      await downloadFinanceLedgerPdf(exportRows, exportCaption, exportLabels, locale);
                     }
                   } finally {
                     setShareBusy(false);
@@ -1045,10 +1069,10 @@ export default function CenterFinancePage() {
       <CenterPageBody>
         <div className="space-y-3 mb-1 print:hidden">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-            <FinanceKpiCard label="Encaissé" value={`${fmtFCFA(totalEncaisse)} F`} tone="green" />
-            <FinanceKpiCard label="Créances" value={`${fmtFCFA(totalImpayes)} F`} tone="red" />
-            <FinanceKpiCard label="Recouvrement" value={`${tauxRecouvrement} %`} tone="blue" />
-            <FinanceKpiCard label="En retard" value={String(lateCount)} tone={lateCount > 0 ? "red" : "blue"} />
+            <FinanceKpiCard label={t("centre", "recoveryCollected")} value={`${fmtFCFA(totalEncaisse)} F`} tone="green" />
+            <FinanceKpiCard label={t("centre", "summaryOpenReceivables")} value={`${fmtFCFA(totalImpayes)} F`} tone="red" />
+            <FinanceKpiCard label={t("centre", "summaryRecovery")} value={`${tauxRecouvrement} %`} tone="blue" />
+            <FinanceKpiCard label={t("centre", "financeOverdue")} value={String(lateCount)} tone={lateCount > 0 ? "red" : "blue"} />
             <FinanceKpiCard label="C.A." value={`${fmtFCFA(totalCA)} F`} tone="blue" />
           </div>
 
@@ -1058,21 +1082,21 @@ export default function CenterFinancePage() {
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher…"
+                placeholder={t("centre", "financeSearch")}
                 className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-black/[0.08] text-[12px] font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 placeholder:text-neutral-400"
                 style={{ backgroundColor: SURFACE }}
               />
             </div>
             <ToolbarSelect
-              label="Vue"
+              label={t("centre", "financeView")}
               value={activeTab}
               onChange={(v) => setActiveTab(v as typeof activeTab)}
               minWidth="8.5rem"
               options={[
-                { value: "ledger", label: "Grand livre" },
-                { value: "overdue", label: `Impayés (${lateCount})` },
-                { value: "journal", label: "Journal" },
-                { value: "coupons", label: "Coupons" },
+                { value: "ledger", label: t("centre", "financeLedger") },
+                { value: "overdue", label: `${t("centre", "financeUnpaid")} (${lateCount})` },
+                { value: "journal", label: t("centre", "collectionsJournalShort") },
+                { value: "coupons", label: t("centre", "discountCenterCoupons") },
               ]}
             />
           </div>
@@ -1080,16 +1104,16 @@ export default function CenterFinancePage() {
 
         {activeTab === "ledger" && (
           filtered.length === 0 ? (
-            <EmptyState title="Aucun dossier trouvé" hint="Modifiez la recherche." />
+            <EmptyState title={t("centre", "financeNoRecord")} hint={t("centre", "financeChangeSearch")} />
           ) : (
             <CenterDataTable
-              columns={["Apprenant", "Programme", "Statut", "Montant", "Coupon", "Actions"]}
+              columns={[t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "settingsStatus"), t("centre", "collectionsAmount"), t("centre", "financeCoupon"), t("centre", "financeActions")]}
               columnWidths={[undefined, "18%", "9%", "18%", "14%", "11.5rem"]}
             >
               {filtered.map((r, i) => {
                 const isPaid = r.financial_status === "paid";
                 const isLate = r.financial_status === "late";
-                const statusLabel = isPaid ? "Soldé" : isLate ? "Retard" : r.financial_status === "exempt" ? "Exempt" : "En cours";
+                const statusLabel = isPaid ? t("centre", "recoveryStatusPaid") : isLate ? t("centre", "financeLate") : r.financial_status === "exempt" ? t("centre", "financeExempt") : t("centre", "financeInProgress");
                 const discount = appliedDiscount(r);
                 const couponCode = couponCodeFromReason(r.discount_reason);
 
@@ -1114,7 +1138,7 @@ export default function CenterFinancePage() {
                         {fmtFCFA(r.tuition_paid)} / {fmtFCFA(r.tuition_fee)} F
                       </p>
                       {r.reste_a_payer > 0 && (
-                        <p className="text-[11px] text-red-600 mt-1 tabular-nums">Reste {fmtFCFA(r.reste_a_payer)} F</p>
+                        <p className="text-[11px] text-red-600 mt-1 tabular-nums">{t("centre", "summaryBalance")} {fmtFCFA(r.reste_a_payer)} F</p>
                       )}
                     </td>
                     <td className="px-4 py-4 min-w-0 align-top">
@@ -1122,7 +1146,7 @@ export default function CenterFinancePage() {
                         <div>
                           <p className="text-[12px] font-semibold text-violet-700 tabular-nums">−{fmtFCFA(discount)} F</p>
                           <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500 mt-0.5 truncate">
-                            {couponCode || r.discount_reason || "Réduction"}
+                            {couponCode || r.discount_reason || t("centre", "financeDiscount")}
                           </p>
                         </div>
                       ) : (
@@ -1130,9 +1154,9 @@ export default function CenterFinancePage() {
                       )}
                     </td>
                     <TableActions>
-                      <TableBtnPreview onClick={() => openInvoice(r)} label="Aperçu" />
+                      <TableBtnPreview onClick={() => openInvoice(r)} label={t("centre", "financePreview")} />
                       {!isPaid && (
-                        <TableBtnModify onClick={() => openPayModal(r)} label="Encaisser" />
+                        <TableBtnModify onClick={() => openPayModal(r)} label={t("centre", "financeCollect")} />
                       )}
                     </TableActions>
                   </CenterTableRow>
@@ -1145,7 +1169,7 @@ export default function CenterFinancePage() {
           {activeTab === "overdue" && (
             <div className="space-y-4">
               <p className="text-sm font-medium" style={{ color: BLUE }}>
-                <span className="font-bold">{fmtFCFA(agingAmounts.current)} F</span> courant
+                <span className="font-bold">{fmtFCFA(agingAmounts.current)} F</span> {t("centre", "financeCurrent")}
                 <StatSep />
                 <span className="font-semibold text-amber-700">{fmtFCFA(agingAmounts.d30)} F</span> 30j
                 <StatSep />
@@ -1155,10 +1179,10 @@ export default function CenterFinancePage() {
               </p>
 
               {([
-                { label: "Retards de plus de 90 jours", list: aging.d90 },
-                { label: "Retards de 60 jours", list: aging.d60 },
-                { label: "Retards de 30 jours", list: aging.d30 },
-                { label: "Échéances courantes", list: aging.current },
+                { label: t("centre", "financeOverdue90"), list: aging.d90 },
+                { label: t("centre", "financeOverdue60"), list: aging.d60 },
+                { label: t("centre", "financeOverdue30"), list: aging.d30 },
+                { label: t("centre", "financeCurrentInstallments"), list: aging.current },
               ]).filter(g => g.list.length > 0).map(({ label, list }) => (
                 <section key={label}>
                   <div className="flex items-center justify-between mb-2 px-0.5">
@@ -1166,7 +1190,7 @@ export default function CenterFinancePage() {
                     <span className="text-xs text-neutral-400">{list.length}</span>
                   </div>
                   <CenterDataTable
-                    columns={["Apprenant", "Programme", "Échéance", "Reste", "Actions"]}
+                    columns={[t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "financeInstallment"), t("centre", "summaryBalance"), t("centre", "financeActions")]}
                     columnWidths={[undefined, "22%", "13%", "15%", "11.5rem"]}
                   >
                     {list.map((r, i) => (
@@ -1178,12 +1202,12 @@ export default function CenterFinancePage() {
                           <p className="text-[12px] text-neutral-600 leading-snug truncate uppercase">{r.filiere_name}</p>
                         </td>
                         <td className="px-4 py-4 text-[12px] text-neutral-600 tabular-nums align-top">
-                          {r.next_due_date ? fmtDate(r.next_due_date) : "—"}
+                          {r.next_due_date ? fmtDate(r.next_due_date, locale) : "—"}
                         </td>
                         <td className="px-4 py-4 text-[12px] font-semibold text-red-600 tabular-nums align-top">{fmtFCFA(r.reste_a_payer)} F</td>
                         <TableActions>
-                          <TableBtnPreview onClick={() => openInvoice(r)} />
-                          <TableBtnModify onClick={() => openPayModal(r)} label="Encaisser" />
+                          <TableBtnPreview onClick={() => openInvoice(r)} label={t("centre", "financePreview")} />
+                          <TableBtnModify onClick={() => openPayModal(r)} label={t("centre", "financeCollect")} />
                         </TableActions>
                       </CenterTableRow>
                     ))}
@@ -1193,7 +1217,7 @@ export default function CenterFinancePage() {
               {lateCount === 0 && aging.current.length === 0 && (
                 <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-12 text-center">
                   <CheckCircle2 size={36} className="text-neutral-300 mx-auto mb-3" />
-                  <p className="text-sm text-neutral-500">Aucun impayé. Tous les comptes sont à jour.</p>
+                  <p className="text-sm text-neutral-500">{t("centre", "financeNoUnpaid")}</p>
                 </div>
               )}
             </div>
@@ -1205,10 +1229,10 @@ export default function CenterFinancePage() {
               <div className="print:hidden rounded-xl border border-black/[0.06] bg-white p-3 space-y-2.5">
                 <div className="flex flex-wrap gap-1.5">
                   {([
-                    ["today", "Aujourd'hui"],
-                    ["7d", "7 jours"],
-                    ["month", "Mois"],
-                    ["year", "Année"],
+                    ["today", t("centre", "financeToday")],
+                    ["7d", t("centre", "financeSevenDays")],
+                    ["month", t("centre", "financeMonth")],
+                    ["year", t("centre", "financeYear")],
                   ] as const).map(([key, label]) => (
                     <button
                       key={key}
@@ -1222,7 +1246,7 @@ export default function CenterFinancePage() {
                 </div>
                 <div className="flex flex-wrap items-end gap-2">
                   <div className="shrink-0">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Du</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">{t("centre", "reportsFrom")}</label>
                     <input
                       type="date"
                       value={dateFrom}
@@ -1231,7 +1255,7 @@ export default function CenterFinancePage() {
                     />
                   </div>
                   <div className="shrink-0">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Au</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">{t("centre", "reportsTo")}</label>
                     <input
                       type="date"
                       value={dateTo}
@@ -1240,14 +1264,14 @@ export default function CenterFinancePage() {
                     />
                   </div>
                   <div className="shrink-0">
-                    <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">Mode</label>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">{t("centre", "collectionsMethod")}</label>
                     <select
                       value={methodFilter}
                       onChange={(e) => setMethodFilter(e.target.value)}
                       className="h-8 px-2 rounded-lg border border-black/[0.08] bg-white text-[12px] font-medium text-neutral-700 outline-none"
                     >
-                      <option value="all">Tous</option>
-                      {METHOD_OPTIONS.map((m) => <option key={m} value={m}>{m}</option>)}
+                      <option value="all">{t("centre", "financeAll")}</option>
+                      {METHOD_OPTIONS.map((m) => <option key={m} value={m}>{paymentMethodLabel(m)}</option>)}
                     </select>
                   </div>
                   <button
@@ -1256,7 +1280,7 @@ export default function CenterFinancePage() {
                     className="h-8 px-3 rounded-lg text-[12px] font-semibold text-white inline-flex items-center gap-1.5 shrink-0"
                     style={{ backgroundColor: BLUE }}
                   >
-                    <Filter size={13} /> Filtrer
+                    <Filter size={13} /> {t("centre", "financeFilter")}
                   </button>
                   <div className="flex-1 min-w-0" />
                   <div className="flex items-center gap-1.5 shrink-0">
@@ -1275,15 +1299,15 @@ export default function CenterFinancePage() {
                       className="h-8 px-3 rounded-lg text-[12px] font-semibold text-white inline-flex items-center gap-1.5 disabled:opacity-40"
                       style={{ backgroundColor: BLUE }}
                     >
-                      <Printer size={13} /> Imprimer
+                      <Printer size={13} /> {t("centre", "financePrint")}
                     </button>
                   </div>
                 </div>
               </div>
 
               <div className="hidden print:block mb-4">
-                <h2 className="text-lg font-black" style={{ color: BLUE }}>Journal des encaissements</h2>
-                <p className="text-xs text-neutral-500">Période : {dateFrom || "—"} → {dateTo || "—"} · Total : {fmtFCFA(journalTotal)} FCFA</p>
+                <h2 className="text-lg font-black" style={{ color: BLUE }}>{t("centre", "collectionsJournal")}</h2>
+                <p className="text-xs text-neutral-500">{t("centre", "reportsPeriod")} : {dateFrom || "—"} → {dateTo || "—"} · {t("centre", "enrollmentTotal")} : {fmtFCFA(journalTotal)} FCFA</p>
               </div>
 
               {/* Totaux par mode */}
@@ -1307,27 +1331,27 @@ export default function CenterFinancePage() {
                 <table className="w-full text-left text-sm min-w-[700px] finance-journal-table">
                   <thead className="bg-neutral-50 text-[9px] font-black uppercase tracking-widest text-neutral-400 border-b">
                     <tr>
-                      <th className="p-4">Date & Heure</th>
-                      <th className="p-4">N° Reçu</th>
-                      <th className="p-4">Apprenant</th>
-                      <th className="p-4">Mode</th>
-                      <th className="p-4 text-right finance-col-amount">Montant</th>
+                      <th className="p-4">{t("centre", "financeDateTime")}</th>
+                      <th className="p-4">{t("centre", "financeReceiptNumber")}</th>
+                      <th className="p-4">{t("centre", "enrollmentLearner")}</th>
+                      <th className="p-4">{t("centre", "collectionsMethod")}</th>
+                      <th className="p-4 text-right finance-col-amount">{t("centre", "collectionsAmount")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100 text-xs">
                     {journalLoading ? (
                       <tr><td colSpan={5} className="p-8 text-center"><Loader2 size={20} className="animate-spin mx-auto text-neutral-300" /></td></tr>
                     ) : payments.length === 0 ? (
-                      <tr><td colSpan={5} className="p-8 text-center text-neutral-400 italic">Aucune transaction sur cette période.</td></tr>
+                      <tr><td colSpan={5} className="p-8 text-center text-neutral-400 italic">{t("centre", "financeNoTransaction")}</td></tr>
                     ) : payments.map(p => (
                       <tr key={p.id} className="hover:bg-neutral-50/50">
-                        <td className="p-4 font-mono text-[11px] text-neutral-500">{new Date(p.payment_date).toLocaleString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
+                        <td className="p-4 font-mono text-[11px] text-neutral-500">{new Date(p.payment_date).toLocaleString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                         <td className="p-4 font-mono font-bold text-[11px]" style={{ color: BLUE }}>{p.receipt_number || "—"}</td>
                         <td className="p-4">
                           <p className="font-bold" style={{ color: BLUE }}>{p.student_name}</p>
                           <p className="text-[10px] text-neutral-400 uppercase">{p.filiere_name}</p>
                         </td>
-                        <td className="p-4 text-neutral-500 font-medium">{p.payment_method}</td>
+                        <td className="p-4 text-neutral-500 font-medium">{paymentMethodLabel(p.payment_method)}</td>
                         <td className="p-4 text-right font-medium tabular-nums text-neutral-900 finance-col-amount">+{fmtFCFA(p.amount)} F</td>
                       </tr>
                     ))}
@@ -1342,36 +1366,36 @@ export default function CenterFinancePage() {
             <div className="space-y-6 max-w-4xl">
               {/* Formulaire création */}
               <div className="bg-white p-5 rounded-2xl border border-neutral-200 space-y-4">
-                <h3 className="text-sm font-medium text-neutral-900 flex items-center gap-1.5"><Tag size={14} style={{ color: ORANGE }} /> Créer un coupon</h3>
+                <h3 className="text-sm font-medium text-neutral-900 flex items-center gap-1.5"><Tag size={14} style={{ color: ORANGE }} /> {t("centre", "financeCreateCoupon")}</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
                     <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">Code *</label>
                     <input value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="RENTRÉE25" className="w-full h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-black outline-none uppercase" />
                   </div>
                   <div>
-                    <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">Type</label>
+                    <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "programType")}</label>
                     <select value={couponForm.type} onChange={e => setCouponForm(f => ({ ...f, type: e.target.value as "fixed" | "percentage" }))} className="w-full h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-bold outline-none">
-                      <option value="fixed">Montant fixe (FCFA)</option>
-                      <option value="percentage">Pourcentage (%)</option>
+                      <option value="fixed">{t("centre", "financeFixedAmount")}</option>
+                      <option value="percentage">{t("centre", "financePercentage")}</option>
                     </select>
                   </div>
                   <div>
-                    <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">Valeur *</label>
+                    <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "summaryValue")} *</label>
                     <input type="number" value={couponForm.value} onChange={e => setCouponForm(f => ({ ...f, value: e.target.value }))} placeholder={couponForm.type === "percentage" ? "Ex: 10" : "Ex: 50000"} className="w-full h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-bold outline-none" />
                     {couponForm.type === "fixed" && <AmountInWords amount={couponForm.value} />}
                   </div>
                   <div>
-                    <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">Max utilisations</label>
-                    <input type="number" value={couponForm.max_uses} onChange={e => setCouponForm(f => ({ ...f, max_uses: e.target.value }))} placeholder="Illimité" className="w-full h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-bold outline-none" />
+                    <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "financeMaxUses")}</label>
+                    <input type="number" value={couponForm.max_uses} onChange={e => setCouponForm(f => ({ ...f, max_uses: e.target.value }))} placeholder={t("centre", "financeUnlimited")} className="w-full h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-bold outline-none" />
                   </div>
                 </div>
                 <div className="flex items-end gap-3">
                   <div>
-                    <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">Expiration</label>
+                    <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "discountExpiration")}</label>
                     <input type="date" value={couponForm.expires_at} onChange={e => setCouponForm(f => ({ ...f, expires_at: e.target.value }))} className="h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-bold outline-none" />
                   </div>
                   <button onClick={createCoupon} disabled={couponSaving} className="h-9 px-4 rounded-full text-sm text-white inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 transition-opacity" style={{ backgroundColor: BLUE }}>
-                    {couponSaving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} Créer
+                    {couponSaving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} {t("centre", "financeCreate")}
                   </button>
                 </div>
                 {couponError && <p className="text-xs font-bold text-red-500">{couponError}</p>}
@@ -1381,7 +1405,7 @@ export default function CenterFinancePage() {
               {couponsLoading ? (
                 <div className="text-center py-8"><Loader2 size={20} className="animate-spin mx-auto text-neutral-300" /></div>
               ) : coupons.length === 0 ? (
-                <p className="text-center py-8 text-sm text-neutral-400">Aucun coupon créé.</p>
+                <p className="text-center py-8 text-sm text-neutral-400">{t("centre", "financeNoCoupon")}</p>
               ) : (
                 <div className="space-y-2">
                   {coupons.map(c => (
@@ -1394,14 +1418,14 @@ export default function CenterFinancePage() {
                           <p className="font-black text-sm font-mono" style={{ color: BLUE }}>{c.code}</p>
                           <p className="text-[10px] text-neutral-400">
                             {c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value)} FCFA`}
-                            {c.max_uses && ` · ${c.uses_count}/${c.max_uses} utilisés`}
-                            {!c.max_uses && c.uses_count > 0 && ` · ${c.uses_count} utilisé${c.uses_count > 1 ? "s" : ""}`}
-                            {c.expires_at && ` · Expire ${fmtDateShort(c.expires_at)}`}
+                            {c.max_uses && ` · ${c.uses_count}/${c.max_uses} ${t("centre", "financeUsedPlural")}`}
+                            {!c.max_uses && c.uses_count > 0 && ` · ${c.uses_count} ${t("centre", c.uses_count > 1 ? "financeUsedPlural" : "financeUsed")}`}
+                            {c.expires_at && ` · ${t("centre", "financeExpires")} ${fmtDateShort(c.expires_at, locale)}`}
                           </p>
                         </div>
                       </div>
                       <button onClick={() => toggleCoupon(c.id, c.is_active)} className={`h-8 px-3 rounded-full border text-[11px] font-bold transition-colors ${c.is_active ? "text-neutral-700 border-neutral-200 hover:bg-neutral-50" : "text-white border-transparent hover:opacity-90"}`} style={!c.is_active ? { backgroundColor: BLUE } : undefined}>
-                        {c.is_active ? "Désactiver" : "Réactiver"}
+                        {c.is_active ? t("centre", "financeDisable") : t("centre", "financeEnableAgain")}
                       </button>
                     </div>
                   ))}
@@ -1412,21 +1436,21 @@ export default function CenterFinancePage() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <h3 className="text-sm font-medium text-neutral-900 flex items-center gap-1.5">
-                    <Tag size={14} style={{ color: ORANGE }} /> Coupons appliqués aux étudiants
+                    <Tag size={14} style={{ color: ORANGE }} /> {t("centre", "financeAppliedCoupons")}
                   </h3>
                   {couponApplications.length > 0 && (
                     <p className="text-xs font-semibold text-violet-700 tabular-nums">
-                      {couponApplications.length} dossier{couponApplications.length > 1 ? "s" : ""} · −{fmtFCFA(totalCouponsApplied)} F
+                      {t("centre", "financeRecordCount", { count: couponApplications.length })} · −{fmtFCFA(totalCouponsApplied)} F
                     </p>
                   )}
                 </div>
                 {couponApplications.length === 0 ? (
                   <p className="text-center py-8 text-sm text-neutral-400 rounded-2xl border border-dashed border-neutral-200 bg-white">
-                    Aucun coupon appliqué pour le moment.
+                    {t("centre", "financeNoAppliedCoupon")}
                   </p>
                 ) : (
                   <CenterDataTable
-                    columns={["Apprenant", "Programme", "Coupon", "Réduction"]}
+                    columns={[t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "financeCoupon"), t("centre", "financeDiscount")]}
                     columnWidths={[undefined, "28%", "18%", "16%"]}
                   >
                     {couponApplications.map((app, i) => (
@@ -1462,16 +1486,16 @@ export default function CenterFinancePage() {
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl border border-neutral-200 relative">
             <button onClick={() => setPayModal(null)} className="absolute top-4 right-4 h-9 w-9 rounded-xl border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50 inline-flex items-center justify-center"><X size={16} /></button>
-            <h3 className="text-xl font-black tracking-tight mb-1" style={{ color: BLUE }}>Saisir un encaissement</h3>
+            <h3 className="text-xl font-black tracking-tight mb-1" style={{ color: BLUE }}>{t("centre", "financeEnterPayment")}</h3>
             <p className="text-sm text-neutral-500 mb-1">{payModal.prenom} {payModal.nom}</p>
             <div className="inline-flex mt-2 mb-5 px-3 py-1.5 rounded-full border border-neutral-200 bg-neutral-50">
-              <p className="text-xs font-medium text-neutral-700">Reste <span className="tabular-nums font-bold" style={{ color: BLUE }}>{fmtFCFA(payModal.reste_a_payer)}</span> FCFA</p>
+              <p className="text-xs font-medium text-neutral-700">{t("centre", "summaryBalance")} <span className="tabular-nums font-bold" style={{ color: BLUE }}>{fmtFCFA(payModal.reste_a_payer)}</span> FCFA</p>
             </div>
 
             <div className="space-y-4">
               {payInstallments.length > 0 && (
                 <div>
-                  <label className="text-xs text-neutral-500 block mb-1">Échéance ciblée</label>
+                  <label className="text-xs text-neutral-500 block mb-1">{t("centre", "financeTargetInstallment")}</label>
                   <select
                     value={payInstallmentId}
                     onChange={(e) => {
@@ -1486,18 +1510,18 @@ export default function CenterFinancePage() {
                     }}
                     className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-700 outline-none focus:ring-2 focus:ring-neutral-900/10"
                   >
-                    <option value="">Répartition auto (cascade)</option>
+                    <option value="">{t("centre", "financeAutomaticAllocation")}</option>
                     {payInstallments.map(inst => (
-                      <option key={inst.id} value={inst.id}>{inst.label} — {fmtFCFA(Math.max(0, inst.amount - (inst.paid_amount || 0)))} F restant (dû {fmtDateShort(inst.due_date)})</option>
+                      <option key={inst.id} value={inst.id}>{inst.label} — {fmtFCFA(Math.max(0, inst.amount - (inst.paid_amount || 0)))} F {t("centre", "financeRemainingLower")} ({t("centre", "financeDueLower")} {fmtDateShort(inst.due_date, locale)})</option>
                     ))}
                   </select>
                   <p className="text-[9px] text-neutral-400 mt-1">
-                    Cascade : remplit les échéances dans l&apos;ordre. Ou choisissez une échéance précise (montant prérempli, modifiable).
+                    {t("centre", "financeCascadeHelp")}
                   </p>
                 </div>
               )}
               <div>
-                <label className="text-xs text-neutral-500 block mb-1">Montant (FCFA) *</label>
+                <label className="text-xs text-neutral-500 block mb-1">{t("centre", "financeAmountFcfa")} *</label>
                 <div className="flex gap-2">
                   <input type="number" min={1} value={payAmount} onChange={e => { setPayAmount(e.target.value); setPayError(""); }} placeholder={`Max : ${fmtFCFA(payModal.reste_a_payer)}`} className="flex-1 h-11 px-3 rounded-xl border border-neutral-200 bg-white font-medium text-sm outline-none focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400" />
                   <button
@@ -1505,24 +1529,24 @@ export default function CenterFinancePage() {
                     onClick={() => { setPayAmount(String(payModal.reste_a_payer)); setPayError(""); setPayInstallmentId(""); }}
                     className="h-11 px-3 rounded-full border border-neutral-200 bg-white text-xs font-medium text-neutral-700 hover:bg-neutral-50 shrink-0"
                   >
-                    Solde
+                    {t("centre", "financeBalance")}
                   </button>
                 </div>
                 <AmountInWords amount={payAmount} />
               </div>
               <div>
-                <label className="text-xs text-neutral-500 block mb-1">Mode de paiement</label>
+                <label className="text-xs text-neutral-500 block mb-1">{t("centre", "financePaymentMethod")}</label>
                 <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-700 outline-none focus:ring-2 focus:ring-neutral-900/10">
-                  {METHOD_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
+                  {METHOD_OPTIONS.map(m => <option key={m} value={m}>{paymentMethodLabel(m)}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-xs text-neutral-500 block mb-1">Note (optionnel)</label>
-                <input value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder="Référence, motif..." className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-neutral-900/10" />
+                <label className="text-xs text-neutral-500 block mb-1">{t("centre", "financeOptionalNote")}</label>
+                <input value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder={t("centre", "financeNotePlaceholder")} className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-neutral-900/10" />
               </div>
               {payError && <p className="text-sm text-neutral-800 bg-neutral-100 border border-neutral-200 rounded-lg px-3 py-2">{payError}</p>}
               <button onClick={submitPayment} disabled={paySaving} className="w-full h-11 rounded-full text-sm font-medium text-white disabled:opacity-50 inline-flex items-center justify-center gap-2 hover:opacity-90 transition-opacity" style={{ backgroundColor: BLUE }}>
-                {paySaving ? <Loader2 size={14} className="animate-spin" /> : <Wallet size={14} />} Valider l'opération
+                {paySaving ? <Loader2 size={14} className="animate-spin" /> : <Wallet size={14} />} {t("centre", "financeValidateOperation")}
               </button>
             </div>
           </div>
@@ -1538,9 +1562,9 @@ export default function CenterFinancePage() {
                 <CheckCircle2 size={24} className="text-emerald-600" />
               </div>
               <div>
-                <h3 className="text-xl font-extrabold tracking-tight" style={{ color: BLUE }}>Paiement validé</h3>
+                <h3 className="text-xl font-extrabold tracking-tight" style={{ color: BLUE }}>{t("centre", "financePaymentValidated")}</h3>
                 <p className="mt-2 text-sm text-neutral-700 tabular-nums">
-                  {fmtFCFA(paymentSuccess.amount)} FCFA encaissés
+                  {fmtFCFA(paymentSuccess.amount)} FCFA {t("centre", "financeCollectedLower")}
                 </p>
                 <AmountInWords amount={paymentSuccess.amount} className="text-[11px] text-neutral-500 italic mt-1 leading-snug" />
                 <p className="mt-1 text-xs font-mono text-neutral-500">
@@ -1549,12 +1573,12 @@ export default function CenterFinancePage() {
                 {paymentSuccess.resteApres > 0 ? (
                   <>
                     <p className="mt-2 text-xs text-neutral-600">
-                      Solde restant : <span className="font-medium tabular-nums">{fmtFCFA(paymentSuccess.resteApres)} FCFA</span>
+                      {t("centre", "financeRemainingBalance")} : <span className="font-medium tabular-nums">{fmtFCFA(paymentSuccess.resteApres)} FCFA</span>
                     </p>
                     <AmountInWords amount={paymentSuccess.resteApres} className="text-[11px] text-neutral-500 italic mt-1 leading-snug" />
                   </>
                 ) : (
-                  <p className="mt-2 text-xs text-emerald-700 font-medium">Compte soldé</p>
+                  <p className="mt-2 text-xs text-emerald-700 font-medium">{t("centre", "financeAccountSettled")}</p>
                 )}
                 <p className="mt-1 text-[11px] text-neutral-400">{paymentSuccess.studentName}</p>
               </div>
@@ -1571,14 +1595,14 @@ export default function CenterFinancePage() {
                   className="w-full h-11 rounded-full text-sm font-medium text-white inline-flex items-center justify-center gap-2 hover:opacity-90"
                   style={{ backgroundColor: BLUE }}
                 >
-                  <Download size={14} /> Télécharger
+                  <Download size={14} /> {t("centre", "financeDownload")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setPaymentSuccess(null)}
                   className="w-full h-10 rounded-full text-sm text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50 transition-colors"
                 >
-                  Fermer
+                  {t("centre", "periodClose")}
                 </button>
               </div>
             </div>
@@ -1590,7 +1614,7 @@ export default function CenterFinancePage() {
       {invoiceModal && (
         <div className={`${centerNotoSans.className} fixed inset-0 z-50 flex flex-col text-[#11224E]`} style={{ backgroundColor: PAGE_BG }}>
           <PrintToolbar
-            title="Relevé de compte"
+            title={t("centre", "financeAccountStatement")}
             onBack={() => setInvoiceModal(null)}
             elementId="invoice-content"
             onDownloadPdf={() => {
@@ -1610,7 +1634,7 @@ export default function CenterFinancePage() {
               <MessageCircle size={13} style={{ color: ORANGE }} /> WhatsApp
             </button>
             <span className="text-[11px] font-medium text-neutral-400 self-center ml-auto">
-              Aperçu {PRINT_FORMATS[printFormat].label} · {PRINT_FORMATS[printFormat].width}
+              {t("centre", "financePreview")} {PRINT_FORMATS[printFormat].label} · {PRINT_FORMATS[printFormat].width}
             </span>
           </div>
 
@@ -1625,8 +1649,8 @@ export default function CenterFinancePage() {
             {/* En-tête centre */}
             <DocumentOfficialHeader
               config={docConfig}
-              fallbackName={branding?.legal_name || "Établissement"}
-              fallbackTitle="Relevé de compte"
+              fallbackName={branding?.legal_name || t("centre", "financeInstitution")}
+              fallbackTitle={t("centre", "financeAccountStatement")}
               hideMeta={printFormat === "ticket"}
               logoSize={parseInt(PRINT_FORMATS[printFormat].logoSize, 10) || 44}
               className="finance-doc-compact finance-doc-header"
@@ -1638,7 +1662,7 @@ export default function CenterFinancePage() {
               }
               titleClassName={printFormat === "ticket" ? "text-[7px] font-bold uppercase tracking-wider" : "text-[10px] font-bold uppercase tracking-wider"}
               rightExtra={
-                <p className="font-medium">Édité le {new Date().toLocaleDateString("fr-FR")}</p>
+                <p className="font-medium">{t("centre", "financeIssuedOn")} {new Date().toLocaleDateString(locale === "en" ? "en-US" : "fr-FR")}</p>
               }
             />
 
@@ -1648,14 +1672,14 @@ export default function CenterFinancePage() {
               style={{ backgroundColor: SURFACE }}
             >
               <div className="min-w-0">
-                <p className="font-bold uppercase tracking-wider text-neutral-400" style={{ fontSize: printFormat === "ticket" ? "7px" : "9px" }}>Apprenant</p>
+                <p className="font-bold uppercase tracking-wider text-neutral-400" style={{ fontSize: printFormat === "ticket" ? "7px" : "9px" }}>{t("centre", "enrollmentLearner")}</p>
                 <p className="font-extrabold tracking-tight" style={{ color: BLUE, fontSize: printFormat === "ticket" ? "10px" : "13px" }}>{invoiceModal.prenom} {invoiceModal.nom}</p>
                 <p className="text-neutral-500 font-medium uppercase" style={{ fontSize: printFormat === "ticket" ? "8px" : "11px" }}>{invoiceModal.filiere_name}</p>
               </div>
               <div className="text-right shrink-0">
-                <p className="font-bold uppercase tracking-wider text-neutral-400" style={{ fontSize: printFormat === "ticket" ? "7px" : "9px" }}>Solde</p>
+                <p className="font-bold uppercase tracking-wider text-neutral-400" style={{ fontSize: printFormat === "ticket" ? "7px" : "9px" }}>{t("centre", "financeBalance")}</p>
                 <p className={`finance-doc-amount font-extrabold tracking-tight tabular-nums ${invoiceModal.reste_a_payer > 0 ? "text-red-600" : "text-emerald-600"}`} style={{ fontSize: PRINT_FORMATS[printFormat].amountSize }}>
-                  {invoiceModal.reste_a_payer > 0 ? fmtFCFA(invoiceModal.reste_a_payer) + " F" : "Soldé"}
+                  {invoiceModal.reste_a_payer > 0 ? fmtFCFA(invoiceModal.reste_a_payer) + " F" : t("centre", "recoveryStatusPaid")}
                 </p>
                 {invoiceModal.reste_a_payer > 0 && (
                   <AmountInWords
@@ -1668,7 +1692,7 @@ export default function CenterFinancePage() {
 
             {(appliedDiscount(invoiceModal) > 0) && (
               <div className="mb-4 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-violet-600 mb-0.5">Coupon / réduction</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-violet-600 mb-0.5">{t("centre", "financeCouponDiscount")}</p>
                 <p className="text-xs font-semibold text-violet-800">
                   −{fmtFCFA(appliedDiscount(invoiceModal))} F
                   {invoiceModal.discount_reason ? ` — ${invoiceModal.discount_reason}` : ""}
@@ -1679,15 +1703,15 @@ export default function CenterFinancePage() {
             {/* Échéancier — masqué sur ticket */}
             {invoiceInstallments.length > 0 && printFormat !== "ticket" && (
               <div className="mb-4 finance-doc-compact finance-doc-hide-ticket">
-                <h4 className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">Échéancier</h4>
+                <h4 className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">{t("centre", "financeSchedule")}</h4>
                 <table className="w-full text-xs border border-black/[0.06] rounded-lg overflow-hidden table-fixed">
                   <thead className="text-[9px] font-bold uppercase tracking-wider text-neutral-400" style={{ backgroundColor: SURFACE }}>
                     <tr>
-                      <th className="p-2.5 text-left">Échéance</th>
-                      <th className="p-2.5 text-center">Date</th>
-                      <th className="p-2.5 text-right">Dû</th>
-                      <th className="p-2.5 text-right">Payé</th>
-                      <th className="p-2.5 text-center">Statut</th>
+                      <th className="p-2.5 text-left">{t("centre", "financeInstallment")}</th>
+                      <th className="p-2.5 text-center">{t("centre", "reportsDate")}</th>
+                      <th className="p-2.5 text-right">{t("centre", "financeDue")}</th>
+                      <th className="p-2.5 text-right">{t("centre", "financePaid")}</th>
+                      <th className="p-2.5 text-center">{t("centre", "settingsStatus")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black/[0.04]">
@@ -1698,19 +1722,19 @@ export default function CenterFinancePage() {
                         <td className="p-2.5 font-semibold" style={{ color: BLUE }}>
                           {inst.label}
                           {deferred && (
-                            <span className="ml-1.5 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded bg-sky-50 text-sky-700">Reporté</span>
+                            <span className="ml-1.5 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded bg-sky-50 text-sky-700">{t("centre", "financeDeferred")}</span>
                           )}
                         </td>
                         <td className="p-2.5 text-center font-medium text-neutral-500">
-                          {fmtDateShort(inst.due_date)}
+                          {fmtDateShort(inst.due_date, locale)}
                           {deferred && inst.original_due_date && (
-                            <div className="text-[9px] text-neutral-400 line-through">{fmtDateShort(inst.original_due_date)}</div>
+                            <div className="text-[9px] text-neutral-400 line-through">{fmtDateShort(inst.original_due_date, locale)}</div>
                           )}
                         </td>
                         <td className="p-2.5 text-right font-semibold tabular-nums finance-col-amount">{fmtFCFA(inst.amount)} F</td>
                         <td className="p-2.5 text-right font-semibold tabular-nums text-emerald-600 finance-col-amount">{fmtFCFA(inst.paid_amount)} F</td>
                         <td className="p-2.5 text-center">
-                          <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${inst.status === "paid" ? "bg-emerald-50 text-emerald-700" : inst.status === "late" ? "bg-red-50 text-red-700" : inst.status === "partial" ? "bg-amber-50 text-amber-700" : "bg-neutral-50 text-neutral-400"}`}>{inst.status === "paid" ? "Soldé" : inst.status === "late" ? "Retard" : inst.status === "partial" ? "Partiel" : "En attente"}</span>
+                          <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${inst.status === "paid" ? "bg-emerald-50 text-emerald-700" : inst.status === "late" ? "bg-red-50 text-red-700" : inst.status === "partial" ? "bg-amber-50 text-amber-700" : "bg-neutral-50 text-neutral-400"}`}>{inst.status === "paid" ? t("centre", "recoveryStatusPaid") : inst.status === "late" ? t("centre", "financeLate") : inst.status === "partial" ? t("centre", "recoveryStatusPartial") : t("centre", "summaryPending")}</span>
                         </td>
                       </tr>
                     );})}
@@ -1720,25 +1744,25 @@ export default function CenterFinancePage() {
             )}
 
             {/* Historique des paiements */}
-            <h4 className="font-bold uppercase tracking-wider text-neutral-400 mb-2 finance-doc-compact" style={{ fontSize: printFormat === "ticket" ? "7px" : "10px" }}>Paiements enregistrés</h4>
+            <h4 className="font-bold uppercase tracking-wider text-neutral-400 mb-2 finance-doc-compact" style={{ fontSize: printFormat === "ticket" ? "7px" : "10px" }}>{t("centre", "financeRecordedPayments")}</h4>
             <table className="w-full border border-black/[0.06] rounded-lg overflow-hidden mb-4 finance-doc-compact" style={{ fontSize: PRINT_FORMATS[printFormat].tableSize }}>
               <thead className="text-white font-bold uppercase tracking-wider" style={{ backgroundColor: BLUE, fontSize: printFormat === "ticket" ? "7px" : "8px" }}>
                 <tr>
-                  <th className="p-2 text-left">Date</th>
-                  <th className="p-2">N° Reçu</th>
-                  {printFormat !== "ticket" && <th className="p-2">Mode</th>}
-                  {printFormat !== "ticket" && <th className="p-2">Par</th>}
-                  <th className="p-2 text-right finance-col-amount">Montant</th>
+                  <th className="p-2 text-left">{t("centre", "reportsDate")}</th>
+                  <th className="p-2">{t("centre", "financeReceiptNumber")}</th>
+                  {printFormat !== "ticket" && <th className="p-2">{t("centre", "collectionsMethod")}</th>}
+                  {printFormat !== "ticket" && <th className="p-2">{t("centre", "financeBy")}</th>}
+                  <th className="p-2 text-right finance-col-amount">{t("centre", "collectionsAmount")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-black/[0.04]">
                 {invoicePayments.length === 0 ? (
-                  <tr><td colSpan={printFormat === "ticket" ? 3 : 5} className="p-3 text-center text-neutral-400 italic font-medium">Aucun paiement.</td></tr>
+                  <tr><td colSpan={printFormat === "ticket" ? 3 : 5} className="p-3 text-center text-neutral-400 italic font-medium">{t("centre", "financeNoPayment")}</td></tr>
                 ) : invoicePayments.map(p => (
                   <tr key={p.id}>
-                    <td className="p-2 font-medium text-neutral-600">{printFormat === "ticket" ? fmtDateShort(p.payment_date) : fmtDate(p.payment_date)}</td>
+                    <td className="p-2 font-medium text-neutral-600">{printFormat === "ticket" ? fmtDateShort(p.payment_date, locale) : fmtDate(p.payment_date, locale)}</td>
                     <td className="p-2 font-mono font-semibold" style={{ color: BLUE }}>{p.receipt_number || "—"}</td>
-                    {printFormat !== "ticket" && <td className="p-2 text-neutral-500 font-medium">{p.payment_method}</td>}
+                    {printFormat !== "ticket" && <td className="p-2 text-neutral-500 font-medium">{paymentMethodLabel(p.payment_method)}</td>}
                     {printFormat !== "ticket" && <td className="p-2 text-neutral-600 font-medium">{p.recorded_by_name || "—"}</td>}
                     <td className="p-2 text-right font-extrabold tabular-nums text-emerald-600 finance-col-amount">+{fmtFCFA(p.amount)} F</td>
                   </tr>
@@ -1746,11 +1770,11 @@ export default function CenterFinancePage() {
               </tbody>
               <tfoot>
                 <tr style={{ backgroundColor: SURFACE }}>
-                  <td colSpan={printFormat === "ticket" ? 2 : 4} className="p-2 text-right font-bold uppercase tracking-wider" style={{ color: BLUE, fontSize: printFormat === "ticket" ? "7px" : "10px" }}>Total versé</td>
+                  <td colSpan={printFormat === "ticket" ? 2 : 4} className="p-2 text-right font-bold uppercase tracking-wider" style={{ color: BLUE, fontSize: printFormat === "ticket" ? "7px" : "10px" }}>{t("centre", "payrollTotalPaid")}</td>
                   <td className="p-2 text-right font-extrabold tabular-nums text-emerald-600 finance-col-amount">{fmtFCFA(invoicePayments.reduce((s, p) => s + p.amount, 0))} F</td>
                 </tr>
                 <tr>
-                  <td colSpan={printFormat === "ticket" ? 2 : 4} className="p-2 text-right font-bold uppercase tracking-wider" style={{ color: BLUE, fontSize: printFormat === "ticket" ? "7px" : "10px" }}>Solde restant</td>
+                  <td colSpan={printFormat === "ticket" ? 2 : 4} className="p-2 text-right font-bold uppercase tracking-wider" style={{ color: BLUE, fontSize: printFormat === "ticket" ? "7px" : "10px" }}>{t("centre", "financeRemainingBalance")}</td>
                   <td className="p-2 text-right font-extrabold tabular-nums finance-doc-amount finance-col-amount" style={{ color: ORANGE, fontSize: PRINT_FORMATS[printFormat].amountSize }}>{fmtFCFA(invoiceModal.reste_a_payer)} F</td>
                 </tr>
               </tfoot>
@@ -1765,12 +1789,12 @@ export default function CenterFinancePage() {
             {(signatures.length > 0 || branding?.stamp_url) && printFormat !== "ticket" && (
               <div className="relative flex flex-wrap justify-end items-end gap-8 mt-6 mb-2">
                 {branding?.stamp_url && (
-                  <img src={branding.stamp_url as string} alt="Cachet officiel" className="absolute left-2 bottom-1 h-20 w-20 object-contain opacity-80 pointer-events-none" />
+                  <img src={branding.stamp_url as string} alt={t("centre", "financeOfficialStamp")} className="absolute left-2 bottom-1 h-20 w-20 object-contain opacity-80 pointer-events-none" />
                 )}
                 {signatures.map((s) => (
                   <div key={s.id} className="text-center min-w-[120px]">
                     {s.signatureUrl ? (
-                      <img src={s.signatureUrl} alt="Signature" className="h-10 mx-auto mb-1 object-contain" />
+                      <img src={s.signatureUrl} alt={t("centre", "financeSignature")} className="h-10 mx-auto mb-1 object-contain" />
                     ) : (
                       <div className="h-10 border-b border-neutral-300 mb-1" />
                     )}
@@ -1844,14 +1868,14 @@ export default function CenterFinancePage() {
           >
             <div className="flex items-start justify-between gap-3 mb-3">
               <h3 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>WhatsApp (PDF)</h3>
-              <button type="button" onClick={() => setWaPhoneOpen(false)} className="text-neutral-400 hover:text-neutral-700" aria-label="Fermer">
+              <button type="button" onClick={() => setWaPhoneOpen(false)} className="text-neutral-400 hover:text-neutral-700" aria-label={t("centre", "periodClose")}>
                 <X size={18} />
               </button>
             </div>
             <p className="text-[12px] text-neutral-500 font-medium mb-3 leading-relaxed">
-              Le PDF de la vue filtrée est préparé dans l&apos;app, puis WhatsApp s&apos;ouvre pour ce numéro. Joignez ensuite le fichier téléchargé.
+              {t("centre", "financeWhatsappHelp")}
             </p>
-            <label className="block text-[11px] font-semibold text-neutral-500 mb-1.5">Numéro (indicatif pays)</label>
+            <label className="block text-[11px] font-semibold text-neutral-500 mb-1.5">{t("centre", "financePhoneCountryCode")}</label>
             <input
               value={waPhone}
               onChange={(e) => setWaPhone(e.target.value)}
@@ -1867,7 +1891,7 @@ export default function CenterFinancePage() {
                 disabled={shareBusy}
                 className="flex-1 h-10 rounded-lg text-xs font-semibold bg-neutral-100 text-neutral-600"
               >
-                Annuler
+                {t("centre", "periodCancel")}
               </button>
               <button
                 type="button"
@@ -1877,7 +1901,7 @@ export default function CenterFinancePage() {
                 style={{ backgroundColor: BLUE }}
               >
                 {shareBusy ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
-                Ouvrir WhatsApp
+                {t("centre", "financeOpenWhatsapp")}
               </button>
             </div>
           </div>
@@ -1900,6 +1924,7 @@ function FinanceShareMenu({
   onPdf: () => void | Promise<void>;
   onWhatsAppPdf: () => void | Promise<void>;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -1932,7 +1957,7 @@ function FinanceShareMenu({
         className="gap-1.5"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} strokeWidth={2.25} />}
-        <span className="hidden sm:inline">Partager</span>
+        <span className="hidden sm:inline">{t("centre", "share")}</span>
       </OutlineHeaderButton>
       {open && (
         <div

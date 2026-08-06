@@ -15,8 +15,8 @@ import {
 import { downloadBulletinNotesPdf } from "@/app/utils/centerPdfExport";
 import {
   formatGradeList,
-  observationFromScore20,
 } from "@/app/utils/gradeObservations";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -64,6 +64,7 @@ export default function BulletinDynamique({
   academicYear = null,
   onClose,
 }: Props) {
+  const { locale, t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [docConfig, setDocConfig] = useState<DocumentExportConfig | null>(null);
   const [signatures, setSignatures] = useState<{ id: string; label: string }[]>([]);
@@ -76,6 +77,14 @@ export default function BulletinDynamique({
   const [pdfBusy, setPdfBusy] = useState(false);
 
   const isCursus = niveauAnnee != null;
+  const observationLabel = (score: number | null) => {
+    if (score === null || Number.isNaN(Number(score))) return "—";
+    if (score < 10) return t("centre", "bulletinObservationInsufficient");
+    if (score < 12) return t("centre", "bulletinObservationFair");
+    if (score < 15) return t("centre", "bulletinObservationQuiteGood");
+    if (score < 17) return t("centre", "bulletinObservationGood");
+    return t("centre", "bulletinObservationVeryGood");
+  };
 
   useEffect(() => {
     (async () => {
@@ -226,14 +235,14 @@ export default function BulletinDynamique({
     if (selectedPeriodFilter === "all") {
       return {
         leafPeriodsForAvg: evalPeriods,
-        filterLabel: evalPeriods.length > 0 ? "Toutes les périodes" : "Notation",
+        filterLabel: evalPeriods.length > 0 ? t("centre", "bulletinAllPeriods") : t("centre", "bulletinGrading"),
       };
     }
     const agg = aggPeriods.find((p) => p.id === selectedPeriodFilter);
     if (!agg) {
       return {
         leafPeriodsForAvg: evalPeriods,
-        filterLabel: "Toutes les périodes",
+        filterLabel: t("centre", "bulletinAllPeriods"),
       };
     }
     const group = allParentGroups.find((g) => g.parent === agg.name);
@@ -244,7 +253,7 @@ export default function BulletinDynamique({
       leafPeriodsForAvg: children,
       filterLabel: agg.name,
     };
-  }, [selectedPeriodFilter, allParentGroups, evalPeriods, aggPeriods]);
+  }, [selectedPeriodFilter, allParentGroups, evalPeriods, aggPeriods, t]);
 
   const leafIdSet = useMemo(
     () => new Set(leafPeriodsForAvg.map((p) => p.id)),
@@ -302,7 +311,7 @@ export default function BulletinDynamique({
         suplText: formatGradeList(supl, { withTitle: true }),
         finaleText: finale !== null ? finale.toFixed(1) : "—",
         finale20,
-        observation: observationFromScore20(finale20),
+        observation: observationLabel(finale20),
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- matiereOverall / filter dérivés
@@ -335,10 +344,10 @@ export default function BulletinDynamique({
       await downloadBulletinNotesPdf({
         studentName,
         enrollmentLabel: labelParts.join(" · "),
-        niveauLabel: niveauAnnee != null ? `Niveau ${niveauAnnee}` : null,
+        niveauLabel: niveauAnnee != null ? `${t("centre", "bulletinLevel")} ${niveauAnnee}` : null,
         classeLabel: studentClasse || null,
         moyenneGenerale: moyenneGenerale !== null ? moyenneGenerale.toFixed(2) : "—",
-        columnHeaders: ["Notes principales", "Notes supl.", "Note finale", "Observation"],
+        columnHeaders: [t("centre", "bulletinPrimaryGrades"), t("centre", "bulletinAdditionalGrades"), t("centre", "bulletinFinalGrade"), t("centre", "bulletinObservation")],
         rows: tableRows.map((r) => ({
           matiereName: r.matiereName,
           coeffLabel: r.coeffLabel,
@@ -346,6 +355,7 @@ export default function BulletinDynamique({
         })),
         config: docConfig || undefined,
         signatures,
+        locale,
       });
     } finally {
       setPdfBusy(false);
@@ -381,7 +391,7 @@ export default function BulletinDynamique({
                 onChange={(e) => setSelectedPeriodFilter(e.target.value)}
                 className="h-10 px-3 rounded-lg border border-black/[0.08] bg-white text-sm font-semibold outline-none focus:border-[#11224E]/40"
               >
-                <option value="all">Toutes les périodes</option>
+                <option value="all">{t("centre", "bulletinAllPeriods")}</option>
                 {aggPeriods.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
@@ -393,7 +403,7 @@ export default function BulletinDynamique({
             )}
             {selectedPeriodFilter !== "all" && (
               <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: ORANGE }}>
-                Filtré · {filterLabel}
+                {t("centre", "bulletinFiltered")} · {filterLabel}
               </span>
             )}
           </div>
@@ -406,7 +416,7 @@ export default function BulletinDynamique({
               style={{ backgroundColor: BLUE }}
             >
               {pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-              Télécharger
+              {t("centre", "bulletinDownload")}
             </button>
             <button
               type="button"
@@ -414,13 +424,13 @@ export default function BulletinDynamique({
               className="h-10 px-4 rounded-lg text-xs font-semibold text-white inline-flex items-center gap-1.5"
               style={{ backgroundColor: ORANGE }}
             >
-              <Printer size={14} /> Imprimer
+              <Printer size={14} /> {t("centre", "bulletinPrint")}
             </button>
             <button
               type="button"
               onClick={onClose}
               className="h-10 w-10 rounded-lg bg-neutral-100 hover:bg-neutral-200 inline-flex items-center justify-center text-neutral-500"
-              aria-label="Fermer"
+              aria-label={t("centre", "bulletinClose")}
             >
               <X size={18} />
             </button>
@@ -437,10 +447,10 @@ export default function BulletinDynamique({
             )}
             <div>
               <h1 className="font-extrabold text-xl tracking-tight" style={{ color: BLUE }}>
-                {docConfig?.legalName || "Établissement"}
+                {docConfig?.legalName || t("centre", "bulletinInstitution")}
               </h1>
               <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: docConfig?.accentColor || ORANGE }}>
-                {docConfig?.title || "Bulletin de notes"}
+                {docConfig?.title || t("centre", "bulletinTitle")}
               </p>
             </div>
           </div>
@@ -454,23 +464,23 @@ export default function BulletinDynamique({
 
         <div className="bg-[#F7F7F6] p-4 rounded-xl border border-black/[0.06] mb-5 flex justify-between items-start gap-4">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Apprenant</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "bulletinLearner")}</p>
             <p className="font-extrabold text-sm tracking-tight" style={{ color: BLUE }}>{studentName}</p>
             <p className="text-xs text-neutral-500 font-medium mt-1">
               {enrollmentLabel}
-              {niveauAnnee != null ? ` — Niveau ${niveauAnnee}` : ""}
+              {niveauAnnee != null ? ` — ${t("centre", "bulletinLevel")} ${niveauAnnee}` : ""}
               {studentClasse ? ` — ${studentClasse}` : ""}
               {selectedPeriodFilter !== "all" ? ` — ${filterLabel}` : ""}
             </p>
           </div>
           <div className="text-right shrink-0">
             <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-              {anneeLabel ? "Année académique" : "Période"}
+              {anneeLabel ? t("centre", "bulletinAcademicYear") : t("centre", "bulletinPeriod")}
             </p>
             <p className="text-xs font-bold text-neutral-700">
               {anneeLabel || filterLabel}
             </p>
-            <p className="text-[10px] text-neutral-400 mt-1 font-medium">Moy. gén. sur /20</p>
+            <p className="text-[10px] text-neutral-400 mt-1 font-medium">{t("centre", "bulletinGeneralAverageShort")}</p>
           </div>
         </div>
 
@@ -478,11 +488,11 @@ export default function BulletinDynamique({
           <table className="w-full text-left text-xs border-collapse border border-neutral-200 min-w-[640px]">
             <thead>
               <tr className="text-white text-[10px] font-bold uppercase tracking-wider" style={{ backgroundColor: BLUE }}>
-                <th className="p-2.5 border border-neutral-300 text-left">Matière</th>
-                <th className="p-2.5 border border-neutral-300 text-left">Notes principales</th>
-                <th className="p-2.5 border border-neutral-300 text-left">Notes supl.</th>
-                <th className="p-2.5 border border-neutral-300 text-center whitespace-nowrap">Note finale</th>
-                <th className="p-2.5 border border-neutral-300 text-left">Observation</th>
+                <th className="p-2.5 border border-neutral-300 text-left">{t("centre", "bulletinSubject")}</th>
+                <th className="p-2.5 border border-neutral-300 text-left">{t("centre", "bulletinPrimaryGrades")}</th>
+                <th className="p-2.5 border border-neutral-300 text-left">{t("centre", "bulletinAdditionalGrades")}</th>
+                <th className="p-2.5 border border-neutral-300 text-center whitespace-nowrap">{t("centre", "bulletinFinalGrade")}</th>
+                <th className="p-2.5 border border-neutral-300 text-left">{t("centre", "bulletinObservation")}</th>
               </tr>
             </thead>
             <tbody>
@@ -511,7 +521,7 @@ export default function BulletinDynamique({
               {tableRows.length === 0 && (
                 <tr>
                   <td colSpan={5} className="p-6 text-center italic text-neutral-400 font-medium">
-                    Aucune matière configurée.
+                    {t("centre", "bulletinNoSubject")}
                   </td>
                 </tr>
               )}
@@ -522,7 +532,7 @@ export default function BulletinDynamique({
                   className="p-3 border border-neutral-300 text-right text-[10px] font-bold uppercase tracking-wider text-neutral-600"
                   colSpan={3}
                 >
-                  Moyenne générale (/20)
+                  {t("centre", "bulletinGeneralAverage")}
                   {selectedPeriodFilter !== "all" ? ` · ${filterLabel}` : ""}
                   {anneeLabel ? ` · ${anneeLabel}` : ""}
                 </td>
@@ -530,7 +540,7 @@ export default function BulletinDynamique({
                   {moyenneGenerale !== null ? moyenneGenerale.toFixed(2) : "—"}
                 </td>
                 <td className="p-3 border border-neutral-300 font-semibold text-neutral-700">
-                  {observationFromScore20(moyenneGenerale)}
+                  {observationLabel(moyenneGenerale)}
                 </td>
               </tr>
             </tfoot>
@@ -546,7 +556,7 @@ export default function BulletinDynamique({
           ))}
           {signatures.length === 0 && (
             <p className="text-[10px] text-neutral-400 italic font-medium">
-              Aucune signature configurée (Paramètres → Documents).
+              {t("centre", "bulletinNoSignature")}
             </p>
           )}
         </div>

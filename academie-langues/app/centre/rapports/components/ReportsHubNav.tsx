@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { filterReportHub, HUB_SECTION_LABEL, type HubSection } from "../config/report-hub";
+import { filterReportHub, type HubSection } from "../config/report-hub";
 import type { ReportSlug } from "../config/p0-reports";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 
@@ -22,22 +23,34 @@ const linkClass = (active: boolean) =>
   }`;
 
 export default function ReportsHubNav({ activeSlug, centerType = null, querySuffix = "" }: Props) {
+  const { t } = useI18n();
+  const sectionKeys: Record<HubSection, string> = { apprenants: "reportsSectionLearners", offre: "reportsSectionOffering", rh: "reportsSectionHr", finance: "reportsSectionFinance", activite: "reportsSectionActivity" };
+  const itemKeys: Partial<Record<ReportSlug, { label: string; description: string }>> = {
+    "effectifs-apprenants": { label: "reportsNavEnrollments", description: "reportsDescEnrollments" },
+    "filieres-programmes": { label: "reportsNavPrograms", description: "reportsDescPrograms" },
+    "effectifs-personnel": { label: "reportsNavStaff", description: "reportsDescStaff" },
+    "masse-salariale": { label: "reportsNavPayroll", description: "reportsDescPayroll" },
+    encaissements: { label: "reportsNavCollections", description: "reportsDescCollections" },
+    recouvrement: { label: "reportsNavRecovery", description: "reportsDescRecovery" },
+    retards: { label: "reportsNavOverdue", description: "reportsDescOverdue" },
+    "reductions-coupons": { label: "reportsNavDiscounts", description: "reportsDescDiscounts" },
+  };
   const cards = filterReportHub(centerType);
   const liveBySection = SECTION_ORDER.map((section) => ({
     section,
-    label: HUB_SECTION_LABEL[section],
+    label: t("centre", sectionKeys[section]),
     items: cards.filter((c) => c.section === section && c.status === "live" && c.href),
   })).filter((g) => g.items.length > 0);
 
   return (
-    <nav className="space-y-2.5" aria-label="Rubriques rapports">
+    <nav className="space-y-2.5" aria-label={t("centre", "reportsNavAria")}>
       <div className="flex flex-wrap items-center gap-1.5">
         <Link
           href={`/centre/rapports${querySuffix}`}
           className={linkClass(activeSlug === "synthese")}
           style={activeSlug === "synthese" ? { backgroundColor: BLUE } : undefined}
         >
-          Synthèse
+          {t("centre", "reportsNavSummary")}
         </Link>
       </div>
 
@@ -58,9 +71,9 @@ export default function ReportsHubNav({ activeSlug, centerType = null, querySuff
                     href={`${item.href}${querySuffix}`}
                     className={linkClass(active)}
                     style={active ? { backgroundColor: BLUE } : undefined}
-                    title={item.description}
+                    title={item.slug && itemKeys[item.slug] ? t("centre", itemKeys[item.slug]!.description) : item.description}
                   >
-                    {item.label}
+                    {item.slug && itemKeys[item.slug] ? t("centre", itemKeys[item.slug]!.label) : item.label}
                   </Link>
                 );
               })}
