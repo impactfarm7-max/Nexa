@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Copy, Mail, MessageCircle, Share2 } from "lucide-react";
 import { BLUE, ORANGE } from "@/app/centre/center-page-ui";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Props = {
   signupUrl: string;
@@ -11,11 +12,6 @@ type Props = {
   onCopy: () => void;
   variant?: "light" | "dark";
 };
-
-function shareMessage(centerName: string | null | undefined, url: string) {
-  const label = centerName?.trim() || "notre centre";
-  return `Bonjour,\n\nVoici le lien d'inscription pour ${label} :\n${url}\n\nÀ bientôt !`;
-}
 
 function openWhatsApp(text: string) {
   window.open(
@@ -36,6 +32,7 @@ export default function ShareSignupLinkMenu({
   onCopy,
   variant = "light",
 }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -48,8 +45,11 @@ export default function ShareSignupLinkMenu({
     return () => document.removeEventListener("mousedown", onOutside);
   }, [open]);
 
-  const message = shareMessage(centerName, signupUrl);
-  const subject = `Inscription${centerName?.trim() ? ` — ${centerName.trim()}` : ""}`;
+  const label = centerName?.trim() || t("centre", "shareOurCenter");
+  const message = t("centre", "shareSignupMessage", { center: label, url: signupUrl });
+  const subject = centerName?.trim()
+    ? t("centre", "shareSignupSubjectNamed", { center: centerName.trim() })
+    : t("centre", "shareSignupSubject");
 
   const isDark = variant === "dark";
 
@@ -68,8 +68,8 @@ export default function ShareSignupLinkMenu({
         aria-haspopup="menu"
       >
         <Share2 size={isDark ? 11 : 14} strokeWidth={2.25} />
-        <span className="hidden sm:inline">Partager le lien</span>
-        <span className="sm:hidden">Partager</span>
+        <span className="hidden sm:inline">{t("centre", "shareLink")}</span>
+        <span className="sm:hidden">{t("centre", "share")}</span>
         <ChevronDown
           size={isDark ? 11 : 14}
           className={`opacity-70 transition-transform ${open ? "rotate-180" : ""}`}
@@ -91,7 +91,7 @@ export default function ShareSignupLinkMenu({
             className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left text-[12px] font-semibold text-neutral-700 hover:bg-black/[0.03]"
           >
             {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} style={{ color: BLUE }} />}
-            {copied ? "Lien copié !" : "Copier le lien"}
+            {copied ? t("centre", "shareLinkCopied") : t("centre", "shareCopyLink")}
           </button>
           <button
             type="button"

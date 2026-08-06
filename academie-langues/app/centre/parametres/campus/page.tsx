@@ -9,12 +9,12 @@ import {
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { BLUE, SURFACE } from "@/app/centre/center-page-ui";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const STATUS_OPTIONS = [
-  { value: "actif", label: "Actif" },
-  { value: "en_construction", label: "En construction" },
+  { value: "actif" },
+  { value: "en_construction" },
 ];
-const statusMeta = (s: string) => STATUS_OPTIONS.find((o) => o.value === s) || STATUS_OPTIONS[0];
 
 /** Pays, drapeau et indicatif téléphonique */
 const COUNTRY_DATA: { name: string; flag: string; dial: string }[] = [
@@ -58,6 +58,8 @@ type Campus = {
 };
 
 export default function CampusSettingsPage() {
+  const { t } = useI18n();
+  const statusLabel = (status: string) => t("centre", status === "en_construction" ? "campusUnderConstruction" : "campusActive");
   const [centerId, setCenterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [multiEnabled, setMultiEnabled] = useState(false);
@@ -164,7 +166,7 @@ export default function CampusSettingsPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        alert(json.error || "Erreur d'attribution.");
+        alert(json.error || t("centre", "campusAssignmentError"));
         return;
       }
       setDirector(json.director ? { id: json.director.id, label: json.director.label, role: json.director.role } : null);
@@ -180,7 +182,7 @@ export default function CampusSettingsPage() {
     const main = campuses.find((c) => c.is_main);
     const { error } = await supabase
       .from("centers").update({ multi_campus_enabled: true }).eq("id", centerId);
-    if (error) { alert("Erreur : " + error.message); setActivating(false); return; }
+    if (error) { alert(t("centre", "campusError") + " : " + error.message); setActivating(false); return; }
     setMultiEnabled(true);
     setActivating(false);
     if (main) setSelectedId(main.id);
@@ -193,7 +195,7 @@ export default function CampusSettingsPage() {
       .insert({ center_id: centerId, name: newName.trim(), is_main: campuses.length === 0, status: "en_construction" })
       .select().single();
     setAdding(false);
-    if (error) { alert("Erreur : " + error.message); return; }
+    if (error) { alert(t("centre", "campusError") + " : " + error.message); return; }
     const newCampus = data as Campus;
     setCampuses((p) => [...p, newCampus]);
     setSelectedId(newCampus.id);
@@ -204,7 +206,7 @@ export default function CampusSettingsPage() {
   const patchCampus = async (id: string, patch: Partial<Campus>) => {
     setCampuses((p) => p.map((c) => (c.id === id ? { ...c, ...patch } : c)));
     const { error } = await supabase.from("campuses").update(patch).eq("id", id);
-    if (error) { alert("Erreur d'enregistrement : " + error.message); load(); }
+    if (error) { alert(t("centre", "documentsSaveError") + " : " + error.message); load(); }
   };
 
   const lockCampus = (id: string) => {
@@ -221,15 +223,15 @@ export default function CampusSettingsPage() {
     if (!centerId) return;
     const { error: e1 } = await supabase.from("campuses").update({ is_main: false }).eq("center_id", centerId);
     const { error: e2 } = await supabase.from("campuses").update({ is_main: true }).eq("id", id);
-    if (e1 || e2) { alert("Erreur : " + (e1 || e2)!.message); return; }
+    if (e1 || e2) { alert(t("centre", "campusError") + " : " + (e1 || e2)!.message); return; }
     setCampuses((p) => p.map((c) => ({ ...c, is_main: c.id === id })));
   };
 
   const removeCampus = async (c: Campus) => {
-    if (c.is_main) return alert("Impossible de supprimer le campus principal. Désignez-en un autre d'abord.");
-    if (!window.confirm(`Supprimer le campus « ${c.name} » ?`)) return;
+    if (c.is_main) return alert(t("centre", "campusCannotDeleteMain"));
+    if (!window.confirm(t("centre", "campusDeleteConfirm", { name: c.name }))) return;
     const { error } = await supabase.from("campuses").delete().eq("id", c.id);
-    if (error) { alert("Erreur : " + error.message); return; }
+    if (error) { alert(t("centre", "campusError") + " : " + error.message); return; }
     setCampuses((p) => p.filter((x) => x.id !== c.id));
     if (selectedId === c.id) setSelectedId(campuses.find((x) => x.id !== c.id)?.id || null);
   };
@@ -240,7 +242,7 @@ export default function CampusSettingsPage() {
     const ext = file.name.split(".").pop() || "png";
     const path = `${centerId}/campus-${id}.${ext}`;
     const { error } = await supabase.storage.from("center-logos").upload(path, file, { upsert: true });
-    if (error) { alert("Erreur logo : " + error.message); setUploadingLogo(false); return; }
+    if (error) { alert(t("centre", "campusLogoError") + " : " + error.message); setUploadingLogo(false); return; }
     const { data } = supabase.storage.from("center-logos").getPublicUrl(path);
     await patchCampus(id, { logo_url: data.publicUrl + "?t=" + Date.now() });
     setUploadingLogo(false);
@@ -264,18 +266,15 @@ export default function CampusSettingsPage() {
     return (
       <div className="max-w-2xl space-y-4">
         <div>
-          <h2 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>Multi-campus</h2>
+          <h2 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>{t("centre", "campusMulti")}</h2>
           <p className="text-[12px] text-neutral-500 font-medium mt-0.5 leading-relaxed max-w-xl">
-            Cloisonnez les données par site, attribuez des directeurs locaux et gérez plusieurs établissements.
-            Vos données actuelles sont conservées.
+            {t("centre", "campusMultiDescription")}
           </p>
         </div>
         <ul className="space-y-2 text-sm text-neutral-600 font-medium">
-          {["Cloisonnement des données par campus",
-            "Directeurs locaux (campus managers)",
-            "Sélecteur de campus en haut du tableau de bord"].map((t) => (
-            <li key={t} className="flex items-center gap-2">
-              <Check size={14} className="text-neutral-400 shrink-0" /> {t}
+          {[t("centre", "campusFeatureIsolation"), t("centre", "campusFeatureDirectors"), t("centre", "campusFeatureSelector")].map((feature) => (
+            <li key={feature} className="flex items-center gap-2">
+              <Check size={14} className="text-neutral-400 shrink-0" /> {feature}
             </li>
           ))}
         </ul>
@@ -287,7 +286,7 @@ export default function CampusSettingsPage() {
           style={{ backgroundColor: BLUE }}
         >
           {activating ? <Loader2 size={15} className="animate-spin" /> : <Rocket size={15} />}
-          Activer le mode multi-campus
+          {t("centre", "campusActivateMulti")}
         </button>
       </div>
     );
@@ -301,16 +300,16 @@ export default function CampusSettingsPage() {
       >
         <div className="flex items-center gap-2">
           <span className="text-sm font-extrabold tracking-tight" style={{ color: BLUE }}>{totalCampuses}</span>
-          <span className="text-xs font-medium text-neutral-500">campus</span>
+          <span className="text-xs font-medium text-neutral-500">{t("centre", "campusCount")}</span>
         </div>
         <span className="text-neutral-300">·</span>
         <div className="flex items-center gap-2">
           <span className="text-sm font-bold text-neutral-700">{activeCampuses}</span>
-          <span className="text-xs font-medium text-neutral-500">actif{activeCampuses !== 1 ? "s" : ""}</span>
+          <span className="text-xs font-medium text-neutral-500">{t("centre", activeCampuses !== 1 ? "campusActivePlural" : "campusActiveLower")}</span>
         </div>
         <span className="text-neutral-300">·</span>
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-neutral-500">Principal :</span>
+          <span className="text-xs font-medium text-neutral-500">{t("centre", "campusMain")} :</span>
           <span className="text-sm font-bold text-neutral-700">{mainCampus?.name || "—"}</span>
         </div>
       </div>
@@ -318,9 +317,9 @@ export default function CampusSettingsPage() {
       {/* ── Rubrique 1 : Créer ── */}
       <section>
         <div className="mb-3">
-          <h2 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>Créer un campus</h2>
+          <h2 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>{t("centre", "campusCreateTitle")}</h2>
           <p className="text-[12px] text-neutral-500 font-medium mt-0.5">
-            Ajoutez un nouveau site, puis sélectionnez-le pour le compléter.
+            {t("centre", "campusCreateDescription")}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 max-w-xl">
@@ -328,7 +327,7 @@ export default function CampusSettingsPage() {
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addCampus()}
-            placeholder="Ex : Campus Akwa"
+            placeholder={t("centre", "campusNamePlaceholder")}
             className="flex-1 h-10 px-3.5 rounded-lg border border-black/[0.08] bg-white text-sm font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
           />
           <button
@@ -339,7 +338,7 @@ export default function CampusSettingsPage() {
             style={{ backgroundColor: BLUE }}
           >
             {adding ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />}
-            Créer
+            {t("centre", "campusCreate")}
           </button>
         </div>
       </section>
@@ -347,9 +346,9 @@ export default function CampusSettingsPage() {
       {/* ── Rubrique 2 : Visualiser / modifier ── */}
       <section>
         <div className="mb-3">
-          <h2 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>Visualiser et modifier</h2>
+          <h2 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>{t("centre", "campusViewEdit")}</h2>
           <p className="text-[12px] text-neutral-500 font-medium mt-0.5">
-            Sélectionnez un campus pour consulter ou éditer ses informations.
+            {t("centre", "campusSelectDescription")}
           </p>
         </div>
 
@@ -358,11 +357,10 @@ export default function CampusSettingsPage() {
             {campuses.length === 0 ? (
               <div className="p-8 text-center text-neutral-400">
                 <Building2 size={24} className="mx-auto mb-2 opacity-40" />
-                <p className="text-xs font-semibold uppercase tracking-wider">Aucun campus</p>
+                <p className="text-xs font-semibold uppercase tracking-wider">{t("centre", "campusNone")}</p>
               </div>
             ) : (
               campuses.map((c) => {
-                const st = statusMeta(c.status);
                 const isSel = selectedId === c.id;
                 const meta = countryMeta(c.country);
                 const locationParts = [c.country, c.city].filter(Boolean);
@@ -391,7 +389,7 @@ export default function CampusSettingsPage() {
                           {c.is_main && <Star size={12} className="text-amber-500 shrink-0" fill="currentColor" />}
                         </div>
                         <p className="text-[11px] text-neutral-400 font-medium truncate">
-                          {meta ? `${meta.flag} ` : ""}{locationParts.join(", ") || "—"} · {st.label}
+                          {meta ? `${meta.flag} ` : ""}{locationParts.join(", ") || "—"} · {statusLabel(c.status)}
                         </p>
                       </div>
                       <ChevronRight size={14} className={`shrink-0 ${isSel ? "text-neutral-500" : "text-neutral-300"}`} />
@@ -409,7 +407,7 @@ export default function CampusSettingsPage() {
                 style={{ backgroundColor: SURFACE }}
               >
                 <Building2 size={28} className="mb-2 opacity-40" />
-                <p className="text-xs font-semibold uppercase tracking-wider">Sélectionnez un campus</p>
+                <p className="text-xs font-semibold uppercase tracking-wider">{t("centre", "campusSelect")}</p>
               </div>
             ) : (
               <div className="border border-black/[0.06] rounded-lg overflow-hidden bg-white">
@@ -428,7 +426,7 @@ export default function CampusSettingsPage() {
                       )}
                     <label
                       className="absolute -bottom-1 -right-1 w-6 h-6 rounded-md flex items-center justify-center cursor-pointer border border-black/[0.08] bg-white hover:bg-black/[0.03]"
-                      title="Changer le logo"
+                      title={t("centre", "campusChangeLogo")}
                     >
                       {uploadingLogo ? <Loader2 size={11} className="animate-spin text-neutral-500" /> : <Camera size={11} className="text-neutral-500" />}
                       <input
@@ -444,7 +442,7 @@ export default function CampusSettingsPage() {
                       <h3 className="text-base font-extrabold tracking-tight truncate" style={{ color: BLUE }}>{selected.name}</h3>
                       {selected.is_main && (
                         <span className="text-[10px] font-semibold text-neutral-500 border border-black/[0.08] px-2 py-0.5 rounded-md">
-                          Principal
+                          {t("centre", "campusMain")}
                         </span>
                       )}
                     </div>
@@ -460,7 +458,7 @@ export default function CampusSettingsPage() {
                     <button
                       type="button"
                       onClick={() => setMain(selected.id)}
-                      title="Définir comme principal"
+                      title={t("centre", "campusSetAsMain")}
                       className={`p-2 rounded-lg ${selected.is_main ? "text-[#11224E]" : "text-neutral-300 hover:text-neutral-500"}`}
                     >
                       <Star size={16} fill={selected.is_main ? "currentColor" : "none"} />
@@ -474,9 +472,9 @@ export default function CampusSettingsPage() {
                 {/* ── Tabs ── */}
                 <div className="flex gap-4 px-4 sm:px-5 border-b border-black/[0.06] text-xs font-semibold overflow-x-auto">
                   {[
-                    { k: "general" as const, label: "Général", icon: MapPin, locked: false },
-                    { k: "infra" as const, label: "Infrastructures", icon: Boxes, locked: true },
-                    { k: "finance" as const, label: "Finances", icon: Wallet, locked: true },
+                    { k: "general" as const, label: t("centre", "campusGeneral"), icon: MapPin, locked: false },
+                    { k: "infra" as const, label: t("centre", "campusInfrastructure"), icon: Boxes, locked: true },
+                    { k: "finance" as const, label: t("centre", "campusFinances"), icon: Wallet, locked: true },
                   ].map((t) => (
                     <button
                       key={t.k}
@@ -501,24 +499,24 @@ export default function CampusSettingsPage() {
                         /* ── READ MODE ── */
                         <div className="space-y-4">
                           <div className="grid sm:grid-cols-2 gap-4">
-                            <ReadField label="Nom du campus" value={selected.name} />
-                            <ReadField label="Code" value={selected.code || "—"} />
+                            <ReadField label={t("centre", "campusName")} value={selected.name} />
+                            <ReadField label={t("centre", "settingsCode")} value={selected.code || "—"} />
                           </div>
-                          <ReadField label="Statut">
+                          <ReadField label={t("centre", "settingsStatus")}>
                             <span className="inline-flex items-center text-xs font-semibold text-neutral-600 border border-black/[0.08] px-2.5 py-1 rounded-md">
-                              {statusMeta(selected.status).label}
+                              {statusLabel(selected.status)}
                             </span>
                           </ReadField>
-                          <ReadField label="Adresse" value={selected.address || "—"} />
+                          <ReadField label={t("centre", "settingsAddress")} value={selected.address || "—"} />
                           <div className="grid sm:grid-cols-2 gap-4">
-                            <ReadField label="Pays">
+                            <ReadField label={t("centre", "settingsCountry")}>
                               <p className="text-sm font-semibold text-neutral-700 py-2 px-3.5 rounded-lg border border-black/[0.06] flex items-center gap-2" style={{ backgroundColor: SURFACE }}>
                                 {countryMeta(selected.country)?.flag || ""} {selected.country || "—"}
                               </p>
                             </ReadField>
-                            <ReadField label="Ville" value={selected.city || "—"} />
+                            <ReadField label={t("centre", "settingsCity")} value={selected.city || "—"} />
                           </div>
-                          <ReadField label="Téléphone">
+                          <ReadField label={t("centre", "settingsPhone")}>
                             <p className="text-sm font-semibold text-neutral-700 py-2 px-3.5 rounded-lg border border-black/[0.06] flex items-center gap-2" style={{ backgroundColor: SURFACE }}>
                               <Phone size={13} className="text-neutral-400 shrink-0" />
                               {selected.phone || "—"}
@@ -529,15 +527,15 @@ export default function CampusSettingsPage() {
                               )}
                             </p>
                           </ReadField>
-                          <ReadField label="Directeur de campus">
+                          <ReadField label={t("centre", "campusDirector")}>
                             <p className="text-sm font-semibold text-neutral-700 py-2 px-3.5 rounded-lg border border-black/[0.06]" style={{ backgroundColor: SURFACE }}>
-                              {directorLoading ? "…" : director?.label || "Non attribué"}
+                              {directorLoading ? "…" : director?.label || t("centre", "campusUnassigned")}
                             </p>
                           </ReadField>
                           <div className="flex items-center justify-between pt-2 border-t border-black/[0.06]">
                             {savedCampusId === selected.id ? (
                               <span className="flex items-center gap-1.5 text-xs font-semibold text-neutral-600">
-                                <CheckCircle2 size={14} /> Enregistré
+                                <CheckCircle2 size={14} /> {t("centre", "documentsSaved")}
                               </span>
                             ) : <span />}
                             <button
@@ -545,7 +543,7 @@ export default function CampusSettingsPage() {
                               onClick={() => unlockCampus(selected.id)}
                               className="flex items-center gap-1.5 h-9 px-3.5 rounded-lg border border-black/[0.08] text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition"
                             >
-                              <PenLine size={13} /> Modifier
+                              <PenLine size={13} /> {t("centre", "liveEdit")}
                             </button>
                           </div>
                         </div>
@@ -553,11 +551,11 @@ export default function CampusSettingsPage() {
                         /* ── EDIT MODE ── */
                         <div className="space-y-4">
                           <div className="grid sm:grid-cols-2 gap-4">
-                            <BlurField label="Nom du campus" defaultValue={selected.name} onCommit={(v) => v.trim() && patchCampus(selected.id, { name: v.trim() })} />
-                            <BlurField label="Code" hint="ex : DLA" defaultValue={selected.code || ""} onCommit={(v) => patchCampus(selected.id, { code: v.trim().toUpperCase() || null })} />
+                            <BlurField label={t("centre", "campusName")} defaultValue={selected.name} onCommit={(v) => v.trim() && patchCampus(selected.id, { name: v.trim() })} />
+                            <BlurField label={t("centre", "settingsCode")} hint={t("centre", "campusCodeHint")} defaultValue={selected.code || ""} onCommit={(v) => patchCampus(selected.id, { code: v.trim().toUpperCase() || null })} />
                           </div>
                           <div>
-                            <FieldLabel label="Statut" />
+                            <FieldLabel label={t("centre", "settingsStatus")} />
                             <div className="flex gap-2 flex-wrap">
                               {STATUS_OPTIONS.map((o) => (
                                 <button
@@ -571,18 +569,18 @@ export default function CampusSettingsPage() {
                                   }`}
                                   style={selected.status === o.value ? { backgroundColor: BLUE } : {}}
                                 >
-                                  {o.label}
+                                  {statusLabel(o.value)}
                                 </button>
                               ))}
                             </div>
                           </div>
 
-                          <BlurField label="Adresse" defaultValue={selected.address || ""} onCommit={(v) => patchCampus(selected.id, { address: v.trim() || null })} />
+                          <BlurField label={t("centre", "settingsAddress")} defaultValue={selected.address || ""} onCommit={(v) => patchCampus(selected.id, { address: v.trim() || null })} />
 
                           {/* Pays AVANT Ville — indicatif auto */}
                           <div className="grid sm:grid-cols-2 gap-4">
                             <div>
-                              <FieldLabel label="Pays" />
+                              <FieldLabel label={t("centre", "settingsCountry")} />
                               <select
                                 defaultValue={selected.country || ""}
                                 onChange={(e) => handleCountryChange(selected.id, e.target.value || null)}
@@ -592,12 +590,12 @@ export default function CampusSettingsPage() {
                                 {COUNTRY_DATA.map((c) => <option key={c.name} value={c.name}>{c.flag} {c.name}</option>)}
                               </select>
                             </div>
-                            <BlurField label="Ville" defaultValue={selected.city || ""} onCommit={(v) => patchCampus(selected.id, { city: v.trim() || null })} />
+                            <BlurField label={t("centre", "settingsCity")} defaultValue={selected.city || ""} onCommit={(v) => patchCampus(selected.id, { city: v.trim() || null })} />
                           </div>
 
                           {/* Téléphone avec indicatif auto */}
                           <div>
-                            <FieldLabel label="Téléphone" />
+                            <FieldLabel label={t("centre", "settingsPhone")} />
                             <div className="flex items-center gap-2">
                               {selected.country && countryMeta(selected.country) && (
                                 <span className="h-10 px-3 rounded-lg border border-black/[0.06] bg-neutral-50 text-xs font-semibold text-neutral-500 flex items-center gap-1.5 shrink-0">
@@ -610,14 +608,14 @@ export default function CampusSettingsPage() {
                                   const v = e.target.value;
                                   if (v !== (selected.phone || "")) patchCampus(selected.id, { phone: v.trim() || null });
                                 }}
-                                placeholder="Numéro de téléphone"
+                                placeholder={t("centre", "campusPhonePlaceholder")}
                                 className="flex-1 h-10 px-3.5 rounded-lg border border-black/[0.08] bg-white text-sm font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
                               />
                             </div>
                           </div>
 
                           <div>
-                            <FieldLabel label="Directeur de campus" />
+                            <FieldLabel label={t("centre", "campusDirector")} />
                             <div className="flex items-center gap-2">
                               <select
                                 value={director?.id || ""}
@@ -625,17 +623,17 @@ export default function CampusSettingsPage() {
                                 onChange={(e) => void assignDirector(selected.id, e.target.value || null)}
                                 className="flex-1 h-10 px-3.5 rounded-lg border border-black/[0.08] bg-white text-sm font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 disabled:opacity-50"
                               >
-                                <option value="">— Non attribué —</option>
+                                <option value="">— {t("centre", "campusUnassigned")} —</option>
                                 {staffOptions.map((s) => (
                                   <option key={s.id} value={s.id}>
-                                    {s.label}{s.role === "campus_manager" ? " · Directeur" : ""}
+                                    {s.label}{s.role === "campus_manager" ? ` · ${t("centre", "campusDirectorShort")}` : ""}
                                   </option>
                                 ))}
                               </select>
                               {directorSaving && <Loader2 size={16} className="animate-spin text-neutral-400 shrink-0" />}
                             </div>
                             <p className="text-[11px] text-neutral-400 mt-1.5">
-                              Attribue le rôle Directeur de campus et rattache ce campus au collaborateur.
+                              {t("centre", "campusDirectorHelp")}
                             </p>
                           </div>
 
@@ -646,7 +644,7 @@ export default function CampusSettingsPage() {
                               className="h-10 px-4 rounded-lg text-xs font-bold uppercase tracking-wider text-white flex items-center gap-2 hover:opacity-90 transition"
                               style={{ backgroundColor: BLUE }}
                             >
-                              <Check size={14} /> Enregistrer
+                              <Check size={14} /> {t("centre", "campusSave")}
                             </button>
                           </div>
                         </div>
@@ -657,16 +655,18 @@ export default function CampusSettingsPage() {
                   {detailTab === "infra" && (
                     <LockedPanel
                       icon={Boxes}
-                      title="Infrastructures — Bâtiments & Salles"
-                      text="Gérez vos bâtiments et vos salles de classe physiques (capacité, équipement). Bientôt disponible."
+                      title={t("centre", "campusInfrastructureTitle")}
+                      text={t("centre", "campusInfrastructureText")}
+                      comingSoon={t("centre", "documentsComingSoon")}
                     />
                   )}
 
                   {detailTab === "finance" && (
                     <LockedPanel
                       icon={Wallet}
-                      title="Configuration de paiement du campus"
-                      text="Rattachez un compte Mobile Money ou Stripe propre à ce campus pour cloisonner les encaissements. Bientôt disponible."
+                      title={t("centre", "campusPaymentTitle")}
+                      text={t("centre", "campusPaymentText")}
+                      comingSoon={t("centre", "documentsComingSoon")}
                     />
                   )}
                 </div>
@@ -716,7 +716,7 @@ function BlurField({ label, hint, defaultValue, onCommit }: {
   );
 }
 
-function LockedPanel({ icon: Icon, title, text }: { icon: React.ElementType; title: string; text: string }) {
+function LockedPanel({ icon: Icon, title, text, comingSoon }: { icon: React.ElementType; title: string; text: string; comingSoon: string }) {
   return (
     <div className="flex flex-col items-center justify-center text-center py-12 px-6 rounded-xl border border-dashed border-black/[0.08]" style={{ backgroundColor: SURFACE }}>
       <div className="relative mb-4">
@@ -730,7 +730,7 @@ function LockedPanel({ icon: Icon, title, text }: { icon: React.ElementType; tit
       <p className="font-extrabold text-sm" style={{ color: BLUE }}>{title}</p>
       <p className="text-xs text-neutral-400 mt-1.5 max-w-sm leading-relaxed font-medium">{text}</p>
       <span className="mt-4 text-[10px] font-bold uppercase tracking-wider text-neutral-400 border border-black/[0.08] rounded-md px-3 py-1">
-        Bientôt disponible
+        {comingSoon}
       </span>
     </div>
   );

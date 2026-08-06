@@ -12,6 +12,8 @@ import ReportTrendChart from "../components/ReportTrendChart";
 import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtNum } from "@/app/utils/reports-export";
+import { useI18n } from "@/app/i18n/I18nProvider";
+import { formatShort } from "@/app/utils/reports-period";
 
 type EffectifsReport = {
   period: { label: string };
@@ -40,16 +42,12 @@ type EffectifsReport = {
   }[];
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  active: "Actif",
-  draft: "En attente",
-  completed: "Terminé",
-  cancelled: "Annulé",
-  paused: "Suspendu",
-  revoked: "Radié",
-};
-
 function EffectifsContent() {
+  const { t, locale } = useI18n();
+  const statusLabel = (status: string) => {
+    const known = ["active", "draft", "completed", "cancelled", "paused", "revoked"];
+    return known.includes(status) ? t("centre", `enrollmentStatus_${status}`) : status;
+  };
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
@@ -60,49 +58,49 @@ function EffectifsContent() {
     if (!report) return;
     downloadCsv(
       `effectifs-${report.period.label.replace(/\s+/g, "-")}.csv`,
-      ["Prénom", "Nom", "Filière", "Niveau", "Classe", "Statut inscription", "Statut centre"],
+      [t("centre", "enrollmentFirstName"), t("centre", "enrollmentLastName"), t("centre", "enrollmentProgram"), t("centre", "enrollmentLevel"), t("centre", "enrollmentClass"), t("centre", "enrollmentStatus"), t("centre", "enrollmentCenterStatus")],
       report.rows.map((r) => [
         r.prenom,
         r.nom,
         r.filiere,
         r.niveau ?? "",
         r.classe,
-        STATUS_LABEL[r.enrollmentStatus] || r.enrollmentStatus,
-        STATUS_LABEL[r.centerStatus] || r.centerStatus,
+        statusLabel(r.enrollmentStatus),
+        statusLabel(r.centerStatus),
       ]),
     );
-  }, [report]);
+  }, [report, t]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
-      title: "Effectifs apprenants",
+      title: t("centre", "enrollmentTitle"),
       periodLabel: report.period.label,
       kpis: [
-        { label: "Total", value: fmtNum(report.kpis.total) },
-        { label: "Actifs", value: fmtNum(report.kpis.active) },
-        { label: "Nouveaux", value: fmtNum(report.kpis.newInPeriod) },
+        { label: t("centre", "enrollmentTotal"), value: fmtNum(report.kpis.total) },
+        { label: t("centre", "summaryActive"), value: fmtNum(report.kpis.active) },
+        { label: t("centre", "enrollmentNew"), value: fmtNum(report.kpis.newInPeriod) },
       ],
       sections: [
         {
-          title: "Par filière",
-          columns: ["Filière", "Effectif"],
+          title: t("centre", "enrollmentByProgram"),
+          columns: [t("centre", "enrollmentProgram"), t("centre", "enrollmentCount")],
           rows: report.byFiliere.map((x) => [x.label, x.count]),
         },
         {
-          title: "Liste",
-          columns: ["Apprenant", "Filière", "Classe", "Statut"],
+          title: t("centre", "enrollmentList"),
+          columns: [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "enrollmentClass"), t("centre", "settingsStatus")],
           rows: report.rows.map((r) => [
             `${r.prenom} ${r.nom}`.trim(),
             r.filiere,
             r.classe,
-            STATUS_LABEL[r.enrollmentStatus] || r.enrollmentStatus,
+            statusLabel(r.enrollmentStatus),
           ]),
         },
       ],
       filename: `effectifs-${report.period.label.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf]);
+  }, [report, exportPdf, t]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -110,8 +108,8 @@ function EffectifsContent() {
     <ReportsShell
       activeSlug="effectifs-apprenants"
       centerType={centerType}
-      title="Effectifs apprenants"
-      periodLabel={report?.period?.label}
+      title={t("centre", "enrollmentTitle")}
+      periodLabel={from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}`}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
@@ -127,85 +125,85 @@ function EffectifsContent() {
       )}
       {loading && (
         <div className="flex items-center gap-2 text-neutral-400 text-sm">
-          <Loader2 size={16} className="animate-spin" /> Actualisation…
+          <Loader2 size={16} className="animate-spin" /> {t("centre", "summaryRefreshing")}
         </div>
       )}
       {report && (
         <>
           <ReportKpiGrid
             items={[
-              { label: "Total inscriptions", value: fmtNum(report.kpis.total) },
-              { label: "Actifs", value: fmtNum(report.kpis.active), sub: "Inscriptions actives" },
-              { label: "En attente", value: fmtNum(report.kpis.draft), sub: "Brouillon" },
-              { label: "Terminés", value: fmtNum(report.kpis.completed) },
-              { label: "Suspendus", value: fmtNum(report.kpis.paused), sub: "Profil centre" },
-              { label: "Nouveaux (période)", value: fmtNum(report.kpis.newInPeriod), sub: report.period.label },
+              { label: t("centre", "enrollmentTotalEnrollments"), value: fmtNum(report.kpis.total) },
+              { label: t("centre", "summaryActive"), value: fmtNum(report.kpis.active), sub: t("centre", "summaryActiveEnrollments") },
+              { label: t("centre", "summaryPending"), value: fmtNum(report.kpis.draft), sub: t("centre", "enrollmentDraft") },
+              { label: t("centre", "enrollmentCompletedPlural"), value: fmtNum(report.kpis.completed) },
+              { label: t("centre", "summarySuspended"), value: fmtNum(report.kpis.paused), sub: t("centre", "enrollmentCenterProfile") },
+              { label: t("centre", "enrollmentNewPeriod"), value: fmtNum(report.kpis.newInPeriod), sub: from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}` },
             ]}
           />
 
           <div className="grid md:grid-cols-2 gap-4">
             <ReportTrendChart
-              title="Évolution des inscriptions"
+              title={t("centre", "enrollmentTrend")}
               points={report.byPeriod.map((p) => ({
-                label: new Date(p.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }),
+                label: new Date(p.date).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "short" }),
                 value: p.count,
               }))}
             />
             <ReportBarChart
-              title="Répartition par filière"
+              title={t("centre", "enrollmentBreakdownProgram")}
               items={report.byFiliere.map((x) => ({ label: x.label, value: x.count }))}
             />
             <ReportBarChart
-              title="Répartition par niveau"
+              title={t("centre", "enrollmentBreakdownLevel")}
               items={report.byNiveau.map((x) => ({ label: x.label, value: x.count }))}
             />
           </div>
 
           <div className="grid lg:grid-cols-2 gap-4">
             <ReportBreakdownTable
-              title="Par filière"
+              title={t("centre", "enrollmentByProgram")}
               columns={[
-                { key: "label", label: "Filière" },
-                { key: "count", label: "Effectif", align: "right" },
+                { key: "label", label: t("centre", "enrollmentProgram") },
+                { key: "count", label: t("centre", "enrollmentCount"), align: "right" },
               ]}
               rows={report.byFiliere}
             />
             <ReportBreakdownTable
-              title="Par niveau"
+              title={t("centre", "enrollmentByLevel")}
               columns={[
-                { key: "label", label: "Niveau" },
-                { key: "count", label: "Effectif", align: "right" },
+                { key: "label", label: t("centre", "enrollmentLevel") },
+                { key: "count", label: t("centre", "enrollmentCount"), align: "right" },
               ]}
               rows={report.byNiveau}
             />
           </div>
 
           <ReportBreakdownTable
-            title="Par filière → niveau → classe"
+            title={t("centre", "enrollmentHierarchy")}
             columns={[
-              { key: "filiere", label: "Filière" },
-              { key: "niveau", label: "Niveau" },
-              { key: "classe", label: "Classe" },
-              { key: "count", label: "Effectif", align: "right" },
+              { key: "filiere", label: t("centre", "enrollmentProgram") },
+              { key: "niveau", label: t("centre", "enrollmentLevel") },
+              { key: "classe", label: t("centre", "enrollmentClass") },
+              { key: "count", label: t("centre", "enrollmentCount"), align: "right" },
             ]}
             rows={report.byHierarchy}
           />
 
           <ReportBreakdownTable
-            title="Liste détaillée"
+            title={t("centre", "enrollmentDetailedList")}
             columns={[
-              { key: "name", label: "Apprenant" },
-              { key: "filiere", label: "Filière" },
-              { key: "niveau", label: "Niv." },
-              { key: "classe", label: "Classe" },
-              { key: "status", label: "Statut" },
+              { key: "name", label: t("centre", "enrollmentLearner") },
+              { key: "filiere", label: t("centre", "enrollmentProgram") },
+              { key: "niveau", label: t("centre", "enrollmentLevelShort") },
+              { key: "classe", label: t("centre", "enrollmentClass") },
+              { key: "status", label: t("centre", "settingsStatus") },
             ]}
             rows={report.rows.map((row) => ({
               name: `${row.prenom} ${row.nom}`.trim(),
               filiere: row.filiere,
               niveau: row.niveau ?? "—",
               classe: row.classe,
-              status: STATUS_LABEL[row.enrollmentStatus] || row.enrollmentStatus,
+              status: statusLabel(row.enrollmentStatus),
             }))}
           />
         </>

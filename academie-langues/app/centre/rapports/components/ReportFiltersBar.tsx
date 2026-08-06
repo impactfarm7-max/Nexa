@@ -4,6 +4,7 @@ import { Building2, GraduationCap } from "lucide-react";
 import { FilterPill } from "@/app/centre/dashboard/dashboard-ui";
 import type { CampusOption, FiliereOption } from "../hooks/useReportPage";
 import ReportPeriodPicker from "./ReportPeriodPicker";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Props = {
   dateFrom: string;
@@ -30,6 +31,7 @@ export default function ReportFiltersBar({
   hideCampusFilter = false,
   hideFiliereFilter = false,
 }: Props) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-wrap items-center gap-2">
       <ReportPeriodPicker from={dateFrom} to={dateTo} onApply={onPeriodChange} />
@@ -38,7 +40,7 @@ export default function ReportFiltersBar({
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none max-w-full">
           <Building2 size={12} className="text-neutral-400 shrink-0 ml-0.5" />
           <FilterPill active={!campusId} onClick={() => onFilter("campusId", null)}>
-            Tous campus
+            {t("centre", "reportsAllCampuses")}
           </FilterPill>
           {campuses.map((c) => (
             <FilterPill
@@ -56,7 +58,7 @@ export default function ReportFiltersBar({
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-none max-w-full">
           <GraduationCap size={12} className="text-neutral-400 shrink-0 ml-0.5" />
           <FilterPill active={!filiereId} onClick={() => onFilter("filiereId", null)}>
-            Toutes filières
+            {t("centre", "reportsAllPrograms")}
           </FilterPill>
           {filieres.map((f) => (
             <FilterPill

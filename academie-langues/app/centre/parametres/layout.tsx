@@ -9,6 +9,7 @@ import {
 import { getCenterMeCache } from "@/app/utils/center-me-cache";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import {
   BLUE,
   ORANGE,
@@ -19,11 +20,11 @@ import {
 } from "@/app/centre/center-page-ui";
 
 const ALL_TABS = [
-  { label: "Entreprise", short: "Entreprise", icon: Building2, path: "/centre/parametres/entreprise", hideForTCF: false },
-  { label: "Campus", short: "Campus", icon: MapPin, path: "/centre/parametres/campus", hideForTCF: false },
-  { label: "Documents", short: "Docs", icon: FileText, path: "/centre/parametres/documents", hideForTCF: false },
-  { label: "Live & Rappels", short: "Live", icon: Video, path: "/centre/parametres/live", hideForTCF: false },
-  { label: "Bulletins & Périodes", short: "Bulletins", icon: Calendar, path: "/centre/parametres/periodes", hideForTCF: true },
+  { labelKey: "settingsCompany", shortKey: "settingsCompany", icon: Building2, path: "/centre/parametres/entreprise", hideForTCF: false },
+  { labelKey: "settingsCampus", shortKey: "settingsCampus", icon: MapPin, path: "/centre/parametres/campus", hideForTCF: false },
+  { labelKey: "settingsDocuments", shortKey: "settingsDocs", icon: FileText, path: "/centre/parametres/documents", hideForTCF: false },
+  { labelKey: "settingsLiveReminders", shortKey: "settingsLive", icon: Video, path: "/centre/parametres/live", hideForTCF: false },
+  { labelKey: "settingsReportsPeriods", shortKey: "settingsReports", icon: Calendar, path: "/centre/parametres/periodes", hideForTCF: true },
 ];
 
 function downloadTextFile(filename: string, content: string, mime: string) {
@@ -37,6 +38,7 @@ function downloadTextFile(filename: string, content: string, mime: string) {
 }
 
 function ParametresShareMenu() {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -59,20 +61,20 @@ function ParametresShareMenu() {
 
   const loadCampusesCsv = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) throw new Error("Session expirée.");
+    if (!session) throw new Error(t("centre", "settingsSessionExpired"));
     const { data: profile } = await supabase
       .from("profiles")
       .select("center_id")
       .eq("id", session.user.id)
       .single();
-    if (!profile?.center_id) throw new Error("Centre introuvable.");
+    if (!profile?.center_id) throw new Error(t("centre", "settingsCenterNotFound"));
     const { data: rows } = await supabase
       .from("campuses")
       .select("name, code, status, city, country, phone, is_main, address")
       .eq("center_id", profile.center_id)
       .order("is_main", { ascending: false })
       .order("name");
-    const header = ["Nom", "Code", "Statut", "Ville", "Pays", "Téléphone", "Principal", "Adresse"];
+    const header = [t("centre", "settingsName"), t("centre", "settingsCode"), t("centre", "settingsStatus"), t("centre", "settingsCity"), t("centre", "settingsCountry"), t("centre", "settingsPhone"), t("centre", "settingsMain"), t("centre", "settingsAddress")];
     const lines = (rows || []).map((c) =>
       [
         c.name,
@@ -81,7 +83,7 @@ function ParametresShareMenu() {
         c.city || "",
         c.country || "",
         c.phone || "",
-        c.is_main ? "oui" : "non",
+        c.is_main ? t("centre", "settingsYes") : t("centre", "settingsNo"),
         c.address || "",
       ]
         .map((v) => `"${String(v).replace(/"/g, '""')}"`)
@@ -101,11 +103,11 @@ function ParametresShareMenu() {
         downloadTextFile(`campus_nexa_${new Date().toISOString().slice(0, 10)}.txt`, csv.replace(/","/g, " | ").replace(/"/g, ""), "text/plain;charset=utf-8");
       } else {
         downloadTextFile(`campus_nexa_${new Date().toISOString().slice(0, 10)}.csv`, csv, "text/csv;charset=utf-8");
-        const text = encodeURIComponent("Liste des campus Nexa (joignez le fichier CSV téléchargé).");
+        const text = encodeURIComponent(t("centre", "settingsCampusShareMessage"));
         window.open(`https://wa.me/?text=${text}`, "_blank", "noopener,noreferrer");
       }
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Export impossible.");
+      alert(e instanceof Error ? e.message : t("centre", "settingsExportImpossible"));
     } finally {
       setBusy(false);
     }
@@ -119,7 +121,7 @@ function ParametresShareMenu() {
         className="gap-1.5"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} strokeWidth={2.25} />}
-        <span className="hidden sm:inline">Partager</span>
+        <span className="hidden sm:inline">{t("centre", "share")}</span>
       </OutlineHeaderButton>
       {open && (
         <div
@@ -157,6 +159,7 @@ function ParametresShareMenu() {
 }
 
 function ParametresLayoutInner({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const params = useSearchParams();
   const isSetup = params.get("setup") === "1";
@@ -213,13 +216,13 @@ function ParametresLayoutInner({ children }: { children: React.ReactNode }) {
               className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight min-w-0 leading-tight truncate shrink-0"
               style={{ color: BLUE, ...centerNotoSans.style }}
             >
-              Paramètres
+              {t("centre", "bottomSettings")}
             </h1>
 
             <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1 justify-end">
               <nav
                 className="flex items-center gap-1 overflow-x-auto min-w-0 max-w-full scrollbar-none"
-                aria-label="Rubriques paramètres"
+                aria-label={t("centre", "settingsSections")}
               >
                 {tabs.map((tab) => {
                   const isActive = pathname === tab.path;
@@ -236,8 +239,8 @@ function ParametresLayoutInner({ children }: { children: React.ReactNode }) {
                       style={isActive ? { backgroundColor: BLUE } : undefined}
                     >
                       <Icon size={13} style={{ color: isActive ? "#fff" : ORANGE }} />
-                      <span className="hidden md:inline">{tab.label}</span>
-                      <span className="md:hidden">{tab.short}</span>
+                      <span className="hidden md:inline">{t("centre", tab.labelKey)}</span>
+                      <span className="md:hidden">{t("centre", tab.shortKey)}</span>
                     </Link>
                   );
                 })}

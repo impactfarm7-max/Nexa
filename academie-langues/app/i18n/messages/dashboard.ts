@@ -14,7 +14,7 @@ export const dashboard = {
     navExamMode: "Mode Examen",
     navExamShort: "Examen",
     navCommunity: "Communauté",
-    navAdmin: "Dashboard Admin",
+    navAdmin: "Tableau de bord administrateur",
     mobileNavigation: "Navigation",
     mobileCloseMenu: "Fermer le menu",
     mobileOpenMenu: "Ouvrir le menu de navigation",

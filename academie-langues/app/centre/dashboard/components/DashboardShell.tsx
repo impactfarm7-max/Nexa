@@ -17,6 +17,7 @@ import type { CenterInfo } from "../types";
 import { PendingBanner } from "../dashboard-ui";
 import { greeting, todayLabel } from "../utils";
 import ShareSignupLinkMenu from "./ShareSignupLinkMenu";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Props = {
   center: CenterInfo | null;
@@ -35,6 +36,7 @@ export default function DashboardShell({
   onCopyLink,
   children,
 }: Props) {
+  const { t, locale } = useI18n();
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export default function DashboardShell({
               <div className="flex items-center gap-2.5 min-w-0">
                 <CenterBrandMark
                   src={logoUrl}
-                  alt={center?.name || "Centre"}
+                  alt={center?.name || t("centre", "dashboardCenter")}
                   icon={LayoutDashboard}
                   size={36}
                   className="!bg-white/95 shadow-md shadow-black/15"
@@ -151,18 +153,18 @@ export default function DashboardShell({
           <div className="flex items-center gap-3 min-w-0">
             <CenterBrandMark
               src={logoUrl}
-              alt={center?.name || "Centre"}
+              alt={center?.name || t("centre", "dashboardCenter")}
               icon={Building2}
               size={40}
             />
             <div className="min-w-0">
               <p className="text-[11px] font-medium text-neutral-500 truncate leading-tight">
-                {center?.name || "Centre"}
+                {center?.name || t("centre", "dashboardCenter")}
                 <span className="text-neutral-300 mx-1.5">·</span>
-                <span className="capitalize">{todayLabel()}</span>
+                <span className="capitalize">{todayLabel(locale)}</span>
               </p>
               <h1 className={CENTER_TYPE.h0} style={{ color: BLUE }}>
-                {greeting()}, {staffPrenom}
+                {greeting(locale)}, {staffPrenom}
               </h1>
             </div>
           </div>
@@ -196,7 +198,7 @@ export default function DashboardShell({
             <div className="rounded-lg border border-neutral-200 bg-white px-4 py-3 flex items-start gap-3">
               <Clock size={16} className="shrink-0 mt-0.5" style={{ color: ORANGE }} />
               <p className="text-sm text-neutral-600 leading-relaxed font-medium">
-                En attente d&apos;activation par Nexa — vous pouvez configurer votre espace librement.
+                {t("centre", "dashboardPendingActivation")}
               </p>
             </div>
           )}

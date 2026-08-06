@@ -8,11 +8,13 @@ import { resolveDashboardModules } from "@/app/centre/dashboard/utils";
 import { defaultReportPeriodRange } from "@/app/utils/reports-period";
 import { isReportHiddenForTcf, type ReportSlug } from "../config/p0-reports";
 import { fetchReportsBundle, peekReportsBundle } from "./reports-bundle-client";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export type CampusOption = { id: string; name: string };
 export type FiliereOption = { id: string; name: string; status: string };
 
 export function useReportPage<T>(slug: ReportSlug) {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -147,15 +149,15 @@ export function useReportPage<T>(slug: ReportSlug) {
       applyBundle(bundle);
 
       if (!bundle.reports[slug]) {
-        setError("Données indisponibles pour cette rubrique.");
+        setError(t("centre", "reportsDataUnavailable"));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement");
+      setError(e instanceof Error ? e.message : t("centre", "reportsLoadingError"));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [slug, queryParams, querySuffix, router, applyBundle]);
+  }, [slug, queryParams, querySuffix, router, applyBundle, t]);
 
   useEffect(() => {
     void load();

@@ -12,12 +12,14 @@ import {
   type CenterNavItem,
 } from "@/app/utils/centerNavItems";
 import { BRAND } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = BRAND.blue;
 const ORANGE = BRAND.orange;
 
 export default function CenterBottomNav() {
   const pathname = usePathname();
+  const { t } = useI18n();
   const [isTCF, setIsTCF] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -35,8 +37,23 @@ export default function CenterBottomNav() {
     return null;
   }
 
-  const { left, right } = getCenterBottomBarItems(isTCF);
-  const sheetItems = getCenterBottomSheetItems(isTCF);
+  const translateItem = (item: CenterNavItem): CenterNavItem => {
+    const keyByPath: Record<string, string> = {
+      "/centre/dashboard": "bottomDashboard", "/centre/etudiants": "bottomStudents",
+      "/centre/tcf/etudiants": "bottomTcfStudents", "/centre/finance": "bottomFinance",
+      "/centre/communaute": "bottomCommunity", "/centre/filieres": "bottomPrograms",
+      "/centre/staff": "bottomStaff", "/centre/cours/planning": "bottomPlanning",
+      "/centre/cours/gestion-cours": "bottomCourses", "/centre/cours/devoirs": "bottomAssignments",
+      "/centre/examens/examensuniversels": "bottomExams", "/centre/parametres/entreprise": "bottomSettings",
+      "/centre/tcf/programme": "bottomTcfProgram", "/centre/lives": "bottomLiveSessions",
+    };
+    const key = keyByPath[item.path];
+    return key ? { ...item, label: t("centre", key), shortLabel: item.shortLabel ? t("centre", `${key}Short`) : undefined } : item;
+  };
+  const rawBarItems = getCenterBottomBarItems(isTCF);
+  const left = rawBarItems.left.map(translateItem);
+  const right = rawBarItems.right.map(translateItem);
+  const sheetItems = getCenterBottomSheetItems(isTCF).map(translateItem);
 
   const renderLink = (item: CenterNavItem) => {
     const isActive = pathname === item.path || pathname?.startsWith(item.path + "/");
@@ -85,13 +102,13 @@ export default function CenterBottomNav() {
           >
             <div className="flex items-center justify-between mb-4 px-1">
               <p className="text-sm font-black" style={{ color: BLUE }}>
-                Navigation centre
+                {t("centre", "bottomCenterNavigation")}
               </p>
               <button
                 type="button"
                 onClick={() => setIsMenuOpen(false)}
                 className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500"
-                aria-label="Fermer le menu"
+                aria-label={t("centre", "bottomCloseMenu")}
               >
                 <X size={16} />
               </button>
@@ -131,7 +148,7 @@ export default function CenterBottomNav() {
                 <div className="w-11 h-11 rounded-full flex items-center justify-center text-[#11224E]" style={{ backgroundColor: "rgba(17,34,78,0.08)" }}>
                   <User size={20} />
                 </div>
-                <span className="text-[11px] font-bold text-slate-700">Mon profil</span>
+                <span className="text-[11px] font-bold text-slate-700">{t("centre", "bottomMyProfile")}</span>
               </Link>
             </div>
           </motion.div>
@@ -148,7 +165,7 @@ export default function CenterBottomNav() {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="relative w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-4 border-white transition-transform active:scale-90"
               style={{ backgroundColor: ORANGE, boxShadow: `0 10px 25px ${ORANGE}66` }}
-              aria-label="Ouvrir le menu de navigation"
+              aria-label={t("centre", "bottomOpenMenu")}
             >
               <motion.div
                 animate={{ rotate: isMenuOpen ? 45 : 0 }}

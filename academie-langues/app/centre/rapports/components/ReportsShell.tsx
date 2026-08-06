@@ -7,17 +7,10 @@ import { centerNotoSans } from "@/app/centre/center-page-ui";
 import { REPORT_NAV, filterReportNav, type ReportSlug } from "../config/p0-reports";
 import ReportFiltersBar from "./ReportFiltersBar";
 import type { CampusOption, FiliereOption } from "../hooks/useReportPage";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 
-const SECTION_LABEL = {
-  pilotage: "Pilotage",
-  apprenants: "Apprenants",
-  offre: "Offre",
-  rh: "RH",
-  finance: "Finance",
-  activite: "Activité",
-} as const;
 type Props = {
   activeSlug: ReportSlug;
   centerType?: string | null;
@@ -57,6 +50,7 @@ export default function ReportsShell({
   exportSlot,
   children,
 }: Props) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const qs = searchParams.toString();
@@ -70,7 +64,7 @@ export default function ReportsShell({
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 mb-1">
-                Rapports · Pilotage
+                {t("centre", "reportsHeading")}
               </p>
               <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight truncate" style={{ color: BLUE }}>
                 {title}
@@ -105,9 +99,9 @@ export default function ReportsShell({
                         : "bg-[#F7F7F6] text-neutral-600 hover:bg-neutral-200/90 border border-black/[0.06]"
                     }`}
                     style={active ? { backgroundColor: BLUE } : undefined}
-                    title={SECTION_LABEL[item.section]}
+                    title={t("centre", `reportsSection_${item.section}`)}
                   >
-                    {item.shortLabel}
+                    {t("centre", `reportsNav_${item.slug.replaceAll("-", "_")}`)}
                   </Link>
                 </span>
               );
@@ -117,10 +111,10 @@ export default function ReportsShell({
           <div className="rounded-lg border border-black/[0.08] bg-[#F7F7F6] p-2.5 md:p-3">
             <div className="flex items-center gap-1.5 mb-2">
               <SlidersHorizontal size={12} className="text-neutral-400" />
-              <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">Filtres</span>
+              <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "reportsFilters")}</span>
               {hideCampusFilter && hideFiliereFilter && (
                 <span className="text-[9px] font-semibold text-neutral-400 ml-1">
-                  · Synthèse globale (période seule)
+                  · {t("centre", "reportsGlobalSummary")}
                 </span>
               )}
             </div>

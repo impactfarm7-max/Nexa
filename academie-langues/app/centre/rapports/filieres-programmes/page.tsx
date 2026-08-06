@@ -11,6 +11,7 @@ import ReportBarChart from "../components/ReportBarChart";
 import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtNum } from "@/app/utils/reports-export";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type FilieresReport = {
   period: { label: string };
@@ -38,6 +39,7 @@ type FilieresReport = {
 };
 
 function FilieresContent() {
+  const { t } = useI18n();
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
@@ -48,33 +50,33 @@ function FilieresContent() {
     if (!report) return;
     downloadCsv(
       `filieres-${report.period.label.replace(/\s+/g, "-")}.csv`,
-      ["Filière", "Type", "Statut", "Mode", "Niveaux", "Effectif actif", "Tarif", "Créée le"],
+      [t("centre", "enrollmentProgram"), t("centre", "programType"), t("centre", "settingsStatus"), t("centre", "programMode"), t("centre", "programLevels"), t("centre", "programActiveEnrollment"), t("centre", "programPrice"), t("centre", "programCreatedAt")],
       report.rows.map((r) => [
         r.name, r.type, r.status, r.mode, r.niveaux, r.effectifActif, r.tuition, r.createdAt,
       ]),
     );
-  }, [report]);
+  }, [report, t]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
-      title: "Filières & programmes",
+      title: t("centre", "programReportTitle"),
       periodLabel: report.period.label,
       kpis: [
-        { label: "Total", value: fmtNum(report.kpis.total) },
-        { label: "Publiées", value: fmtNum(report.kpis.published) },
-        { label: "Brouillon", value: fmtNum(report.kpis.draft) },
+        { label: t("centre", "enrollmentTotal"), value: fmtNum(report.kpis.total) },
+        { label: t("centre", "programPublished"), value: fmtNum(report.kpis.published) },
+        { label: t("centre", "enrollmentDraft"), value: fmtNum(report.kpis.draft) },
       ],
       sections: [
         {
-          title: "Catalogue",
-          columns: ["Filière", "Type", "Statut", "Effectif"],
+          title: t("centre", "programCatalog"),
+          columns: [t("centre", "enrollmentProgram"), t("centre", "programType"), t("centre", "settingsStatus"), t("centre", "enrollmentCount")],
           rows: report.rows.map((r) => [r.name, r.type, r.status, r.effectifActif]),
         },
       ],
       filename: `filieres-${report.period.label.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf]);
+  }, [report, exportPdf, t]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -82,7 +84,7 @@ function FilieresContent() {
     <ReportsShell
       activeSlug="filieres-programmes"
       centerType={centerType}
-      title="Filières & programmes"
+      title={t("centre", "programReportTitle")}
       periodLabel={report?.period?.label}
       dateFrom={from}
       dateTo={to}
@@ -99,59 +101,59 @@ function FilieresContent() {
       )}
       {loading && (
         <div className="flex items-center gap-2 text-neutral-400 text-sm">
-          <Loader2 size={16} className="animate-spin" /> Actualisation…
+          <Loader2 size={16} className="animate-spin" /> {t("centre", "summaryRefreshing")}
         </div>
       )}
       {report && (
         <>
           <ReportKpiGrid
             items={[
-              { label: "Total filières", value: fmtNum(report.kpis.total) },
-              { label: "Publiées", value: fmtNum(report.kpis.published) },
-              { label: "Brouillon", value: fmtNum(report.kpis.draft) },
-              { label: "Cursus", value: fmtNum(report.kpis.cursus) },
-              { label: "Formations courtes", value: fmtNum(report.kpis.formationCourte) },
-              { label: "Nouvelles (période)", value: fmtNum(report.kpis.newInPeriod), sub: report.period.label },
+              { label: t("centre", "programTotal"), value: fmtNum(report.kpis.total) },
+              { label: t("centre", "programPublished"), value: fmtNum(report.kpis.published) },
+              { label: t("centre", "enrollmentDraft"), value: fmtNum(report.kpis.draft) },
+              { label: t("centre", "programCurricula"), value: fmtNum(report.kpis.cursus) },
+              { label: t("centre", "programShortCourses"), value: fmtNum(report.kpis.formationCourte) },
+              { label: t("centre", "programNewPeriod"), value: fmtNum(report.kpis.newInPeriod), sub: report.period.label },
             ]}
           />
           <div className="grid md:grid-cols-2 gap-4">
-            <ReportBarChart title="Par statut" items={report.byStatus.map((x) => ({ label: x.label, value: x.count }))} />
-            <ReportBarChart title="Par campus" items={report.byCampus.map((x) => ({ label: x.label, value: x.count }))} />
+            <ReportBarChart title={t("centre", "programByStatus")} items={report.byStatus.map((x) => ({ label: x.label, value: x.count }))} />
+            <ReportBarChart title={t("centre", "programByCampus")} items={report.byCampus.map((x) => ({ label: x.label, value: x.count }))} />
           </div>
           <div className="grid lg:grid-cols-2 gap-4">
             <ReportBreakdownTable
-              title="Par statut"
+              title={t("centre", "programByStatus")}
               columns={[
-                { key: "label", label: "Statut" },
-                { key: "count", label: "Nombre", align: "right" },
+                { key: "label", label: t("centre", "settingsStatus") },
+                { key: "count", label: t("centre", "programCount"), align: "right" },
               ]}
               rows={report.byStatus}
             />
             <ReportBreakdownTable
-              title="Par type"
+              title={t("centre", "programByType")}
               columns={[
-                { key: "label", label: "Type" },
-                { key: "count", label: "Nombre", align: "right" },
+                { key: "label", label: t("centre", "programType") },
+                { key: "count", label: t("centre", "programCount"), align: "right" },
               ]}
               rows={report.byType}
             />
             <ReportBreakdownTable
-              title="Par campus"
+              title={t("centre", "programByCampus")}
               columns={[
-                { key: "label", label: "Campus" },
-                { key: "count", label: "Filières", align: "right" },
+                { key: "label", label: t("centre", "programCampus") },
+                { key: "count", label: t("centre", "programPrograms"), align: "right" },
               ]}
               rows={report.byCampus}
             />
           </div>
           <ReportBreakdownTable
-            title="Catalogue détaillé"
+            title={t("centre", "programDetailedCatalog")}
             columns={[
-              { key: "name", label: "Filière" },
-              { key: "type", label: "Type" },
-              { key: "status", label: "Statut" },
-              { key: "effectifActif", label: "Actifs", align: "right" },
-              { key: "tuition", label: "Tarif", align: "right" },
+              { key: "name", label: t("centre", "enrollmentProgram") },
+              { key: "type", label: t("centre", "programType") },
+              { key: "status", label: t("centre", "settingsStatus") },
+              { key: "effectifActif", label: t("centre", "summaryActive"), align: "right" },
+              { key: "tuition", label: t("centre", "programPrice"), align: "right" },
             ]}
             rows={report.rows.map((r) => ({
               ...r,

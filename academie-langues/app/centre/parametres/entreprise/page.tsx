@@ -11,6 +11,7 @@ import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import SetupBanner from "@/app/components/SetupBanner";
 import SetupFooter from "@/app/components/SetupFooter";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#F87B1B";
@@ -111,6 +112,11 @@ const TITRE_SUGGESTIONS = [
   "Proviseur", "Principal", "Censeur", "Surveillant Général",
   "Comptable", "Économe", "Secrétaire Général",
 ];
+const TITRE_SUGGESTIONS_EN = [
+  "Director", "Director", "Managing Director", "Founder", "Promoter",
+  "Principal", "Headteacher", "Dean of Studies", "Head Supervisor",
+  "Accountant", "Bursar", "Secretary General",
+];
 
 type Signataire = {
   id: string;
@@ -120,6 +126,29 @@ type Signataire = {
 };
 
 export default function EntrepriseSettingsPage() {
+  const { t, locale } = useI18n();
+  const countryNames = new Intl.DisplayNames([locale], { type: "region" });
+  const currencyNames = new Intl.DisplayNames([locale], { type: "currency" });
+  const companySizeOptions = COMPANY_SIZES.map((option) => ({
+    ...option,
+    label: locale === "fr" ? option.label : t("centre", `companySize_${(option.value || "unspecified").replaceAll("-", "_").replace("+", "plus")}`),
+  }));
+  const taxRegimeOptions = TAX_REGIMES.map((option) => ({
+    ...option,
+    label: locale === "fr" ? option.label : t("centre", `companyTax_${option.value || "unspecified"}`),
+  }));
+  const currencyOptions = CURRENCIES.map((option) => ({
+    ...option,
+    label: locale === "fr" ? option.label : `${currencyNames.of(option.value) || option.value} (${option.value})`,
+  }));
+  const timezoneOptions = TIMEZONES.map((option) => ({
+    ...option,
+    label: locale === "fr" ? option.label : option.value.replace("_", " "),
+  }));
+  const dateFormatOptions = DATE_FORMATS.map((option) => ({
+    ...option,
+    label: locale === "fr" ? option.label : option.label.replaceAll("JJ", "DD").replaceAll("AAAA", "YYYY"),
+  }));
   const searchParams = useSearchParams();
   const isSetup = searchParams.get("setup") === "1";
   const [centerId, setCenterId] = useState<string | null>(null);
@@ -426,7 +455,7 @@ export default function EntrepriseSettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-white rounded-3xl p-10 shadow-2xl flex flex-col items-center gap-3 border border-neutral-200">
             <CheckCircle2 size={60} className="text-emerald-500" />
-            <p className="text-lg font-black text-emerald-700">Enregistré avec succès</p>
+            <p className="text-lg font-black text-emerald-700">{t("centre", "liveSavedSuccessfully")}</p>
           </div>
         </div>
       )}
@@ -436,30 +465,30 @@ export default function EntrepriseSettingsPage() {
         : "w-full min-w-0"
       }>
       {/* ============================= IDENTITÉ ============================= */}
-      <Section icon={Building2} title="Identité de l'établissement"
-        description="Le logo, le nom et la devise apparaissent en en-tête de tous vos documents officiels.">
+      <Section icon={Building2} title={t("centre", "companyIdentityTitle")}
+        description={t("centre", "companyIdentityDescription")}>
         <div className="flex flex-wrap items-end gap-6 sm:gap-8">
-          <LogoUpload label="Logo" url={logoUrl} busy={uploadingLogo} accent={BLUE}
+          <LogoUpload label={t("centre", "documentsLogo")} url={logoUrl} busy={uploadingLogo} accent={BLUE}
             accept="image/png,image/jpeg" onPick={uploadLogo} fit="cover" disabled={isLocked} />
           <LogoUpload label="Favicon" url={faviconUrl} busy={uploadingFavicon} accent={ORANGE}
             accept="image/png,image/x-icon,image/svg+xml" onPick={uploadFavicon} fit="contain" disabled={isLocked} />
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="Nom affiché dans l'application" value={displayName} required error={errors.displayName} disabled={isLocked}
+          <Field label={t("centre", "companyDisplayName")} value={displayName} required error={errors.displayName} errorMessage={t("centre", "companyRequiredField")} disabled={isLocked}
             onChange={(v) => { setDisplayName(v); errors.displayName && setErrors((e) => ({ ...e, displayName: false })); }}
             placeholder="Ex: CSIC" />
-          <Field label="Nom court / Acronyme" hint="SMS & mobile" value={shortName} onChange={setShortName} placeholder="Ex: CSIC" disabled={isLocked} />
+          <Field label={t("centre", "companyShortName")} hint="SMS & mobile" value={shortName} onChange={setShortName} placeholder="Ex: CSIC" disabled={isLocked} />
         </div>
-        <Field label="Raison sociale (nom légal)" value={raisonSociale} required error={errors.raisonSociale} disabled={isLocked}
+        <Field label={t("centre", "companyLegalName")} value={raisonSociale} required error={errors.raisonSociale} errorMessage={t("centre", "companyRequiredField")} disabled={isLocked}
           onChange={(v) => { setRaisonSociale(v); errors.raisonSociale && setErrors((e) => ({ ...e, raisonSociale: false })); }}
           placeholder="Ex: Complexe Scolaire International Les Champions" />
-        <Field label="Slogan / Devise" value={slogan} onChange={setSlogan} placeholder="Ex: Discipline – Travail – Succès" disabled={isLocked} />
+        <Field label={t("centre", "companySlogan")} value={slogan} onChange={setSlogan} placeholder={t("centre", "companySloganPlaceholder")} disabled={isLocked} />
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <SelectField label="Taille de l'établissement" value={companySize} onChange={setCompanySize} options={COMPANY_SIZES} disabled={isLocked} />
+          <SelectField label={t("centre", "companySize")} value={companySize} onChange={setCompanySize} options={companySizeOptions} disabled={isLocked} />
           <div>
-            <FieldLabel label="Couleur des documents" />
+            <FieldLabel label={t("centre", "companyDocumentColor")} />
             <div className={`flex items-center gap-3 h-11 px-3 rounded-xl border border-neutral-200 ${isLocked ? "bg-neutral-50" : "bg-white"}`}>
               <input type="color" value={documentColor} onChange={(e) => setDocumentColor(e.target.value)}
                 disabled={isLocked} className="w-7 h-7 rounded-md border cursor-pointer p-0 disabled:cursor-default disabled:opacity-60" />
@@ -470,13 +499,13 @@ export default function EntrepriseSettingsPage() {
       </Section>
 
       {/* ===================== IDENTIFIANTS LÉGAUX ===================== */}
-      <Section icon={ScrollText} title="Identifiants légaux & réglementaires"
-        description="Indispensables à la conformité avec le Ministère et l'administration fiscale.">
-        <Field label="N° d'agrément / Autorisation d'ouverture" value={agrementNumber} onChange={setAgrementNumber}
-          placeholder="Arrêté ministériel d'ouverture" disabled={isLocked} />
+      <Section icon={ScrollText} title={t("centre", "companyLegalIdsTitle")}
+        description={t("centre", "companyLegalIdsDescription")}>
+        <Field label={t("centre", "companyApprovalNumber")} value={agrementNumber} onChange={setAgrementNumber}
+          placeholder={t("centre", "companyApprovalPlaceholder")} disabled={isLocked} />
 
         <div>
-          <FieldLabel label="Document d'agrément" />
+          <FieldLabel label={t("centre", "companyApprovalDocument")} />
           {agrementFileUrl ? (
             <div className="flex items-center gap-2 bg-neutral-50 border border-neutral-200 rounded-xl px-3.5 py-3">
               <button
@@ -484,51 +513,51 @@ export default function EntrepriseSettingsPage() {
                 className="inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-bold uppercase tracking-wide text-white hover:opacity-90 transition"
                 style={{ backgroundColor: BLUE }}
               >
-                <ScrollText size={14} /> Voir le document
+                <ScrollText size={14} /> {t("centre", "companyViewDocument")}
               </button>
               <span className="flex-1" />
-              <label className="flex items-center gap-1 p-1 text-neutral-400 hover:text-blue-600 cursor-pointer" title="Remplacer">
+              <label className="flex items-center gap-1 p-1 text-neutral-400 hover:text-blue-600 cursor-pointer" title={t("centre", "companyReplace")}>
                 {uploadingAgrement ? <Loader2 size={15} className="animate-spin" /> : <FileUp size={15} />}
                 <input type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadAgrement(e.target.files[0])} />
               </label>
-              <button onClick={removeAgrement} className="p-1 text-neutral-400 hover:text-red-500" title="Supprimer"><X size={15} /></button>
+              <button onClick={removeAgrement} className="p-1 text-neutral-400 hover:text-red-500" title={t("centre", "companyDelete")}><X size={15} /></button>
             </div>
           ) : (
             <label className="flex items-center justify-center gap-2 h-11 rounded-xl border border-dashed border-neutral-300 cursor-pointer text-sm font-semibold text-neutral-400 hover:border-orange-300 hover:text-neutral-600 transition">
               {uploadingAgrement ? <Loader2 size={15} className="animate-spin" /> : <FileUp size={15} />}
-              Téléverser (PDF ou image)
+              {t("centre", "companyUploadDocument")}
               <input type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadAgrement(e.target.files[0])} />
             </label>
           )}
         </div>
 
-        <Field label="Identifiant national / Matricule ministériel" value={ministryMatricule} onChange={setMinistryMatricule}
-          placeholder="Code unique (MINESEC / MINEDUB…)" disabled={isLocked} />
+        <Field label={t("centre", "companyMinistryId")} value={ministryMatricule} onChange={setMinistryMatricule}
+          placeholder={t("centre", "companyMinistryIdPlaceholder")} disabled={isLocked} />
 
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label="N° RCCM" hint="Registre du Commerce" value={rccm} onChange={setRccm} disabled={isLocked} />
           <Field label="NIU" hint="N° contribuable" value={niu} onChange={setNiu} disabled={isLocked} />
         </div>
-        <SelectField label="Régime fiscal" value={taxRegime} onChange={setTaxRegime} options={TAX_REGIMES} disabled={isLocked} />
+        <SelectField label={t("centre", "companyTaxRegime")} value={taxRegime} onChange={setTaxRegime} options={taxRegimeOptions} disabled={isLocked} />
       </Section>
 
       {/* ============== LOCALISATION & PRÉFÉRENCES RÉGIONALES ============== */}
-      <Section icon={Globe2} title="Siège & préférences régionales"
-        description="Adresse légale du siège uniquement. Les adresses des sites d'enseignement se gèrent dans l'onglet Campus.">
+      <Section icon={Globe2} title={t("centre", "companyRegionalTitle")}
+        description={t("centre", "companyRegionalDescription")}>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
-            <FieldLabel label="Pays" />
+            <FieldLabel label={t("centre", "settingsCountry")} />
             <div className="relative">
               <select value={country} onChange={(e) => onCountryChange(e.target.value)} disabled={isLocked}
                 className={`w-full h-11 pl-3.5 pr-9 rounded-xl border border-neutral-200 text-sm font-semibold outline-none appearance-none transition focus:border-[#11224E] focus:ring-4 focus:ring-[#11224E]/5 ${isLocked ? "bg-neutral-50 text-neutral-500 cursor-default" : "bg-white"}`}>
-                {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.flag}  {c.name} ({c.dial})</option>)}
+                {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.flag}  {locale === "fr" ? c.name : countryNames.of(c.code) || c.name} ({c.dial})</option>)}
               </select>
               <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
             </div>
           </div>
 
           <div>
-            <FieldLabel label="Téléphone officiel" />
+            <FieldLabel label={t("centre", "companyOfficialPhone")} />
             <div className={`flex items-stretch rounded-xl border border-neutral-200 overflow-hidden focus-within:border-[#11224E] focus-within:ring-4 focus-within:ring-[#11224E]/5 transition ${isLocked ? "bg-neutral-50" : "bg-white"}`}>
               <span className="flex items-center gap-1.5 px-3 bg-neutral-50 border-r border-neutral-200 text-sm font-bold text-neutral-600 shrink-0">
                 {countryOf(country)?.flag} {dialOf(country)}
@@ -540,29 +569,29 @@ export default function EntrepriseSettingsPage() {
           </div>
         </div>
 
-        <Field label="Adresse du siège social" value={siegeAddress} onChange={setSiegeAddress} placeholder="Rue, quartier, ville" disabled={isLocked} />
-        <Field label="E-mail institutionnel" type="email" value={institutionalEmail} onChange={setInstitutionalEmail} placeholder="info@ecole.cm" disabled={isLocked} />
+        <Field label={t("centre", "companyHeadOfficeAddress")} value={siegeAddress} onChange={setSiegeAddress} placeholder={t("centre", "companyAddressPlaceholder")} disabled={isLocked} />
+        <Field label={t("centre", "companyInstitutionalEmail")} type="email" value={institutionalEmail} onChange={setInstitutionalEmail} placeholder="info@ecole.cm" disabled={isLocked} />
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <SelectField label="Devise par défaut" value={currency} onChange={setCurrency} options={CURRENCIES} disabled={isLocked} />
-          <SelectField label="Format de date" value={dateFormat} onChange={setDateFormat} options={DATE_FORMATS} disabled={isLocked} />
+          <SelectField label={t("centre", "companyDefaultCurrency")} value={currency} onChange={setCurrency} options={currencyOptions} disabled={isLocked} />
+          <SelectField label={t("centre", "companyDateFormat")} value={dateFormat} onChange={setDateFormat} options={dateFormatOptions} disabled={isLocked} />
         </div>
-        <SelectField label="Fuseau horaire" value={timezone} onChange={setTimezone} options={TIMEZONES} disabled={isLocked} />
+        <SelectField label={t("centre", "companyTimezone")} value={timezone} onChange={setTimezone} options={timezoneOptions} disabled={isLocked} />
       </Section>
 
       {/* ===================== SIGNATAIRES OFFICIELS ===================== */}
-      <Section icon={Signature} title="Signataires officiels"
-        description="Apparaissent au bas des bulletins et reçus, dans l'ordre ci-dessous. Le cachet est apposé automatiquement.">
+      <Section icon={Signature} title={t("centre", "companySignatoriesTitle")}
+        description={t("centre", "companySignatoriesDescription")}>
         {!isLocked && (
           <div className="flex justify-end">
             <button onClick={addSignataire} className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide px-3.5 h-9 rounded-lg text-white transition hover:opacity-90" style={{ backgroundColor: ORANGE }}>
-              <Plus size={14} /> Ajouter un signataire
+              <Plus size={14} /> {t("centre", "companyAddSignatory")}
             </button>
           </div>
         )}
 
         {signataires.length === 0 && (
-          <p className="text-sm text-neutral-400 italic">Aucun signataire configuré.</p>
+          <p className="text-sm text-neutral-400 italic">{t("centre", "companyNoSignatory")}</p>
         )}
 
         <div className="space-y-3">
@@ -576,11 +605,11 @@ export default function EntrepriseSettingsPage() {
                   </div>
                 )}
                 <div className="flex-1 grid sm:grid-cols-2 gap-3">
-                  <Field label="Nom complet" value={s.name} onChange={(v) => updateSignataire(s.id, { name: v })} placeholder="Ex: M. NKOMO Jean" disabled={isLocked} />
+                  <Field label={t("centre", "companyFullName")} value={s.name} onChange={(v) => updateSignataire(s.id, { name: v })} placeholder={t("centre", "companyFullNamePlaceholder")} disabled={isLocked} />
                   <div>
-                    <FieldLabel label="Titre officiel" />
+                    <FieldLabel label={t("centre", "companyOfficialTitle")} />
                     <input list="titre-suggestions" value={s.title}
-                      onChange={(e) => updateSignataire(s.id, { title: e.target.value })} placeholder="Ex: Proviseur"
+                      onChange={(e) => updateSignataire(s.id, { title: e.target.value })} placeholder={t("centre", "companyTitlePlaceholder")}
                       disabled={isLocked}
                       className={`w-full h-11 px-3.5 rounded-xl border border-neutral-200 text-sm font-medium outline-none transition focus:border-[#11224E] focus:ring-4 focus:ring-[#11224E]/5 ${isLocked ? "bg-neutral-50 text-neutral-500 cursor-default" : "bg-white"}`} />
                   </div>
@@ -597,11 +626,11 @@ export default function EntrepriseSettingsPage() {
                   </div>
                 ) : !isLocked ? (
                   <label className="flex items-center gap-2 h-9 px-3 rounded-lg border border-dashed border-neutral-300 cursor-pointer text-xs font-semibold text-neutral-400 hover:border-orange-300 transition">
-                    <PenLine size={13} /> Signature scannée (fond transparent)
+                    <PenLine size={13} /> {t("centre", "companyScannedSignature")}
                     <input type="file" accept="image/png,image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadSignatureImg(s.id, e.target.files[0])} />
                   </label>
                 ) : (
-                  <span className="text-xs text-neutral-400 italic">Pas de signature numérique</span>
+                  <span className="text-xs text-neutral-400 italic">{t("centre", "companyNoDigitalSignature")}</span>
                 )}
               </div>
             </div>
@@ -609,11 +638,11 @@ export default function EntrepriseSettingsPage() {
         </div>
 
         <datalist id="titre-suggestions">
-          {TITRE_SUGGESTIONS.map((t) => <option key={t} value={t} />)}
+          {(locale === "fr" ? TITRE_SUGGESTIONS : TITRE_SUGGESTIONS_EN).map((title) => <option key={title} value={title} />)}
         </datalist>
 
         <div className="pt-2">
-          <FieldLabel label="Cachet officiel de l'établissement" />
+          <FieldLabel label={t("centre", "companyOfficialStamp")} />
           {stampUrl ? (
             <div className="flex items-center gap-2">
               <img src={stampUrl} alt="cachet" className="h-16 object-contain border rounded-xl bg-white p-2" />
@@ -622,11 +651,11 @@ export default function EntrepriseSettingsPage() {
           ) : !isLocked ? (
             <label className="flex items-center justify-center gap-2 h-11 w-full rounded-xl border border-dashed border-neutral-300 cursor-pointer text-sm font-semibold text-neutral-400 hover:border-orange-300 hover:text-neutral-600 transition">
               {uploadingStamp ? <Loader2 size={15} className="animate-spin" /> : <Stamp size={15} />}
-              Téléverser le tampon (fond transparent)
+              {t("centre", "companyUploadStamp")}
               <input type="file" accept="image/png,image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadStamp(e.target.files[0])} />
             </label>
           ) : (
-            <div className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 flex items-center px-3.5 text-sm text-neutral-400">Aucun cachet</div>
+            <div className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 flex items-center px-3.5 text-sm text-neutral-400">{t("centre", "companyNoStamp")}</div>
           )}
         </div>
       </Section>
@@ -643,14 +672,14 @@ export default function EntrepriseSettingsPage() {
           {isLocked ? (
             <button onClick={() => setIsLocked(false)}
               className="h-12 w-full sm:w-auto px-8 rounded-xl text-xs font-black uppercase tracking-widest border border-neutral-200 text-neutral-600 bg-white flex items-center justify-center gap-2 shadow-sm hover:border-[#11224E] hover:text-[#11224E] transition">
-              <PenLine size={16} /> Modifier
+              <PenLine size={16} /> {t("centre", "liveEdit")}
             </button>
           ) : (
             <button onClick={save} disabled={saving}
               className="h-12 w-full sm:w-auto px-8 rounded-xl text-xs font-black uppercase tracking-widest text-white disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg transition hover:opacity-95"
               style={{ backgroundColor: BLUE }}>
               {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-              {saving ? "Enregistrement…" : "Valider et enregistrer"}
+              {saving ? t("centre", "liveSaving") : t("centre", "liveSave")}
             </button>
           )}
         </div>
@@ -694,16 +723,16 @@ function FieldLabel({ label, hint, required }: { label: string; hint?: string; r
   );
 }
 
-function Field({ label, value, onChange, placeholder, required, error, hint, type = "text", disabled }: {
+function Field({ label, value, onChange, placeholder, required, error, errorMessage, hint, type = "text", disabled }: {
   label: string; value: string; onChange: (v: string) => void; placeholder?: string;
-  required?: boolean; error?: boolean; hint?: string; type?: string; disabled?: boolean;
+  required?: boolean; error?: boolean; errorMessage?: string; hint?: string; type?: string; disabled?: boolean;
 }) {
   return (
     <div>
       <FieldLabel label={label} hint={hint} required={required} />
       <input type={type} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} disabled={disabled}
         className={`w-full h-11 px-3.5 rounded-xl border text-sm font-medium outline-none transition focus:ring-4 ${disabled ? "bg-neutral-50 text-neutral-500 cursor-default" : "bg-white"} ${error ? "border-red-400 focus:ring-red-100" : "border-neutral-200 focus:border-[#11224E] focus:ring-[#11224E]/5"}`} />
-      {error && <p className="text-[11px] text-red-500 mt-1 font-medium">Ce champ est obligatoire.</p>}
+      {error && <p className="text-[11px] text-red-500 mt-1 font-medium">{errorMessage}</p>}
     </div>
   );
 }

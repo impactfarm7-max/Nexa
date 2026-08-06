@@ -103,9 +103,9 @@ export function resolveReportPeriod(
   };
 }
 
-export function formatShort(iso: string) {
+export function formatShort(iso: string, locale: "fr" | "en" = "fr") {
   const d = new Date(iso + "T12:00:00");
-  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "short", year: "numeric" });
+  return d.toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function periodStartIso(from: string) {

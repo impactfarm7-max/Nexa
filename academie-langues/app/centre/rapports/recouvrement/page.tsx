@@ -11,6 +11,8 @@ import ReportBarChart from "../components/ReportBarChart";
 import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtNum } from "@/app/utils/reports-export";
+import { useI18n } from "@/app/i18n/I18nProvider";
+import { formatShort } from "@/app/utils/reports-period";
 
 type RecouvrementReport = {
   period: { label: string };
@@ -36,6 +38,14 @@ type RecouvrementReport = {
 };
 
 function RecouvrementContent() {
+  const { t, locale } = useI18n();
+  const debtStatus = (status: string) => {
+    const normalized = status.toLowerCase().trim();
+    if (["soldé", "solde", "paid"].includes(normalized)) return t("centre", "recoveryStatusPaid");
+    if (["partiel", "partial"].includes(normalized)) return t("centre", "recoveryStatusPartial");
+    if (["impayé", "impaye", "unpaid"].includes(normalized)) return t("centre", "recoveryStatusUnpaid");
+    return status;
+  };
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
@@ -46,7 +56,7 @@ function RecouvrementContent() {
     if (!report) return;
     downloadCsv(
       `recouvrement-${report.period.label.replace(/\s+/g, "-")}.csv`,
-      ["Apprenant", "Filière", "Niveau", "Classe", "CA", "Encaissé", "Reste", "Statut"],
+      [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "enrollmentLevel"), t("centre", "enrollmentClass"), "CA", t("centre", "recoveryCollected"), t("centre", "summaryBalance"), t("centre", "settingsStatus")],
       report.rows.map((r) => [
         r.student,
         r.filiere,
@@ -55,36 +65,36 @@ function RecouvrementContent() {
         r.ca,
         r.encaisse,
         r.reste,
-        r.statut,
+        debtStatus(r.statut),
       ]),
     );
-  }, [report]);
+  }, [report, t]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
-      title: "Créances & recouvrement",
+      title: t("centre", "recoveryTitle"),
       periodLabel: report.period.label,
       kpis: [
-        { label: "CA facturé", value: fmtFCFA(report.kpis.caFacture) },
-        { label: "Encaissé", value: fmtFCFA(report.kpis.encaisse) },
-        { label: "Taux", value: `${report.kpis.tauxRecouvrement} %` },
+        { label: t("centre", "summaryInvoicedRevenue"), value: fmtFCFA(report.kpis.caFacture) },
+        { label: t("centre", "recoveryCollected"), value: fmtFCFA(report.kpis.encaisse) },
+        { label: t("centre", "recoveryRateShort"), value: `${report.kpis.tauxRecouvrement} %` },
       ],
       sections: [
         {
-          title: "Par filière",
-          columns: ["Filière", "CA", "Encaissé", "Reste", "Taux"],
+          title: t("centre", "enrollmentByProgram"),
+          columns: [t("centre", "enrollmentProgram"), "CA", t("centre", "recoveryCollected"), t("centre", "summaryBalance"), t("centre", "recoveryRateShort")],
           rows: report.byFiliere.map((x) => [x.label, fmtFCFA(x.ca), fmtFCFA(x.encaisse), fmtFCFA(x.reste), `${x.taux} %`]),
         },
         {
-          title: "Top impayés",
-          columns: ["Apprenant", "Filière", "Reste"],
+          title: t("centre", "recoveryTopUnpaid"),
+          columns: [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance")],
           rows: report.rows.map((r) => [r.student, r.filiere, fmtFCFA(r.reste)]),
         },
       ],
       filename: `recouvrement-${report.period.label.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf]);
+  }, [report, exportPdf, t]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -92,8 +102,8 @@ function RecouvrementContent() {
     <ReportsShell
       activeSlug="recouvrement"
       centerType={centerType}
-      title="Créances & recouvrement"
-      periodLabel={report?.period?.label}
+      title={t("centre", "recoveryTitle")}
+      periodLabel={from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}`}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
@@ -109,44 +119,44 @@ function RecouvrementContent() {
       )}
       {loading && (
         <div className="flex items-center gap-2 text-neutral-400 text-sm">
-          <Loader2 size={16} className="animate-spin" /> Actualisation…
+          <Loader2 size={16} className="animate-spin" /> {t("centre", "summaryRefreshing")}
         </div>
       )}
       {report && (
         <>
           <ReportKpiGrid
             items={[
-              { label: "CA facturé", value: fmtFCFA(report.kpis.caFacture), sub: "Dossiers actifs" },
-              { label: "Encaissé (cumul)", value: fmtFCFA(report.kpis.encaisse) },
-              { label: "Reste à recouvrer", value: fmtFCFA(report.kpis.resteARecouvrer) },
+              { label: t("centre", "summaryInvoicedRevenue"), value: fmtFCFA(report.kpis.caFacture), sub: t("centre", "recoveryActiveRecords") },
+              { label: t("centre", "recoveryCollectedCumulative"), value: fmtFCFA(report.kpis.encaisse) },
+              { label: t("centre", "summaryOutstanding"), value: fmtFCFA(report.kpis.resteARecouvrer) },
               {
-                label: "Taux recouvrement",
+                label: t("centre", "summaryRecoveryRate"),
                 value: `${report.kpis.tauxRecouvrement} %`,
-                sub: `${fmtNum(report.kpis.nbDossiers)} dossiers`,
+                sub: t("centre", "recoveryRecordsCount", { count: fmtNum(report.kpis.nbDossiers) }),
               },
             ]}
           />
 
           <div className="grid md:grid-cols-2 gap-4">
             <ReportBarChart
-              title="Reste à recouvrer par filière"
+              title={t("centre", "recoveryOutstandingByProgram")}
               items={report.byFiliere.map((x) => ({ label: x.label, value: x.reste }))}
             />
             <ReportBarChart
-              title="Taux de recouvrement par filière"
+              title={t("centre", "summaryRecoveryByProgram")}
               items={report.byFiliere.map((x) => ({ label: x.label, value: x.taux }))}
               formatValue={(n) => `${n} %`}
             />
           </div>
 
           <ReportBreakdownTable
-            title="Par filière"
+            title={t("centre", "enrollmentByProgram")}
             columns={[
-              { key: "label", label: "Filière" },
+              { key: "label", label: t("centre", "enrollmentProgram") },
               { key: "ca", label: "CA", align: "right" },
-              { key: "encaisse", label: "Encaissé", align: "right" },
-              { key: "reste", label: "Reste", align: "right" },
-              { key: "taux", label: "Taux %", align: "right" },
+              { key: "encaisse", label: t("centre", "recoveryCollected"), align: "right" },
+              { key: "reste", label: t("centre", "summaryBalance"), align: "right" },
+              { key: "taux", label: t("centre", "recoveryRatePercent"), align: "right" },
             ]}
             rows={report.byFiliere.map((x) => ({
               label: x.label,
@@ -158,20 +168,20 @@ function RecouvrementContent() {
           />
 
           <ReportBreakdownTable
-            title="Top 20 impayés"
+            title={t("centre", "recoveryTop20Unpaid")}
             columns={[
-              { key: "student", label: "Apprenant" },
-              { key: "filiere", label: "Filière" },
-              { key: "reste", label: "Reste", align: "right" },
-              { key: "nextDue", label: "Prochaine échéance" },
-              { key: "statut", label: "Statut" },
+              { key: "student", label: t("centre", "enrollmentLearner") },
+              { key: "filiere", label: t("centre", "enrollmentProgram") },
+              { key: "reste", label: t("centre", "summaryBalance"), align: "right" },
+              { key: "nextDue", label: t("centre", "recoveryNextDueDate") },
+              { key: "statut", label: t("centre", "settingsStatus") },
             ]}
             rows={report.rows.map((row) => ({
               student: row.student,
               filiere: row.filiere,
               reste: fmtFCFA(row.reste),
               nextDue: row.nextDueDate?.slice(0, 10) ?? "—",
-              statut: row.statut,
+              statut: debtStatus(row.statut),
             }))}
           />
         </>

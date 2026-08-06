@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export type ReportAlertItem = {
   level: "danger" | "warning";
@@ -15,11 +16,12 @@ type Props = {
 };
 
 export default function ReportAlerts({ items, hrefFor }: Props) {
+  const { t } = useI18n();
   if (!items.length) return null;
 
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white p-5 min-w-0">
-      <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 mb-4">Alertes</p>
+      <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 mb-4">{t("centre", "reportsAlerts")}</p>
       <div className="space-y-2">
         {items.map((a, i) => (
           <Link

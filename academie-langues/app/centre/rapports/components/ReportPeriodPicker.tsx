@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Calendar, ChevronDown, X } from "lucide-react";
 import { formatShort } from "@/app/utils/reports-period";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 
@@ -12,13 +13,13 @@ type Props = {
   onApply: (from: string, to: string) => void;
 };
 
-function periodLabel(from: string, to: string) {
-  if (!from || !to) return "Choisir une période";
-  if (from === to) return formatShort(from);
-  return `${formatShort(from)} → ${formatShort(to)}`;
-}
-
 export default function ReportPeriodPicker({ from, to, onApply }: Props) {
+  const { t, locale } = useI18n();
+  const periodLabel = () => {
+    if (!from || !to) return t("centre", "reportsChoosePeriod");
+    if (from === to) return formatShort(from, locale);
+    return `${formatShort(from, locale)} → ${formatShort(to, locale)}`;
+  };
   const [open, setOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
@@ -57,7 +58,7 @@ export default function ReportPeriodPicker({ from, to, onApply }: Props) {
         className="inline-flex items-center gap-2 h-8 pl-2.5 pr-3 rounded-full border border-neutral-200 bg-white text-[11px] font-semibold text-neutral-700 hover:border-[#11224E]/30 hover:shadow-sm transition-all max-w-[min(100%,280px)]"
       >
         <Calendar size={14} style={{ color: BLUE }} className="shrink-0" />
-        <span className="truncate">{periodLabel(from, to)}</span>
+        <span className="truncate">{periodLabel()}</span>
         <ChevronDown size={12} className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
@@ -65,13 +66,13 @@ export default function ReportPeriodPicker({ from, to, onApply }: Props) {
         <div className="absolute left-0 top-full mt-1.5 z-30 w-[min(calc(100vw-2rem),300px)] rounded-2xl border border-neutral-200 bg-white shadow-xl shadow-neutral-200/50 p-3 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
-              Période
+              {t("centre", "reportsPeriod")}
             </span>
             <button
               type="button"
               onClick={() => setOpen(false)}
               className="p-1 rounded-md text-neutral-400 hover:bg-neutral-100"
-              aria-label="Fermer"
+              aria-label={t("centre", "periodClose")}
             >
               <X size={14} />
             </button>
@@ -87,13 +88,13 @@ export default function ReportPeriodPicker({ from, to, onApply }: Props) {
               }}
               className="rounded border-neutral-300"
             />
-            <span className="text-[11px] font-semibold text-neutral-600">Date précise (un seul jour)</span>
+            <span className="text-[11px] font-semibold text-neutral-600">{t("centre", "reportsSingleDay")}</span>
           </label>
 
           <div className="space-y-2">
             <div>
               <label className="text-[9px] font-black uppercase tracking-wider text-neutral-400 mb-1 block">
-                {singleDay ? "Date" : "Du"}
+                {singleDay ? t("centre", "reportsDate") : t("centre", "reportsFrom")}
               </label>
               <input
                 type="date"
@@ -109,7 +110,7 @@ export default function ReportPeriodPicker({ from, to, onApply }: Props) {
             {!singleDay && (
               <div>
                 <label className="text-[9px] font-black uppercase tracking-wider text-neutral-400 mb-1 block">
-                  Au
+                  {t("centre", "reportsTo")}
                 </label>
                 <input
                   type="date"
@@ -129,7 +130,7 @@ export default function ReportPeriodPicker({ from, to, onApply }: Props) {
             className="w-full h-9 rounded-full text-[11px] font-black uppercase tracking-wide text-white disabled:opacity-40"
             style={{ backgroundColor: BLUE }}
           >
-            Appliquer
+            {t("centre", "reportsApply")}
           </button>
         </div>
       )}

@@ -1,6 +1,7 @@
 "use client";
 
 import { fmtMoneyBar } from "@/app/utils/reports-export";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export type BarChartItem = {
   label: string;
@@ -16,21 +17,22 @@ type Props = {
   maxItems?: number;
 };
 
-function defaultMoneyFormat(n: number) {
+function defaultMoneyFormat(n: number, locale: "fr" | "en") {
   if (Math.abs(n) >= 10_000) return fmtMoneyBar(n);
-  return n.toLocaleString("fr-FR");
+  return n.toLocaleString(locale === "en" ? "en-US" : "fr-FR");
 }
 
 export default function ReportBarChart({ title, items, formatValue, maxItems = 8 }: Props) {
+  const { t, locale } = useI18n();
   const slice = items.slice(0, maxItems);
   const max = Math.max(...slice.map((i) => i.value), 1);
-  const fmt = formatValue ?? defaultMoneyFormat;
+  const fmt = formatValue ?? ((n: number) => defaultMoneyFormat(n, locale));
 
   if (!slice.length) {
     return (
       <div className="rounded-2xl border border-neutral-200 bg-white p-5">
         <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 mb-2">{title}</p>
-        <p className="text-xs text-neutral-400">Aucune donnée à afficher</p>
+        <p className="text-xs text-neutral-400">{t("centre", "reportsNoDataToDisplay")}</p>
       </div>
     );
   }

@@ -13,6 +13,7 @@ import {
   isGradeLeafPeriod,
 } from "@/app/utils/gradePeriods";
 import { BLUE, SURFACE } from "@/app/centre/center-page-ui";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const inputCls =
   "w-full h-10 px-3.5 rounded-lg border border-black/[0.08] bg-white text-sm font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10";
@@ -75,13 +76,13 @@ function clamp(n: number, min: number, max: number) {
 }
 
 /** Construit la hiérarchie grade_periods (types DB : trimestre/semestre/autre) */
-function buildPeriodsFromConfig(key: TemplateKey, cfg: TemplateConfig): BuiltPeriod[] {
+function buildPeriodsFromConfig(key: TemplateKey, cfg: TemplateConfig, name: (key: string, values?: Record<string, string | number>) => string): BuiltPeriod[] {
   const coeff = cfg.coefficient > 0 ? cfg.coefficient : 1;
 
   if (key === "simple") {
     const n = clamp(cfg.evalCount, 1, 12);
     return Array.from({ length: n }, (_, i) => ({
-      name: i === 0 ? "Évaluation continue" : i === 1 ? "Examen final" : `Évaluation ${i + 1}`,
+      name: i === 0 ? name("periodGeneratedContinuous") : i === 1 ? name("periodGeneratedFinalExam") : name("periodGeneratedEvaluation", { number: i + 1 }),
       type: "autre" as const,
       children: [] as [],
     }));
@@ -94,11 +95,11 @@ function buildPeriodsFromConfig(key: TemplateKey, cfg: TemplateConfig): BuiltPer
     let seq = 1;
     for (let g = 1; g <= groups; g++) {
       const children = Array.from({ length: per }, () => {
-        const child = { name: `Séquence ${seq}`, coefficient: coeff };
+        const child = { name: name("periodGeneratedSequence", { number: seq }), coefficient: coeff };
         seq += 1;
         return child;
       });
-      out.push({ name: `Trimestre ${g}`, type: "trimestre", children });
+      out.push({ name: name("periodGeneratedQuarter", { number: g }), type: "trimestre", children });
     }
     return out;
   }
@@ -111,13 +112,13 @@ function buildPeriodsFromConfig(key: TemplateKey, cfg: TemplateConfig): BuiltPer
   for (let g = 1; g <= groups; g++) {
     const children: { name: string; coefficient: number }[] = [];
     for (let s = 0; s < sessions; s++) {
-      children.push({ name: `Session ${sessionNum}`, coefficient: coeff });
+      children.push({ name: name("periodGeneratedSession", { number: sessionNum }), coefficient: coeff });
       sessionNum += 1;
     }
     if (cfg.includeRattrapage) {
-      children.push({ name: `Rattrapage S${g}`, coefficient: coeff });
+      children.push({ name: name("periodGeneratedRetake", { number: g }), coefficient: coeff });
     }
-    out.push({ name: `Semestre ${g}`, type: "semestre", children });
+    out.push({ name: name("periodGeneratedSemester", { number: g }), type: "semestre", children });
   }
   return out;
 }
@@ -135,6 +136,10 @@ function previewLines(built: BuiltPeriod[]): string[] {
 }
 
 export default function PeriodConfigPage() {
+  const { t } = useI18n();
+  const generatedName = useCallback((key: string, values?: Record<string, string | number>) => t("centre", key, values), [t]);
+  const templateLabel = (key: TemplateKey) => t("centre", `periodTemplate_${key}`);
+  const templateDescription = (key: TemplateKey) => t("centre", `periodTemplateDescription_${key}`);
   const [loading, setLoading] = useState(true);
   const [centerId, setCenterId] = useState<string | null>(null);
   const [periods, setPeriods] = useState<Period[]>([]);
@@ -184,22 +189,22 @@ export default function PeriodConfigPage() {
   };
 
   const builtPreview = useMemo(
-    () => (configKey ? buildPeriodsFromConfig(configKey, config) : []),
-    [configKey, config],
+    () => (configKey ? buildPeriodsFromConfig(configKey, config, generatedName) : []),
+    [configKey, config, generatedName],
   );
 
   /** Applique la config → écrit grade_periods (même schéma qu’avant) */
   const applyConfiguredTemplate = async () => {
     if (!configKey) return;
     if (!centerId) {
-      setApplyError("Centre introuvable — reconnectez-vous.");
+      setApplyError(t("centre", "periodCenterNotFound"));
       return;
     }
-    if (periods.length > 0 && !confirm("Cela remplacera vos périodes actuelles. Continuer ?")) return;
+    if (periods.length > 0 && !confirm(t("centre", "periodReplaceConfirm"))) return;
 
-    const built = buildPeriodsFromConfig(configKey, config);
+    const built = buildPeriodsFromConfig(configKey, config, generatedName);
     if (built.length === 0) {
-      setApplyError("Configuration invalide.");
+      setApplyError(t("centre", "periodInvalidConfiguration"));
       return;
     }
 
@@ -229,7 +234,7 @@ export default function PeriodConfigPage() {
           .single();
 
         if (pErr || !parent) {
-          setApplyError(pErr?.message || "Impossible de créer le groupe.");
+          setApplyError(pErr?.message || t("centre", "periodCreateGroupError"));
           setSaving(false);
           await loadPeriods(centerId);
           return;
@@ -274,7 +279,7 @@ export default function PeriodConfigPage() {
   };
 
   const addPeriod = async () => {
-    if (!newName.trim()) { setAddError("Le nom est requis."); return; }
+    if (!newName.trim()) { setAddError(t("centre", "periodNameRequired")); return; }
     if (!centerId) return;
     setAddError(""); setSaving(true);
 
@@ -303,8 +308,8 @@ export default function PeriodConfigPage() {
     const period = periods.find((p) => p.id === id);
     const hasChildren = periods.some((p) => p.parent_id === id);
 
-    if (hasChildren && !confirm(`"${period?.name}" contient des sous-périodes. Tout sera supprimé. Continuer ?`)) return;
-    if (!hasChildren && !confirm(`Supprimer "${period?.name}" ? Les notes liées à cette période resteront mais sans période associée.`)) return;
+    if (hasChildren && !confirm(t("centre", "periodDeleteWithChildren", { name: period?.name || "" }))) return;
+    if (!hasChildren && !confirm(t("centre", "periodDeleteConfirm", { name: period?.name || "" }))) return;
 
     await supabase.from("grade_periods").delete().eq("id", id);
     await loadPeriods(centerId);
@@ -335,11 +340,10 @@ export default function PeriodConfigPage() {
     <div className="space-y-8 max-w-3xl">
       <section>
         <h2 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>
-          Découpage de l&apos;année scolaire
+          {t("centre", "periodSchoolYearBreakdown")}
         </h2>
         <p className="text-[12px] text-neutral-500 font-medium mt-0.5 leading-relaxed">
-          Ces périodes apparaissent dans Examens → Notes (saisie) et sur les bulletins.
-          Les groupes (trimestre / semestre) calculent automatiquement la moyenne de leurs séquences.
+          {t("centre", "periodSchoolYearDescription")}
         </p>
       </section>
 
@@ -348,15 +352,14 @@ export default function PeriodConfigPage() {
         <section>
           <div className="mb-3">
             <h2 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>
-              Démarrage rapide
+              {t("centre", "periodQuickStart")}
             </h2>
             <p className="text-[12px] text-neutral-500 font-medium mt-0.5">
-              Choisissez un modèle, configurez-le, puis créez les périodes.
+              {t("centre", "periodQuickStartDescription")}
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
             {(Object.keys(TEMPLATE_META) as TemplateKey[]).map((key) => {
-              const tpl = TEMPLATE_META[key];
               return (
                 <button
                   key={key}
@@ -366,8 +369,8 @@ export default function PeriodConfigPage() {
                   className="text-left rounded-lg border border-black/[0.08] bg-white px-4 py-4 hover:bg-[#FFF5EE] hover:border-[#eb670e]/35 transition-colors disabled:opacity-50"
                 >
                   <FolderOpen size={18} className="text-neutral-400 mb-2.5" />
-                  <h3 className="text-sm font-bold" style={{ color: BLUE }}>{tpl.label}</h3>
-                  <p className="text-[12px] text-neutral-500 font-medium mt-1 leading-relaxed">{tpl.description}</p>
+                  <h3 className="text-sm font-bold" style={{ color: BLUE }}>{templateLabel(key)}</h3>
+                  <p className="text-[12px] text-neutral-500 font-medium mt-1 leading-relaxed">{templateDescription(key)}</p>
                 </button>
               );
             })}
@@ -380,9 +383,9 @@ export default function PeriodConfigPage() {
         <section className="space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>Vos périodes</h2>
+              <h2 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>{t("centre", "periodYourPeriods")}</h2>
               <p className="text-[12px] text-neutral-500 font-medium mt-0.5">
-                Renommez, activez ou ajoutez des périodes.
+                {t("centre", "periodManageDescription")}
               </p>
             </div>
             <button
@@ -391,7 +394,7 @@ export default function PeriodConfigPage() {
               className={btnPrimary}
               style={{ backgroundColor: BLUE }}
             >
-              <Plus size={14} /> Ajouter
+              <Plus size={14} /> {t("centre", "periodAdd")}
             </button>
           </div>
 
@@ -404,7 +407,7 @@ export default function PeriodConfigPage() {
                     <Layers size={14} className="text-neutral-400 shrink-0" />
                     <PeriodNameEditor name={agg.name} onRename={(n) => renamePeriod(agg.id, n)} />
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 shrink-0 hidden sm:inline">
-                      Moyenne auto
+                      {t("centre", "periodAutomaticAverage")}
                     </span>
                     <button
                       type="button"
@@ -416,7 +419,7 @@ export default function PeriodConfigPage() {
                       }`}
                       style={agg.is_active ? { backgroundColor: BLUE } : undefined}
                     >
-                      {agg.is_active ? "Actif" : "Inactif"}
+                      {agg.is_active ? t("centre", "campusActive") : t("centre", "periodInactive")}
                     </button>
                     <button type="button" onClick={() => deletePeriod(agg.id)} className="p-1.5 text-neutral-300 hover:text-red-500 ml-auto shrink-0">
                       <Trash2 size={14} />
@@ -427,7 +430,7 @@ export default function PeriodConfigPage() {
                       <div key={child.id} className="flex items-center gap-2.5 px-3.5 py-2.5 pl-10 hover:bg-black/[0.015]">
                         <FileText size={13} className="text-neutral-300 shrink-0" />
                         <PeriodNameEditor name={child.name} onRename={(n) => renamePeriod(child.id, n)} />
-                        <span className="text-[11px] text-neutral-400 font-medium shrink-0">Coeff. {child.coefficient}</span>
+                        <span className="text-[11px] text-neutral-400 font-medium shrink-0">{t("centre", "periodCoefficientShort")} {child.coefficient}</span>
                         <button
                           type="button"
                           onClick={() => toggleActive(child.id, child.is_active)}
@@ -438,7 +441,7 @@ export default function PeriodConfigPage() {
                           }`}
                           style={child.is_active ? { backgroundColor: BLUE } : undefined}
                         >
-                          {child.is_active ? "Actif" : "Inactif"}
+                          {child.is_active ? t("centre", "campusActive") : t("centre", "periodInactive")}
                         </button>
                         <button type="button" onClick={() => deletePeriod(child.id)} className="p-1.5 text-neutral-300 hover:text-red-500 ml-auto shrink-0">
                           <Trash2 size={13} />
@@ -446,7 +449,7 @@ export default function PeriodConfigPage() {
                       </div>
                     ))}
                     {children.length === 0 && (
-                      <p className="px-10 py-2.5 text-[12px] text-neutral-400 italic">Aucune sous-période.</p>
+                      <p className="px-10 py-2.5 text-[12px] text-neutral-400 italic">{t("centre", "periodNoSubperiod")}</p>
                     )}
                   </div>
                 </div>
@@ -457,7 +460,7 @@ export default function PeriodConfigPage() {
               <div>
                 <div className="px-3.5 py-2" style={{ backgroundColor: SURFACE }}>
                   <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                    Périodes indépendantes
+                    {t("centre", "periodIndependentPeriods")}
                   </span>
                 </div>
                 <div className="divide-y divide-black/[0.04]">
@@ -465,7 +468,7 @@ export default function PeriodConfigPage() {
                     <div key={p.id} className="flex items-center gap-2.5 px-3.5 py-2.5 hover:bg-black/[0.015]">
                       <FileText size={13} className="text-neutral-300 shrink-0" />
                       <PeriodNameEditor name={p.name} onRename={(n) => renamePeriod(p.id, n)} />
-                      <span className="text-[11px] text-neutral-400 font-medium shrink-0">Coeff. {p.coefficient}</span>
+                      <span className="text-[11px] text-neutral-400 font-medium shrink-0">{t("centre", "periodCoefficientShort")} {p.coefficient}</span>
                       <button
                         type="button"
                         onClick={() => toggleActive(p.id, p.is_active)}
@@ -476,7 +479,7 @@ export default function PeriodConfigPage() {
                         }`}
                         style={p.is_active ? { backgroundColor: BLUE } : undefined}
                       >
-                        {p.is_active ? "Actif" : "Inactif"}
+                        {p.is_active ? t("centre", "campusActive") : t("centre", "periodInactive")}
                       </button>
                       <button type="button" onClick={() => deletePeriod(p.id)} className="p-1.5 text-neutral-300 hover:text-red-500 ml-auto shrink-0">
                         <Trash2 size={13} />
@@ -490,7 +493,7 @@ export default function PeriodConfigPage() {
 
           <div className="pt-2">
             <p className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider mb-2">
-              Réinitialiser avec un modèle
+              {t("centre", "periodResetWithTemplate")}
             </p>
             <div className="flex flex-wrap gap-1.5">
               {(Object.keys(TEMPLATE_META) as TemplateKey[]).map((key) => (
@@ -501,7 +504,7 @@ export default function PeriodConfigPage() {
                   disabled={saving}
                   className={btnGhost}
                 >
-                  {TEMPLATE_META[key].label}
+                  {templateLabel(key)}
                 </button>
               ))}
             </div>
@@ -512,34 +515,34 @@ export default function PeriodConfigPage() {
       {/* Ajout manuel */}
       {showAddForm && (
         <div className="rounded-lg border border-black/[0.06] bg-white p-4 sm:p-5 space-y-3 max-w-xl">
-          <h3 className="text-sm font-extrabold" style={{ color: BLUE }}>Nouvelle période</h3>
+          <h3 className="text-sm font-extrabold" style={{ color: BLUE }}>{t("centre", "periodNewPeriod")}</h3>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">Nom</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">{t("centre", "settingsName")}</label>
             <input
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="Ex : Séquence 3, Examen final…"
+              placeholder={t("centre", "periodNamePlaceholder")}
               className={inputCls}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">Type</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">{t("centre", "periodType")}</label>
               <select
                 value={newType}
                 onChange={(e) => setNewType(e.target.value as GradePeriodDbType)}
                 className={inputCls}
               >
-                <option value="autre">Évaluation / séquence (saisie de notes)</option>
-                <option value="trimestre">Trimestre (moyenne auto)</option>
-                <option value="semestre">Semestre (moyenne auto)</option>
-                <option value="annee">Année (moyenne auto)</option>
-                <option value="mois">Mois</option>
-                <option value="semaine">Semaine</option>
+                <option value="autre">{t("centre", "periodTypeEvaluation")}</option>
+                <option value="trimestre">{t("centre", "periodTypeQuarter")}</option>
+                <option value="semestre">{t("centre", "periodTypeSemester")}</option>
+                <option value="annee">{t("centre", "periodTypeYear")}</option>
+                <option value="mois">{t("centre", "periodTypeMonth")}</option>
+                <option value="semaine">{t("centre", "periodTypeWeek")}</option>
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">Coefficient</label>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">{t("centre", "periodCoefficient")}</label>
               <input
                 type="number"
                 min={0.5}
@@ -553,14 +556,14 @@ export default function PeriodConfigPage() {
           {isGradeLeafPeriod(newType) && aggregates.length > 0 && (
             <div>
               <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
-                Rattacher à un groupe
+                {t("centre", "periodAttachToGroup")}
               </label>
               <select
                 value={newParentId}
                 onChange={(e) => setNewParentId(e.target.value)}
                 className={inputCls}
               >
-                <option value="">Aucun (période indépendante)</option>
+                <option value="">{t("centre", "periodNoGroup")}</option>
                 {aggregates.map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
@@ -576,14 +579,14 @@ export default function PeriodConfigPage() {
               className={btnPrimary}
               style={{ backgroundColor: BLUE }}
             >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Ajouter
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} {t("centre", "periodAdd")}
             </button>
             <button
               type="button"
               onClick={() => { setShowAddForm(false); setAddError(""); }}
               className={btnGhost}
             >
-              Annuler
+              {t("centre", "periodCancel")}
             </button>
           </div>
         </div>
@@ -596,14 +599,14 @@ export default function PeriodConfigPage() {
           <div className="relative w-full sm:max-w-md bg-white rounded-t-xl sm:rounded-xl border border-black/[0.08] shadow-xl max-h-[90dvh] overflow-y-auto">
             <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-black/[0.06]">
               <div>
-                <h3 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>{meta.label}</h3>
-                <p className="text-[12px] text-neutral-500 font-medium mt-0.5">{meta.description}</p>
+                <h3 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>{templateLabel(configKey)}</h3>
+                <p className="text-[12px] text-neutral-500 font-medium mt-0.5">{templateDescription(configKey)}</p>
               </div>
               <button
                 type="button"
                 onClick={closeTemplateConfig}
                 className="h-8 w-8 rounded-lg hover:bg-black/[0.04] flex items-center justify-center text-neutral-500"
-                aria-label="Fermer"
+                aria-label={t("centre", "periodClose")}
               >
                 <X size={16} />
               </button>
@@ -612,7 +615,7 @@ export default function PeriodConfigPage() {
             <div className="px-5 py-5 space-y-4">
               {configKey === "trimestrial" && (
                 <>
-                  <Field label="Nombre de trimestres" hint="Ex. 3 pour une année classique">
+                  <Field label={t("centre", "periodQuarterCount")} hint={t("centre", "periodQuarterCountHint")}>
                     <NumberInput
                       value={config.groups}
                       min={1}
@@ -620,7 +623,7 @@ export default function PeriodConfigPage() {
                       onChange={(n) => setConfig((c) => ({ ...c, groups: n }))}
                     />
                   </Field>
-                  <Field label="Séquences par trimestre" hint="Ex. 2 → Séquence 1 et 2 dans le Trimestre 1">
+                  <Field label={t("centre", "periodSequencesPerQuarter")} hint={t("centre", "periodSequencesPerQuarterHint")}>
                     <NumberInput
                       value={config.childrenPerGroup}
                       min={1}
@@ -633,7 +636,7 @@ export default function PeriodConfigPage() {
 
               {configKey === "semestrial" && (
                 <>
-                  <Field label="Nombre de semestres" hint="Ex. 2">
+                  <Field label={t("centre", "periodSemesterCount")} hint={t("centre", "periodSemesterCountHint")}>
                     <NumberInput
                       value={config.groups}
                       min={1}
@@ -641,7 +644,7 @@ export default function PeriodConfigPage() {
                       onChange={(n) => setConfig((c) => ({ ...c, groups: n }))}
                     />
                   </Field>
-                  <Field label="Sessions par semestre" hint="Hors rattrapage">
+                  <Field label={t("centre", "periodSessionsPerSemester")} hint={t("centre", "periodSessionsPerSemesterHint")}>
                     <NumberInput
                       value={config.childrenPerGroup}
                       min={1}
@@ -656,13 +659,13 @@ export default function PeriodConfigPage() {
                       checked={config.includeRattrapage}
                       onChange={(e) => setConfig((c) => ({ ...c, includeRattrapage: e.target.checked }))}
                     />
-                    <span className="text-sm font-medium text-neutral-700">Ajouter un rattrapage par semestre</span>
+                    <span className="text-sm font-medium text-neutral-700">{t("centre", "periodAddRetake")}</span>
                   </label>
                 </>
               )}
 
               {configKey === "simple" && (
-                <Field label="Nombre d’évaluations" hint="Périodes indépendantes, sans groupement">
+                <Field label={t("centre", "periodEvaluationCount")} hint={t("centre", "periodEvaluationCountHint")}>
                   <NumberInput
                     value={config.evalCount}
                     min={1}
@@ -672,7 +675,7 @@ export default function PeriodConfigPage() {
                 </Field>
               )}
 
-              <Field label="Coefficient des évaluations" hint="Utilisé à la création (modifiable ensuite)">
+              <Field label={t("centre", "periodEvaluationCoefficient")} hint={t("centre", "periodEvaluationCoefficientHint")}>
                 <NumberInput
                   value={config.coefficient}
                   min={0.5}
@@ -683,7 +686,7 @@ export default function PeriodConfigPage() {
               </Field>
 
               <div className="rounded-lg border border-black/[0.06] p-3" style={{ backgroundColor: SURFACE }}>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">Aperçu</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">{t("centre", "periodPreview")}</p>
                 <ul className="space-y-1">
                   {previewLines(builtPreview).map((line) => (
                     <li key={line} className="text-[13px] font-medium text-neutral-700">{line}</li>
@@ -698,7 +701,7 @@ export default function PeriodConfigPage() {
 
             <div className="px-5 py-4 border-t border-black/[0.06] flex gap-2 justify-end">
               <button type="button" onClick={closeTemplateConfig} disabled={saving} className={btnGhost}>
-                Annuler
+                {t("centre", "periodCancel")}
               </button>
               <button
                 type="button"
@@ -708,7 +711,7 @@ export default function PeriodConfigPage() {
                 style={{ backgroundColor: BLUE }}
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                Créer les périodes
+                {t("centre", "periodCreatePeriods")}
               </button>
             </div>
           </div>

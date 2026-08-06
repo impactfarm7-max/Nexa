@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send } from "lucide-react";
 import { supabase } from "../utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const FEEDBACK_INTERVAL_DAYS = 12;
 
@@ -12,6 +13,7 @@ interface FeedbackPromptProps {
 }
 
 export default function FeedbackPrompt({ onOpen }: FeedbackPromptProps) {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -82,14 +84,15 @@ export default function FeedbackPrompt({ onOpen }: FeedbackPromptProps) {
                   <MessageCircle className="w-5 h-5 mt-0.5" />
                 </motion.div>
                 <div>
-                  <h3 className="font-bold text-sm">Votre avis nous aide!</h3>
+                  <h3 className="font-bold text-sm">{t("common", "feedbackTitle")}</h3>
                   <p className="text-xs text-blue-100">
-                    Partagez vos retours pour améliorer l'app
+                    {t("common", "feedbackSubtitle")}
                   </p>
                 </div>
               </div>
               <button
                 onClick={handleClose}
+                aria-label={t("common", "feedbackClose")}
                 className="text-white/60 hover:text-white transition-colors p-1"
               >
                 <X size={18} />
@@ -99,7 +102,7 @@ export default function FeedbackPrompt({ onOpen }: FeedbackPromptProps) {
             {/* Body */}
             <div className="px-6 py-4 space-y-4">
               <p className="text-sm text-slate-600 leading-relaxed">
-                Comment se passe votre expérience sur NEXA? Vos suggestions nous permettent d'améliorer continuellement l'app.
+                {t("common", "feedbackBody")}
               </p>
 
               <div className="flex gap-3">
@@ -108,13 +111,13 @@ export default function FeedbackPrompt({ onOpen }: FeedbackPromptProps) {
                   className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
                 >
                   <Send size={16} />
-                  Partager
+                  {t("common", "feedbackShare")}
                 </button>
                 <button
                   onClick={handleClose}
                   className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-lg transition-colors text-sm"
                 >
-                  Plus tard
+                  {t("common", "feedbackLater")}
                 </button>
               </div>
             </div>

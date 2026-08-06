@@ -51,12 +51,13 @@ export function fmtFCFA(n: number) {
   return neg ? `-${grouped}` : grouped;
 }
 
-export function greeting() {
+export function greeting(locale: "fr" | "en" = "fr") {
+  if (locale === "en") return new Date().getHours() < 18 ? "Good morning" : "Good evening";
   return new Date().getHours() < 18 ? "Bonjour" : "Bonsoir";
 }
 
-export function todayLabel() {
-  return new Date().toLocaleDateString("fr-FR", {
+export function todayLabel(locale: "fr" | "en" = "fr") {
+  return new Date().toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", {
     weekday: "long",
     day: "numeric",
     month: "long",

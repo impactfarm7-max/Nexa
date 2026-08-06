@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/app/utils/supabase";
 import { loadStudentAccess, clearStudentAccessCache } from "@/app/utils/student-access-cache";
 import { Lock, LogOut } from "lucide-react";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function PinGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -159,7 +161,7 @@ export default function PinGuard({ children }: { children: React.ReactNode }) {
     // Vérification du lockout
     if (lockedUntil && Date.now() < lockedUntil) {
       const remaining = Math.ceil((lockedUntil - Date.now()) / 1000 / 60);
-      setErrorText(`Trop de tentatives. Réessayez dans ${remaining} min.`);
+      setErrorText(t("common", "pinTooManyAttempts", { remaining }));
       setPinInput("");
       return;
     }
@@ -193,13 +195,13 @@ export default function PinGuard({ children }: { children: React.ReactNode }) {
           const until = Date.now() + 5 * 60 * 1000; // 5 minutes
           setLockedUntil(until);
           setAttempts(0);
-          setErrorText("Compte verrouillé 5 min après 3 tentatives incorrectes.");
+          setErrorText(t("common", "pinAccountLocked"));
         } else {
-          setErrorText(`Code PIN incorrect. ${3 - newAttempts} tentative(s) restante(s).`);
+          setErrorText(t("common", "pinIncorrect", { count: 3 - newAttempts }));
         }
       }
     } catch {
-      setErrorText("Erreur réseau. Réessayez.");
+      setErrorText(t("common", "pinNetworkError"));
       setPinInput("");
     } finally {
       setIsVerifying(false);
@@ -236,8 +238,8 @@ export default function PinGuard({ children }: { children: React.ReactNode }) {
             <Lock className="w-8 h-8 text-orange-500" />
           </div>
           
-          <h1 className="text-2xl font-black mb-1">Rebonjour, {userProfile?.prenom || "Étudiant"}</h1>
-          <p className="text-sm text-slate-400 font-medium mb-8">Entrez votre code PIN pour accéder à l'Académie.</p>
+          <h1 className="text-2xl font-black mb-1">{t("common", "pinWelcomeBack", { name: userProfile?.prenom || t("common", "pinStudent") })}</h1>
+          <p className="text-sm text-slate-400 font-medium mb-8">{t("common", "pinInstructions")}</p>
 
           <form onSubmit={handlePinSubmit} className="space-y-6">
             <input
@@ -261,12 +263,12 @@ export default function PinGuard({ children }: { children: React.ReactNode }) {
               disabled={pinInput.length !== 4 || isVerifying || (lockedUntil !== null && Date.now() < lockedUntil)}
               className="w-full h-14 rounded-2xl bg-orange-600 text-white font-bold tracking-widest uppercase text-xs hover:bg-orange-500 transition-all disabled:opacity-50 active:scale-95 shadow-lg shadow-orange-500/20"
             >
-              {isVerifying ? "Vérification..." : "Déverrouiller"}
+              {isVerifying ? t("common", "pinVerifying") : t("common", "pinUnlock")}
             </button>
           </form>
 
           <button onClick={forceLogout} className="mt-8 flex items-center justify-center gap-2 text-[10px] uppercase font-bold text-slate-500 hover:text-slate-300 transition-colors mx-auto tracking-widest">
-            <LogOut size={14} /> Se connecter avec un autre compte
+            <LogOut size={14} /> {t("common", "pinAnotherAccount")}
           </button>
         </div>
       </div>

@@ -19,6 +19,8 @@ import ReportExportBar from "./components/ReportExportBar";
 import { useReportPage } from "./hooks/useReportPage";
 import { useReportPdfExport } from "./hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtMoneyBar, fmtNum } from "@/app/utils/reports-export";
+import { useI18n } from "@/app/i18n/I18nProvider";
+import { formatShort } from "@/app/utils/reports-period";
 
 type SyntheseReport = {
   period: { label: string };
@@ -55,6 +57,7 @@ type SyntheseReport = {
 };
 
 function SyntheseContent() {
+  const { t, locale } = useI18n();
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange, reportHref,
@@ -67,45 +70,45 @@ function SyntheseContent() {
     if (!report) return;
     downloadCsv(
       `synthese-${report.period.label.replace(/\s+/g, "-")}.csv`,
-      ["Domaine", "Indicateur", "Valeur"],
+      [t("centre", "summaryDomain"), t("centre", "summaryIndicator"), t("centre", "summaryValue")],
       report.summaryTable.map((r) => [r.domaine, r.indicateur, r.valeur]),
     );
-  }, [report]);
+  }, [report, t]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
-      title: "Synthèse direction",
+      title: t("centre", "summaryTitle"),
       periodLabel: report.period.label,
       kpis: [
-        { label: "Apprenants actifs", value: fmtNum(report.kpis.apprenantsActifs) },
-        { label: "Encaissé (période)", value: fmtFCFA(report.kpis.encaissePeriode) },
-        { label: "Taux recouvrement", value: `${report.kpis.tauxRecouvrement} %` },
-        { label: "Reste à recouvrer", value: fmtFCFA(report.kpis.resteARecouvrer) },
+        { label: t("centre", "summaryActiveLearners"), value: fmtNum(report.kpis.apprenantsActifs) },
+        { label: t("centre", "summaryCollectedPeriod"), value: fmtFCFA(report.kpis.encaissePeriode) },
+        { label: t("centre", "summaryRecoveryRate"), value: `${report.kpis.tauxRecouvrement} %` },
+        { label: t("centre", "summaryOutstanding"), value: fmtFCFA(report.kpis.resteARecouvrer) },
       ],
       sections: [
         {
-          title: "Tableau de synthèse",
-          columns: ["Domaine", "Indicateur", "Valeur"],
+          title: t("centre", "summaryTable"),
+          columns: [t("centre", "summaryDomain"), t("centre", "summaryIndicator"), t("centre", "summaryValue")],
           rows: report.summaryTable.map((r) => [r.domaine, r.indicateur, r.valeur]),
         },
       ],
       filename: `synthese-${report.period.label.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf]);
+  }, [report, exportPdf, t]);
 
   if (loading && !report) {
     return <CenterPageLoading />;
   }
 
-  const periodLabel = report?.period?.label;
+  const periodLabel = from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}`;
 
   return (
     <ReportsShell
       activeSlug="synthese"
       centerType={centerType}
-      title="Synthèse direction"
-      subtitle="Tableau de pilotage multi-campus"
+      title={t("centre", "summaryTitle")}
+      subtitle={t("centre", "summarySubtitle")}
       periodLabel={periodLabel}
       dateFrom={from}
       dateTo={to}
@@ -128,7 +131,7 @@ function SyntheseContent() {
 
       {loading && (
         <div className="flex items-center gap-2 text-neutral-400 text-sm">
-          <Loader2 size={16} className="animate-spin" /> Actualisation…
+          <Loader2 size={16} className="animate-spin" /> {t("centre", "summaryRefreshing")}
         </div>
       )}
 
@@ -137,15 +140,15 @@ function SyntheseContent() {
           <ReportKpiGrid
             items={[
               {
-                label: "Apprenants actifs",
+                label: t("centre", "summaryActiveLearners"),
                 value: fmtNum(report.kpis.apprenantsActifs),
-                sub: "Inscriptions actives",
+                sub: t("centre", "summaryActiveEnrollments"),
                 icon: Users,
                 iconBg: "bg-blue-50",
                 iconColor: "text-blue-600",
               },
               {
-                label: "Encaissé (période)",
+                label: t("centre", "summaryCollectedPeriod"),
                 money: report.kpis.encaissePeriode,
                 value: "",
                 sub: periodLabel,
@@ -155,26 +158,26 @@ function SyntheseContent() {
                 valueColor: "text-emerald-700",
               },
               {
-                label: "Taux recouvrement",
+                label: t("centre", "summaryRecoveryRate"),
                 value: `${report.kpis.tauxRecouvrement} %`,
-                sub: "Sur dossiers actifs",
+                sub: t("centre", "summaryOnActiveRecords"),
                 icon: TrendingUp,
                 iconBg: "bg-indigo-50",
                 iconColor: "text-indigo-600",
               },
               {
-                label: "Reste à recouvrer",
+                label: t("centre", "summaryOutstanding"),
                 money: report.kpis.resteARecouvrer,
                 value: "",
-                sub: "Créances ouvertes",
+                sub: t("centre", "summaryOpenReceivables"),
                 icon: Wallet,
                 iconBg: "bg-amber-50",
                 iconColor: "text-amber-600",
               },
               {
-                label: "Dossiers en retard",
+                label: t("centre", "summaryOverdueRecords"),
                 value: fmtNum(report.kpis.nbRetard),
-                sub: report.kpis.montantRetard > 0 ? fmtMoneyBar(report.kpis.montantRetard) : "Aucun retard",
+                sub: report.kpis.montantRetard > 0 ? fmtMoneyBar(report.kpis.montantRetard) : t("centre", "summaryNoOverdue"),
                 icon: Clock,
                 iconBg: report.kpis.nbRetard > 0 ? "bg-red-50" : "bg-neutral-50",
                 iconColor: report.kpis.nbRetard > 0 ? "text-red-500" : "text-neutral-400",
@@ -182,9 +185,9 @@ function SyntheseContent() {
                 alert: report.kpis.nbRetard > 0,
               },
               {
-                label: "Nouvelles inscriptions",
+                label: t("centre", "summaryNewEnrollments"),
                 value: fmtNum(report.kpis.nouvellesInscriptions),
-                sub: "Sur la période",
+                sub: t("centre", "summaryDuringPeriod"),
                 icon: UserPlus,
                 iconBg: "bg-purple-50",
                 iconColor: "text-purple-600",
@@ -194,21 +197,21 @@ function SyntheseContent() {
 
           <div className="grid md:grid-cols-2 gap-4 min-w-0">
             <ReportTrendChart
-              title="Évolution des encaissements"
+              title={t("centre", "summaryCollectionsTrend")}
               points={report.charts.encaissementTrend}
             />
             <ReportBarChart
-              title="Répartition finance (CA / encaissé / reste)"
+              title={t("centre", "summaryFinanceBreakdown")}
               items={report.charts.financeSplit}
             />
             <ReportBarChart
-              title="Encaissements par filière"
+              title={t("centre", "summaryCollectionsByProgram")}
               items={report.charts.encaissementByFiliere}
             />
             <ReportBarChart
-              title="Effectifs actifs par filière"
+              title={t("centre", "summaryActiveEnrollmentByProgram")}
               items={report.charts.effectifsByFiliere}
-              formatValue={(n) => n.toLocaleString("fr-FR")}
+              formatValue={(n) => n.toLocaleString(locale === "en" ? "en-US" : "fr-FR")}
             />
           </div>
 
@@ -217,80 +220,80 @@ function SyntheseContent() {
           )}
 
           <div className="grid sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-2 gap-3 md:gap-4">
-            <Panel title="Apprenants" href={reportHref("/centre/rapports/effectifs-apprenants")}>
+            <Panel title={t("centre", "summaryLearners")} href={reportHref("/centre/rapports/effectifs-apprenants")}>
               <div className="divide-y divide-neutral-100">
-                <PanelRow icon={<Users size={12} className="text-blue-600" />} iconBg="bg-blue-50" label="Actifs" value={report.sections.effectifs.active} />
-                <PanelRow icon={<Clock size={12} className="text-amber-600" />} iconBg="bg-amber-50" label="En attente" value={report.sections.effectifs.draft} />
-                <PanelRow icon={<Users size={12} className="text-neutral-500" />} iconBg="bg-neutral-50" label="Suspendus" value={report.sections.effectifs.paused} />
+                <PanelRow icon={<Users size={12} className="text-blue-600" />} iconBg="bg-blue-50" label={t("centre", "summaryActive")} value={report.sections.effectifs.active} />
+                <PanelRow icon={<Clock size={12} className="text-amber-600" />} iconBg="bg-amber-50" label={t("centre", "summaryPending")} value={report.sections.effectifs.draft} />
+                <PanelRow icon={<Users size={12} className="text-neutral-500" />} iconBg="bg-neutral-50" label={t("centre", "summarySuspended")} value={report.sections.effectifs.paused} />
               </div>
             </Panel>
 
             <Panel title="Finance" href={reportHref("/centre/rapports/recouvrement")}>
               <dl className="divide-y divide-neutral-100">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline py-2.5">
-                  <dt className="text-sm text-neutral-500 font-medium">CA facturé</dt>
+                  <dt className="text-sm text-neutral-500 font-medium">{t("centre", "summaryInvoicedRevenue")}</dt>
                   <dd className="text-sm font-bold tabular-nums text-right whitespace-nowrap">{fmtMoneyBar(report.sections.finance.caFacture)}</dd>
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline py-2.5">
-                  <dt className="text-sm text-neutral-500 font-medium">Encaissé (période)</dt>
+                  <dt className="text-sm text-neutral-500 font-medium">{t("centre", "summaryCollectedPeriod")}</dt>
                   <dd className="text-sm font-bold tabular-nums text-right whitespace-nowrap text-emerald-700">{fmtMoneyBar(report.sections.finance.encaissePeriode)}</dd>
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline py-2.5">
-                  <dt className="text-sm text-neutral-500 font-medium">Reste</dt>
+                  <dt className="text-sm text-neutral-500 font-medium">{t("centre", "summaryBalance")}</dt>
                   <dd className="text-sm font-bold tabular-nums text-right whitespace-nowrap">{fmtMoneyBar(report.sections.finance.reste)}</dd>
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline py-2.5">
-                  <dt className="text-sm text-neutral-500 font-medium">Recouvrement</dt>
+                  <dt className="text-sm text-neutral-500 font-medium">{t("centre", "summaryRecovery")}</dt>
                   <dd className="text-sm font-black text-[#11224E] text-right">{report.sections.finance.taux} %</dd>
                 </div>
               </dl>
             </Panel>
 
             {!isTcf && report.sections.offre && report.sections.rh && (
-              <Panel title="Offre & RH" href={reportHref("/centre/rapports/filieres-programmes")}>
+              <Panel title={t("centre", "summaryProgramsHr")} href={reportHref("/centre/rapports/filieres-programmes")}>
                 <div className="divide-y divide-neutral-100">
-                  <PanelRow icon={<BookOpen size={12} className="text-emerald-600" />} iconBg="bg-emerald-50" label="Filières publiées" value={report.sections.offre.published} />
-                  <PanelRow icon={<Briefcase size={12} className="text-blue-600" />} iconBg="bg-blue-50" label="Personnel actif" value={report.sections.rh.active} />
-                  <PanelRow icon={<Users size={12} className="text-purple-600" />} iconBg="bg-purple-50" label="Formateurs" value={report.sections.rh.academic} />
+                  <PanelRow icon={<BookOpen size={12} className="text-emerald-600" />} iconBg="bg-emerald-50" label={t("centre", "summaryPublishedPrograms")} value={report.sections.offre.published} />
+                  <PanelRow icon={<Briefcase size={12} className="text-blue-600" />} iconBg="bg-blue-50" label={t("centre", "summaryActiveStaff")} value={report.sections.rh.active} />
+                  <PanelRow icon={<Users size={12} className="text-purple-600" />} iconBg="bg-purple-50" label={t("centre", "summaryTrainers")} value={report.sections.rh.academic} />
                 </div>
                 {report.kpis.masseSalarialeNet != null && (
                   <p className="mt-3 pt-3 border-t border-neutral-100 text-[11px] text-neutral-500">
-                    Masse salariale :{" "}
+                    {t("centre", "summaryPayroll")} :{" "}
                     <span className="font-bold text-neutral-800 tabular-nums">{fmtMoneyBar(report.kpis.masseSalarialeNet)}</span>
                   </p>
                 )}
                 <div className="mt-3 flex flex-wrap gap-3">
                   <Link href={reportHref("/centre/rapports/effectifs-personnel")} className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: ORANGE }}>
-                    Personnel <ArrowUpRight size={12} />
+                    {t("centre", "reportsNav_effectifs_personnel")} <ArrowUpRight size={12} />
                   </Link>
                   <Link href={reportHref("/centre/rapports/masse-salariale")} className="inline-flex items-center gap-1 text-[11px] font-bold" style={{ color: ORANGE }}>
-                    Paie <ArrowUpRight size={12} />
+                    {t("centre", "reportsNav_masse_salariale")} <ArrowUpRight size={12} />
                   </Link>
                 </div>
               </Panel>
             )}
 
-            <Panel title={isTcf ? "Examens TCF" : "Examens (période)"} href={reportHref("/centre/rapports/examens")}>
+            <Panel title={isTcf ? "Examens TCF" : t("centre", "summaryExamsPeriod")} href={reportHref("/centre/rapports/examens")}>
               <div className="divide-y divide-neutral-100">
-                <PanelRow icon={<ClipboardCheck size={12} className="text-indigo-600" />} iconBg="bg-indigo-50" label="Programmés" value={report.sections.examens.programmes} />
-                <PanelRow icon={<ClipboardCheck size={12} className="text-emerald-600" />} iconBg="bg-emerald-50" label="Réalisés" value={report.sections.examens.realises} />
-                <PanelRow icon={<ClipboardCheck size={12} className="text-red-500" />} iconBg="bg-red-50" label="Annulés" value={report.sections.examens.annules} alert={report.sections.examens.annules > 0} />
+                <PanelRow icon={<ClipboardCheck size={12} className="text-indigo-600" />} iconBg="bg-indigo-50" label={t("centre", "summaryScheduled")} value={report.sections.examens.programmes} />
+                <PanelRow icon={<ClipboardCheck size={12} className="text-emerald-600" />} iconBg="bg-emerald-50" label={t("centre", "summaryCompleted")} value={report.sections.examens.realises} />
+                <PanelRow icon={<ClipboardCheck size={12} className="text-red-500" />} iconBg="bg-red-50" label={t("centre", "summaryCanceled")} value={report.sections.examens.annules} alert={report.sections.examens.annules > 0} />
               </div>
             </Panel>
           </div>
 
           <ReportBarChart
-            title="Taux de recouvrement par filière"
+            title={t("centre", "summaryRecoveryByProgram")}
             items={report.charts.recouvrementByFiliere}
             formatValue={(n) => `${n} %`}
           />
 
           <ReportBreakdownTable
-            title="Tableau de synthèse (niveau 3)"
+            title={t("centre", "summaryTableLevel3")}
             columns={[
-              { key: "domaine", label: "Domaine" },
-              { key: "indicateur", label: "Indicateur" },
-              { key: "valeur", label: "Valeur", align: "right" },
+              { key: "domaine", label: t("centre", "summaryDomain") },
+              { key: "indicateur", label: t("centre", "summaryIndicator") },
+              { key: "valeur", label: t("centre", "summaryValue"), align: "right" },
             ]}
             rows={report.summaryTable}
           />

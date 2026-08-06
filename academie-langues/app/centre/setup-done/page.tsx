@@ -4,12 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE  = "#11224E";
 const ORANGE = "#eb670e";
 
 export default function SetupDonePage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [centerName, setCenterName] = useState("");
   const [centerType, setCenterType] = useState("generic");
   const [loading, setLoading] = useState(true);
@@ -61,11 +63,11 @@ export default function SetupDonePage() {
             {centerType === "tcf_canada"
               ? "Formation TCF Canada"
               : centerType === "formation_courte"
-                ? "Formation courte"
-                : "Centre de formation"}
+                ? t("centre", "setupDoneShortTraining")
+                : t("centre", "setupDoneTrainingCenter")}
           </p>
           <h1 className="text-4xl font-black text-white tracking-tight leading-tight">
-            Félicitations,
+            {t("centre", "setupDoneCongratulations")}
           </h1>
           <h2 className="text-3xl font-black tracking-tight" style={{ color: ORANGE }}>
             {centerName}
@@ -74,8 +76,7 @@ export default function SetupDonePage() {
 
         {/* Message */}
         <p className="text-white/50 text-[15px] leading-relaxed font-medium max-w-sm mx-auto">
-          Votre espace est configuré. Notre équipe NEXA étudie votre demande d'activation —
-          {" "}vous pouvez commencer à explorer votre tableau de bord dès maintenant.
+          {t("centre", "setupDoneMessage")}
         </p>
 
         {/* CTA */}
@@ -85,12 +86,12 @@ export default function SetupDonePage() {
             className="w-full py-3.5 rounded-xl text-[13px] font-bold text-white hover:opacity-90 transition-opacity"
             style={{ backgroundColor: ORANGE }}
           >
-            Entrer dans mon espace
+            {t("centre", "setupDoneEnter")}
           </button>
         </div>
 
         <p className="text-[11px] text-white/20">
-          Vous recevrez un email dès l'activation de votre compte.
+          {t("centre", "setupDoneEmailNotice")}
         </p>
       </div>
     </div>

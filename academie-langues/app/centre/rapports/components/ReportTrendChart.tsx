@@ -1,6 +1,7 @@
 "use client";
 
 import { fmtMoneyBar } from "@/app/utils/reports-export";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export type TrendPoint = {
   label: string;
@@ -15,19 +16,20 @@ type Props = {
   formatValue?: (n: number) => string;
 };
 
-function defaultMoneyFormat(n: number) {
+function defaultMoneyFormat(n: number, locale: "fr" | "en") {
   if (Math.abs(n) >= 10_000) return fmtMoneyBar(n);
-  return n.toLocaleString("fr-FR");
+  return n.toLocaleString(locale === "en" ? "en-US" : "fr-FR");
 }
 
 export default function ReportTrendChart({ title, points, formatValue }: Props) {
-  const fmt = formatValue ?? defaultMoneyFormat;
+  const { t, locale } = useI18n();
+  const fmt = formatValue ?? ((n: number) => defaultMoneyFormat(n, locale));
 
   if (!points.length) {
     return (
       <div className="rounded-2xl border border-neutral-200 bg-white p-5">
         <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 mb-2">{title}</p>
-        <p className="text-xs text-neutral-400">Aucune donnée sur la période</p>
+        <p className="text-xs text-neutral-400">{t("centre", "reportsNoDataForPeriod")}</p>
       </div>
     );
   }

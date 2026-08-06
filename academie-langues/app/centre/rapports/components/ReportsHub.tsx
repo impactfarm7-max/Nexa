@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Label, ORANGE } from "@/app/centre/dashboard/dashboard-ui";
 import { hubCardsBySection, type HubCard, type HubSection } from "../config/report-hub";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const SECTION_ICON: Record<HubSection, typeof Users> = {
   apprenants: Users,
@@ -24,6 +25,7 @@ const SECTION_ACCENT: Record<HubSection, string> = {
 };
 
 function HubCardItem({ card, querySuffix }: { card: HubCard; querySuffix: string }) {
+  const { t } = useI18n();
   const live = card.status === "live" && card.href;
   const inner = (
     <>
@@ -38,15 +40,15 @@ function HubCardItem({ card, querySuffix }: { card: HubCard; querySuffix: string
         )}
         {!live && (
           <span className="inline-flex items-center gap-0.5 text-[9px] font-bold uppercase text-neutral-400">
-            <Lock size={10} /> Phase 2
+            <Lock size={10} /> {t("centre", "reportsPhase2")}
           </span>
         )}
       </div>
-      <p className="text-sm font-black text-[#11224E] mt-2 leading-snug">{card.label}</p>
-      <p className="text-[11px] text-neutral-500 leading-snug mt-1 line-clamp-2">{card.description}</p>
+      <p className="text-sm font-black text-[#11224E] mt-2 leading-snug">{t("centre", `reportsHubCard${card.id}Title`)}</p>
+      <p className="text-[11px] text-neutral-500 leading-snug mt-1 line-clamp-2">{t("centre", `reportsHubCard${card.id}Description`)}</p>
       {live && (
         <span className="mt-3 inline-flex items-center gap-1 text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: ORANGE }}>
-          Ouvrir <ArrowRight size={11} />
+          {t("centre", "hubOpen")} <ArrowRight size={11} />
         </span>
       )}
     </>
@@ -81,19 +83,20 @@ type Props = {
 };
 
 export default function ReportsHub({ centerType = null, querySuffix = "", compact = false }: Props) {
+  const { t } = useI18n();
   const groups = hubCardsBySection(centerType);
 
   if (compact) {
     return (
       <section className="space-y-4" id="hub-rapports">
         <div>
-          <Label>Hub rapports — point d&apos;entrée §7</Label>
+          <Label>{t("centre", "reportsHubEntry")}</Label>
           <p className="text-[11px] text-neutral-500 mt-1">
-            20 rubriques par thème · cliquez une carte pour ouvrir la rubrique
+            {t("centre", "reportsHubCompactDescription")}
           </p>
         </div>
         <div className="space-y-5">
-          {groups.map(({ section, label, cards }) => {
+          {groups.map(({ section, cards }) => {
             const Icon = SECTION_ICON[section];
             return (
               <div key={section}>
@@ -101,7 +104,7 @@ export default function ReportsHub({ centerType = null, querySuffix = "", compac
                   <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${SECTION_ACCENT[section]} border flex items-center justify-center`}>
                     <Icon size={14} className="text-[#11224E]" />
                   </div>
-                  <h3 className="text-xs font-black uppercase tracking-wider text-[#11224E]">{label}</h3>
+                  <h3 className="text-xs font-black uppercase tracking-wider text-[#11224E]">{t("centre", `reportsHubSection_${section}`)}</h3>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 md:gap-3">
                   {cards.map((card) => (
@@ -120,18 +123,18 @@ export default function ReportsHub({ centerType = null, querySuffix = "", compac
     <section className="space-y-5" id="hub-rapports">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
         <div>
-          <Label>Hub rapports — 20 rubriques</Label>
+          <Label>{t("centre", "reportsHubTitle")}</Label>
           <p className="text-[11px] text-neutral-500 mt-1">
-            Parcourir toutes les rubriques par thème (§7 du cahier des charges)
+            {t("centre", "reportsHubDescription")}
           </p>
         </div>
         <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-          {groups.reduce((n, g) => n + g.cards.length, 0)} rubriques
+          {groups.reduce((n, g) => n + g.cards.length, 0)} {t("centre", "reportsSectionsCount")}
         </span>
       </div>
 
       <div className="space-y-6">
-        {groups.map(({ section, label, cards }) => {
+        {groups.map(({ section, cards }) => {
           const Icon = SECTION_ICON[section];
           return (
             <div key={section}>
@@ -139,7 +142,7 @@ export default function ReportsHub({ centerType = null, querySuffix = "", compac
                 <div className={`w-7 h-7 rounded-lg bg-gradient-to-br ${SECTION_ACCENT[section]} border flex items-center justify-center`}>
                   <Icon size={14} className="text-[#11224E]" />
                 </div>
-                <h3 className="text-xs font-black uppercase tracking-wider text-[#11224E]">{label}</h3>
+                <h3 className="text-xs font-black uppercase tracking-wider text-[#11224E]">{t("centre", `reportsHubSection_${section}`)}</h3>
                 <span className="text-[10px] font-semibold text-neutral-400">({cards.length})</span>
               </div>
 

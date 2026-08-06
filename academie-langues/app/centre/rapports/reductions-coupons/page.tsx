@@ -11,6 +11,7 @@ import ReportBarChart from "../components/ReportBarChart";
 import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtNum } from "@/app/utils/reports-export";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type ReductionsReport = {
   period: { label: string };
@@ -34,6 +35,7 @@ type ReductionsReport = {
 };
 
 function ReductionsContent() {
+  const { t } = useI18n();
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
@@ -44,36 +46,36 @@ function ReductionsContent() {
     if (!report) return;
     downloadCsv(
       `reductions-${report.period.label.replace(/\s+/g, "-")}.csv`,
-      ["Apprenant", "Filière", "Montant", "Motif", "Inscription"],
+      [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "discountReason"), t("centre", "discountEnrollment")],
       report.rows.map((r) => [r.student, r.filiere, r.amount, r.reason, r.enrolledAt]),
     );
-  }, [report]);
+  }, [report, t]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
-      title: "Réductions & coupons",
+      title: t("centre", "discountTitle"),
       periodLabel: report.period.label,
       kpis: [
-        { label: "Total réductions", value: fmtFCFA(report.kpis.totalReductions) },
-        { label: "Dossiers concernés", value: fmtNum(report.kpis.nbDossiers) },
-        { label: "Coupons actifs", value: fmtNum(report.kpis.nbCouponsActifs) },
+        { label: t("centre", "discountTotal"), value: fmtFCFA(report.kpis.totalReductions) },
+        { label: t("centre", "discountAffectedRecords"), value: fmtNum(report.kpis.nbDossiers) },
+        { label: t("centre", "discountActiveCoupons"), value: fmtNum(report.kpis.nbCouponsActifs) },
       ],
       sections: [
         {
-          title: "Par motif",
-          columns: ["Motif", "Montant"],
+          title: t("centre", "discountByReason"),
+          columns: [t("centre", "discountReason"), t("centre", "collectionsAmount")],
           rows: report.byReason.map((x) => [x.label, fmtFCFA(x.amount)]),
         },
         {
-          title: "Détail",
-          columns: ["Apprenant", "Filière", "Montant", "Motif"],
+          title: t("centre", "discountDetail"),
+          columns: [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "discountReason")],
           rows: report.rows.map((r) => [r.student, r.filiere, fmtFCFA(r.amount), r.reason]),
         },
       ],
       filename: `reductions-${report.period.label.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf]);
+  }, [report, exportPdf, t]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -81,7 +83,7 @@ function ReductionsContent() {
     <ReportsShell
       activeSlug="reductions-coupons"
       centerType={centerType}
-      title="Réductions & coupons"
+      title={t("centre", "discountTitle")}
       periodLabel={report?.period?.label}
       dateFrom={from}
       dateTo={to}
@@ -98,59 +100,59 @@ function ReductionsContent() {
       )}
       {loading && (
         <div className="flex items-center gap-2 text-neutral-400 text-sm">
-          <Loader2 size={16} className="animate-spin" /> Actualisation…
+          <Loader2 size={16} className="animate-spin" /> {t("centre", "summaryRefreshing")}
         </div>
       )}
       {report && (
         <>
           <ReportKpiGrid
             items={[
-              { label: "Total réductions", value: fmtFCFA(report.kpis.totalReductions), sub: report.period.label },
-              { label: "Dossiers concernés", value: fmtNum(report.kpis.nbDossiers) },
-              { label: "Coupons actifs", value: fmtNum(report.kpis.nbCouponsActifs) },
-              { label: "Utilisations coupons", value: fmtNum(report.kpis.utilisationsCoupons) },
+              { label: t("centre", "discountTotal"), value: fmtFCFA(report.kpis.totalReductions), sub: report.period.label },
+              { label: t("centre", "discountAffectedRecords"), value: fmtNum(report.kpis.nbDossiers) },
+              { label: t("centre", "discountActiveCoupons"), value: fmtNum(report.kpis.nbCouponsActifs) },
+              { label: t("centre", "discountCouponUses"), value: fmtNum(report.kpis.utilisationsCoupons) },
             ]}
           />
 
           <div className="grid md:grid-cols-2 gap-4">
             <ReportBarChart
-              title="Répartition par filière"
+              title={t("centre", "discountBreakdownProgram")}
               items={report.byFiliere.map((x) => ({ label: x.label, value: x.amount }))}
             />
             <ReportBarChart
-              title="Répartition par motif"
+              title={t("centre", "discountBreakdownReason")}
               items={report.byReason.map((x) => ({ label: x.label, value: x.amount }))}
             />
           </div>
 
           {report.coupons.length > 0 && (
             <ReportBreakdownTable
-              title="Coupons du centre"
+              title={t("centre", "discountCenterCoupons")}
               columns={[
-                { key: "code", label: "Code" },
-                { key: "type", label: "Valeur" },
-                { key: "uses", label: "Utilisations", align: "right" },
-                { key: "active", label: "Statut" },
-                { key: "expiresAt", label: "Expiration" },
+                { key: "code", label: t("centre", "discountCode") },
+                { key: "type", label: t("centre", "summaryValue") },
+                { key: "uses", label: t("centre", "discountUses"), align: "right" },
+                { key: "active", label: t("centre", "settingsStatus") },
+                { key: "expiresAt", label: t("centre", "discountExpiration") },
               ]}
               rows={report.coupons.map((c) => ({
                 code: c.code,
                 type: c.type,
                 uses: `${c.uses}${c.maxUses ? ` / ${c.maxUses}` : ""}`,
-                active: c.active ? "Actif" : "Inactif",
+                active: c.active ? t("centre", "campusActive") : t("centre", "periodInactive"),
                 expiresAt: c.expiresAt,
               }))}
             />
           )}
 
           <ReportBreakdownTable
-            title="Dossiers avec réduction"
+            title={t("centre", "discountRecords")}
             columns={[
-              { key: "student", label: "Apprenant" },
-              { key: "filiere", label: "Filière" },
-              { key: "amount", label: "Montant", align: "right" },
-              { key: "reason", label: "Motif" },
-              { key: "enrolledAt", label: "Inscription" },
+              { key: "student", label: t("centre", "enrollmentLearner") },
+              { key: "filiere", label: t("centre", "enrollmentProgram") },
+              { key: "amount", label: t("centre", "collectionsAmount"), align: "right" },
+              { key: "reason", label: t("centre", "discountReason") },
+              { key: "enrolledAt", label: t("centre", "discountEnrollment") },
             ]}
             rows={report.rows.map((r) => ({ ...r, amount: fmtFCFA(r.amount) }))}
           />

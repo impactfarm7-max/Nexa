@@ -4,17 +4,18 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { Loader2, CheckCircle2, Video, Bell, PenLine } from "lucide-react";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
 
-const OPTIONS = [
-  { value: 15, label: "15 minutes avant", desc: "Rappel de dernière minute." },
-  { value: 30, label: "30 minutes avant", desc: "Temps pour se préparer." },
-  { value: 120, label: "2 heures avant", desc: "Rappel anticipé (recommandé)." },
-] as const;
-
 export default function LiveSettingsPage() {
+  const { t } = useI18n();
+  const options = [
+    { value: 15, label: t("centre", "live15MinutesBefore"), desc: t("centre", "liveLastMinuteReminder") },
+    { value: 30, label: t("centre", "live30MinutesBefore"), desc: t("centre", "liveTimeToPrepare") },
+    { value: 120, label: t("centre", "live2HoursBefore"), desc: t("centre", "liveEarlyReminder") },
+  ];
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [token, setToken] = useState("");
@@ -35,10 +36,10 @@ export default function LiveSettingsPage() {
       setIsTCF(json.center_type === "tcf_canada");
       setIsLocked(true);
     } else {
-      setError(json.error || "Impossible de charger les paramètres.");
+      setError(json.error || t("centre", "liveLoadError"));
     }
     setLoading(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     (async () => {
@@ -61,7 +62,7 @@ export default function LiveSettingsPage() {
     const json = await res.json();
     setSaving(false);
     if (!res.ok) {
-      setError(json.error || "Erreur lors de l'enregistrement.");
+      setError(json.error || t("centre", "liveSaveError"));
       return;
     }
     setMinutes(json.coaching_reminder_minutes ?? minutes);
@@ -70,7 +71,7 @@ export default function LiveSettingsPage() {
     setTimeout(() => setShowSuccessAnim(false), 2200);
   };
 
-  const activeLabel = OPTIONS.find((o) => o.value === minutes)?.label || `${minutes} min avant`;
+  const activeLabel = options.find((o) => o.value === minutes)?.label || t("centre", "liveMinutesBefore", { minutes });
 
   if (loading) return <CenterPageLoading embedded />;
 
@@ -80,24 +81,24 @@ export default function LiveSettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-white rounded-3xl p-10 shadow-2xl flex flex-col items-center gap-3 border border-neutral-200">
             <CheckCircle2 size={60} className="text-emerald-500" />
-            <p className="text-lg font-black text-emerald-700">Enregistré avec succès</p>
+            <p className="text-lg font-black text-emerald-700">{t("centre", "liveSavedSuccessfully")}</p>
           </div>
         </div>
       )}
 
       <div>
-        <h2 className="text-lg font-black" style={{ color: BLUE }}>Live & rappels</h2>
+        <h2 className="text-lg font-black" style={{ color: BLUE }}>{t("centre", "liveTitle")}</h2>
         <p className="text-sm text-neutral-500 mt-1">
-          Configurez quand vos étudiants reçoivent un rappel avant une séance Live (individuelle ou collective en ligne).
+          {t("centre", "liveDescription")}
         </p>
         {!isLocked && (
           <p className="text-xs text-neutral-400 mt-2">
-            Ce délai est enregistré sur votre centre et utilisé par le cron de rappels (notifications in-app, push et e-mail).
+            {t("centre", "liveDelayHelp")}
           </p>
         )}
         {isLocked && (
           <p className="text-xs font-bold mt-2" style={{ color: ORANGE }}>
-            Rappel actif : {activeLabel}
+            {t("centre", "liveActiveReminder")} : {activeLabel}
           </p>
         )}
       </div>
@@ -109,9 +110,9 @@ export default function LiveSettingsPage() {
               <Bell size={18} style={{ color: ORANGE }} />
             </div>
             <div>
-              <p className="font-black text-sm" style={{ color: BLUE }}>Délai de rappel</p>
+              <p className="font-black text-sm" style={{ color: BLUE }}>{t("centre", "liveReminderDelay")}</p>
               <p className="text-xs text-neutral-500">
-                {isLocked ? "Consultation — cliquez sur Modifier pour éditer." : "Mode édition actif"}
+                {isLocked ? t("centre", "liveReadOnlyHint") : t("centre", "liveEditModeActive")}
               </p>
             </div>
           </div>
@@ -121,22 +122,22 @@ export default function LiveSettingsPage() {
               onClick={() => setIsLocked(false)}
               className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-neutral-200 text-xs font-black text-neutral-600 hover:border-[#11224E] hover:text-[#11224E] transition"
             >
-              <PenLine size={13} /> Modifier
+              <PenLine size={13} /> {t("centre", "liveEdit")}
             </button>
           ) : (
             <span className="rounded-full bg-orange-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-orange-600">
-              Édition
+              {t("centre", "liveEditing")}
             </span>
           )}
         </div>
 
         <div className="p-6 space-y-5">
           <p className="text-xs text-neutral-500">
-            Notification push + message in-app — séances individuelles Live et séances collectives TCF planifiées en ligne.
+            {t("centre", "liveNotificationHelp")}
           </p>
 
           <div className="grid gap-3">
-            {OPTIONS.map((opt) => (
+            {options.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
@@ -168,7 +169,7 @@ export default function LiveSettingsPage() {
                 style={{ backgroundColor: BLUE }}
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                {saving ? "Enregistrement…" : "Valider et enregistrer"}
+                {saving ? t("centre", "liveSaving") : t("centre", "liveSave")}
               </button>
             </div>
           )}

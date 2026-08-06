@@ -3,6 +3,7 @@
 import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, ArrowRight } from "lucide-react";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE  = "#11224E";
 const ORANGE = "#eb670e";
@@ -16,6 +17,7 @@ interface Props {
 }
 
 function FooterInner({ step, centerType, onSave, saving, hidden }: Props) {
+  const { t } = useI18n();
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -51,8 +53,8 @@ function FooterInner({ step, centerType, onSave, saving, hidden }: Props) {
         {saving
           ? <Loader2 size={14} className="animate-spin" />
           : isLastStep
-            ? "Terminer"
-            : <><span>Suivant</span><ArrowRight size={14} /></>
+            ? t("common", "setupFinish")
+            : <><span>{t("common", "setupNext")}</span><ArrowRight size={14} /></>
         }
       </button>
     </div>

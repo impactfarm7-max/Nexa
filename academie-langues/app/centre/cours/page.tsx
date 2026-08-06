@@ -9,6 +9,7 @@ import {
   CenterPageHeader,
   CenterPageBody,
 } from "../center-page-ui";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type ModuleCardProps = {
   title: string;
@@ -18,58 +19,31 @@ type ModuleCardProps = {
   dev?: boolean;
 };
 
-const TRAINER_MODULES: ModuleCardProps[] = [
-  {
-    title: "Cours & Quiz",
-    description: "Créez vos leçons, ajoutez des médias et construisez des quiz interactifs pour vos apprenants.",
-    href: "/centre/cours/gestion-cours",
-    icon: <BookOpen />,
-  },
-  {
-    title: "Devoirs & Missions",
-    description: "Assignez des devoirs par matière ou par classe. Planifiez les déblocages et les échéances.",
-    href: "/centre/cours/devoirs",
-    icon: <FileText />,
-  },
-  {
-    title: "Sessions Live",
-    description: "Planifiez une visioconférence, invitez étudiants ou staff, et rejoignez la salle en direct.",
-    href: "/centre/lives",
-    icon: <Video />,
-  },
-];
-
-const ADMIN_MODULES: ModuleCardProps[] = [
-  {
-    title: "Emploi du temps",
-    description: "Gérez la grille horaire hebdomadaire, programmez les cours par filière, niveau et salle.",
-    href: "/centre/cours/planning",
-    icon: <Calendar />,
-  },
-  {
-    title: "Portail Administratif",
-    description: "Suivi des présences, émargements, conformité et statistiques d'heures.",
-    href: "/centre/cours/administration",
-    icon: <UserCheck />,
-    dev: true,
-  },
-];
-
 export default function CentreHubDashboard() {
+  const { t } = useI18n();
+  const trainerModules: ModuleCardProps[] = [
+    { title: t("centre", "hubCoursesQuiz"), description: t("centre", "hubCoursesQuizDescription"), href: "/centre/cours/gestion-cours", icon: <BookOpen /> },
+    { title: t("centre", "hubAssignmentsMissions"), description: t("centre", "hubAssignmentsDescription"), href: "/centre/cours/devoirs", icon: <FileText /> },
+    { title: t("centre", "hubLiveSessions"), description: t("centre", "hubLiveDescription"), href: "/centre/lives", icon: <Video /> },
+  ];
+  const adminModules: ModuleCardProps[] = [
+    { title: t("centre", "hubSchedule"), description: t("centre", "hubScheduleDescription"), href: "/centre/cours/planning", icon: <Calendar /> },
+    { title: t("centre", "hubAdminPortal"), description: t("centre", "hubAdminPortalDescription"), href: "/centre/cours/administration", icon: <UserCheck />, dev: true },
+  ];
   return (
-    <CenterPageLayout header={<CenterPageHeader title="Hub Pédagogique" />}>
+    <CenterPageLayout header={<CenterPageHeader title={t("centre", "hubTitle")} />}>
       <CenterPageBody className="space-y-10">
         <section>
-          <SectionLabel badge="Formateur" description="Modules accessibles aux formateurs et enseignants du centre." />
+          <SectionLabel badge={t("centre", "hubTrainer")} description={t("centre", "hubTrainerDescription")} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {TRAINER_MODULES.map((m) => <ModuleCard key={m.href} {...m} />)}
+            {trainerModules.map((m) => <ModuleCard key={m.href} {...m} soonLabel={t("centre", "hubComingSoon")} openLabel={t("centre", "hubOpen")} />)}
           </div>
         </section>
 
         <section>
-          <SectionLabel badge="Administration" description="Modules de gestion réservés à l'équipe d'administration." />
+          <SectionLabel badge={t("centre", "hubAdministration")} description={t("centre", "hubAdministrationDescription")} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {ADMIN_MODULES.map((m) => <ModuleCard key={m.href} {...m} />)}
+            {adminModules.map((m) => <ModuleCard key={m.href} {...m} soonLabel={t("centre", "hubComingSoon")} openLabel={t("centre", "hubOpen")} />)}
           </div>
         </section>
       </CenterPageBody>
@@ -88,7 +62,7 @@ function SectionLabel({ badge, description }: { badge: string; description: stri
   );
 }
 
-function ModuleCard({ title, description, href, icon, dev = false }: ModuleCardProps) {
+function ModuleCard({ title, description, href, icon, dev = false, soonLabel, openLabel }: ModuleCardProps & { soonLabel: string; openLabel: string }) {
   const Wrapper = dev ? "div" : Link;
 
   return (
@@ -108,7 +82,7 @@ function ModuleCard({ title, description, href, icon, dev = false }: ModuleCardP
             </div>
             {dev && (
               <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-neutral-100 text-neutral-400 border border-neutral-200 flex items-center gap-1">
-                <Lock size={8} /> Bientôt
+                <Lock size={8} /> {soonLabel}
               </span>
             )}
           </div>
@@ -119,7 +93,7 @@ function ModuleCard({ title, description, href, icon, dev = false }: ModuleCardP
 
         {!dev && (
           <div className="mt-5 flex items-center text-[11px] font-semibold" style={{ color: BLUE }}>
-            <span>Ouvrir</span>
+            <span>{openLabel}</span>
             <ArrowRight className="ml-1 w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition-transform duration-200" />
           </div>
         )}

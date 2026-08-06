@@ -11,6 +11,7 @@ import ReportBarChart from "../components/ReportBarChart";
 import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtNum } from "@/app/utils/reports-export";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type PersonnelReport = {
   period: { label: string };
@@ -34,6 +35,7 @@ type PersonnelReport = {
 };
 
 function PersonnelContent() {
+  const { t } = useI18n();
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
@@ -44,33 +46,33 @@ function PersonnelContent() {
     if (!report) return;
     downloadCsv(
       `personnel-${report.period.label.replace(/\s+/g, "-")}.csv`,
-      ["Nom", "Rôle", "Catégorie", "Statut", "Poste", "Salaire base"],
+      [t("centre", "staffName"), t("centre", "staffRole"), t("centre", "staffCategory"), t("centre", "settingsStatus"), t("centre", "staffPosition"), t("centre", "staffBaseSalary")],
       report.rows.map((r) => [
         r.name, r.role, r.category, r.status, r.jobTitle, r.baseSalary,
       ]),
     );
-  }, [report]);
+  }, [report, t]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
-      title: "Effectifs personnel",
+      title: t("centre", "staffReportTitle"),
       periodLabel: report.period.label,
       kpis: [
-        { label: "Total", value: fmtNum(report.kpis.total) },
-        { label: "Actifs", value: fmtNum(report.kpis.active) },
-        { label: "Formateurs", value: fmtNum(report.kpis.academic) },
+        { label: t("centre", "enrollmentTotal"), value: fmtNum(report.kpis.total) },
+        { label: t("centre", "summaryActive"), value: fmtNum(report.kpis.active) },
+        { label: t("centre", "summaryTrainers"), value: fmtNum(report.kpis.academic) },
       ],
       sections: [
         {
-          title: "Liste",
-          columns: ["Nom", "Rôle", "Catégorie", "Statut"],
+          title: t("centre", "enrollmentList"),
+          columns: [t("centre", "staffName"), t("centre", "staffRole"), t("centre", "staffCategory"), t("centre", "settingsStatus")],
           rows: report.rows.map((r) => [r.name, r.role, r.category, r.status]),
         },
       ],
       filename: `personnel-${report.period.label.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf]);
+  }, [report, exportPdf, t]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -78,7 +80,7 @@ function PersonnelContent() {
     <ReportsShell
       activeSlug="effectifs-personnel"
       centerType={centerType}
-      title="Effectifs personnel"
+      title={t("centre", "staffReportTitle")}
       periodLabel={report?.period?.label}
       dateFrom={from}
       dateTo={to}
@@ -95,50 +97,50 @@ function PersonnelContent() {
       )}
       {loading && (
         <div className="flex items-center gap-2 text-neutral-400 text-sm">
-          <Loader2 size={16} className="animate-spin" /> Actualisation…
+          <Loader2 size={16} className="animate-spin" /> {t("centre", "summaryRefreshing")}
         </div>
       )}
       {report && (
         <>
           <ReportKpiGrid
             items={[
-              { label: "Total personnel", value: fmtNum(report.kpis.total) },
-              { label: "Académique", value: fmtNum(report.kpis.academic), sub: "Formateurs" },
-              { label: "Administratif", value: fmtNum(report.kpis.administrative) },
-              { label: "Actifs", value: fmtNum(report.kpis.active) },
-              { label: "Suspendus", value: fmtNum(report.kpis.suspended), alert: report.kpis.suspended > 0 },
+              { label: t("centre", "staffTotal"), value: fmtNum(report.kpis.total) },
+              { label: t("centre", "staffAcademic"), value: fmtNum(report.kpis.academic), sub: t("centre", "summaryTrainers") },
+              { label: t("centre", "staffAdministrative"), value: fmtNum(report.kpis.administrative) },
+              { label: t("centre", "summaryActive"), value: fmtNum(report.kpis.active) },
+              { label: t("centre", "summarySuspended"), value: fmtNum(report.kpis.suspended), alert: report.kpis.suspended > 0 },
             ]}
           />
           <div className="grid md:grid-cols-2 gap-4">
-            <ReportBarChart title="Par catégorie" items={report.byCategory.map((x) => ({ label: x.label, value: x.count }))} />
-            <ReportBarChart title="Par rôle" items={report.byRole.map((x) => ({ label: x.label, value: x.count }))} />
+            <ReportBarChart title={t("centre", "staffByCategory")} items={report.byCategory.map((x) => ({ label: x.label, value: x.count }))} />
+            <ReportBarChart title={t("centre", "staffByRole")} items={report.byRole.map((x) => ({ label: x.label, value: x.count }))} />
           </div>
           <div className="grid lg:grid-cols-2 gap-4">
             <ReportBreakdownTable
-              title="Par catégorie"
+              title={t("centre", "staffByCategory")}
               columns={[
-                { key: "label", label: "Catégorie" },
-                { key: "count", label: "Effectif", align: "right" },
+                { key: "label", label: t("centre", "staffCategory") },
+                { key: "count", label: t("centre", "enrollmentCount"), align: "right" },
               ]}
               rows={report.byCategory}
             />
             <ReportBreakdownTable
-              title="Par rôle"
+              title={t("centre", "staffByRole")}
               columns={[
-                { key: "label", label: "Rôle" },
-                { key: "count", label: "Effectif", align: "right" },
+                { key: "label", label: t("centre", "staffRole") },
+                { key: "count", label: t("centre", "enrollmentCount"), align: "right" },
               ]}
               rows={report.byRole}
             />
           </div>
           <ReportBreakdownTable
-            title="Liste du personnel"
+            title={t("centre", "staffList")}
             columns={[
-              { key: "name", label: "Nom" },
-              { key: "role", label: "Rôle" },
-              { key: "category", label: "Catégorie" },
-              { key: "status", label: "Statut" },
-              { key: "baseSalary", label: "Base", align: "right" },
+              { key: "name", label: t("centre", "staffName") },
+              { key: "role", label: t("centre", "staffRole") },
+              { key: "category", label: t("centre", "staffCategory") },
+              { key: "status", label: t("centre", "settingsStatus") },
+              { key: "baseSalary", label: t("centre", "staffBase"), align: "right" },
             ]}
             rows={report.rows.map((r) => ({
               ...r,

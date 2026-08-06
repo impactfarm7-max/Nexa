@@ -1,23 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FileText, Receipt, Award, Loader2, CheckCircle2,
   ChevronRight, MapPin, Check, PenLine, Lock,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#F87B1B";
 
 const DEFAULT_DOC_KEY = "document";
-
-const DOCUMENT_TYPES = [
-  { key: DEFAULT_DOC_KEY, label: "Type de document", icon: FileText, defaultTitle: "Document officiel", available: true },
-  { key: "facture",     label: "Facture / Reçu",     icon: Receipt,       defaultTitle: "Reçu de Paiement", available: true },
-  { key: "attestation", label: "Attestation de réussite", icon: Award, defaultTitle: "Attestation de réussite", available: true },
-];
 
 type DocConfig = {
   title: string;
@@ -45,6 +40,12 @@ function legacyDocKey(key: string): string {
 }
 
 export default function DocumentsSettingsPage() {
+  const { t } = useI18n();
+  const documentTypes = useMemo(() => [
+    { key: DEFAULT_DOC_KEY, label: t("centre", "documentsType"), icon: FileText, defaultTitle: t("centre", "documentsOfficial"), available: true },
+    { key: "facture", label: t("centre", "documentsInvoiceReceipt"), icon: Receipt, defaultTitle: t("centre", "documentsPaymentReceipt"), available: true },
+    { key: "attestation", label: t("centre", "documentsCertificate"), icon: Award, defaultTitle: t("centre", "documentsCertificate"), available: true },
+  ], [t]);
   const [centerId, setCenterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -58,7 +59,7 @@ export default function DocumentsSettingsPage() {
   const [lockedDocs, setLockedDocs] = useState<Set<string>>(new Set());
 
   const selected = configs[selectedKey];
-  const selectedMeta = DOCUMENT_TYPES.find((d) => d.key === selectedKey)!;
+  const selectedMeta = documentTypes.find((d) => d.key === selectedKey)!;
   const isLocked = lockedDocs.has(selectedKey);
 
   const load = useCallback(async () => {
@@ -90,7 +91,7 @@ export default function DocumentsSettingsPage() {
 
     const map: Record<string, DocConfig> = {};
     const initialLocked = new Set<string>();
-    for (const dt of DOCUMENT_TYPES) {
+    for (const dt of documentTypes) {
       const row = (rows || []).find((r: { document_type: string }) =>
         r.document_type === dt.key || r.document_type === legacyDocKey(dt.key));
       map[dt.key] = row ? {
@@ -110,7 +111,7 @@ export default function DocumentsSettingsPage() {
     setLockedDocs(initialLocked);
     setSelectedKey(DEFAULT_DOC_KEY);
     setLoading(false);
-  }, []);
+  }, [documentTypes]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -148,7 +149,7 @@ export default function DocumentsSettingsPage() {
     }
 
     setSaving(false);
-    if (error) { alert("Erreur d'enregistrement : " + error.message); return; }
+    if (error) { alert(t("centre", "documentsSaveError") + " : " + error.message); return; }
     setLockedDocs((p) => new Set([...p, selectedKey]));
     setShowSuccessAnim(true);
     setTimeout(() => setShowSuccessAnim(false), 2000);
@@ -168,15 +169,15 @@ export default function DocumentsSettingsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
           <div className="bg-white rounded-3xl p-8 shadow-2xl flex flex-col items-center gap-3 border border-neutral-200 animate-pulse">
             <CheckCircle2 size={52} className="text-emerald-500" />
-            <p className="text-base font-black text-emerald-700">Enregistré</p>
+            <p className="text-base font-black text-emerald-700">{t("centre", "documentsSaved")}</p>
           </div>
         </div>
       )}
 
       {/* MASTER — types de documents */}
       <div className="space-y-2">
-        <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 px-1 pb-1">Modèles de documents</p>
-        {DOCUMENT_TYPES.map((dt) => {
+        <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 px-1 pb-1">{t("centre", "documentsTemplates")}</p>
+        {documentTypes.map((dt) => {
           const isSel = selectedKey === dt.key;
           const cfg = configs[dt.key];
           const isDocLocked = lockedDocs.has(dt.key);
@@ -207,12 +208,12 @@ export default function DocumentsSettingsPage() {
                   <p className="font-black text-xs" style={{ color: disabled ? "#a3a3a3" : BLUE }}>{dt.label}</p>
                   {dt.key === DEFAULT_DOC_KEY && !disabled && (
                     <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full text-white" style={{ backgroundColor: ORANGE }}>
-                      Défaut
+                      {t("centre", "documentsDefault")}
                     </span>
                   )}
                   {disabled && (
                     <span className="text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-neutral-200 text-neutral-500">
-                      Bientôt disponible
+                      {t("centre", "documentsComingSoon")}
                     </span>
                   )}
                   {isDocLocked && !disabled && <Check size={11} className="text-emerald-500 shrink-0" />}
@@ -226,12 +227,10 @@ export default function DocumentsSettingsPage() {
         })}
 
         <p className="text-[11px] text-neutral-400 pt-4 leading-relaxed px-1">
-          Le <span className="font-bold">Type de document</span> sert aux bulletins et documents généraux.
-          Le modèle <span className="font-bold">Facture / Reçu</span> est utilisé dans Finances.
-          L&apos;<span className="font-bold">Attestation de réussite</span> se génère depuis le dossier apprenant.
+          {t("centre", "documentsHelp")}
         </p>
         <p className="text-[11px] text-neutral-400 leading-relaxed px-1">
-          L&apos;identité (logo, RCCM, NIU) est commune à tous les documents.
+          {t("centre", "documentsIdentityHelp")}
         </p>
       </div>
 
@@ -240,7 +239,7 @@ export default function DocumentsSettingsPage() {
         <div className="rounded-3xl border border-neutral-200 bg-white overflow-hidden">
           <div className="px-5 py-2.5 border-b border-neutral-100 bg-neutral-50/60 flex items-center gap-2">
             <FileText size={13} className="text-neutral-400" />
-            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Aperçu de l&apos;en-tête</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{t("centre", "documentsHeaderPreview")}</span>
           </div>
           <div className="p-6">
             <div className="border-b-2 pb-4 flex items-start justify-between gap-4" style={{ borderColor: selected.accent_color }}>
@@ -249,19 +248,19 @@ export default function DocumentsSettingsPage() {
                   ? <img src={branding.logo_url} alt="" className="w-12 h-12 rounded-lg object-cover" />
                   : <div className="w-12 h-12 rounded-lg bg-neutral-100 flex items-center justify-center text-[8px] text-neutral-300 font-bold">LOGO</div>)}
                 <div>
-                  <p className="font-black text-sm uppercase" style={{ color: BLUE }}>{branding?.legal_name || "Raison sociale"}</p>
+                  <p className="font-black text-sm uppercase" style={{ color: BLUE }}>{branding?.legal_name || t("centre", "documentsLegalName")}</p>
                   <p className="text-[10px] font-bold uppercase" style={{ color: selected.accent_color }}>{selected.title}</p>
                 </div>
               </div>
               <div className="text-right text-[9px] text-neutral-500 space-y-0.5">
-                {selected.show_address && <p className="italic text-neutral-400">[Adresse du campus émetteur]</p>}
-                {selected.show_phone && <p className="italic text-neutral-400">[Tél. du campus]</p>}
+                {selected.show_address && <p className="italic text-neutral-400">[{t("centre", "documentsIssuingCampusAddress")}]</p>}
+                {selected.show_phone && <p className="italic text-neutral-400">[{t("centre", "documentsCampusPhoneShort")}]</p>}
                 {selected.show_rccm && <p>RCCM : {branding?.rccm_number || "—"}</p>}
                 {selected.show_niu && <p>NIU : {branding?.niu_number || "—"}</p>}
               </div>
             </div>
             <p className="text-[10px] text-neutral-300 mt-3 flex items-center gap-1.5">
-              <MapPin size={11} /> L&apos;adresse et le téléphone proviennent du campus qui émet le document.
+              <MapPin size={11} /> {t("centre", "documentsCampusSourceHelp")}
             </p>
           </div>
         </div>
@@ -275,7 +274,7 @@ export default function DocumentsSettingsPage() {
               <div>
                 <p className="text-sm font-black" style={{ color: BLUE }}>{selectedMeta.label}</p>
                 <p className="text-[10px] text-neutral-400">
-                  {isLocked ? "Consultation — cliquez sur Modifier pour éditer." : "Mode édition actif"}
+                  {isLocked ? t("centre", "liveReadOnlyHint") : t("centre", "liveEditModeActive")}
                 </p>
               </div>
             </div>
@@ -285,11 +284,11 @@ export default function DocumentsSettingsPage() {
                 onClick={() => setLockedDocs((p) => { const s = new Set(p); s.delete(selectedKey); return s; })}
                 className="flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-neutral-200 text-xs font-black text-neutral-600 hover:border-[#11224E] hover:text-[#11224E] transition"
               >
-                <PenLine size={13} /> Modifier
+                <PenLine size={13} /> {t("centre", "liveEdit")}
               </button>
             ) : (
               <span className="rounded-full bg-orange-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-orange-600">
-                Édition
+                {t("centre", "liveEditing")}
               </span>
             )}
           </div>
@@ -297,7 +296,7 @@ export default function DocumentsSettingsPage() {
           <div className="p-6 space-y-6">
             <div className="grid sm:grid-cols-[1fr_auto] gap-4 items-end">
               <div>
-                <FieldLabel label={`Titre du document — ${selectedMeta.label}`} />
+                <FieldLabel label={t("centre", "documentsTitleLabel", { type: selectedMeta.label })} />
                 <input
                   value={selected.title}
                   onChange={(e) => patch({ title: e.target.value })}
@@ -308,7 +307,7 @@ export default function DocumentsSettingsPage() {
                 />
               </div>
               <div>
-                <FieldLabel label="Couleur d'accent" />
+                <FieldLabel label={t("centre", "documentsAccentColor")} />
                 <div className={`flex items-center gap-2 h-11 px-3 rounded-xl border border-neutral-200 ${isLocked ? "bg-neutral-50" : "bg-white"}`}>
                   <input
                     type="color"
@@ -323,12 +322,12 @@ export default function DocumentsSettingsPage() {
             </div>
 
             <div>
-              <FieldLabel label="Champs affichés sur ce document" />
+              <FieldLabel label={t("centre", "documentsDisplayedFields")} />
               <div className="grid sm:grid-cols-2 gap-2">
                 {([
-                  ["show_logo", "Logo"],
-                  ["show_address", "Adresse du campus"],
-                  ["show_phone", "Téléphone du campus"],
+                  ["show_logo", t("centre", "documentsLogo")],
+                  ["show_address", t("centre", "documentsCampusAddress")],
+                  ["show_phone", t("centre", "documentsCampusPhone")],
                   ["show_rccm", "N° RCCM"],
                   ["show_niu", "NIU"],
                 ] as [keyof DocConfig, string][]).map(([k, lbl]) => (
@@ -338,10 +337,10 @@ export default function DocumentsSettingsPage() {
             </div>
 
             <div>
-              <FieldLabel label="Signataires apposés sur ce document" />
+              <FieldLabel label={t("centre", "documentsSignatories")} />
               {signatures.length === 0 ? (
                 <p className="text-xs text-neutral-400 italic bg-neutral-50 border border-dashed rounded-xl p-3">
-                  Aucun signataire. Configurez-les d&apos;abord dans l&apos;onglet <span className="font-bold">Entreprise</span>.
+                  {t("centre", "documentsNoSignatory")}
                 </p>
               ) : (
                 <div className="flex flex-wrap gap-2">
@@ -368,14 +367,14 @@ export default function DocumentsSettingsPage() {
             </div>
 
             <div>
-              <FieldLabel label="Mentions de bas de page" hint="optionnel" />
+              <FieldLabel label={t("centre", "documentsFooterNotes")} hint={t("centre", "documentsOptional")} />
               <textarea
                 value={selected.footer_text}
                 onChange={(e) => patch({ footer_text: e.target.value })}
                 rows={2}
                 disabled={isLocked}
                 readOnly={isLocked}
-                placeholder="Ex : Document officiel — toute reproduction est interdite."
+                placeholder={t("centre", "documentsFooterPlaceholder")}
                 className={`w-full p-3.5 rounded-xl border border-neutral-200 text-sm font-medium outline-none resize-none transition focus:ring-4 ${
                   isLocked ? "bg-neutral-50 text-neutral-500 cursor-default" : "bg-white focus:border-[#11224E] focus:ring-[#11224E]/5"
                 }`}
@@ -393,7 +392,7 @@ export default function DocumentsSettingsPage() {
                 style={{ backgroundColor: BLUE }}
               >
                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-                Valider et enregistrer
+                {t("centre", "liveSave")}
               </button>
             </div>
           )}
