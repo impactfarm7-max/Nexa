@@ -17,10 +17,10 @@ import {
 } from "@/app/components/landing";
 import TypewriterHeroTitle from "@/app/components/landing/TypewriterHeroTitle";
 import LanguageSwitcher from "@/app/components/LanguageSwitcher";
+import AgentContactMenu from "@/app/components/landing/AgentContactMenu";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
 const ORANGE = BRAND.orange;
-const WHATSAPP = "237621105640";
 
 const fadeUp = (delay = 0) => ({
   initial: { opacity: 0, y: 24 },
@@ -60,12 +60,6 @@ export default function LandingPage() {
       else router.replace("/dashboard");
     });
   }, [router]);
-
-  const talkToAgent = () =>
-    window.open(
-      `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(t("landing", "whatsappMessage"))}`,
-      "_blank",
-    );
 
   if (checking) {
     return (
@@ -127,9 +121,7 @@ export default function LandingPage() {
             <Link href="/presentation" className="hidden md:flex items-center h-10 px-4 rounded-xl text-[12px] xl:text-[13px] font-bold border border-black/10 bg-white hover:border-black/20 transition whitespace-nowrap">
               {t("landing", "discover")}
             </Link>
-            <button onClick={talkToAgent} className="hidden md:flex items-center h-10 px-4 rounded-xl text-[12px] xl:text-[13px] font-bold border border-black/10 bg-white hover:border-black/20 transition whitespace-nowrap">
-              {t("landing", "talkToAgent")}
-            </button>
+            <AgentContactMenu />
             <Link href="/login" className="flex items-center h-10 px-4 sm:px-5 rounded-xl text-[12px] xl:text-[13px] font-black text-white transition hover:opacity-90 whitespace-nowrap" style={{ backgroundColor: BRAND.blue }}>
               {t("landing", "login")}
             </Link>
@@ -173,9 +165,7 @@ export default function LandingPage() {
                 <Link href="/presentation" onClick={() => setMobileNavOpen(false)} className="flex items-center h-11 px-4 rounded-xl text-sm font-bold border border-black/10 bg-white">
                   {t("landing", "discover")}
                 </Link>
-                <button onClick={() => { setMobileNavOpen(false); talkToAgent(); }} className="flex items-center h-11 px-4 rounded-xl text-sm font-bold border border-black/10 bg-white text-left">
-                  {t("landing", "talkToAgent")}
-                </button>
+                <AgentContactMenu mobile />
                 <Link href="/login" onClick={() => setMobileNavOpen(false)} className="flex items-center justify-center h-11 px-4 rounded-xl text-sm font-black text-white" style={{ backgroundColor: BRAND.blue }}>
                   {t("landing", "login")}
                 </Link>
@@ -321,9 +311,7 @@ export default function LandingPage() {
             {t("landing", "finalDescription")}
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button onClick={talkToAgent} className="w-full sm:w-auto inline-flex items-center justify-center h-12 px-8 rounded-2xl text-sm font-bold border-2 transition hover:bg-neutral-50" style={{ borderColor: ORANGE, color: ORANGE }}>
-              {t("landing", "talkToAgent")}
-            </button>
+            <AgentContactMenu cta />
             <Link href="/ouvrir-centre" className="w-full sm:w-auto inline-flex items-center justify-center h-12 px-8 rounded-2xl text-sm font-black text-white transition hover:opacity-90" style={{ backgroundColor: BRAND.blue }}>
               {t("landing", "createCenter")}
             </Link>

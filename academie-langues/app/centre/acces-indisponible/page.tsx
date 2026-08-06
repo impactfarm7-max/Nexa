@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { Clock, ShieldOff, MessageCircle, GraduationCap, LogOut } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { isCenterOperational } from "@/app/utils/center-trial";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Reason = "checking" | "trial_expired" | "suspended" | "rejected" | "unknown";
 
 export default function CenterAccessUnavailablePage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [reason, setReason] = useState<Reason>("checking");
   const [centerName, setCenterName] = useState<string | null>(null);
 
@@ -49,8 +51,8 @@ export default function CenterAccessUnavailablePage() {
   const handleContact = () => {
     const msg = encodeURIComponent(
       centerName
-        ? `Bonjour NEXA, je gère le centre "${centerName}" et je souhaite régulariser son accès à la plateforme.`
-        : "Bonjour NEXA, je souhaite régulariser l'accès de mon centre à la plateforme."
+        ? t("centre", "accessContactNamed", { name: centerName })
+        : t("centre", "accessContactGeneric")
     );
     window.open(`https://wa.me/+237683375069?text=${msg}`, "_blank");
   };
@@ -64,32 +66,32 @@ export default function CenterAccessUnavailablePage() {
 
   const copy = {
     trial_expired: {
-      title: "Période d'essai terminée",
+      title: t("centre", "accessTrialExpiredTitle"),
       icon: <Clock className="w-8 h-8 text-amber-400" />,
       tone: "bg-amber-500/20 border-amber-500/30",
-      lead: centerName ? <>Les 72h d&apos;essai de <strong className="text-white">{centerName}</strong> sont écoulées.</> : "Les 72h d'essai de votre centre sont écoulées.",
-      detail: "Pour continuer à utiliser la plateforme, votre centre doit être validé par l'équipe NEXA. Contactez-nous pour finaliser l'activation.",
+      lead: centerName ? t("centre", "accessTrialExpiredNamed", { name: centerName }) : t("centre", "accessTrialExpiredGeneric"),
+      detail: t("centre", "accessTrialExpiredDetail"),
     },
     suspended: {
-      title: "Centre suspendu",
+      title: t("centre", "accessSuspendedTitle"),
       icon: <ShieldOff className="w-8 h-8 text-red-400" />,
       tone: "bg-red-500/20 border-red-500/30",
-      lead: centerName ? <>L&apos;accès de <strong className="text-white">{centerName}</strong> a été suspendu par NEXA.</> : "L'accès de votre centre a été suspendu par NEXA.",
-      detail: "Contactez directement NEXA pour régulariser la situation et rétablir l'accès.",
+      lead: centerName ? t("centre", "accessSuspendedNamed", { name: centerName }) : t("centre", "accessSuspendedGeneric"),
+      detail: t("centre", "accessSuspendedDetail"),
     },
     rejected: {
-      title: "Candidature refusée",
+      title: t("centre", "accessRejectedTitle"),
       icon: <ShieldOff className="w-8 h-8 text-red-400" />,
       tone: "bg-red-500/20 border-red-500/30",
-      lead: centerName ? <>La candidature de <strong className="text-white">{centerName}</strong> n&apos;a pas été validée par NEXA.</> : "Votre candidature n'a pas été validée par NEXA.",
-      detail: "Contactez NEXA si vous souhaitez faire réexaminer votre dossier.",
+      lead: centerName ? t("centre", "accessRejectedNamed", { name: centerName }) : t("centre", "accessRejectedGeneric"),
+      detail: t("centre", "accessRejectedDetail"),
     },
     unknown: {
-      title: "Accès indisponible",
+      title: t("centre", "accessUnavailableTitle"),
       icon: <ShieldOff className="w-8 h-8 text-red-400" />,
       tone: "bg-red-500/20 border-red-500/30",
-      lead: "L'accès à votre espace centre est actuellement indisponible.",
-      detail: "Contactez NEXA pour en savoir plus.",
+      lead: t("centre", "accessUnavailableLead"),
+      detail: t("centre", "accessUnavailableDetail"),
     },
   }[reason];
 
@@ -120,7 +122,7 @@ export default function CenterAccessUnavailablePage() {
           className="w-full flex items-center justify-center gap-2.5 bg-orange-500 hover:bg-orange-600 active:scale-[0.98] text-white font-black text-sm py-4 rounded-2xl transition-all shadow-lg shadow-orange-500/25 mb-3"
         >
           <MessageCircle className="w-5 h-5" />
-          Contacter NEXA
+          {t("centre", "accessContactButton")}
         </button>
 
         <button
@@ -128,7 +130,7 @@ export default function CenterAccessUnavailablePage() {
           className="w-full flex items-center justify-center gap-2 text-neutral-500 hover:text-neutral-300 text-sm font-semibold py-3 rounded-2xl transition-colors"
         >
           <LogOut className="w-4 h-4" />
-          Se déconnecter
+          {t("centre", "accessSignOut")}
         </button>
       </div>
     </div>

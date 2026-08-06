@@ -8,8 +8,7 @@ import { Menu, X } from "lucide-react";
 import { BRAND } from "@/app/utils/brand";
 import LanguageSwitcher from "@/app/components/LanguageSwitcher";
 import { useI18n } from "@/app/i18n/I18nProvider";
-
-const WHATSAPP = "237621105640";
+import AgentContactMenu from "@/app/components/landing/AgentContactMenu";
 
 type ActiveNav = "programmes" | "valeurs" | null;
 
@@ -25,12 +24,6 @@ export default function MarketingChrome({
 }) {
   const { t } = useI18n();
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  const talkToAgent = () =>
-    window.open(
-      `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(t("landing", "whatsappMessage"))}`,
-      "_blank",
-    );
 
   const navLink = (href: string, label: string, key: ActiveNav) => {
     const isActive = active === key;
@@ -87,13 +80,7 @@ export default function MarketingChrome({
             >
               {t("landing", "discover")}
             </Link>
-            <button
-              type="button"
-              onClick={talkToAgent}
-              className="hidden md:flex items-center h-10 px-4 rounded-xl text-[12px] xl:text-[13px] font-bold border border-black/10 bg-white hover:border-black/20 transition whitespace-nowrap"
-            >
-              {t("landing", "talkToAgent")}
-            </button>
+            <AgentContactMenu />
             <Link
               href="/login"
               className="flex items-center h-10 px-4 sm:px-5 rounded-xl text-[12px] xl:text-[13px] font-black text-white transition hover:opacity-90 whitespace-nowrap"
@@ -133,16 +120,7 @@ export default function MarketingChrome({
                 <Link href="/presentation" onClick={() => setMobileOpen(false)} className="flex items-center h-11 px-4 rounded-xl text-sm font-bold border border-black/10 bg-white">
                   {t("landing", "discover")}
                 </Link>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMobileOpen(false);
-                    talkToAgent();
-                  }}
-                  className="flex items-center h-11 px-4 rounded-xl text-sm font-bold border border-black/10 bg-white text-left"
-                >
-                  {t("landing", "talkToAgent")}
-                </button>
+                <AgentContactMenu mobile />
                 <Link
                   href="/login"
                   onClick={() => setMobileOpen(false)}

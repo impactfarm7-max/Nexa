@@ -9,6 +9,7 @@ import type { Campus, GenericDashboardStats } from "../types";
 import { BLUE, ORANGE, QuietKpi } from "../dashboard-ui";
 import { CENTER_TYPE } from "@/app/centre/center-page-ui";
 import { fmtXAF } from "../utils";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Props = {
   stats: GenericDashboardStats;
@@ -73,6 +74,7 @@ export default function GenericManagerDashboard({
   onCampusChange,
   canAccess = () => true,
 }: Props) {
+  const { locale, t } = useI18n();
   const { fin, activeStudents, coursesCount, cancelledCount, absent, exams, msgCount } = stats;
 
   const showFinance = canAccess("finance");
@@ -89,12 +91,12 @@ export default function GenericManagerDashboard({
         <section className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center justify-between gap-3 min-w-0">
-              <SectionTitle>Finances</SectionTitle>
+              <SectionTitle>{t("centre", "managerFinances")}</SectionTitle>
               <Link
                 href="/centre/finance"
                 className="sm:hidden inline-flex items-center gap-1 text-[12px] font-medium text-neutral-600"
               >
-                Détails <ArrowUpRight size={13} style={{ color: ORANGE }} />
+                {t("centre", "managerDetails")} <ArrowUpRight size={13} style={{ color: ORANGE }} />
               </Link>
             </div>
 
@@ -110,7 +112,7 @@ export default function GenericManagerDashboard({
                   }`}
                   style={!selectedCampus ? { backgroundColor: BLUE } : undefined}
                 >
-                  Tous
+                  {t("centre", "managerAllCampuses")}
                 </button>
                 {campuses.map((c) => {
                   const active = selectedCampus === c.id;
@@ -137,18 +139,18 @@ export default function GenericManagerDashboard({
               href="/centre/finance"
               className="hidden sm:inline-flex items-center gap-1 text-[12px] font-medium text-neutral-600 hover:text-neutral-900"
             >
-              Détails <ArrowUpRight size={13} style={{ color: ORANGE }} />
+              {t("centre", "managerDetails")} <ArrowUpRight size={13} style={{ color: ORANGE }} />
             </Link>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <QuietKpi label="C.A. attendu" value={fmtXAF(fin.ca)} sub="XAF" icon={TrendingUp} />
-            <QuietKpi label="Encaissé" value={fmtXAF(fin.paid)} sub="XAF" icon={Wallet} />
-            <QuietKpi label="Reste à percevoir" value={fmtXAF(fin.pending)} sub="XAF" icon={Clock} />
+            <QuietKpi label={t("centre", "managerExpectedRevenue")} value={fmtXAF(fin.ca)} sub="XAF" icon={TrendingUp} />
+            <QuietKpi label={t("centre", "managerCollected")} value={fmtXAF(fin.paid)} sub="XAF" icon={Wallet} />
+            <QuietKpi label={t("centre", "managerOutstanding")} value={fmtXAF(fin.pending)} sub="XAF" icon={Clock} />
             <QuietKpi
-              label="Retards"
+              label={t("centre", "managerLatePayments")}
               value={String(fin.late)}
-              sub="paiements"
+              sub={t("centre", "managerPayments")}
               icon={AlertTriangle}
               alert={fin.late > 0}
             />
@@ -161,18 +163,18 @@ export default function GenericManagerDashboard({
           {showCourses && (
             <div className="rounded-lg border border-black/[0.08] bg-white p-5">
               <div className="flex items-center justify-between mb-4">
-                <SectionTitle>Cours · cette semaine</SectionTitle>
+                <SectionTitle>{t("centre", "managerCoursesThisWeek")}</SectionTitle>
                 <Link href="/centre/cours/planning" className="text-[12px] font-medium text-neutral-500 hover:text-neutral-800 inline-flex items-center gap-0.5">
-                  Voir <ArrowUpRight size={12} style={{ color: ORANGE }} />
+                  {t("centre", "managerView")} <ArrowUpRight size={12} style={{ color: ORANGE }} />
                 </Link>
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className={CENTER_TYPE.label}>Programmés</span>
+                  <span className={CENTER_TYPE.label}>{t("centre", "managerScheduled")}</span>
                   <span className={CENTER_TYPE.figure} style={{ color: BLUE }}>{coursesCount}</span>
                 </div>
                 <div className="flex items-center justify-between border-t border-neutral-100 pt-3">
-                  <span className={CENTER_TYPE.label}>Annulés</span>
+                  <span className={CENTER_TYPE.label}>{t("centre", "managerCancelled")}</span>
                   <span className={`${CENTER_TYPE.figure} ${cancelledCount > 0 ? "text-red-600" : "text-neutral-300"}`}>
                     {cancelledCount}
                   </span>
@@ -184,13 +186,13 @@ export default function GenericManagerDashboard({
           {showExams && (
             <div className="rounded-lg border border-black/[0.08] bg-white p-5">
               <div className="flex items-center justify-between mb-4">
-                <SectionTitle>Prochains événements</SectionTitle>
+                <SectionTitle>{t("centre", "managerUpcomingEvents")}</SectionTitle>
                 <Link href="/centre/examens/examensuniversels" className="text-[12px] font-medium text-neutral-500 hover:text-neutral-800 inline-flex items-center gap-0.5">
-                  Voir <ArrowUpRight size={12} style={{ color: ORANGE }} />
+                  {t("centre", "managerView")} <ArrowUpRight size={12} style={{ color: ORANGE }} />
                 </Link>
               </div>
               {exams.length === 0 ? (
-                <p className="text-sm text-neutral-400 py-6 text-center">Aucun événement à venir.</p>
+                <p className="text-sm text-neutral-400 py-6 text-center">{t("centre", "managerNoUpcomingEvents")}</p>
               ) : (
                 <ul className="space-y-3">
                   {exams.map((e) => (
@@ -199,7 +201,7 @@ export default function GenericManagerDashboard({
                       <div className="min-w-0">
                         <p className={`${CENTER_TYPE.h1} truncate`} style={{ color: BLUE }}>{e.title}</p>
                         <p className={`${CENTER_TYPE.muted} mt-0.5`}>
-                          {new Date(e.actual_date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                          {new Date(e.actual_date).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "short" })}
                           {e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}
                         </p>
                       </div>
@@ -213,21 +215,21 @@ export default function GenericManagerDashboard({
           {showStudents && (
             <div className="rounded-lg border border-black/[0.08] bg-white p-5">
               <div className="flex items-center justify-between mb-4">
-                <SectionTitle>Apprenants</SectionTitle>
+                <SectionTitle>{t("centre", "managerLearners")}</SectionTitle>
                 <Link href="/centre/etudiants" className="text-[12px] font-medium text-neutral-500 hover:text-neutral-800 inline-flex items-center gap-0.5">
-                  Voir <ArrowUpRight size={12} style={{ color: ORANGE }} />
+                  {t("centre", "managerView")} <ArrowUpRight size={12} style={{ color: ORANGE }} />
                 </Link>
               </div>
               <div className="flex items-baseline gap-2 mb-4">
                 <span className={CENTER_TYPE.figure} style={{ color: BLUE }}>
                   {activeStudents}
                 </span>
-                <span className={CENTER_TYPE.label}>inscrits actifs</span>
+                <span className={CENTER_TYPE.label}>{t("centre", "managerActiveEnrolled")}</span>
               </div>
               {absent.length > 0 ? (
                 <div className="border-t border-neutral-100 pt-3">
                   <p className={`${CENTER_TYPE.h1} mb-2`} style={{ color: BLUE }}>
-                    Absents +5 jours · {absent.length}
+                    {t("centre", "managerAbsentFiveDays")} · {absent.length}
                   </p>
                   <ul className="space-y-1">
                     {absent.slice(0, 4).map((s) => (
@@ -236,13 +238,13 @@ export default function GenericManagerDashboard({
                       </li>
                     ))}
                     {absent.length > 4 && (
-                      <li className={CENTER_TYPE.muted}>+ {absent.length - 4} autres</li>
+                      <li className={CENTER_TYPE.muted}>+ {absent.length - 4} {t("centre", "managerOthers")}</li>
                     )}
                   </ul>
                 </div>
               ) : (
                 <p className="text-[13px] text-neutral-500 border-t border-neutral-100 pt-3">
-                  Tous les apprenants sont actifs.
+                  {t("centre", "managerAllLearnersActive")}
                 </p>
               )}
             </div>
@@ -251,30 +253,30 @@ export default function GenericManagerDashboard({
       )}
 
       <section className="space-y-3">
-        <SectionTitle>Actions rapides</SectionTitle>
+        <SectionTitle>{t("centre", "managerQuickActions")}</SectionTitle>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {showStudents && (
             <QuietAction
               href="/centre/etudiants"
               icon={UserPlus}
-              label="Créer un étudiant"
-              subtitle="Nouvelle inscription"
+              label={t("centre", "managerCreateStudent")}
+              subtitle={t("centre", "managerNewEnrollment")}
             />
           )}
           {showStaff && (
             <QuietAction
               href="/centre/staff"
               icon={Users}
-              label="Ajouter du personnel"
-              subtitle="Équipe du centre"
+              label={t("centre", "managerAddStaff")}
+              subtitle={t("centre", "managerCenterTeam")}
             />
           )}
           {showCommunaute && (
             <QuietAction
               href="/centre/communaute"
               icon={MessageSquare}
-              label="Communauté"
-              subtitle="Messages & groupes"
+              label={t("centre", "managerCommunity")}
+              subtitle={t("centre", "managerMessagesGroups")}
               badge={msgCount > 0 ? msgCount : undefined}
             />
           )}
@@ -282,8 +284,8 @@ export default function GenericManagerDashboard({
             <QuietAction
               href="/centre/finance"
               icon={TrendingUp}
-              label="Voir les finances"
-              subtitle="Encaissements & soldes"
+              label={t("centre", "managerViewFinances")}
+              subtitle={t("centre", "managerCollectionsBalances")}
             />
           )}
         </div>

@@ -1,23 +1,37 @@
 "use client";
 
-import { Languages } from "lucide-react";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
-export default function LanguageSwitcher({ compact = false, dark = false }: { compact?: boolean; dark?: boolean }) {
+export default function LanguageSwitcher({ dark = false }: { compact?: boolean; dark?: boolean }) {
   const { locale, setLocale, t } = useI18n();
-  const next = locale === "fr" ? "en" : "fr";
-  const label = next === "fr" ? t("common", "french") : t("common", "english");
+  const inactiveClass = dark ? "text-white/45 hover:text-white" : "text-neutral-400 hover:text-neutral-700";
+  const activeClass = "text-red-500";
 
   return (
-    <button
-      type="button"
-      onClick={() => setLocale(next)}
-      className={`inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-3 text-xs font-black uppercase tracking-wide transition ${dark ? "border-white/15 bg-white/10 text-white hover:bg-white/15" : "border-black/10 bg-white text-neutral-700 hover:border-black/20"}`}
-      aria-label={`${t("common", "language")}: ${label}`}
-      title={label}
+    <div
+      className="inline-flex items-center gap-2 whitespace-nowrap text-xs font-black uppercase tracking-wide"
+      role="group"
+      aria-label={t("common", "language")}
     >
-      <Languages className="h-4 w-4" aria-hidden />
-      {!compact && <span>{locale.toUpperCase()}</span>}
-    </button>
+      <button
+        type="button"
+        onClick={() => setLocale("fr")}
+        className={`transition-colors ${locale === "fr" ? activeClass : inactiveClass}`}
+        aria-pressed={locale === "fr"}
+        title={t("common", "french")}
+      >
+        FR
+      </button>
+      <span className={dark ? "text-white/25" : "text-neutral-300"} aria-hidden>|</span>
+      <button
+        type="button"
+        onClick={() => setLocale("en")}
+        className={`transition-colors ${locale === "en" ? activeClass : inactiveClass}`}
+        aria-pressed={locale === "en"}
+        title={t("common", "english")}
+      >
+        EN
+      </button>
+    </div>
   );
 }
