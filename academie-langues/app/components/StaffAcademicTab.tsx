@@ -556,7 +556,9 @@ export default function StaffAcademicTab({
         const classesOnNiv = visibleClasses.filter((c) => c.niveau_key === nivKey);
         const picked = classesOnNiv.filter((c) => draftGroupeIds.includes(c.id));
         if (hasMatiereOnNiv && picked.length === 0) {
-          const label = classesOnNiv[0]?.niveau_label || "ce niveau";
+          const label = classesOnNiv[0]?.niveau_label
+            ? levelDisplayLabel(classesOnNiv[0].niveau_label, en)
+            : (en ? "this level" : "ce niveau");
           throw new Error(en ? `Select at least one class for ${label}.` : `Sélectionnez au moins une classe pour ${label}.`);
         }
       }
@@ -813,7 +815,7 @@ export default function StaffAcademicTab({
                   >
                     <option value="all">{en ? "All levels" : "Tous les niveaux"}</option>
                     {niveauFilterOptions.map((n) => (
-                      <option key={n} value={n}>{n}</option>
+                      <option key={n} value={n}>{levelDisplayLabel(n, en)}</option>
                     ))}
                   </select>
                 )}

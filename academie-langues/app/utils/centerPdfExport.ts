@@ -717,7 +717,7 @@ export async function downloadProgrammePdf(
           body: niv.installments.map((inst, i) => [
             `${en ? "Installment" : "Échéance"} ${i + 1}`,
             `${fmtFCFA(inst.montant)} FCFA`,
-            `J + ${inst.jours}`,
+            `${en ? "D" : "J"} + ${inst.jours}`,
           ]),
           styles: { fontSize: 8, cellPadding: 2 },
           headStyles: { fillColor: cfg.blueRgb, textColor: 255 },
@@ -763,7 +763,7 @@ export async function downloadProgrammePdf(
         body: data.globalInstallments.map((inst, i) => [
           `${en ? "Installment" : "Échéance"} ${i + 1}`,
           `${fmtFCFA(inst.montant)} FCFA`,
-          `J + ${inst.jours}`,
+          `${en ? "D" : "J"} + ${inst.jours}`,
         ]),
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: { fillColor: cfg.blueRgb, textColor: 255 },

@@ -407,7 +407,7 @@ function InstallmentsBlock({
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-neutral-400">FCFA</span>
               </div>
               <div className="relative w-28 shrink-0">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-neutral-400">J +</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-neutral-400">{en ? "D +" : "J +"}</span>
                 <input
                   type="text"
                   inputMode="numeric"

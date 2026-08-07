@@ -1345,7 +1345,7 @@ function DeleteModal({ prog, onClose, onDeleted }: { prog: ProgrammeCard; onClos
     setDeleting(true);
     const { error } = await supabase.from("filieres").delete().eq("id", prog.id);
     setDeleting(false);
-    if (error) { setError(error.message); return; }
+    if (error) { setError(t("centre", "programsDeleteImpossible")); return; }
     onDeleted();
   };
 

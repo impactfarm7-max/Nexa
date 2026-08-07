@@ -228,19 +228,21 @@ export function StatSep({ wide = false }: { wide?: boolean }) {
 export function ToolbarSearch({
   value,
   onChange,
-  placeholder = "Rechercher…",
+  placeholder,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
 }) {
+  const { locale } = useI18n();
+  const resolvedPlaceholder = placeholder || (locale === "en" ? "Search…" : "Rechercher…");
   return (
     <div className="relative flex-1 min-w-0 sm:min-w-[12rem]">
       <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
+        placeholder={resolvedPlaceholder}
         className="w-full h-9 pl-9 pr-3 rounded-lg border border-black/[0.08] text-[13px] font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 placeholder:text-neutral-400 transition-shadow duration-200"
         style={{ backgroundColor: SURFACE }}
       />
