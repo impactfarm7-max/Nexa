@@ -13,6 +13,7 @@ import TcfPlanningBoard, { type TcfPlanningKind } from "@/app/components/centre/
 import EstablishmentPlanningBoard from "@/app/components/centre/EstablishmentPlanningBoard";
 import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
 import { isPastCalendarDay, localDateIso } from "@/app/utils/planning-calendar";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import {
   CenterPageLayout,
   BackButton,
@@ -25,7 +26,9 @@ import {
 // ─── palette ─────────────────────────────────────────────────────────────────
 const BLUE   = "#11224E";
 const ORANGE = "#eb670e";
-const DAYS   = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+const DAYS_FR = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+const DAYS_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const daysFor = (locale: string) => (locale === "en" ? DAYS_EN : DAYS_FR);
 
 // ─── types ───────────────────────────────────────────────────────────────────
 type FiliereOption    = { id: string; name: string };
@@ -66,11 +69,11 @@ type SidePanel =
   | { type: "exception"; slotId: string; date: string; existingExceptionId?: string }
   | null;
 
-const STATUS_STYLES: Record<string, { label: string; bg: string; text: string; border: string }> = {
-  normal:      { label: "Actif",    bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
-  cancelled:   { label: "Annulé",   bg: "bg-red-50",     text: "text-red-600",     border: "border-red-200" },
-  rescheduled: { label: "Reporté",  bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200" },
-  substituted: { label: "Remplacé", bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200" },
+const STATUS_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  normal:      { bg: "bg-emerald-50", text: "text-emerald-700", border: "border-emerald-200" },
+  cancelled:   { bg: "bg-red-50",     text: "text-red-600",     border: "border-red-200" },
+  rescheduled: { bg: "bg-amber-50",   text: "text-amber-700",   border: "border-amber-200" },
+  substituted: { bg: "bg-blue-50",    text: "text-blue-700",    border: "border-blue-200" },
 };
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
@@ -97,6 +100,9 @@ function isPastDay(d: Date): boolean {
 // PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════════════════
 export default function CenterPlanningPage() {
+  const { t, locale } = useI18n();
+  const DAYS = daysFor(locale);
+  const statusLabel = (status: string) => t("centre", `planningStatus_${status}`);
   const [loading,    setLoading]    = useState(true);
   const [centerId,   setCenterId]   = useState<string | null>(null);
   const [centerType, setCenterType] = useState<string>("generic");
@@ -432,10 +438,10 @@ export default function CenterPlanningPage() {
   if (loading) return <CenterPageLoading />;
 
   const pageTitle = !isTcfCenter && planningView === "etablissement"
-    ? "Établissement"
+    ? t("centre", "planningEstablishment")
     : selectedFiliere
       ? selectedFiliere.name
-      : "Emploi du temps";
+      : t("centre", "planningSchedule");
 
   const showBack =
     Boolean(selectedFiliereId) || (!isTcfCenter && planningView === "etablissement");
@@ -479,7 +485,7 @@ export default function CenterPlanningPage() {
                         ? "Séances individuelles"
                         : selectedGroupe
                           ? selectedGroupe.nom
-                          : "Planning hebdomadaire"}
+                          : t("centre", "planningWeekly")}
                   </p>
                 )}
               </div>
@@ -495,7 +501,7 @@ export default function CenterPlanningPage() {
                       planningView === "classe" ? "bg-white text-[#11224E] font-semibold shadow-sm" : "text-neutral-500"
                     }`}
                   >
-                    Classe
+                    {t("centre", "planningClass")}
                   </button>
                   <button
                     type="button"
@@ -504,21 +510,21 @@ export default function CenterPlanningPage() {
                       planningView === "etablissement" ? "bg-white text-[#11224E] font-semibold shadow-sm" : "text-neutral-500"
                     }`}
                   >
-                    Établissement
+                    {t("centre", "planningEstablishment")}
                   </button>
                 </div>
               )}
-              <AgentIaComingSoonButton title="Agent IA NEXA — filtres intelligents avancés à venir" />
+              <AgentIaComingSoonButton title={t("centre", "planningAiFiltersComingSoon")} />
               {selectedFiliereId && planningView === "classe" && (
                 <>
                   {!isTcfCenter && (
                     <OutlineHeaderButton onClick={() => setShowPrint(true)} disabled={!libreReady}>
-                      <Printer size={14} /> Imprimer
+                      <Printer size={14} /> {t("centre", "planningPrint")}
                     </OutlineHeaderButton>
                   )}
                   {(isTcfCenter ? tcfPlanningMode === "collective" : libreReady) && (
                     <OutlineHeaderButton onClick={() => setSidePanel({ type: "add_slot" })}>
-                      <Plus size={14} /> {isTcfCenter ? "Nouveau coaching" : "Nouveau créneau"}
+                      <Plus size={14} /> {isTcfCenter ? "Nouveau coaching" : t("centre", "planningNewSlot")}
                     </OutlineHeaderButton>
                   )}
                 </>
@@ -566,10 +572,10 @@ export default function CenterPlanningPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold border border-black/[0.08] bg-white/70 text-[#11224E]">
                         {selectedNiveauId
-                          ? `Niv. ${niveaux.find((n) => n.id === selectedNiveauId)?.annee ?? niveaux.find((n) => n.id === selectedNiveauId)?.mois ?? "—"}`
-                          : "Niveau"}
+                          ? `${t("centre", "planningLevelAbbr")} ${niveaux.find((n) => n.id === selectedNiveauId)?.annee ?? niveaux.find((n) => n.id === selectedNiveauId)?.mois ?? "—"}`
+                          : t("centre", "planningLevel")}
                         <span className="text-neutral-300">·</span>
-                        {selectedGroupe?.nom || "Classe"}
+                        {selectedGroupe?.nom || t("centre", "planningClass")}
                         {selectedTrainerId && (
                           <>
                             <span className="text-neutral-300">·</span>
@@ -588,7 +594,7 @@ export default function CenterPlanningPage() {
                         onClick={() => setFiltersExpanded(true)}
                         className="h-8 px-3 rounded-lg text-xs font-semibold border border-black/[0.08] bg-white/70 text-neutral-600 hover:bg-white inline-flex items-center gap-1"
                       >
-                        <Filter size={12} /> Modifier filtres
+                        <Filter size={12} /> {t("centre", "planningEditFilters")}
                       </button>
                       {(selectedTrainerId || selectedRoom || smartClassFilter !== "all") && (
                         <button
@@ -600,7 +606,7 @@ export default function CenterPlanningPage() {
                           }}
                           className="h-8 px-3 rounded-lg text-xs text-neutral-500 hover:text-neutral-800"
                         >
-                          Réinitialiser
+                          {t("centre", "planningReset")}
                         </button>
                       )}
                     </div>
@@ -608,7 +614,7 @@ export default function CenterPlanningPage() {
                     <>
                       {niveaux.length > 0 && (
                         <div className="flex gap-1.5 flex-wrap items-center">
-                          <span className="text-xs text-neutral-500">Niveau</span>
+                          <span className="text-xs text-neutral-500">{t("centre", "planningLevel")}</span>
                           {niveaux.map((n) => (
                             <FilterPill
                               key={n.id}
@@ -619,7 +625,7 @@ export default function CenterPlanningPage() {
                                 setFiltersExpanded(true);
                               }}
                             >
-                              Niv. {n.annee ?? `${n.mois}m`}
+                              {t("centre", "planningLevelAbbr")} {n.annee ?? `${n.mois}m`}
                             </FilterPill>
                           ))}
                         </div>
@@ -629,9 +635,9 @@ export default function CenterPlanningPage() {
                         <>
                           {niveaux.length > 0 && <span className="w-px h-5 bg-neutral-200 shrink-0" />}
                           <div className="flex gap-1.5 flex-wrap items-center">
-                            <span className="text-xs text-neutral-500">Classe</span>
+                            <span className="text-xs text-neutral-500">{t("centre", "planningClass")}</span>
                             {groupes.length === 0 ? (
-                              <span className="text-[10px] text-neutral-400 italic">Aucune classe pour ce niveau</span>
+                              <span className="text-[10px] text-neutral-400 italic">{t("centre", "planningNoClassForLevel")}</span>
                             ) : (
                               groupes.map((g) => (
                                 <FilterPill
@@ -654,22 +660,22 @@ export default function CenterPlanningPage() {
                           )}
                           {trainers.length > 0 && (
                             <div className="flex gap-1.5 flex-wrap items-center">
-                              <span className="text-xs text-neutral-500">Formateur</span>
-                              {trainers.slice(0, 8).map((t) => (
+                              <span className="text-xs text-neutral-500">{t("centre", "planningTrainer")}</span>
+                              {trainers.slice(0, 8).map((tr) => (
                                 <FilterPill
-                                  key={t.id}
-                                  active={selectedTrainerId === t.id}
+                                  key={tr.id}
+                                  active={selectedTrainerId === tr.id}
                                   color="blue"
-                                  onClick={() => setSelectedTrainerId(selectedTrainerId === t.id ? "" : t.id)}
+                                  onClick={() => setSelectedTrainerId(selectedTrainerId === tr.id ? "" : tr.id)}
                                 >
-                                  {t.prenom}
+                                  {tr.prenom}
                                 </FilterPill>
                               ))}
                             </div>
                           )}
                           {roomOptions.length > 0 && (
                             <div className="flex gap-1.5 flex-wrap items-center">
-                              <span className="text-xs text-neutral-500">Salle</span>
+                              <span className="text-xs text-neutral-500">{t("centre", "planningRoom")}</span>
                               {roomOptions.map((r) => (
                                 <FilterPill
                                   key={r}
@@ -687,7 +693,7 @@ export default function CenterPlanningPage() {
                             onClick={() => setFiltersExpanded(false)}
                             className="h-8 px-3 rounded-lg text-xs text-neutral-500 hover:text-neutral-800 inline-flex items-center gap-1"
                           >
-                            <ChevronDown size={12} className="rotate-180" /> Réduire
+                            <ChevronDown size={12} className="rotate-180" /> {t("centre", "planningCollapse")}
                           </button>
                         </>
                       )}
@@ -698,14 +704,14 @@ export default function CenterPlanningPage() {
                   {libreReady && (
                     <div className="w-full flex flex-wrap items-center gap-1.5 pt-1">
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400 mr-1">
-                        <Sparkles size={11} style={{ color: ORANGE }} /> Intelligent
+                        <Sparkles size={11} style={{ color: ORANGE }} /> {t("centre", "planningSmart")}
                       </span>
                       {(
                         [
-                          { id: "all" as const, label: "Tout" },
-                          { id: "free_rooms" as const, label: `Salles libres (${freeRoomsThisWeek.length})` },
-                          { id: "no_formateur" as const, label: "Sans formateur" },
-                          { id: "cancelled" as const, label: "Annulés" },
+                          { id: "all" as const, label: t("centre", "planningFilterAll") },
+                          { id: "free_rooms" as const, label: `${t("centre", "planningFilterFreeRooms")} (${freeRoomsThisWeek.length})` },
+                          { id: "no_formateur" as const, label: t("centre", "planningFilterNoTrainer") },
+                          { id: "cancelled" as const, label: t("centre", "planningFilterCancelled") },
                         ]
                       ).map((f) => (
                         <button
@@ -724,8 +730,8 @@ export default function CenterPlanningPage() {
                       {smartClassFilter === "free_rooms" && (
                         <span className="text-[11px] text-neutral-500">
                           {freeRoomsThisWeek.length === 0
-                            ? "Toutes les salles connues ont au moins un cours cette semaine."
-                            : <>Sans cours : <span className="font-semibold text-[#11224E]">{freeRoomsThisWeek.join(" · ")}</span></>}
+                            ? t("centre", "planningAllRoomsUsed")
+                            : <>{t("centre", "planningNoCoursesFor")} <span className="font-semibold text-[#11224E]">{freeRoomsThisWeek.join(" · ")}</span></>}
                         </span>
                       )}
                     </div>
@@ -791,22 +797,22 @@ export default function CenterPlanningPage() {
                   onClick={() => navigateWeek("prev")}
                   className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white/70 text-xs font-medium text-neutral-700 hover:bg-white inline-flex items-center gap-1.5"
                 >
-                  <ChevronLeft size={14} /> Semaine précédente
+                  <ChevronLeft size={14} /> {t("centre", "planningPrevWeek")}
                 </button>
                 <button
                   type="button"
                   onClick={() => setWeekStart(getMonday(new Date()))}
                   className="h-8 px-2.5 rounded-lg text-[10px] font-black uppercase tracking-wider text-neutral-400 hover:text-orange-600"
-                  title="Revenir à cette semaine"
+                  title={t("centre", "planningBackToThisWeek")}
                 >
-                  {weekStart.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                  {weekStart.toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR", { day: "2-digit", month: "short" })}
                 </button>
                 <button
                   type="button"
                   onClick={() => navigateWeek("next")}
                   className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white/70 text-xs font-medium text-neutral-700 hover:bg-white inline-flex items-center gap-1.5"
                 >
-                  Semaine suivante <ChevronRight size={14} />
+                  {t("centre", "planningNextWeek")} <ChevronRight size={14} />
                 </button>
               </div>
               ) : null}
@@ -853,7 +859,7 @@ export default function CenterPlanningPage() {
               <>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-4 flex items-center gap-2">
-                  <CalendarDays size={12} /> Sélectionnez un programme à planifier
+                  <CalendarDays size={12} /> {t("centre", "planningSelectProgram")}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filieres.map((f) => (
@@ -865,13 +871,13 @@ export default function CenterPlanningPage() {
                       <span className="w-2.5 h-2.5 rounded-full block mb-4" style={{ backgroundColor: ORANGE }} />
                       <h3 className="font-black text-base leading-tight group-hover:text-orange-600 transition-colors" style={{ color: BLUE }}>{f.name}</h3>
                       <p className="text-[10px] font-bold uppercase text-neutral-400 tracking-wider mt-3 flex items-center gap-1">
-                        <CalendarIcon size={10} /> Filière → Niveau → Classe
+                        <CalendarIcon size={10} /> {t("centre", "planningProgramLevelClass")}
                       </p>
                     </button>
                   ))}
                   {filieres.length === 0 && (
                     <p className="col-span-full text-center text-xs text-neutral-400 py-16 italic">
-                      Aucun programme publié. Publiez d'abord une filière.
+                      {t("centre", "planningNoPublishedProgram")}
                     </p>
                   )}
                 </div>
@@ -884,10 +890,9 @@ export default function CenterPlanningPage() {
                       <Filter size={16} className="text-blue-500" />
                     </div>
                     <div>
-                      <p className="font-black text-sm" style={{ color: BLUE }}>Parcours classe-first</p>
+                      <p className="font-black text-sm" style={{ color: BLUE }}>{t("centre", "planningClassFirstTitle")}</p>
                       <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
-                        Choisissez une <strong>filière</strong>, puis un <strong>niveau</strong> et une <strong>classe</strong> avant d’ouvrir la grille.
-                        Utilisez l’onglet <strong>Établissement</strong> pour le calendrier global et les reports à placer.
+                        {t("centre", "planningClassFirstStep1")}{" "}{t("centre", "planningClassFirstStep2")}
                       </p>
                     </div>
                   </div>
@@ -904,12 +909,12 @@ export default function CenterPlanningPage() {
                 <Users size={20} style={{ color: ORANGE }} />
               </div>
               <h2 className="text-lg font-black" style={{ color: BLUE }}>
-                {niveaux.length > 0 && !selectedNiveauId ? "Choisissez un niveau" : "Choisissez une classe"}
+                {niveaux.length > 0 && !selectedNiveauId ? t("centre", "planningChooseLevel") : t("centre", "planningChooseClass")}
               </h2>
               <p className="text-sm text-neutral-500">
                 {niveaux.length > 0 && !selectedNiveauId
-                  ? "Sélectionnez d’abord le niveau dans la barre de filtres, puis la classe."
-                  : "La grille hebdomadaire s’ouvre après le choix de la classe."}
+                  ? t("centre", "planningChooseLevelHelp")
+                  : t("centre", "planningChooseClassHelp")}
               </p>
             </div>
           ) : weekLoading ? (
@@ -988,7 +993,7 @@ export default function CenterPlanningPage() {
                                   </span>
                                 )}
                                 {slot.status !== "normal" && (
-                                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${st.bg} ${st.text} border ${st.border}`}>{st.label}</span>
+                                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${st.bg} ${st.text} border ${st.border}`}>{statusLabel(slot.status)}</span>
                                 )}
                               </div>
                             </div>
@@ -1021,7 +1026,7 @@ export default function CenterPlanningPage() {
                       )}
                       {daySlots.length === 0 && isPast && (
                         <div className="h-20 rounded-xl border border-dashed border-neutral-200 flex items-center justify-center text-[10px] font-bold uppercase tracking-wider text-neutral-300">
-                          Passé
+                          {t("centre", "planningPast")}
                         </div>
                       )}
                       {daySlots.length > 0 && !isPast && (
@@ -1105,26 +1110,28 @@ function FilterPill({ children, active, onClick, color = "orange" }: {
 function PrintPlanningModal({ weekStart, slotsByDay, filiereName, onClose }: {
   weekStart: Date; slotsByDay: Record<number, WeekSlot[]>; filiereName: string; onClose: () => void;
 }) {
+  const { t, locale } = useI18n();
+  const DAYS = daysFor(locale);
   const totalSlots = Object.values(slotsByDay).reduce((a, d) => a + d.length, 0);
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white max-w-3xl w-full p-8 rounded-2xl shadow-2xl my-8">
         <div className="print:hidden flex justify-end gap-3 mb-6 pb-5 border-b">
           <button onClick={() => window.print()} className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase text-white" style={{ backgroundColor: ORANGE }}>
-            <Printer size={15} /> Imprimer / PDF
+            <Printer size={15} /> {t("centre", "planningPrintPdf")}
           </button>
           <button onClick={onClose} className="p-2.5 bg-neutral-100 rounded-xl hover:bg-neutral-200"><X size={17} /></button>
         </div>
 
         <div className="flex justify-between items-start border-b-2 pb-5 mb-6" style={{ borderColor: BLUE }}>
           <div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-neutral-400">Emploi du temps</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-neutral-400">{t("centre", "planningSchedule")}</p>
             <h1 className="text-2xl font-black uppercase mt-1" style={{ color: BLUE }}>{filiereName}</h1>
             <p className="text-xs font-bold mt-1" style={{ color: ORANGE }}>
-              Semaine du {weekStart.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+              {t("centre", "planningWeekOf")} {weekStart.toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
             </p>
           </div>
-          <p className="text-[10px] text-neutral-500">{totalSlots} créneau(x)</p>
+          <p className="text-[10px] text-neutral-500">{t("centre", "planningSlotCount", { count: String(totalSlots) })}</p>
         </div>
 
         <div className="grid grid-cols-6 gap-3">
@@ -1168,6 +1175,8 @@ function SlotPanel({
   defaultNiveauId?: string; defaultGroupeId?: string;
   onClose: () => void; onSaved: () => void;
 }) {
+  const { t, locale } = useI18n();
+  const DAYS = daysFor(locale);
   const isAddSlot   = type.type === "add_slot";
   const isException = type.type === "exception";
   const isEditSlot  = type.type === "edit_slot";
@@ -1429,14 +1438,14 @@ function SlotPanel({
   const notifyStudents = async (title: string, slotId: string, sessionDate: string | null) => {
     try {
       const dateLabel = sessionDate
-        ? new Date(`${sessionDate}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })
+        ? new Date(`${sessionDate}T12:00:00`).toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR", { weekday: "long", day: "numeric", month: "long" })
         : (DAYS[dayOfWeek - 1] ?? "");
-      const modeLabel = mode === "en_ligne" ? "En ligne (visio NEXA)" : "Présentiel";
+      const modeLabel = mode === "en_ligne" ? t("centre", "planningOnlineMode") : t("centre", "planningInPersonMode");
       const joinPath =
         mode === "en_ligne" && slotId && sessionDate
           ? `/tcf-canada/live/room/${slotId}?date=${sessionDate}`
           : null;
-      const baseMsg = `📅 Nouvelle séance programmée — « ${title} » · ${dateLabel} · ${startTime}–${endTime} · ${modeLabel}${roomName && mode === "presentiel" ? ` · ${roomName}` : ""}${joinPath ? `\n🔗 Rejoindre : ${joinPath}` : ""}`;
+      const baseMsg = `📅 ${t("centre", "planningNewSessionScheduled")} — « ${title} » · ${dateLabel} · ${startTime}–${endTime} · ${modeLabel}${roomName && mode === "presentiel" ? ` · ${roomName}` : ""}${joinPath ? `\n🔗 ${t("centre", "planningJoin")} : ${joinPath}` : ""}`;
 
       const groupeIds = isTcfCenter
         ? selectedGroupeIds
@@ -1493,8 +1502,8 @@ function SlotPanel({
   };
 
   const handleSaveSlot = async () => {
-    if (!startTime || !endTime)           { setError("Horaires requis."); return; }
-    if (!slotTitle.trim() && !disciplineId) { setError("Titre ou matière requis."); return; }
+    if (!startTime || !endTime)           { setError(t("centre", "planningTimesRequired")); return; }
+    if (!slotTitle.trim() && !disciplineId) { setError(t("centre", "planningTitleOrSubjectRequired")); return; }
     if (isTcfCenter && !specificDate) { setError("Date de la séance requise."); return; }
     if (isTcfCenter && selectedGroupeIds.length === 0) {
       setError("Sélectionnez au moins une classe pour le coaching de groupe.");
@@ -1503,19 +1512,19 @@ function SlotPanel({
     if (!isTcfCenter) {
       const effectiveNiveau = lockedNiveauId || niveauId;
       const effectiveGroupe = lockedGroupeId || groupeId;
-      if (niveaux.length > 0 && !effectiveNiveau) { setError("Niveau obligatoire."); return; }
+      if (niveaux.length > 0 && !effectiveNiveau) { setError(t("centre", "planningLevelRequired")); return; }
       if (isTroncCommun) {
         const extras = selectedGroupeIds.filter((id) => id !== effectiveGroupe);
         if (!effectiveGroupe || extras.length < 1) {
-          setError("Tronc commun : ajoutez au moins une autre classe.");
+          setError(t("centre", "planningTroncAddClass"));
           return;
         }
         if (mode === "presentiel" && !roomName.trim()) {
-          setError("Salle obligatoire pour le tronc commun en présentiel.");
+          setError(t("centre", "planningTroncRoomRequired"));
           return;
         }
       } else if (!effectiveGroupe) {
-        setError("Classe obligatoire.");
+        setError(t("centre", "planningClassRequired"));
         return;
       }
     }
@@ -1562,13 +1571,13 @@ function SlotPanel({
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setError(json.error || "Enregistrement impossible.");
+          setError(json.error || t("centre", "planningSaveError"));
           setSaving(false);
           return;
         }
         if (type.type === "add_slot" && json.slot_id) {
           await notifyStudents(
-            slotTitle.trim() || disciplines.find((d) => d.id === disciplineId)?.name || "Nouveau cours",
+            slotTitle.trim() || disciplines.find((d) => d.id === disciplineId)?.name || t("centre", "planningNewCourse"),
             json.slot_id,
             null,
           );
@@ -1577,7 +1586,7 @@ function SlotPanel({
         onSaved();
         return;
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Erreur réseau.");
+        setError(e instanceof Error ? e.message : t("centre", "planningNetworkError"));
         setSaving(false);
         return;
       }
@@ -1629,10 +1638,10 @@ function SlotPanel({
 
   const handleSaveException = async () => {
     if (type.type !== "exception") return;
-    if (!exReason.trim()) { setError("Motif obligatoire."); return; }
+    if (!exReason.trim()) { setError(t("centre", "planningReasonRequired")); return; }
     if (exType === "rescheduled" && !exPendingPlace) {
       if (!exNewDate || !exNewStart || !exNewEnd) {
-        setError("Date et horaires de report obligatoires (ou cochez « placer plus tard »).");
+        setError(t("centre", "planningRescheduleDateRequired"));
         return;
       }
     }
@@ -1661,12 +1670,12 @@ function SlotPanel({
           }),
         });
         const json = await res.json().catch(() => ({}));
-        if (!res.ok) { setError(json.error || "Enregistrement impossible."); setSaving(false); return; }
+        if (!res.ok) { setError(json.error || t("centre", "planningSaveError")); setSaving(false); return; }
         setSaving(false);
         onSaved();
         return;
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : "Erreur réseau.");
+        setError(e instanceof Error ? e.message : t("centre", "planningNetworkError"));
         setSaving(false);
         return;
       }
@@ -1714,10 +1723,10 @@ function SlotPanel({
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) { setError(json.error || "Duplication impossible."); setSaving(false); return; }
-      setDupMsg(`Créés : ${json.created ?? 0} · Ignorés (conflit) : ${json.skipped ?? 0}`);
+      if (!res.ok) { setError(json.error || t("centre", "planningDuplicateError")); setSaving(false); return; }
+      setDupMsg(t("centre", "planningDuplicateResult", { created: String(json.created ?? 0), skipped: String(json.skipped ?? 0) }));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur réseau.");
+      setError(e instanceof Error ? e.message : t("centre", "planningNetworkError"));
     } finally {
       setSaving(false);
     }
@@ -1725,14 +1734,14 @@ function SlotPanel({
 
   const handleDeleteSlot = async () => {
     if (type.type !== "edit_slot" && type.type !== "exception") return;
-    if (!confirm("Supprimer ce créneau ?")) return;
+    if (!confirm(t("centre", "planningDeleteSlotConfirm"))) return;
     await supabase.from("schedule_slots").delete().eq("id", type.slotId);
     onSaved();
   };
 
   const handleDeleteException = async () => {
     if (type.type !== "exception" || !type.existingExceptionId) return;
-    if (!confirm("Rétablir le cours normal ?")) return;
+    if (!confirm(t("centre", "planningRestoreConfirm"))) return;
     await supabase.from("schedule_exceptions").delete().eq("id", type.existingExceptionId);
     onSaved();
   };
@@ -1741,9 +1750,9 @@ function SlotPanel({
   const showExceptionForm = isException && (isTcfCenter || panelMode === "manage");
 
   const panelTitle = isAddSlot
-    ? (isTcfCenter ? "Nouveau coaching de groupe" : "Nouveau créneau")
-    : showSlotForm ? "Modifier le créneau"
-    : "Gérer ce cours";
+    ? (isTcfCenter ? "Nouveau coaching de groupe" : t("centre", "planningNewSlot"))
+    : showSlotForm ? t("centre", "planningEditSlot")
+    : t("centre", "planningManageCourse");
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -1754,14 +1763,14 @@ function SlotPanel({
           <div className="min-w-0 pr-3">
             <h3 className="text-lg font-medium text-neutral-900 tracking-tight">{panelTitle}</h3>
             {isException && (
-              <p className="text-sm text-neutral-500 mt-0.5">Date : {(type as { date?: string }).date}</p>
+              <p className="text-sm text-neutral-500 mt-0.5">{t("centre", "planningDateLabel")} {(type as { date?: string }).date}</p>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
             className="h-9 w-9 rounded-full text-neutral-500 hover:bg-neutral-100 flex items-center justify-center shrink-0"
-            aria-label="Fermer"
+            aria-label={t("centre", "planningClose")}
           >
             <X size={18} />
           </button>
@@ -1775,14 +1784,14 @@ function SlotPanel({
                 onClick={() => setPanelMode("manage")}
                 className={`flex-1 h-8 rounded-full text-sm transition-colors ${panelMode === "manage" ? "bg-white shadow-sm text-neutral-900 font-medium" : "text-neutral-500"}`}
               >
-                Annuler / Reporter
+                {t("centre", "planningCancelOrReschedule")}
               </button>
               <button
                 type="button"
                 onClick={() => setPanelMode("edit")}
                 className={`flex-1 h-8 rounded-full text-sm transition-colors ${panelMode === "edit" ? "bg-white shadow-sm text-neutral-900 font-medium" : "text-neutral-500"}`}
               >
-                Modifier
+                {t("centre", "planningEdit")}
               </button>
             </div>
           )}
@@ -1791,16 +1800,16 @@ function SlotPanel({
             <>
               <div className="bg-neutral-50 rounded-xl p-3 border text-xs">
                 <p className="font-black" style={{ color: BLUE }}>{slotTitle || "—"}</p>
-                <p className="text-neutral-400 mt-0.5">{DAYS[(dayOfWeek - 1)]} {startTime}–{endTime} · {roomName || "Sans salle"}</p>
+                <p className="text-neutral-400 mt-0.5">{DAYS[(dayOfWeek - 1)]} {startTime}–{endTime} · {roomName || t("centre", "planningNoRoom")}</p>
               </div>
 
               <div>
-                <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block mb-2">Que se passe-t-il ?</label>
+                <label className="text-[10px] font-black uppercase text-neutral-400 tracking-wider block mb-2">{t("centre", "planningWhatHappens")}</label>
                 <div className="grid grid-cols-3 gap-2">
                   {([
-                    { value: "cancelled"   as const, label: "Annuler",   icon: Ban,       cls: "red" },
-                    { value: "rescheduled" as const, label: "Reporter",  icon: RefreshCw, cls: "amber" },
-                    { value: "substituted" as const, label: "Remplacer", icon: UserCheck, cls: "blue" },
+                    { value: "cancelled"   as const, label: t("centre", "planningCancel"),      icon: Ban,       cls: "red" },
+                    { value: "rescheduled" as const, label: t("centre", "planningReschedule"),   icon: RefreshCw, cls: "amber" },
+                    { value: "substituted" as const, label: t("centre", "planningSubstitute"),   icon: UserCheck, cls: "blue" },
                   ]).map(({ value, label, icon: Icon, cls }) => (
                     <button key={value} type="button" onClick={() => setExType(value)} className={`p-3 rounded-xl border-2 text-center transition-all ${exType === value ? `border-${cls}-400 bg-${cls}-50` : "border-neutral-200 hover:border-neutral-300"}`}>
                       <Icon size={16} className={`mx-auto mb-1 ${exType === value ? `text-${cls}-600` : "text-neutral-400"}`} />
@@ -1810,13 +1819,13 @@ function SlotPanel({
                 </div>
               </div>
 
-              <PanelField label="Motif (obligatoire)">
-                <textarea value={exReason} onChange={(e) => setExReason(e.target.value)} placeholder="Prof malade, fête nationale..." rows={2} className="w-full p-3 bg-neutral-50 border rounded-xl text-xs font-medium outline-none resize-none focus:border-blue-400" />
+              <PanelField label={t("centre", "planningReasonRequiredLabel")}>
+                <textarea value={exReason} onChange={(e) => setExReason(e.target.value)} placeholder={t("centre", "planningReasonPlaceholder")} rows={2} className="w-full p-3 bg-neutral-50 border rounded-xl text-xs font-medium outline-none resize-none focus:border-blue-400" />
               </PanelField>
 
               {exType === "rescheduled" && (
                 <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-3">
-                  <p className="text-[10px] font-black uppercase text-amber-700">Nouveau créneau</p>
+                  <p className="text-[10px] font-black uppercase text-amber-700">{t("centre", "planningNewSlot")}</p>
                   {!isTcfCenter && (
                     <label className="flex items-center gap-2 text-xs font-bold text-amber-800 cursor-pointer">
                       <input
@@ -1824,17 +1833,17 @@ function SlotPanel({
                         checked={exPendingPlace}
                         onChange={(e) => setExPendingPlace(e.target.checked)}
                       />
-                      Placer plus tard (calendrier établissement)
+                      {t("centre", "planningPlaceLater")}
                     </label>
                   )}
                   {!exPendingPlace && (
                     <>
-                      <PanelField label="Nouvelle date"><input type="date" value={exNewDate} onChange={(e) => setExNewDate(e.target.value)} className={panelInputCls} /></PanelField>
+                      <PanelField label={t("centre", "planningNewDate")}><input type="date" value={exNewDate} onChange={(e) => setExNewDate(e.target.value)} className={panelInputCls} /></PanelField>
                       <div className="grid grid-cols-2 gap-2">
-                        <PanelField label="Début"><input type="time" value={exNewStart} onChange={(e) => setExNewStart(e.target.value)} className={panelInputCls} /></PanelField>
-                        <PanelField label="Fin">  <input type="time" value={exNewEnd}   onChange={(e) => setExNewEnd(e.target.value)}   className={panelInputCls} /></PanelField>
+                        <PanelField label={t("centre", "planningStart")}><input type="time" value={exNewStart} onChange={(e) => setExNewStart(e.target.value)} className={panelInputCls} /></PanelField>
+                        <PanelField label={t("centre", "planningEnd")}>  <input type="time" value={exNewEnd}   onChange={(e) => setExNewEnd(e.target.value)}   className={panelInputCls} /></PanelField>
                       </div>
-                      <PanelField label="Salle"><input value={exNewRoom} onChange={(e) => setExNewRoom(e.target.value)} placeholder="Même salle si vide" className={panelInputCls} /></PanelField>
+                      <PanelField label={t("centre", "planningRoom")}><input value={exNewRoom} onChange={(e) => setExNewRoom(e.target.value)} placeholder={t("centre", "planningSameRoomIfEmpty")} className={panelInputCls} /></PanelField>
                     </>
                   )}
                 </div>
@@ -1842,10 +1851,10 @@ function SlotPanel({
 
               {exType === "substituted" && (
                 <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
-                  <PanelField label="Formateur remplaçant">
+                  <PanelField label={t("centre", "planningSubstituteTrainer")}>
                     <select value={exSubstituteId} onChange={(e) => setExSubstituteId(e.target.value)} className={panelInputCls}>
-                      <option value="">Choisir...</option>
-                      {trainers.map((t) => <option key={t.id} value={t.id}>{t.prenom} {t.nom ?? ""}</option>)}
+                      <option value="">{t("centre", "planningChoose")}</option>
+                      {trainers.map((tr) => <option key={tr.id} value={tr.id}>{tr.prenom} {tr.nom ?? ""}</option>)}
                     </select>
                   </PanelField>
                 </div>
@@ -1860,7 +1869,7 @@ function SlotPanel({
               )}
 
               {!isTcfCenter && (
-              <PanelField label="Jour">
+              <PanelField label={t("centre", "planningDay")}>
                 <select value={dayOfWeek} onChange={(e) => setDayOfWeek(Number(e.target.value))} className={panelInputCls}>
                   {DAYS.map((d, i) => <option key={i} value={i + 1}>{d}</option>)}
                 </select>
@@ -1868,41 +1877,41 @@ function SlotPanel({
               )}
 
               <div className="grid grid-cols-2 gap-3">
-                <PanelField label="Début"><input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={panelInputCls} /></PanelField>
-                <PanelField label="Fin">  <input type="time" value={endTime}   onChange={(e) => setEndTime(e.target.value)}   className={panelInputCls} /></PanelField>
+                <PanelField label={t("centre", "planningStart")}><input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className={panelInputCls} /></PanelField>
+                <PanelField label={t("centre", "planningEnd")}>  <input type="time" value={endTime}   onChange={(e) => setEndTime(e.target.value)}   className={panelInputCls} /></PanelField>
               </div>
 
               {!isTcfCenter && (
-              <PanelField label="Matière">
+              <PanelField label={t("centre", "planningSubject")}>
                 <select value={disciplineId} onChange={(e) => setDisciplineId(e.target.value)} className={panelInputCls}>
-                  <option value="">Pas de matière (titre libre)</option>
+                  <option value="">{t("centre", "planningNoSubjectFreeTitle")}</option>
                   {disciplines.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                 </select>
               </PanelField>
               )}
 
               {(isTcfCenter || !disciplineId) && (
-                <PanelField label={isTcfCenter ? "Titre de la séance" : "Titre libre"}>
-                  <input value={slotTitle} onChange={(e) => setSlotTitle(e.target.value)} placeholder={isTcfCenter ? "Ex : Expression orale — groupe A" : "Ex : Étude dirigée..."} className={panelInputCls} />
+                <PanelField label={isTcfCenter ? "Titre de la séance" : t("centre", "planningFreeTitle")}>
+                  <input value={slotTitle} onChange={(e) => setSlotTitle(e.target.value)} placeholder={isTcfCenter ? "Ex : Expression orale — groupe A" : t("centre", "planningFreeTitlePlaceholder")} className={panelInputCls} />
                 </PanelField>
               )}
 
-              <PanelField label="Formateur">
+              <PanelField label={t("centre", "planningTrainer")}>
                 <select value={formateurId} onChange={(e) => setFormateurId(e.target.value)} className={panelInputCls}>
-                  <option value="">À définir</option>
-                  {trainers.map((t) => <option key={t.id} value={t.id}>{t.prenom} {t.nom ?? ""}</option>)}
+                  <option value="">{t("centre", "planningToBeDetermined")}</option>
+                  {trainers.map((tr) => <option key={tr.id} value={tr.id}>{tr.prenom} {tr.nom ?? ""}</option>)}
                 </select>
               </PanelField>
 
               {!isTcfCenter && (
                 <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-3">
-                  <p className="text-xs text-neutral-500">Contexte</p>
+                  <p className="text-xs text-neutral-500">{t("centre", "planningContext")}</p>
                   <p className="text-sm font-medium text-neutral-900 mt-0.5">
                     {lockedNiveau
-                      ? `Niveau ${lockedNiveau.annee ?? `${lockedNiveau.mois}m`}`
-                      : "Niveau —"}
+                      ? `${t("centre", "planningLevel")} ${lockedNiveau.annee ?? `${lockedNiveau.mois}m`}`
+                      : `${t("centre", "planningLevel")} —`}
                     {" · "}
-                    {lockedGroupe?.nom || "Classe —"}
+                    {lockedGroupe?.nom || `${t("centre", "planningClass")} —`}
                   </p>
                   {filiereName && (
                     <p className="text-xs text-neutral-400 mt-0.5 truncate">{filiereName}</p>
@@ -1926,9 +1935,9 @@ function SlotPanel({
                       }}
                     />
                     <span>
-                      <span className="text-sm font-medium text-neutral-900 block">Tronc commun</span>
+                      <span className="text-sm font-medium text-neutral-900 block">{t("centre", "planningTroncCommun")}</span>
                       <span className="text-xs text-neutral-500">
-                        Ajouter d’autres classes (autres niveaux du programme, ou d’autres programmes)
+                        {t("centre", "planningTroncCommunHelp")}
                       </span>
                     </span>
                   </label>
@@ -1939,17 +1948,17 @@ function SlotPanel({
                         <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-50 text-sm text-neutral-800">
                           <Check size={14} className="text-neutral-500 shrink-0" />
                           <span className="font-medium truncate">{lockedGroupe.nom}</span>
-                          <span className="ml-auto text-xs text-neutral-400 shrink-0">Actuelle</span>
+                          <span className="ml-auto text-xs text-neutral-400 shrink-0">{t("centre", "planningCurrent")}</span>
                         </div>
                       )}
 
                       <div>
                         <p className="text-xs text-neutral-500 mb-1.5">
-                          Même programme{filiereName ? ` · ${filiereName}` : ""} — tous niveaux
+                          {t("centre", "planningSameProgram")}{filiereName ? ` · ${filiereName}` : ""} — {t("centre", "planningAllLevels")}
                         </p>
                         <div className="space-y-0.5 max-h-40 overflow-y-auto rounded-xl border border-neutral-100">
                           {troncSameProgram.length === 0 ? (
-                            <p className="text-xs text-neutral-400 italic px-3 py-4">Aucune autre classe dans ce programme.</p>
+                            <p className="text-xs text-neutral-400 italic px-3 py-4">{t("centre", "planningNoOtherClassInProgram")}</p>
                           ) : (
                             troncSameProgram.map((g) => (
                               <label key={g.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-neutral-50 cursor-pointer text-sm">
@@ -1976,19 +1985,19 @@ function SlotPanel({
                           checked={includeOtherPrograms}
                           onChange={(e) => setIncludeOtherPrograms(e.target.checked)}
                         />
-                        <span className="text-sm text-neutral-800">Inclure d’autres programmes</span>
+                        <span className="text-sm text-neutral-800">{t("centre", "planningIncludeOtherPrograms")}</span>
                       </label>
 
                       {includeOtherPrograms && (
                         <div>
-                          <p className="text-xs text-neutral-500 mb-1.5">Autres programmes du centre</p>
+                          <p className="text-xs text-neutral-500 mb-1.5">{t("centre", "planningOtherCenterPrograms")}</p>
                           <div className="space-y-0.5 max-h-44 overflow-y-auto rounded-xl border border-neutral-100">
                             {troncLoading ? (
                               <p className="text-xs text-neutral-400 px-3 py-4 flex items-center gap-2">
-                                <Loader2 size={12} className="animate-spin" /> Chargement…
+                                <Loader2 size={12} className="animate-spin" /> {t("centre", "planningLoadingEllipsis")}
                               </p>
                             ) : troncOtherPrograms.length === 0 ? (
-                              <p className="text-xs text-neutral-400 italic px-3 py-4">Aucune classe hors programme.</p>
+                              <p className="text-xs text-neutral-400 italic px-3 py-4">{t("centre", "planningNoClassOutsideProgram")}</p>
                             ) : (
                               troncOtherPrograms.map((g) => (
                                 <label key={g.id} className="flex items-center gap-2.5 px-3 py-2 hover:bg-neutral-50 cursor-pointer text-sm">
@@ -2010,7 +2019,7 @@ function SlotPanel({
                       )}
 
                       <p className="text-xs text-neutral-400">
-                        Min. 1 autre classe{mode === "presentiel" ? " · salle obligatoire en présentiel" : ""}
+                        {t("centre", "planningMinOtherClass")}{mode === "presentiel" ? ` · ${t("centre", "planningRoomRequiredInPerson")}` : ""}
                       </p>
                     </div>
                   )}
@@ -2039,11 +2048,11 @@ function SlotPanel({
                 </PanelField>
               )}
 
-              <PanelField label="Mode">
+              <PanelField label={t("centre", "planningMode")}>
                 <div className="flex gap-1 p-1 bg-neutral-100 rounded-full">
                   {([
-                    { v: "presentiel" as const, label: "Présentiel", icon: MapPin },
-                    { v: "en_ligne"   as const, label: "En ligne",   icon: Monitor },
+                    { v: "presentiel" as const, label: t("centre", "planningInPerson"), icon: MapPin },
+                    { v: "en_ligne"   as const, label: t("centre", "planningOnline"),   icon: Monitor },
                   ]).map(({ v, label, icon: Icon }) => (
                     <button
                       key={v}
@@ -2060,12 +2069,12 @@ function SlotPanel({
               </PanelField>
 
               {mode === "presentiel" && (
-                <PanelField label={isTroncCommun && !isTcfCenter ? "Salle (obligatoire)" : "Salle"}>
+                <PanelField label={isTroncCommun && !isTcfCenter ? t("centre", "planningRoomRequiredLabel") : t("centre", "planningRoom")}>
                   <input
                     list={!isTcfCenter ? "planning-known-rooms" : undefined}
                     value={roomName}
                     onChange={(e) => setRoomName(e.target.value)}
-                    placeholder={knownRooms.length ? "Choisir ou saisir…" : "Salle 101, Labo…"}
+                    placeholder={knownRooms.length ? t("centre", "planningChooseOrType") : t("centre", "planningRoomPlaceholder")}
                     className={panelInputCls}
                   />
                   {!isTcfCenter && knownRooms.length > 0 && (
@@ -2079,9 +2088,9 @@ function SlotPanel({
                     <p className="mt-1.5 text-xs text-neutral-400">
                       {isTroncCommun
                         ? includeOtherPrograms
-                          ? "Suggestions : salles déjà utilisées dans le centre."
-                          : "Suggestions : salles déjà utilisées dans ce programme."
-                        : "Suggestions : salles déjà utilisées sur ce niveau."}
+                          ? t("centre", "planningRoomSuggestionsCenter")
+                          : t("centre", "planningRoomSuggestionsProgram")
+                        : t("centre", "planningRoomSuggestionsLevel")}
                     </p>
                   )}
                 </PanelField>
@@ -2089,16 +2098,16 @@ function SlotPanel({
 
               {mode === "en_ligne" && (
                 <div className="rounded-2xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-700">
-                  Visio NEXA (LiveKit) automatique — séance de groupe. Les apprenants rejoignent depuis Coaching / Live.
+                  {t("centre", "planningOnlineAutoNote")}
                 </div>
               )}
 
               {!isTcfCenter && (isEditSlot || isException) && (
                 <div className="rounded-xl border border-dashed border-neutral-300 p-4 space-y-3 bg-neutral-50">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Dupliquer cette plage</p>
-                  <p className="text-[11px] text-neutral-500">Génère des occurrences datées sur N semaines (conflits formateur ignorés).</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">{t("centre", "planningDuplicateRange")}</p>
+                  <p className="text-[11px] text-neutral-500">{t("centre", "planningDuplicateHelp")}</p>
                   <div className="flex items-end gap-2">
-                    <PanelField label="Semaines">
+                    <PanelField label={t("centre", "planningWeeks")}>
                       <input
                         type="number"
                         min={1}
@@ -2115,7 +2124,7 @@ function SlotPanel({
                       className="h-11 px-4 rounded-xl text-xs font-black uppercase text-white shrink-0 disabled:opacity-50"
                       style={{ backgroundColor: ORANGE }}
                     >
-                      Dupliquer
+                      {t("centre", "planningDuplicate")}
                     </button>
                   </div>
                   {dupMsg && <p className="text-[11px] font-medium text-emerald-700">{dupMsg}</p>}
@@ -2133,18 +2142,18 @@ function SlotPanel({
           <div>
             {(isEditSlot || (isException && panelMode === "edit")) && (
               <button type="button" onClick={handleDeleteSlot} className="h-9 px-3 rounded-full text-sm text-red-600 hover:bg-red-50 inline-flex items-center gap-1.5">
-                <Trash2 size={14} /> Supprimer
+                <Trash2 size={14} /> {t("centre", "programsDelete")}
               </button>
             )}
             {showExceptionForm && type.type === "exception" && type.existingExceptionId && (
               <button type="button" onClick={handleDeleteException} className="h-9 px-3 rounded-full text-sm text-neutral-700 hover:bg-neutral-100 inline-flex items-center gap-1.5">
-                <RefreshCw size={14} /> Rétablir
+                <RefreshCw size={14} /> {t("centre", "planningRestore")}
               </button>
             )}
           </div>
           <div className="flex gap-2">
             <button type="button" onClick={onClose} className="h-9 px-4 rounded-full border border-neutral-200 text-sm text-neutral-700 hover:bg-neutral-50">
-              Annuler
+              {t("centre", "periodCancel")}
             </button>
             <button
               type="button"
@@ -2153,7 +2162,7 @@ function SlotPanel({
               className="h-9 px-5 rounded-full text-sm text-white inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90"
               style={{ backgroundColor: BLUE }}
             >
-              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} Enregistrer
+              {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />} {t("centre", "accountSave")}
             </button>
           </div>
         </div>

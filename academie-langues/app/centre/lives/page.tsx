@@ -139,7 +139,7 @@ export default function CentreLivesPage() {
 
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        setError("Session expirée.");
+        setError(en ? "Session expired." : "Session expirée.");
         setLoading(false);
         return;
       }
@@ -148,7 +148,7 @@ export default function CentreLivesPage() {
       const from = new Date().toISOString().slice(0, 10);
       const to = new Date(Date.now() + 21 * 86400000).toISOString().slice(0, 10);
       const res = await fetch(`/api/centre/lives?from=${from}&to=${to}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: { Authorization: `Bearer ${session.access_token}`, "X-Nexa-Locale": locale },
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || (en ? "Unable to load sessions." : "Impossible de charger les sessions."));
@@ -161,7 +161,7 @@ export default function CentreLivesPage() {
     } finally {
       setLoading(false);
     }
-  }, [en]);
+  }, [en, locale]);
 
   useEffect(() => {
     void load();
@@ -240,13 +240,15 @@ export default function CentreLivesPage() {
       .sort((a, b) => a.label.localeCompare(b.label, "fr"));
     const scopeLabel = useClasses
       ? selectedGroupes.map((g) => g.name).join(" · ")
-      : `Tout le programme « ${selectedAudienceProgramme.name} »`;
+      : en
+        ? `Entire program "${selectedAudienceProgramme.name}"`
+        : `Tout le programme « ${selectedAudienceProgramme.name} »`;
     return {
       scopeLabel,
       groupeNames: selectedGroupes.map((g) => g.name),
       people: previewPeople,
     };
-  }, [selectedAudienceProgramme, audienceGroupeIds, people]);
+  }, [selectedAudienceProgramme, audienceGroupeIds, people, en]);
 
   const applyAudiencePreview = () => {
     const n = mergeStudentIds(audiencePreview.people.map((p) => p.id));
@@ -318,8 +320,8 @@ export default function CentreLivesPage() {
 
   const handleSave = async () => {
     if (!token) return;
-    if (!title.trim()) { setFormError("Titre requis."); return; }
-    if (!date) { setFormError("Date requise."); return; }
+    if (!title.trim()) { setFormError(en ? "Title required." : "Titre requis."); return; }
+    if (!date) { setFormError(en ? "Date required." : "Date requise."); return; }
     if (selectedIds.length === 0) { setFormError(en ? "Select at least one participant." : "Sélectionnez au moins un participant."); return; }
     setSaving(true);
     setFormError("");
@@ -339,13 +341,14 @@ export default function CentreLivesPage() {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
+        "X-Nexa-Locale": locale,
       },
       body: JSON.stringify(payload),
     });
     const json = await res.json().catch(() => ({}));
     setSaving(false);
     if (!res.ok) {
-      setFormError(json.error || "Enregistrement impossible.");
+      setFormError(json.error || (en ? "Unable to save." : "Enregistrement impossible."));
       return;
     }
     setPanelOpen(false);
@@ -359,6 +362,7 @@ export default function CentreLivesPage() {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
+        "X-Nexa-Locale": locale,
       },
       body: JSON.stringify({ id: item.slot_id, action: "cancel" }),
     });
@@ -369,7 +373,7 @@ export default function CentreLivesPage() {
     if (!token || !confirm(en ? "Permanently delete this session?" : "Supprimer définitivement cette session ?")) return;
     const res = await fetch(`/api/centre/lives?id=${item.slot_id}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${token}`, "X-Nexa-Locale": locale },
     });
     if (res.ok) await load();
   };

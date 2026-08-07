@@ -10,6 +10,14 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function reqLocale(req: Request): "fr" | "en" {
+  return req.headers.get("x-nexa-locale") === "en" ? "en" : "fr";
+}
+
+function msg(req: Request, fr: string, en: string): string {
+  return reqLocale(req) === "en" ? en : fr;
+}
+
 const STAFF_ROLES = ["admin", "center_manager", "campus_manager", "trainer", "staff"];
 const PARTICIPANT_ROLES = [
   "student",
@@ -47,10 +55,10 @@ function kanbanForOccurrence(
 
 export async function GET(req: Request) {
   const user = await getAuthUser(req);
-  if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: msg(req, "Non autorisé.", "Unauthorized.") }, { status: 401 });
 
   const ctx = await getCallerCenter(user.id);
-  if (!ctx) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  if (!ctx) return NextResponse.json({ error: msg(req, "Accès refusé.", "Access denied.") }, { status: 403 });
 
   const url = new URL(req.url);
   const from = url.searchParams.get("from") || new Date().toISOString().slice(0, 10);
@@ -236,10 +244,10 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const user = await getAuthUser(req);
-  if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: msg(req, "Non autorisé.", "Unauthorized.") }, { status: 401 });
 
   const ctx = await getCallerCenter(user.id);
-  if (!ctx) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  if (!ctx) return NextResponse.json({ error: msg(req, "Accès refusé.", "Access denied.") }, { status: 403 });
 
   const body = await req.json();
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 120) : "";
@@ -254,15 +262,15 @@ export async function POST(req: Request) {
       )]
     : [];
 
-  if (!title) return NextResponse.json({ error: "Titre requis." }, { status: 400 });
+  if (!title) return NextResponse.json({ error: msg(req, "Titre requis.", "Title required.") }, { status: 400 });
   if (!/^\d{4}-\d{2}-\d{2}$/.test(specificDate)) {
-    return NextResponse.json({ error: "Date invalide." }, { status: 400 });
+    return NextResponse.json({ error: msg(req, "Date invalide.", "Invalid date.") }, { status: 400 });
   }
   if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) {
-    return NextResponse.json({ error: "Horaires invalides." }, { status: 400 });
+    return NextResponse.json({ error: msg(req, "Horaires invalides.", "Invalid times.") }, { status: 400 });
   }
   if (participantIds.length === 0) {
-    return NextResponse.json({ error: "Sélectionnez au moins un participant." }, { status: 400 });
+    return NextResponse.json({ error: msg(req, "Sélectionnez au moins un participant.", "Select at least one participant.") }, { status: 400 });
   }
 
   const { data: validPeople } = await supabaseAdmin
@@ -275,7 +283,7 @@ export async function POST(req: Request) {
   const validIds = new Set((validPeople ?? []).map((p) => p.id));
   const filtered = participantIds.filter((id) => validIds.has(id));
   if (filtered.length === 0) {
-    return NextResponse.json({ error: "Aucun participant valide pour ce centre." }, { status: 400 });
+    return NextResponse.json({ error: msg(req, "Aucun participant valide pour ce centre.", "No valid participant for this center.") }, { status: 400 });
   }
 
   const { data: centerRow } = await supabaseAdmin
@@ -286,7 +294,9 @@ export async function POST(req: Request) {
   const offer = resolveEffectiveNexaOffer(centerRow);
   if (offer.maxLives <= 0 || !offer.modules.includes("lives")) {
     return NextResponse.json({
-      error: `Les sessions Lives ne sont pas incluses dans l'offre ${offer.name}.`,
+      error: msg(req,
+        `Les sessions Lives ne sont pas incluses dans l'offre ${offer.name}.`,
+        `Live sessions are not included in the ${offer.name} plan.`),
     }, { status: 403 });
   }
   const { count: liveCount } = await supabaseAdmin
@@ -296,7 +306,9 @@ export async function POST(req: Request) {
     .eq("session_scope", "live");
   if ((liveCount || 0) >= offer.maxLives) {
     return NextResponse.json({
-      error: `Limite de Lives atteinte pour l'offre ${offer.name} (${offer.maxLives} sessions).`,
+      error: msg(req,
+        `Limite de Lives atteinte pour l'offre ${offer.name} (${offer.maxLives} sessions).`,
+        `Live session limit reached for the ${offer.name} plan (${offer.maxLives} sessions).`),
     }, { status: 403 });
   }
 
@@ -312,7 +324,7 @@ export async function POST(req: Request) {
     .maybeSingle();
 
   if (!filiere?.id) {
-    return NextResponse.json({ error: "Aucune filière configurée pour ce centre." }, { status: 400 });
+    return NextResponse.json({ error: msg(req, "Aucune filière configurée pour ce centre.", "No program configured for this center.") }, { status: 400 });
   }
 
   const { data: inserted, error } = await supabaseAdmin
@@ -334,7 +346,7 @@ export async function POST(req: Request) {
     .single();
 
   if (error || !inserted) {
-    return NextResponse.json({ error: error?.message || "Création impossible." }, { status: 500 });
+    return NextResponse.json({ error: error?.message || msg(req, "Création impossible.", "Unable to create.") }, { status: 500 });
   }
 
   const { error: partErr } = await supabaseAdmin.from("schedule_slot_participants").insert(
@@ -360,14 +372,14 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   const user = await getAuthUser(req);
-  if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: msg(req, "Non autorisé.", "Unauthorized.") }, { status: 401 });
 
   const ctx = await getCallerCenter(user.id);
-  if (!ctx) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  if (!ctx) return NextResponse.json({ error: msg(req, "Accès refusé.", "Access denied.") }, { status: 403 });
 
   const body = await req.json();
   const slotId = typeof body.id === "string" ? body.id : "";
-  if (!slotId) return NextResponse.json({ error: "ID manquant." }, { status: 400 });
+  if (!slotId) return NextResponse.json({ error: msg(req, "ID manquant.", "Missing ID.") }, { status: 400 });
 
   const { data: slot } = await supabaseAdmin
     .from("schedule_slots")
@@ -377,7 +389,7 @@ export async function PATCH(req: Request) {
     .eq("session_scope", "live")
     .maybeSingle();
 
-  if (!slot) return NextResponse.json({ error: "Session introuvable." }, { status: 404 });
+  if (!slot) return NextResponse.json({ error: msg(req, "Session introuvable.", "Session not found.") }, { status: 404 });
 
   if (body.action === "cancel") {
     const dateKey = slot.specific_date as string;
@@ -438,7 +450,7 @@ export async function PATCH(req: Request) {
     : null;
 
   if (participantIds && participantIds.length === 0) {
-    return NextResponse.json({ error: "Sélectionnez au moins un participant." }, { status: 400 });
+    return NextResponse.json({ error: msg(req, "Sélectionnez au moins un participant.", "Select at least one participant.") }, { status: 400 });
   }
 
   const d = new Date(`${specificDate}T12:00:00`);
@@ -493,14 +505,14 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   const user = await getAuthUser(req);
-  if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+  if (!user) return NextResponse.json({ error: msg(req, "Non autorisé.", "Unauthorized.") }, { status: 401 });
 
   const ctx = await getCallerCenter(user.id);
-  if (!ctx) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  if (!ctx) return NextResponse.json({ error: msg(req, "Accès refusé.", "Access denied.") }, { status: 403 });
 
   const url = new URL(req.url);
   const slotId = url.searchParams.get("id");
-  if (!slotId) return NextResponse.json({ error: "ID manquant." }, { status: 400 });
+  if (!slotId) return NextResponse.json({ error: msg(req, "ID manquant.", "Missing ID.") }, { status: 400 });
 
   const { error } = await supabaseAdmin
     .from("schedule_slots")
