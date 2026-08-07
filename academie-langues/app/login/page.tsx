@@ -891,6 +891,17 @@ function LoginPageContent() {
         last_sign_in_at: new Date().toISOString(),
       });
 
+      // Ensure center signup status sticks even if an auth trigger wrote a default first.
+      if (centerContext) {
+        const { error: statusErr } = await supabase.from("profiles").update({
+          center_id: centerContext.id,
+          created_by_center_id: centerContext.id,
+          center_status: "pending_center_approval",
+          tag_status: "pending_center_approval",
+        }).eq("id", data.user.id);
+        if (statusErr) console.error("center signup status update:", statusErr.message);
+      }
+
       if (centerContext || selectedCountry) {
         await supabase.from("student_details").upsert({
           student_id: data.user.id,

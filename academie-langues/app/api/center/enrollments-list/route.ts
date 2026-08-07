@@ -132,7 +132,7 @@ export async function GET(req: Request) {
       avatar_url: p.avatar_url,
       birth_date: p.birth_date ?? null,
       genre: p.genre ?? null,
-      center_status: p.center_status || "active",
+      center_status: p.center_status ?? "active",
       enrollments: ses.map((e) => {
         const niv = e.niveaux;
         const isShort = e.filieres?.type === "formation_courte" || (niv != null && niv.annee == null);

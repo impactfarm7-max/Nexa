@@ -29,6 +29,7 @@ import {
 } from "../center-page-ui";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 
 const fcfa = (n: number | null | undefined, locale: "fr" | "en" = "fr") => (Number(n) || 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB") + " FCFA";
 
@@ -460,9 +461,9 @@ export default function CenterFilieresPage() {
               >
                 <span className="font-bold">{t("centre", counts.total > 1 ? "programsCountMany" : "programsCountOne", { count: counts.total })}</span>
                 <StatSep />
-                <span className="font-semibold">{t("centre", counts.published > 1 ? "programsPublishedMany" : "programsPublishedOne", { count: counts.published })}</span>
+                <span className={ACTION_TONE.positiveStat}>{t("centre", counts.published > 1 ? "programsPublishedMany" : "programsPublishedOne", { count: counts.published })}</span>
                 <StatSep />
-                <span className="font-semibold text-red-600">{t("centre", counts.draft > 1 ? "programsDraftMany" : "programsDraftOne", { count: counts.draft })}</span>
+                <span className={ACTION_TONE.negativeStat}>{t("centre", counts.draft > 1 ? "programsDraftMany" : "programsDraftOne", { count: counts.draft })}</span>
                 <StatSep />
                 <span className="font-semibold">{t("centre", counts.matieres > 1 ? "programsSubjectMany" : "programsSubjectOne", { count: counts.matieres })}</span>
               </span>
@@ -922,11 +923,11 @@ function TypeBadge({ type }: { type: "cursus" | "formation_courte" }) {
 function StatusBadge({ status }: { status: "draft" | "published" }) {
   const { t } = useI18n();
   return status === "published" ? (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-neutral-600 border border-black/[0.08] bg-neutral-50">
+    <span className={ACTION_TONE.positivePill}>
       {t("centre", "programsPublishedStatus")}
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold text-red-600 border border-red-200 bg-red-50">
+    <span className={ACTION_TONE.negativePill}>
       {t("centre", "programsDraftStatus")}
     </span>
   );
@@ -954,7 +955,7 @@ function PublishToggleSwitch({
     >
       <div
         className={`w-9 h-5 shrink-0 rounded-full p-0.5 transition-colors duration-200 ease-in-out flex items-center ${
-          published ? "bg-[#11224E]" : "bg-neutral-300 group-hover:bg-neutral-400"
+          published ? "bg-emerald-600" : "bg-neutral-300 group-hover:bg-neutral-400"
         }`}
       >
         <div
@@ -963,7 +964,7 @@ function PublishToggleSwitch({
           }`}
         />
       </div>
-      <span className={`text-[11.5px] font-bold inline-block w-[3.6rem] truncate ${published ? "text-[#11224E]" : "text-red-600"}`}>
+      <span className={`text-[11.5px] font-bold inline-block w-[3.6rem] truncate ${published ? ACTION_TONE.positiveText : ACTION_TONE.negativeText}`}>
         {t("centre", published ? "programsPublishedStatus" : "programsDraftStatus")}
       </span>
     </button>
@@ -1358,10 +1359,10 @@ function DeleteModal({ prog, onClose, onDeleted }: { prog: ProgrammeCard; onClos
       ) : enrollCount > 0 ? (
         <div className="space-y-3">
           <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
-            <AlertTriangle size={20} className="text-red-500 shrink-0 mt-0.5" />
+            <AlertTriangle size={20} className={`${ACTION_TONE.dangerIcon} shrink-0 mt-0.5`} />
             <div>
-              <p className="text-sm font-black text-red-700">{t("centre", "programsDeleteImpossible")}</p>
-              <p className="text-xs text-red-600 mt-1">
+              <p className={`text-sm font-black ${ACTION_TONE.negativeText}`}>{t("centre", "programsDeleteImpossible")}</p>
+              <p className={`text-xs ${ACTION_TONE.negativeText} mt-1`}>
                 {t("centre", enrollCount > 1 ? "programsEnrolledMany" : "programsEnrolledOne", { count: enrollCount })}
               </p>
             </div>
@@ -1376,13 +1377,13 @@ function DeleteModal({ prog, onClose, onDeleted }: { prog: ProgrammeCard; onClos
               {t("centre", "programsDeleteWarning", { name: displayProgrammeName(prog.name) })}
             </p>
           </div>
-          {error && <p className="text-xs font-bold text-red-500">{error}</p>}
+          {error && <p className={ACTION_TONE.errorText}>{error}</p>}
           <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 h-11 rounded-xl text-xs font-black uppercase bg-neutral-100">{t("centre", "identityCancel")}</button>
             <button
               onClick={confirmDelete}
               disabled={deleting}
-              className="flex-1 h-11 rounded-xl text-xs font-black uppercase text-white bg-red-600 disabled:opacity-50 flex items-center justify-center gap-2"
+              className={`${ACTION_TONE.negativeBtnMd} flex-1 h-11 rounded-xl text-xs font-black uppercase`}
             >
               {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} {t("centre", "programsDelete")}
             </button>

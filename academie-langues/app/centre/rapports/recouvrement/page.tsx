@@ -12,6 +12,7 @@ import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtNum } from "@/app/utils/reports-export";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 
 type RecouvrementReport = {
   period: { label: string };
@@ -128,7 +129,7 @@ function RecouvrementContent() {
             items={[
               { label: t("centre", "summaryInvoicedRevenue"), value: fmtFCFA(report.kpis.caFacture), sub: t("centre", "recoveryActiveRecords") },
               { label: t("centre", "recoveryCollectedCumulative"), value: fmtFCFA(report.kpis.encaisse) },
-              { label: t("centre", "summaryOutstanding"), value: fmtFCFA(report.kpis.resteARecouvrer) },
+              { label: t("centre", "summaryOutstanding"), value: fmtFCFA(report.kpis.resteARecouvrer), alert: report.kpis.resteARecouvrer > 0, valueColor: report.kpis.resteARecouvrer > 0 ? ACTION_TONE.negativeText : undefined },
               {
                 label: t("centre", "summaryRecoveryRate"),
                 value: `${report.kpis.tauxRecouvrement} %`,

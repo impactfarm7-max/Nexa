@@ -31,6 +31,7 @@ import {
   centerNotoSans,
   OutlineHeaderButton,
 } from "@/app/centre/center-page-ui";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 
 /** Typo formulaire — alignée Informations générales (SaaS lisible) */
 const FIELD_LABEL = "text-sm font-semibold text-neutral-600 block mb-1.5";
@@ -382,7 +383,7 @@ function InstallmentsBlock({
         <div className="flex flex-wrap gap-3 mb-3 text-[11px] font-bold">
           <span className="text-neutral-500">{en ? "Tuition" : "Pension"} : <span style={{ color: BLUE }}>{formatFCFA(total)} FCFA</span></span>
           <span className="text-neutral-500">{en ? "Allocated" : "Réparti"} : <span style={{ color: BLUE }}>{formatFCFA(allocated)} FCFA</span></span>
-          <span className={remaining === 0 ? "text-emerald-600" : "text-orange-600"}>
+          <span className={remaining === 0 ? ACTION_TONE.positiveText : ACTION_TONE.negativeText}>
             {en ? "Remaining" : "Reste"} : {formatFCFA(remaining)} FCFA
           </span>
         </div>

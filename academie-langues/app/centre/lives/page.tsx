@@ -11,6 +11,7 @@ import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { loadCenterBootstrap } from "@/app/utils/center-me-cache";
 import { JOIN_BEFORE_MS, sessionStartMs, sessionEndMs } from "@/app/utils/collectiveLive";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 import {
   BLUE,
   CenterPageLayout,
@@ -419,7 +420,7 @@ export default function CentreLivesPage() {
         </p>
 
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm font-semibold text-red-600">
+          <div className={ACTION_TONE.errorBox}>
             {error}
           </div>
         )}
@@ -500,7 +501,7 @@ export default function CentreLivesPage() {
 
             <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
               {formError && (
-                <div className="bg-red-50 border border-red-100 rounded-xl p-3 text-xs font-bold text-red-600">{formError}</div>
+                <div className={ACTION_TONE.errorBox}>{formError}</div>
               )}
 
               <label className="block">
@@ -883,7 +884,7 @@ function SessionCard({
           </span>
         </div>
         {cancelled && (
-          <span className="inline-block mt-2 text-[9px] font-black uppercase tracking-wider text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+          <span className={`inline-block mt-2 ${ACTION_TONE.negativePill}`}>
             {en ? "Cancelled" : "Annulée"}
           </span>
         )}
@@ -894,7 +895,7 @@ function SessionCard({
           <button
             type="button"
             onClick={onJoin}
-            className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-700 transition-colors min-h-[44px]"
+            className={`${ACTION_TONE.positiveBtnMd} min-h-[44px]`}
           >
             <Radio size={14} /> {en ? "Join" : "Rejoindre"}
           </button>
@@ -910,12 +911,12 @@ function SessionCard({
           </button>
         )}
         {onCancel && !compact && !cancelled && (
-          <button type="button" onClick={onCancel} className="px-3 py-2 rounded-xl text-[10px] font-bold text-red-500 border border-red-100 hover:bg-red-50">
+          <button type="button" onClick={onCancel} className={ACTION_TONE.negativeOutline}>
             {en ? "Cancel" : "Annuler"}
           </button>
         )}
         {onDelete && !compact && (
-          <button type="button" onClick={onDelete} className="p-2 rounded-xl text-neutral-400 hover:text-red-500 hover:bg-red-50" title={en ? "Delete" : "Supprimer"}>
+          <button type="button" onClick={onDelete} className="p-2 rounded-xl text-neutral-400 hover:text-red-600 hover:bg-red-50" title={en ? "Delete" : "Supprimer"}>
             <Trash2 size={14} />
           </button>
         )}

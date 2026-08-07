@@ -19,6 +19,7 @@ import BulletinDynamique from "@/app/components/BulletinDynamique";
 import {
   passageDecisionLabel,
 } from "@/app/utils/cursus-passage";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 import {
   CenterPageLayout,
   CenterPageHeader,
@@ -70,7 +71,7 @@ type StudentRow = {
   avatar_url: string | null;
   birth_date: string | null;     // YYYY-MM-DD
   genre: string | null;
-  center_status: "active" | "paused" | "revoked";
+  center_status: "active" | "paused" | "revoked" | "pending_center_approval" | string;
   enrollments: Enrollment[];
 };
 
@@ -87,7 +88,7 @@ type ExportStudentRow = {
   statut: string;
 };
 
-type StatusFilter = "all" | "active" | "paused" | "revoked";
+type StatusFilter = "all" | "active" | "paused" | "revoked" | "pending_center_approval";
 
 // ─── helper ──────────────────────────────────────────────────────────────────
 function fmtBirth(iso: string | null): string {
@@ -103,7 +104,19 @@ function calcAge(iso: string | null, unit = "ans"): string {
   return isNaN(age) || age < 0 ? "" : `${age} ${unit}`;
 }
 
-type StudentExportLabels = { title: string; lastName: string; firstName: string; email: string; phone: string; program: string; status: string; active: string; suspended: string; revoked: string; allStatuses: string; allPrograms: string; filter: string; generatedOn: string; search: string; lines: string };
+type StudentExportLabels = {
+  title: string; lastName: string; firstName: string; email: string; phone: string; program: string; status: string;
+  active: string; suspended: string; revoked: string; pending: string;
+  allStatuses: string; allPrograms: string; filter: string; generatedOn: string; search: string; lines: string;
+};
+
+function centerStatusExportLabel(status: string | null | undefined, labels: Pick<StudentExportLabels, "active" | "suspended" | "revoked" | "pending">): string {
+  if (!status || status === "active") return labels.active;
+  if (status === "paused") return labels.suspended;
+  if (status === "pending_center_approval") return labels.pending;
+  if (status === "revoked") return labels.revoked;
+  return labels.revoked;
+}
 
 function toStudentExportRows(list: StudentRow[], labels: StudentExportLabels): ExportStudentRow[] {
   return list.map((s) => ({
@@ -112,7 +125,7 @@ function toStudentExportRows(list: StudentRow[], labels: StudentExportLabels): E
     email: s.email || "",
     telephone: s.phone || "",
     filiere: (s.enrollments[0]?.filiere_name_raw || "").toUpperCase(),
-    statut: s.center_status === "active" ? labels.active : s.center_status === "paused" ? labels.suspended : labels.revoked,
+    statut: centerStatusExportLabel(s.center_status, labels),
   }));
 }
 
@@ -127,6 +140,7 @@ function studentsFilterCaption(
     statusFilter === "all" ? labels.allStatuses
     : statusFilter === "active" ? labels.active
     : statusFilter === "paused" ? labels.suspended
+    : statusFilter === "pending_center_approval" ? labels.pending
     : labels.revoked;
   const parts = [
     filiereName ? `${labels.program}: ${filiereName}` : labels.allPrograms,
@@ -237,6 +251,7 @@ export default function CenterStudentsPage() {
     title: t("centre", "studentsTitle"), lastName: t("centre", "enrollmentLastName"), firstName: t("centre", "enrollmentFirstName"),
     email: t("centre", "accountEmail"), phone: t("centre", "accountPhone"), program: t("centre", "enrollmentProgram"), status: t("centre", "settingsStatus"),
     active: t("centre", "summaryActive"), suspended: t("centre", "summarySuspended"), revoked: t("centre", "studentsRevokedPlural"),
+    pending: t("centre", "studentsPendingApproval"),
     allStatuses: t("centre", "studentsAllStatuses"), allPrograms: t("centre", "reportsAllPrograms"), filter: t("centre", "financeFilter"),
     generatedOn: t("centre", "financeGeneratedOn"), search: t("centre", "financeSearchLabel"), lines: t("centre", "studentsLines"),
   };
@@ -341,8 +356,9 @@ export default function CenterStudentsPage() {
 
   const rosterStats = useMemo(() => ({
     total: students.length,
-    active: students.filter((s) => s.center_status === "active").length,
+    active: students.filter((s) => s.center_status === "active" || !s.center_status).length,
     paused: students.filter((s) => s.center_status === "paused").length,
+    pending: students.filter((s) => s.center_status === "pending_center_approval").length,
     filieres: filiereStats.length,
   }), [students, filiereStats]);
 
@@ -353,24 +369,56 @@ export default function CenterStudentsPage() {
     setActiveTab("identity");
   };
 
-  const toggleStatus = async (id: string, st: "active" | "paused" | "revoked") => {
-    await supabase.from("profiles").update({ center_status: st }).eq("id", id);
+  const setAccessStatus = async (
+    id: string,
+    st: "active" | "paused" | "revoked",
+  ) => {
+    const patch =
+      st === "revoked"
+        ? { center_status: "revoked", tag_status: "revoque" }
+        : st === "active"
+          ? { center_status: "active", tag_status: "normal" }
+          : { center_status: "paused" };
+    const { error } = await supabase.from("profiles").update(patch).eq("id", id);
+    if (error) {
+      alert(`${t("centre", "membersError")} : ${error.message}`);
+      return;
+    }
     setStudents((prev) => prev.map((s) => (s.id === id ? { ...s, center_status: st } : s)));
   };
 
-  const activateEnrollment = async (enrollmentId: string) => {
+  const activateEnrollment = async (enrollmentId: string, studentId?: string) => {
     if (!centerId) return;
     setActivating(true);
     const { error } = await supabase.from("enrollments").update({ status: "active" }).eq("id", enrollmentId);
-    if (error) alert(`${t("centre", "membersError")} : ${error.message}`);
-    else await loadStudents(centerId, { silent: true, force: true });
+    if (error) {
+      alert(`${t("centre", "membersError")} : ${error.message}`);
+    } else {
+      if (studentId) {
+        await supabase.from("profiles").update({ center_status: "active", tag_status: "normal" }).eq("id", studentId);
+      }
+      await loadStudents(centerId, { silent: true, force: true });
+    }
     clearCenterApiCache("/api/center/enrollments-list");
     setActivating(false);
   };
 
   const revokeStudent = async (studentId: string) => {
     if (!confirm(t("centre", "studentsRevokeConfirm"))) return;
-    await toggleStatus(studentId, "revoked");
+    await setAccessStatus(studentId, "revoked");
+  };
+
+  const reactivateStudent = async (studentId: string) => {
+    if (!confirm(t("centre", "studentsReactivateConfirm"))) return;
+    await setAccessStatus(studentId, "active");
+  };
+
+  const approvePendingStudent = async (studentId: string) => {
+    setActivating(true);
+    await setAccessStatus(studentId, "active");
+    if (centerId) await loadStudents(centerId, { silent: true, force: true });
+    clearCenterApiCache("/api/center/enrollments-list");
+    setActivating(false);
   };
 
   const handleAvatarUpdated = (url: string) => {
@@ -487,11 +535,19 @@ export default function CenterStudentsPage() {
                   </button>
                 ))}
 
-                {selectedStudent.center_status !== "revoked" && (
+                {selectedStudent.center_status === "revoked" ? (
+                  <button
+                    type="button"
+                    onClick={() => void reactivateStudent(selectedStudent.id)}
+                    className={ACTION_TONE.positiveBtn}
+                  >
+                    {t("centre", "studentsReactivate")}
+                  </button>
+                ) : (
                   <button
                     type="button"
                     onClick={() => void revokeStudent(selectedStudent.id)}
-                    className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 hover:bg-black/[0.03] transition-colors"
+                    className={ACTION_TONE.negativeOutline}
                   >
                     {t("centre", "studentsRevoked")}
                   </button>
@@ -551,9 +607,11 @@ export default function CenterStudentsPage() {
                       <span>{t("centre", "studentsRegisteredCount", { count: rosterStats.total })}</span>
                     </span>
                     <StatSep />
-                    <span className="font-semibold">{rosterStats.active} {t("centre", "studentsActiveCount", { count: rosterStats.active })}</span>
+                    <span className={ACTION_TONE.positiveStat}>{rosterStats.active} {t("centre", "studentsActiveCount", { count: rosterStats.active })}</span>
                     <StatSep />
-                    <span className="font-semibold text-amber-700">{rosterStats.paused} {t("centre", "studentsSuspendedCount", { count: rosterStats.paused })}</span>
+                    <span className={ACTION_TONE.warningStat}>{rosterStats.pending} {t("centre", "studentsPendingCount")}</span>
+                    <StatSep />
+                    <span className={ACTION_TONE.negativeStat}>{rosterStats.paused} {t("centre", "studentsSuspendedCount", { count: rosterStats.paused })}</span>
                     <StatSep />
                     <span className="font-semibold">{rosterStats.filieres} {t("centre", "studentsProgramCount", { count: rosterStats.filieres })}</span>
                   </span>
@@ -568,6 +626,7 @@ export default function CenterStudentsPage() {
                   options={[
                     { value: "all", label: t("centre", "studentsAllStatuses") },
                     { value: "active", label: t("centre", "summaryActive") },
+                    { value: "pending_center_approval", label: t("centre", "studentsPendingApproval") },
                     { value: "paused", label: t("centre", "summarySuspended") },
                     { value: "revoked", label: t("centre", "studentsRevokedPlural") },
                   ]}
@@ -612,11 +671,17 @@ export default function CenterStudentsPage() {
                   {filtered.map((s, i) => {
                     const primaryEnr = s.enrollments[0];
                     const hasDraft = s.enrollments.some((e) => e.status === "draft");
-                    const statusLabel =
-                      s.center_status === "active" || !s.center_status ? t("centre", "campusActive")
-                      : s.center_status === "paused" ? t("centre", "summarySuspended")
-                      : t("centre", "studentsRevoked");
+                    const statusLabel = centerStatusExportLabel(s.center_status, {
+                      active: t("centre", "campusActive"),
+                      suspended: t("centre", "summarySuspended"),
+                      revoked: t("centre", "studentsRevoked"),
+                      pending: t("centre", "studentsPendingApproval"),
+                    });
                     const enrStatus = hasDraft ? t("centre", "enrollmentDraft") : primaryEnr?.status === "active" ? t("centre", "studentsActiveEnrollment") : primaryEnr ? t("centre", "studentsRegistered") : "—";
+                    const statusTone =
+                      hasDraft || s.center_status === "revoked" || s.center_status === "paused" ? ACTION_TONE.negativeText
+                      : s.center_status === "pending_center_approval" ? ACTION_TONE.warningText
+                      : ACTION_TONE.positiveText;
 
                     return (
                       <CenterTableRow key={s.id} index={i}>
@@ -630,9 +695,7 @@ export default function CenterStudentsPage() {
                           {primaryEnr?.filiere_name_raw ? primaryEnr.filiere_name_raw.toUpperCase() : "—"}
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span className={`text-[12px] font-semibold ${
-                            hasDraft || (s.center_status && s.center_status !== "active") ? "text-red-600" : "text-neutral-600"
-                          }`}>
+                          <span className={`text-[12px] font-semibold ${statusTone}`}>
                             {hasDraft ? t("centre", "enrollmentDraft") : statusLabel}
                           </span>
                         </td>
@@ -654,7 +717,9 @@ export default function CenterStudentsPage() {
           ) : (
             /* ══ DOSSIER — contenu (actions dans la sticky bar) ══ */
             <div className="nexa-center-shell pt-4 sm:pt-6 pb-8" style={{ backgroundColor: PAGE_BG }}>
-              {(selectedStudent.enrollments.length > 1 || selectedEnrollment?.status === "draft") && (
+              {(selectedStudent.enrollments.length > 1
+                || selectedEnrollment?.status === "draft"
+                || selectedStudent.center_status === "pending_center_approval") && (
                 <div className="mb-4 space-y-3">
                   {selectedStudent.enrollments.length > 1 && (
                     <div className="flex flex-wrap gap-1.5">
@@ -687,10 +752,29 @@ export default function CenterStudentsPage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => activateEnrollment(selectedEnrollment.id)}
+                        onClick={() => activateEnrollment(selectedEnrollment.id, selectedStudent.id)}
                         disabled={activating}
-                        className="h-9 px-4 rounded-lg text-sm font-semibold text-white inline-flex items-center gap-1.5 shrink-0 hover:opacity-90 transition-opacity disabled:opacity-50"
-                        style={{ backgroundColor: BLUE }}
+                        className={ACTION_TONE.positiveBtnMd}
+                      >
+                        {activating ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} {t("centre", "studentsValidate")}
+                      </button>
+                    </div>
+                  )}
+
+                  {selectedStudent.center_status === "pending_center_approval" && selectedEnrollment?.status !== "draft" && (
+                    <div className="bg-white border border-amber-200 rounded-lg p-3.5 flex items-center justify-between gap-4">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={15} />
+                        <div>
+                          <p className="text-sm font-semibold text-neutral-900">{t("centre", "studentsPendingApproval")}</p>
+                          <p className="text-xs text-neutral-500 mt-0.5">{t("centre", "studentsPendingApprovalHelp")}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void approvePendingStudent(selectedStudent.id)}
+                        disabled={activating}
+                        className={ACTION_TONE.positiveBtnMd}
                       >
                         {activating ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} {t("centre", "studentsValidate")}
                       </button>
@@ -833,10 +917,12 @@ function StudentViewModal({
 }) {
   const { t, locale } = useI18n();
   const primary = student.enrollments[0];
-  const statusLabel =
-    student.center_status === "active" ? t("centre", "campusActive")
-    : student.center_status === "paused" ? t("centre", "summarySuspended")
-    : t("centre", "studentsRevoked");
+  const statusLabel = centerStatusExportLabel(student.center_status, {
+    active: t("centre", "campusActive"),
+    suspended: t("centre", "summarySuspended"),
+    revoked: t("centre", "studentsRevoked"),
+    pending: t("centre", "studentsPendingApproval"),
+  });
   const passageLabel = (decision: string) => passageDecisionLabel(decision, locale);
 
   return (
@@ -1259,7 +1345,7 @@ function GradesTab({
                       {g.title ? ` · ${g.title}` : ` · ${t("centre", "gradesMainGrade")}`}
                       {g.comment ? ` · ${g.comment}` : ""}
                     </span>
-                    <span className="font-extrabold text-emerald-700 shrink-0">
+                    <span className={`font-extrabold ${ACTION_TONE.positiveText} shrink-0`}>
                       {g.score}/{g.max_score}
                     </span>
                   </div>
@@ -1313,7 +1399,7 @@ function GradesTab({
                     />
                   </div>
                   {error && (
-                    <p className="text-sm font-semibold text-red-500 bg-red-50 p-2.5 rounded-lg border border-red-100">
+                    <p className={ACTION_TONE.errorBox}>
                       {error}
                     </p>
                   )}

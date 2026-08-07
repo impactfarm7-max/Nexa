@@ -6,6 +6,8 @@ import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/fin
 
 const BLUE_RGB: [number, number, number] = [17, 34, 78];
 const ORANGE_RGB: [number, number, number] = [235, 103, 14];
+const RED_RGB: [number, number, number] = [220, 38, 38];
+const GREEN_RGB: [number, number, number] = [4, 120, 87];
 
 const PACK_LABELS: Record<string, string> = {
   ivoire: "Pack Ivoire",
@@ -298,7 +300,7 @@ export async function buildStatementPdf(params: StatementPdfParams): Promise<{ b
   doc.text(params.filiereName, 14, y);
   y += 6;
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(params.resteAPayer > 0 ? 220 : 5, params.resteAPayer > 0 ? 38 : 150, params.resteAPayer > 0 ? 38 : 105);
+  doc.setTextColor(...(params.resteAPayer > 0 ? RED_RGB : GREEN_RGB));
   doc.text(
     params.resteAPayer > 0 ? `${isEn ? "Remaining balance" : "Solde restant"} : ${fmtFCFA(params.resteAPayer)} FCFA` : (isEn ? "Account settled" : "Compte soldé"),
     14,
@@ -373,6 +375,19 @@ export async function buildStatementPdf(params: StatementPdfParams): Promise<{ b
     columnStyles: showAgent
       ? { 4: { halign: "right" } }
       : { 3: { halign: "right" } },
+    didParseCell: (data) => {
+      if (data.section !== "body") return;
+      const lastIdx = params.payments.length + 1; // remaining balance row
+      const amountCol = showAgent ? 4 : 3;
+      if (data.row.index === lastIdx && data.column.index === amountCol) {
+        data.cell.styles.textColor = params.resteAPayer > 0 ? RED_RGB : GREEN_RGB;
+        data.cell.styles.fontStyle = "bold";
+      }
+      if (data.row.index === params.payments.length && data.column.index === amountCol) {
+        data.cell.styles.textColor = GREEN_RGB;
+        data.cell.styles.fontStyle = "bold";
+      }
+    },
   });
 
   await addPdfSignatures(doc, cfg, params.signatures, params.stampUrl);

@@ -14,6 +14,7 @@ import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtNum } from "@/app/utils/reports-export";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 
 type ExamensReport = {
   period: { label: string };
@@ -135,7 +136,7 @@ function ExamensContent() {
       exportSlot={<ReportExportBar onCsv={exportCsv} onPdf={exportPdfReport} pdfLoading={pdfLoading} />}
     >
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
+        <div className={ACTION_TONE.errorBox}>{error}</div>
       )}
       {loading && (
         <div className="flex items-center gap-2 text-neutral-400 text-sm">

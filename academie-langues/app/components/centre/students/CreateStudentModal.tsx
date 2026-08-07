@@ -23,6 +23,7 @@ import {
 import { isPluriannualCenter } from "@/app/data/center-types";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { localizeCountryName } from "@/app/utils/countryI18n";
+import { fetchUsableCoupons, type CouponListItem } from "@/app/utils/coupon.client";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -105,7 +106,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState<{ emailSent: boolean; temporaryPassword?: string } | null>(null);
-  const [availableCoupons, setAvailableCoupons] = useState<{ id: string; code: string; type: string; value: number }[]>([]);
+  const [availableCoupons, setAvailableCoupons] = useState<CouponListItem[]>([]);
 
   const selectedCountry = findAfricaCountry(countryCode);
   const regions = selectedCountry?.regions ?? [];
@@ -115,29 +116,16 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   // ============================================================
   useEffect(() => {
     (async () => {
-      const [{ data: filiereRows }, { data: centerRow }, { data: coupRows }] = await Promise.all([
+      const [{ data: filiereRows }, { data: centerRow }] = await Promise.all([
         supabase
           .from("filieres")
           .select("id, name, type, default_tuition_fee, pricing_mode, cursus_fee_mode, duree_valeur, duree_unite, payment_plan")
           .eq("center_id", centerId)
           .eq("status", "published"),
         supabase.from("centers").select("center_type").eq("id", centerId).maybeSingle(),
-        supabase
-          .from("coupons")
-          .select("id, code, type, value, expires_at, max_uses, uses_count, is_active")
-          .eq("center_id", centerId)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false }),
       ]);
       setIsLibreCenter(isPluriannualCenter(centerRow?.center_type));
-      if (coupRows?.length) {
-        const valid = coupRows.filter((c: any) => {
-          if (c.expires_at && new Date(c.expires_at) < new Date()) return false;
-          if (c.max_uses != null && c.uses_count >= c.max_uses) return false;
-          return true;
-        });
-        setAvailableCoupons(valid);
-      }
+      setAvailableCoupons(await fetchUsableCoupons(supabase, centerId));
       setFilieres(
         (filiereRows || []).map((f: any) => ({
           ...f,
@@ -745,28 +733,18 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             {filiereId && (
               <div>
                 <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "createStudentCouponCode")}</label>
-                {availableCoupons.length > 0 ? (
-                  <select
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    className="w-full h-11 px-3 bg-neutral-50 rounded-xl border text-xs font-black uppercase outline-none focus:border-blue-500 transition-colors"
-                  >
-                    <option value="">{t("centre", "createStudentNoCoupon")}</option>
-                    {availableCoupons.map((c) => (
-                      <option key={c.id} value={c.code}>
-                        {c.code} ({c.type === "percentage" ? `${c.value}%` : `${c.value.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")} FCFA`})
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    type="text"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                    placeholder="RENTRÉE25"
-                    className="w-full h-11 px-3 bg-neutral-50 rounded-xl border text-xs font-black uppercase outline-none focus:border-blue-500 transition-colors"
-                  />
-                )}
+                <select
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  className="w-full h-11 px-3 bg-neutral-50 rounded-xl border text-xs font-black uppercase outline-none focus:border-blue-500 transition-colors"
+                >
+                  <option value="">{availableCoupons.length ? t("centre", "createStudentNoCoupon") : t("centre", "financeNoCouponAvailable")}</option>
+                  {availableCoupons.map((c) => (
+                    <option key={c.id} value={c.code}>
+                      {c.code} ({c.type === "percentage" ? `${c.value}%` : `${c.value.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")} FCFA`})
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 

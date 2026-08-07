@@ -19,6 +19,8 @@ import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHead
 import { AmountInWords } from "@/app/components/AmountInWords";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/financeI18n";
+import { ACTION_TONE } from "@/app/utils/action-tones";
+import { deactivateExpiredCoupons, isCouponExpired } from "@/app/utils/coupon.client";
 import {
   CenterPageLayout,
   CenterPageHeader,
@@ -369,8 +371,8 @@ function FinanceKpiCard({
     : tone === "red" ? "border-red-500/70"
     : "border-[#11224E]/55";
   const valueCls =
-    tone === "green" ? "text-emerald-700"
-    : tone === "red" ? "text-red-600"
+    tone === "green" ? ACTION_TONE.positiveText
+    : tone === "red" ? ACTION_TONE.negativeText
     : "";
   return (
     <div
@@ -576,6 +578,7 @@ export default function CenterFinancePage() {
   const loadCoupons = useCallback(async () => {
     if (!centerId) return;
     setCouponsLoading(true);
+    await deactivateExpiredCoupons(supabase, centerId);
     const { data } = await supabase.from("coupons").select("*").eq("center_id", centerId).order("created_at", { ascending: false });
     setCoupons((data || []) as Coupon[]);
     setCouponsLoading(false);
@@ -594,6 +597,7 @@ export default function CenterFinancePage() {
       value: Number(couponForm.value),
       max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : null,
       expires_at: couponForm.expires_at ? new Date(couponForm.expires_at).toISOString() : null,
+      is_active: true,
       created_by: session?.user?.id || null,
     });
     if (error) setCouponError(t("centre", "financeCouponCreateError"));
@@ -1138,7 +1142,7 @@ export default function CenterFinancePage() {
                       <p className="text-[12px] font-medium text-neutral-600 leading-snug truncate uppercase">{r.filiere_name}</p>
                     </td>
                     <td className="px-4 py-4 min-w-0 align-top">
-                      <span className={`text-[12px] font-semibold ${isLate || (!isPaid && r.reste_a_payer > 0) ? "text-red-600" : "text-neutral-500"}`}>
+                      <span className={`text-[12px] font-semibold ${isLate || (!isPaid && r.reste_a_payer > 0) ? ACTION_TONE.negativeText : "text-neutral-500"}`}>
                         {statusLabel}
                       </span>
                     </td>
@@ -1147,7 +1151,7 @@ export default function CenterFinancePage() {
                         {fmtFCFA(r.tuition_paid)} / {fmtFCFA(r.tuition_fee)} F
                       </p>
                       {r.reste_a_payer > 0 && (
-                        <p className="text-[11px] text-red-600 mt-1 tabular-nums">{t("centre", "summaryBalance")} {fmtFCFA(r.reste_a_payer)} F</p>
+                        <p className={`text-[11px] ${ACTION_TONE.negativeText} mt-1 tabular-nums`}>{t("centre", "summaryBalance")} {fmtFCFA(r.reste_a_payer)} F</p>
                       )}
                     </td>
                     <td className="px-4 py-4 min-w-0 align-top">
@@ -1185,9 +1189,9 @@ export default function CenterFinancePage() {
                 <StatSep />
                 <span className="font-semibold text-amber-700">{fmtFCFA(agingAmounts.d30)} F</span> {locale === "en" ? "30d" : "30j"}
                 <StatSep />
-                <span className="font-semibold text-red-600">{fmtFCFA(agingAmounts.d60)} F</span> {locale === "en" ? "60d" : "60j"}
+                <span className={ACTION_TONE.negativeStat}>{fmtFCFA(agingAmounts.d60)} F</span> {locale === "en" ? "60d" : "60j"}
                 <StatSep />
-                <span className="font-semibold text-red-600">{fmtFCFA(agingAmounts.d90)} F</span> {locale === "en" ? "90+d" : "90+j"}
+                <span className={ACTION_TONE.negativeStat}>{fmtFCFA(agingAmounts.d90)} F</span> {locale === "en" ? "90+d" : "90+j"}
               </p>
 
               {([
@@ -1216,7 +1220,7 @@ export default function CenterFinancePage() {
                         <td className="px-4 py-4 text-[12px] text-neutral-600 tabular-nums align-top">
                           {r.next_due_date ? fmtDate(r.next_due_date, locale) : "—"}
                         </td>
-                        <td className="px-4 py-4 text-[12px] font-semibold text-red-600 tabular-nums align-top">{fmtFCFA(r.reste_a_payer)} F</td>
+                        <td className={`px-4 py-4 text-[12px] font-semibold ${ACTION_TONE.negativeText} tabular-nums align-top`}>{fmtFCFA(r.reste_a_payer)} F</td>
                         <TableActions>
                           <TableBtnPreview onClick={() => openInvoice(r)} label={t("centre", "financePreview")} />
                           <TableBtnModify onClick={() => openPayModal(r)} label={t("centre", "financeCollect")} />
@@ -1410,7 +1414,7 @@ export default function CenterFinancePage() {
                     {couponSaving ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />} {t("centre", "financeCreate")}
                   </button>
                 </div>
-                {couponError && <p className="text-xs font-bold text-red-500">{couponError}</p>}
+                {couponError && <p className={ACTION_TONE.errorText}>{couponError}</p>}
               </div>
 
               {/* Liste coupons */}
@@ -1420,14 +1424,24 @@ export default function CenterFinancePage() {
                 <p className="text-center py-8 text-sm text-neutral-400">{t("centre", "financeNoCoupon")}</p>
               ) : (
                 <div className="space-y-2">
-                  {coupons.map(c => (
-                    <div key={c.id} className={`bg-white rounded-xl border p-4 flex items-center justify-between gap-4 ${!c.is_active ? "opacity-50" : ""}`}>
+                  {coupons.map(c => {
+                    const expired = isCouponExpired(c.expires_at);
+                    const inactive = !c.is_active || expired;
+                    return (
+                    <div key={c.id} className={`bg-white rounded-xl border p-4 flex items-center justify-between gap-4 ${inactive ? "opacity-50" : ""}`}>
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-orange-50 border border-orange-100">
                           {c.type === "percentage" ? <Percent size={16} className="text-orange-600" /> : <Hash size={16} className="text-orange-600" />}
                         </div>
                         <div>
-                          <p className="font-black text-sm font-mono" style={{ color: BLUE }}>{c.code}</p>
+                          <p className="font-black text-sm font-mono flex items-center gap-2" style={{ color: BLUE }}>
+                            {c.code}
+                            {expired && (
+                              <span className={`text-[10px] font-bold uppercase tracking-wide ${ACTION_TONE.negativeText}`}>
+                                {t("centre", "financeCouponExpired")}
+                              </span>
+                            )}
+                          </p>
                           <p className="text-[10px] text-neutral-400">
                             {c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value)} FCFA`}
                             {c.max_uses && ` · ${c.uses_count}/${c.max_uses} ${t("centre", "financeUsedPlural")}`}
@@ -1436,11 +1450,16 @@ export default function CenterFinancePage() {
                           </p>
                         </div>
                       </div>
-                      <button onClick={() => toggleCoupon(c.id, c.is_active)} className={`h-8 px-3 rounded-full border text-[11px] font-bold transition-colors ${c.is_active ? "text-neutral-700 border-neutral-200 hover:bg-neutral-50" : "text-white border-transparent hover:opacity-90"}`} style={!c.is_active ? { backgroundColor: BLUE } : undefined}>
-                        {c.is_active ? t("centre", "financeDisable") : t("centre", "financeEnableAgain")}
+                      <button
+                        onClick={() => toggleCoupon(c.id, c.is_active)}
+                        disabled={expired && !c.is_active}
+                        className={c.is_active && !expired ? ACTION_TONE.negativeOutline : ACTION_TONE.positiveBtn}
+                      >
+                        {c.is_active && !expired ? t("centre", "financeDisable") : t("centre", "financeEnableAgain")}
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -1501,7 +1520,7 @@ export default function CenterFinancePage() {
             <h3 className="text-xl font-black tracking-tight mb-1" style={{ color: BLUE }}>{t("centre", "financeEnterPayment")}</h3>
             <p className="text-sm text-neutral-500 mb-1">{payModal.prenom} {payModal.nom}</p>
             <div className="inline-flex mt-2 mb-5 px-3 py-1.5 rounded-full border border-neutral-200 bg-neutral-50">
-              <p className="text-xs font-medium text-neutral-700">{t("centre", "summaryBalance")} <span className="tabular-nums font-bold" style={{ color: BLUE }}>{fmtFCFA(payModal.reste_a_payer)}</span> FCFA</p>
+              <p className="text-xs font-medium text-neutral-700">{t("centre", "summaryBalance")} <span className={`tabular-nums font-bold ${payModal.reste_a_payer > 0 ? ACTION_TONE.negativeText : ACTION_TONE.positiveText}`}>{fmtFCFA(payModal.reste_a_payer)}</span> FCFA</p>
             </div>
 
             <div className="space-y-4">
@@ -1585,12 +1604,12 @@ export default function CenterFinancePage() {
                 {paymentSuccess.resteApres > 0 ? (
                   <>
                     <p className="mt-2 text-xs text-neutral-600">
-                      {t("centre", "financeRemainingBalance")} : <span className="font-medium tabular-nums">{fmtFCFA(paymentSuccess.resteApres)} FCFA</span>
+                      {t("centre", "financeRemainingBalance")} : <span className={`font-medium tabular-nums ${ACTION_TONE.negativeText}`}>{fmtFCFA(paymentSuccess.resteApres)} FCFA</span>
                     </p>
                     <AmountInWords amount={paymentSuccess.resteApres} className="text-[11px] text-neutral-500 italic mt-1 leading-snug" />
                   </>
                 ) : (
-                  <p className="mt-2 text-xs text-emerald-700 font-medium">{t("centre", "financeAccountSettled")}</p>
+                  <p className={`mt-2 text-xs ${ACTION_TONE.positiveText} font-medium`}>{t("centre", "financeAccountSettled")}</p>
                 )}
                 <p className="mt-1 text-[11px] text-neutral-400">{paymentSuccess.studentName}</p>
               </div>
@@ -1690,7 +1709,7 @@ export default function CenterFinancePage() {
               </div>
               <div className="text-right shrink-0">
                 <p className="font-bold uppercase tracking-wider text-neutral-400" style={{ fontSize: printFormat === "ticket" ? "7px" : "9px" }}>{t("centre", "financeBalance")}</p>
-                <p className={`finance-doc-amount font-extrabold tracking-tight tabular-nums ${invoiceModal.reste_a_payer > 0 ? "text-red-600" : "text-emerald-600"}`} style={{ fontSize: PRINT_FORMATS[printFormat].amountSize }}>
+                <p className={`finance-doc-amount font-extrabold tracking-tight tabular-nums ${invoiceModal.reste_a_payer > 0 ? ACTION_TONE.negativeText : ACTION_TONE.positiveText}`} style={{ fontSize: PRINT_FORMATS[printFormat].amountSize }}>
                   {invoiceModal.reste_a_payer > 0 ? fmtFCFA(invoiceModal.reste_a_payer) + " F" : t("centre", "recoveryStatusPaid")}
                 </p>
                 {invoiceModal.reste_a_payer > 0 && (
@@ -1746,7 +1765,7 @@ export default function CenterFinancePage() {
                         <td className="p-2.5 text-right font-semibold tabular-nums finance-col-amount">{fmtFCFA(inst.amount)} F</td>
                         <td className="p-2.5 text-right font-semibold tabular-nums text-emerald-600 finance-col-amount">{fmtFCFA(inst.paid_amount)} F</td>
                         <td className="p-2.5 text-center">
-                          <span className={`text-[8px] font-bold uppercase px-1.5 py-0.5 rounded ${inst.status === "paid" ? "bg-emerald-50 text-emerald-700" : inst.status === "late" ? "bg-red-50 text-red-700" : inst.status === "partial" ? "bg-amber-50 text-amber-700" : "bg-neutral-50 text-neutral-400"}`}>{inst.status === "paid" ? t("centre", "recoveryStatusPaid") : inst.status === "late" ? t("centre", "financeLate") : inst.status === "partial" ? t("centre", "recoveryStatusPartial") : t("centre", "summaryPending")}</span>
+                          <span className={inst.status === "paid" ? ACTION_TONE.positivePill : inst.status === "late" ? ACTION_TONE.negativePill : inst.status === "partial" ? ACTION_TONE.warningPill : ACTION_TONE.neutralPill}>{inst.status === "paid" ? t("centre", "recoveryStatusPaid") : inst.status === "late" ? t("centre", "financeLate") : inst.status === "partial" ? t("centre", "recoveryStatusPartial") : t("centre", "summaryPending")}</span>
                         </td>
                       </tr>
                     );})}
@@ -1787,7 +1806,12 @@ export default function CenterFinancePage() {
                 </tr>
                 <tr>
                   <td colSpan={printFormat === "ticket" ? 2 : 4} className="p-2 text-right font-bold uppercase tracking-wider" style={{ color: BLUE, fontSize: printFormat === "ticket" ? "7px" : "10px" }}>{t("centre", "financeRemainingBalance")}</td>
-                  <td className="p-2 text-right font-extrabold tabular-nums finance-doc-amount finance-col-amount" style={{ color: ORANGE, fontSize: PRINT_FORMATS[printFormat].amountSize }}>{fmtFCFA(invoiceModal.reste_a_payer)} F</td>
+                  <td
+                    className={`p-2 text-right font-extrabold tabular-nums finance-doc-amount finance-col-amount ${invoiceModal.reste_a_payer > 0 ? ACTION_TONE.negativeText : ACTION_TONE.positiveText}`}
+                    style={{ fontSize: PRINT_FORMATS[printFormat].amountSize }}
+                  >
+                    {fmtFCFA(invoiceModal.reste_a_payer)} F
+                  </td>
                 </tr>
               </tfoot>
             </table>

@@ -146,7 +146,7 @@ export default function GenericManagerDashboard({
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <QuietKpi label={t("centre", "managerExpectedRevenue")} value={fmtXAF(fin.ca)} sub="XAF" icon={TrendingUp} />
             <QuietKpi label={t("centre", "managerCollected")} value={fmtXAF(fin.paid)} sub="XAF" icon={Wallet} />
-            <QuietKpi label={t("centre", "managerOutstanding")} value={fmtXAF(fin.pending)} sub="XAF" icon={Clock} />
+            <QuietKpi label={t("centre", "managerOutstanding")} value={fmtXAF(fin.pending)} sub="XAF" icon={Clock} alert={fin.pending > 0} />
             <QuietKpi
               label={t("centre", "managerLatePayments")}
               value={String(fin.late)}

@@ -936,7 +936,7 @@ export default function CenterStudentProfil() {
                 <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <FinanceCard label={financeEn ? "Program cost" : "Coût programme"} value={`${account.finance.tuition_fee.toLocaleString(financeLocale)} FCFA`} />
                   <FinanceCard label={financeEn ? "Paid" : "Versé"} value={`${account.finance.tuition_paid.toLocaleString(financeLocale)} FCFA`} accent="emerald" />
-                  <FinanceCard label={financeEn ? "Balance due" : "Reste à payer"} value={`${account.finance.remaining.toLocaleString(financeLocale)} FCFA`} accent="orange" />
+                  <FinanceCard label={financeEn ? "Balance due" : "Reste à payer"} value={`${account.finance.remaining.toLocaleString(financeLocale)} FCFA`} accent="red" />
                 </div>
 
                 {(account.finance.discount_amount || 0) > 0 && (
@@ -1215,12 +1215,13 @@ function FinanceCard({
 }: {
   label: string;
   value: string;
-  accent?: "blue" | "emerald" | "orange";
+  accent?: "blue" | "emerald" | "orange" | "red";
 }) {
   const colors = {
     blue: "text-blue-700 border-blue-100 bg-blue-50",
     emerald: "text-emerald-700 border-emerald-100 bg-emerald-50",
     orange: "text-orange-700 border-orange-100 bg-orange-50",
+    red: "text-red-700 border-red-100 bg-red-50",
   };
 
   return (

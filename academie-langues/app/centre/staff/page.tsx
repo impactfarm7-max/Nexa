@@ -19,6 +19,7 @@ import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHead
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { centre as centreMessages } from "@/app/i18n/messages/centre";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 import { localizeCountryName } from "@/app/utils/countryI18n";
 import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
 import {
@@ -638,9 +639,9 @@ export default function CenterStaffPage() {
                   <span>{en ? `staff member${staffList.length !== 1 ? "s" : ""}` : `collaborateur${staffList.length > 1 ? "s" : ""}`}</span>
                 </span>
                 <StatSep />
-                <span className="font-semibold text-emerald-700">{activeCount} {en ? "active" : `actif${activeCount > 1 ? "s" : ""}`}</span>
+                <span className={ACTION_TONE.positiveStat}>{activeCount} {en ? "active" : `actif${activeCount > 1 ? "s" : ""}`}</span>
                 <StatSep />
-                <span className="font-semibold text-red-600">{pausedCount} {en ? "suspended" : `suspendu${pausedCount > 1 ? "s" : ""}`}</span>
+                <span className={ACTION_TONE.negativeStat}>{pausedCount} {en ? "suspended" : `suspendu${pausedCount > 1 ? "s" : ""}`}</span>
               </span>
             }
           >
@@ -676,7 +677,7 @@ export default function CenterStaffPage() {
                       {isAcademic ? (en ? "Academic" : "Académique") : (en ? "Administrative" : "Administratif")}
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className={`text-[13px] font-semibold ${s.center_status === "active" ? "text-neutral-600" : "text-red-600"}`}>
+                      <span className={`text-[13px] font-semibold ${s.center_status === "active" ? ACTION_TONE.positiveText : ACTION_TONE.negativeText}`}>
                         {s.center_status === "active" ? (en ? "Active" : "Actif") : (en ? "Suspended" : "Suspendu")}
                       </span>
                     </td>
@@ -909,7 +910,7 @@ export default function CenterStaffPage() {
                 <button
                   type="button"
                   onClick={() => void toggleStatus(selectedStaff.id, selectedStaff.center_status)}
-                  className="h-10 px-4 rounded-lg border border-black/[0.08] bg-white text-sm font-semibold text-neutral-700 hover:bg-black/[0.03]"
+                  className={selectedStaff.center_status === "active" ? ACTION_TONE.negativeOutlineMd : ACTION_TONE.positiveBtnMd}
                 >
                   {selectedStaff.center_status === "active" ? (en ? "Suspend" : "Suspendre") : (en ? "Reactivate" : "Réactiver")}
                 </button>
@@ -1015,11 +1016,7 @@ function StaffCard({ staff, onSelect }: { staff: StaffRow; onSelect: () => void 
           </p>
           <div className="mt-2.5 flex items-center gap-2 flex-wrap">
             <span
-              className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border ${
-                staff.center_status === "active"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                  : "bg-red-50 text-red-600 border-red-200"
-              }`}
+              className={staff.center_status === "active" ? ACTION_TONE.positivePill : ACTION_TONE.negativePill}
             >
               {staff.center_status === "active" ? (locale === "en" ? "Active" : "Actif") : (locale === "en" ? "Suspended" : "Suspendu")}
             </span>
@@ -2300,7 +2297,7 @@ function StaffPrintModal({
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-neutral-500">
               <span>{staff.email}</span>
-              <span className={`font-bold ${staff.center_status === "active" ? "text-emerald-600" : "text-red-500"}`}>
+              <span className={`font-bold ${staff.center_status === "active" ? ACTION_TONE.positiveText : ACTION_TONE.negativeText}`}>
                 {staff.center_status === "active" ? (en ? "Active" : "Actif") : (en ? "Suspended" : "Suspendu")}
               </span>
             </div>

@@ -10,7 +10,9 @@ import { supabase } from "@/app/utils/supabase";
 import { downloadStatementPdf } from "@/app/utils/centerPdfExport";
 import { fetchDocumentExportConfig } from "@/app/utils/documentConfig";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/financeI18n";
+import { fetchUsableCoupons, type CouponListItem } from "@/app/utils/coupon.client";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -121,17 +123,6 @@ function FinanceSection({
   );
 }
 
-type CouponOption = {
-  id: string;
-  code: string;
-  type: string;
-  value: number;
-  max_uses: number | null;
-  uses_count: number;
-  expires_at: string | null;
-  is_active: boolean;
-};
-
 function dedupeInstallments(list: Installment[]): Installment[] {
   if (!list || list.length <= 1) return list;
 
@@ -216,24 +207,13 @@ export default function StudentFinanceTab({
   const [couponApplying, setCouponApplying] = useState(false);
   const [couponError, setCouponError] = useState("");
   const [couponSuccess, setCouponSuccess] = useState("");
-  const [availableCoupons, setAvailableCoupons] = useState<CouponOption[]>([]);
+  const [availableCoupons, setAvailableCoupons] = useState<CouponListItem[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       if (centerId) {
-        const { data: coupData } = await supabase
-          .from("coupons")
-          .select("id, code, type, value, max_uses, uses_count, expires_at, is_active")
-          .eq("center_id", centerId)
-          .eq("is_active", true)
-          .order("created_at", { ascending: false });
-        const valid = (coupData || []).filter((c) => {
-          if (c.expires_at && new Date(c.expires_at) < new Date()) return false;
-          if (c.max_uses != null && c.uses_count >= c.max_uses) return false;
-          return true;
-        });
-        setAvailableCoupons(valid);
+        setAvailableCoupons(await fetchUsableCoupons(supabase, centerId));
       }
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -505,14 +485,14 @@ export default function StudentFinanceTab({
           <div>
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-semibold text-neutral-600">{t("centre", "studentFinanceProgress")}</span>
-              <span className="text-sm font-bold" style={{ color: isPaid ? "#059669" : ORANGE }}>
+              <span className={`text-sm font-bold ${isPaid ? ACTION_TONE.positiveText : ACTION_TONE.negativeText}`}>
                 {progressPct.toFixed(0)}%
               </span>
             </div>
             <div className="h-2.5 bg-white border border-black/[0.06] rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${progressPct}%`, backgroundColor: isPaid ? "#059669" : ORANGE }}
+                style={{ width: `${progressPct}%`, backgroundColor: isPaid ? ACTION_TONE.positiveHex : ACTION_TONE.negativeHex }}
               />
             </div>
           </div>
@@ -534,49 +514,38 @@ export default function StudentFinanceTab({
               <Tag size={14} style={{ color: ORANGE }} /> {t("centre", "studentFinanceApplyCouponTitle")}
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
-              {availableCoupons.length > 0 ? (
-                <select
-                  value={couponCode}
-                  onChange={(e) => {
-                    setCouponCode(e.target.value);
-                    setCouponError("");
-                    setCouponSuccess("");
-                  }}
-                  className={`${FIELD_INPUT} flex-1 uppercase text-sm`}
-                >
-                  <option value="">{locale === "en" ? "Select a center coupon" : t("centre", "studentFinanceSelectCoupon")}</option>
-                  {availableCoupons.map((c) => (
-                    <option key={c.id} value={c.code}>
-                      {c.code} ({c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value, locale)} FCFA`})
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={couponCode}
-                  onChange={(e) => {
-                    setCouponCode(e.target.value.toUpperCase());
-                    setCouponError("");
-                    setCouponSuccess("");
-                  }}
-                  placeholder={t("centre", "studentFinanceCouponPlaceholder")}
-                  className={`${FIELD_INPUT} flex-1 uppercase`}
-                />
-              )}
+              <select
+                value={couponCode}
+                onChange={(e) => {
+                  setCouponCode(e.target.value);
+                  setCouponError("");
+                  setCouponSuccess("");
+                }}
+                className={`${FIELD_INPUT} flex-1 uppercase text-sm`}
+              >
+                <option value="">
+                  {availableCoupons.length
+                    ? t("centre", "studentFinanceSelectCoupon")
+                    : t("centre", "financeNoCouponAvailable")}
+                </option>
+                {availableCoupons.map((c) => (
+                  <option key={c.id} value={c.code}>
+                    {c.code} ({c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value, locale)} FCFA`})
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={submitCoupon}
                 disabled={couponApplying || !couponCode.trim()}
-                className="h-12 px-5 rounded-lg text-sm font-semibold text-white disabled:opacity-50 inline-flex items-center justify-center gap-1.5 shrink-0"
-                style={{ backgroundColor: BLUE }}
+                className={`${ACTION_TONE.positiveBtnMd} shrink-0`}
               >
                 {couponApplying ? <Loader2 size={14} className="animate-spin" /> : null}
                 {t("centre", "studentFinanceApply")}
               </button>
             </div>
-            {couponError && <p className="text-sm font-semibold text-red-500">{couponError}</p>}
-            {couponSuccess && <p className="text-sm font-semibold text-emerald-600">{couponSuccess}</p>}
+            {couponError && <p className={`text-sm font-semibold ${ACTION_TONE.negativeText}`}>{couponError}</p>}
+            {couponSuccess && <p className={`text-sm font-semibold ${ACTION_TONE.positiveText}`}>{couponSuccess}</p>}
           </div>
         )}
       </FinanceSection>

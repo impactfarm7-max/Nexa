@@ -18,6 +18,7 @@ import ReportAlerts from "./components/ReportAlerts";
 import ReportExportBar from "./components/ReportExportBar";
 import { useReportPage } from "./hooks/useReportPage";
 import { useReportPdfExport } from "./hooks/useReportPdfExport";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 import { downloadCsv, fmtFCFA, fmtMoneyBar, fmtNum } from "@/app/utils/reports-export";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
@@ -56,7 +57,7 @@ type SyntheseReport = {
 };
 
 function SyntheseContent() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange, reportHref,
@@ -121,7 +122,7 @@ function SyntheseContent() {
       exportSlot={<ReportExportBar onCsv={exportCsv} onPdf={exportPdfReport} pdfLoading={pdfLoading} />}
     >
       {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/80 px-4 py-3 text-sm text-red-700 flex items-center gap-2">
+        <div className={`${ACTION_TONE.errorBox} flex items-center gap-2`}>
           <AlertTriangle size={16} className="shrink-0" />
           {error}
         </div>
@@ -153,7 +154,7 @@ function SyntheseContent() {
                 icon: Wallet,
                 iconBg: "bg-emerald-50",
                 iconColor: "text-emerald-600",
-                valueColor: "text-emerald-700",
+                valueColor: ACTION_TONE.positiveText,
               },
               {
                 label: t("centre", "summaryRecoveryRate"),
@@ -179,7 +180,7 @@ function SyntheseContent() {
                 icon: Clock,
                 iconBg: report.kpis.nbRetard > 0 ? "bg-red-50" : "bg-neutral-50",
                 iconColor: report.kpis.nbRetard > 0 ? "text-red-500" : "text-neutral-400",
-                valueColor: report.kpis.nbRetard > 0 ? "text-red-600" : undefined,
+                valueColor: report.kpis.nbRetard > 0 ? ACTION_TONE.negativeText : undefined,
                 alert: report.kpis.nbRetard > 0,
               },
               {
@@ -234,11 +235,11 @@ function SyntheseContent() {
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline py-2.5">
                   <dt className="text-sm text-neutral-500 font-medium">{t("centre", "summaryCollectedPeriod")}</dt>
-                  <dd className="text-sm font-bold tabular-nums text-right whitespace-nowrap text-emerald-700">{fmtMoneyBar(report.sections.finance.encaissePeriode)}</dd>
+                  <dd className={`text-sm font-bold tabular-nums text-right whitespace-nowrap ${ACTION_TONE.positiveText}`}>{fmtMoneyBar(report.sections.finance.encaissePeriode)}</dd>
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline py-2.5">
                   <dt className="text-sm text-neutral-500 font-medium">{t("centre", "summaryBalance")}</dt>
-                  <dd className="text-sm font-bold tabular-nums text-right whitespace-nowrap">{fmtMoneyBar(report.sections.finance.reste)}</dd>
+                  <dd className={`text-sm font-bold tabular-nums text-right whitespace-nowrap ${report.sections.finance.reste > 0 ? ACTION_TONE.negativeText : ACTION_TONE.positiveText}`}>{fmtMoneyBar(report.sections.finance.reste)}</dd>
                 </div>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline py-2.5">
                   <dt className="text-sm text-neutral-500 font-medium">{t("centre", "summaryRecovery")}</dt>

@@ -12,6 +12,7 @@ import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { BLUE, ORANGE, PAGE_BG } from "@/app/centre/center-page-ui";
 import Link from "next/link";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 
 function toDatetimeLocal(iso: string): string {
   const d = new Date(iso);
@@ -383,7 +384,7 @@ export default function TcfExamPlanningPage() {
                     </div>
                     <div className="flex flex-wrap gap-1 mt-2">
                       {entry.students.map(s => (
-                        <span key={s.id} className={`text-[9px] font-bold px-2 py-0.5 rounded border ${s.status === "completed" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : s.status === "no_show" ? "bg-red-50 text-red-600 border-red-200" : "bg-neutral-50 text-neutral-600 border-neutral-200"}`}>
+                        <span key={s.id} className={s.status === "completed" ? ACTION_TONE.positivePill : s.status === "no_show" ? ACTION_TONE.negativePill : ACTION_TONE.neutralPill}>
                           {s.name}
                         </span>
                       ))}
@@ -450,7 +451,7 @@ export default function TcfExamPlanningPage() {
                   ))}
                 </div>
               )}
-              {error && <p className="text-xs text-red-500">{error}</p>}
+              {error && <p className={ACTION_TONE.errorText}>{error}</p>}
               <button
                 onClick={editingSessionId ? handleUpdate : handleCreate}
                 disabled={saving}

@@ -1370,19 +1370,26 @@ export async function buildReductionsReport(centerId: string, filters: ReportFil
     kpis: {
       totalReductions,
       nbDossiers: displayRows.length,
-      nbCouponsActifs: couponList.filter((c) => c.is_active).length,
+      nbCouponsActifs: couponList.filter((c) => {
+        if (!c.is_active) return false;
+        if (c.expires_at && new Date(c.expires_at).getTime() < Date.now()) return false;
+        return true;
+      }).length,
       utilisationsCoupons: sum(couponList.map((c) => c.uses_count)),
     },
     byReason,
     byFiliere,
-    coupons: couponList.map((c) => ({
-      code: c.code,
-      type: c.type === "percentage" ? `${c.value} %` : `${c.value.toLocaleString("fr-FR")} FCFA`,
-      uses: c.uses_count,
-      maxUses: c.max_uses,
-      active: c.is_active,
-      expiresAt: c.expires_at?.slice(0, 10) || "—",
-    })),
+    coupons: couponList.map((c) => {
+      const expired = !!(c.expires_at && new Date(c.expires_at).getTime() < Date.now());
+      return {
+        code: c.code,
+        type: c.type === "percentage" ? `${c.value} %` : `${c.value.toLocaleString("fr-FR")} FCFA`,
+        uses: c.uses_count,
+        maxUses: c.max_uses,
+        active: !!c.is_active && !expired,
+        expiresAt: c.expires_at?.slice(0, 10) || "—",
+      };
+    }),
     rows: displayRows
       .sort((a, b) => b.amount - a.amount)
       .map((r) => ({

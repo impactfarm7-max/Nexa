@@ -24,6 +24,7 @@ import {
 import { downloadClassGradeSheetPdf } from "@/app/utils/centerPdfExport";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 
 import {
   BLUE,
@@ -1676,9 +1677,9 @@ export default function GradeBookPage() {
             )}
 
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-2">
-                <AlertTriangle size={14} className="text-red-500 shrink-0 mt-0.5" />
-                <p className="text-xs font-bold text-red-600">{error}</p>
+              <div className={`mb-4 p-3 rounded-2xl flex items-start gap-2 ${ACTION_TONE.errorBox}`}>
+                <AlertTriangle size={14} className={`${ACTION_TONE.dangerIcon} shrink-0 mt-0.5`} />
+                <p className={`text-xs font-bold ${ACTION_TONE.negativeText}`}>{error}</p>
               </div>
             )}
 

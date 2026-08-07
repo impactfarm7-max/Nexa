@@ -20,6 +20,22 @@ export function computeCouponDiscount(coupon: Pick<CouponRow, "type" | "value">,
   return Math.min(Math.round(Number(coupon.value) || 0), base);
 }
 
+export function isCouponExpiredServer(expiresAt: string | null | undefined, now = new Date()): boolean {
+  if (!expiresAt) return false;
+  return new Date(expiresAt).getTime() < now.getTime();
+}
+
+/** Mark coupon inactive when past expires_at (best-effort). */
+export async function deactivateCouponIfExpired(
+  supabase: SupabaseClient,
+  coupon: Pick<CouponRow, "id" | "expires_at" | "is_active">,
+  now = new Date(),
+): Promise<boolean> {
+  if (!coupon.is_active || !isCouponExpiredServer(coupon.expires_at, now)) return false;
+  await supabase.from("coupons").update({ is_active: false }).eq("id", coupon.id);
+  return true;
+}
+
 export async function fetchValidCoupon(
   supabase: SupabaseClient,
   centerId: string,
@@ -40,11 +56,17 @@ export async function fetchValidCoupon(
   if (error) {
     return { ok: false, error: error.message };
   }
-  if (!coupon || !coupon.is_active) {
+  if (!coupon) {
     return { ok: false, error: "Coupon invalide." };
   }
-  if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+
+  if (isCouponExpiredServer(coupon.expires_at)) {
+    await deactivateCouponIfExpired(supabase, coupon as CouponRow);
     return { ok: false, error: "Coupon expiré." };
+  }
+
+  if (!coupon.is_active) {
+    return { ok: false, error: "Coupon invalide." };
   }
   if (coupon.max_uses != null && coupon.uses_count >= coupon.max_uses) {
     return { ok: false, error: "Coupon épuisé." };

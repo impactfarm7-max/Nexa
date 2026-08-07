@@ -26,6 +26,8 @@ import { downloadTcfDossierPdf } from "@/app/utils/centerPdfExport";
 import { AmountInWords } from "@/app/components/AmountInWords";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 import { sumNamedExtraFees } from "@/app/utils/short-pricing";
+import { fetchUsableCoupons, type CouponListItem } from "@/app/utils/coupon.client";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -610,8 +612,8 @@ export default function CenterTCFStudentsPage() {
               <p className="text-2xl font-black" style={{ color: BLUE }}>{visibleStudents.length}</p>
             </div>
             <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-200 shadow-sm">
-              <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Actifs</p>
-              <p className="text-2xl font-black text-emerald-600">{activeCount}</p>
+              <p className={`text-[9px] font-black ${ACTION_TONE.positiveText} uppercase tracking-widest mb-1`}>Actifs</p>
+              <p className={`text-2xl font-black ${ACTION_TONE.positiveText}`}>{activeCount}</p>
             </div>
             <div className={`p-5 rounded-2xl border shadow-sm ${pendingCount > 0 ? "bg-amber-50/50 border-amber-200" : "bg-white"}`}>
               <p className="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-1">En attente</p>
@@ -676,13 +678,13 @@ export default function CenterTCFStudentsPage() {
                         <p className="text-[10px] text-neutral-500 truncate">{formatStudentLocation(s)}</p>
                       )}
                       {eff === "active" && s.subscription_ends_at && (
-                        <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                        <p className={`text-[10px] ${ACTION_TONE.positiveText} font-bold mt-0.5`}>
                           Jusqu&apos;au {fmtDate(s.subscription_ends_at)}
                           {formatStudentDuration(s) ? ` · ${formatStudentDuration(s)}` : ""}
                           {s.tuition_fee ? ` · ${fmtFCFA(s.tuition_fee)} F` : ""}
                         </p>
                       )}
-                      {eff === "expired" && <p className="text-[10px] text-red-500 font-bold mt-0.5">Expiré le {fmtDate(s.subscription_ends_at)}</p>}
+                      {eff === "expired" && <p className={`text-[10px] ${ACTION_TONE.negativeText} font-bold mt-0.5`}>Expiré le {fmtDate(s.subscription_ends_at)}</p>}
                       {eff === "pending" && <p className="text-[10px] text-amber-600 font-bold mt-0.5">Inscrit le {fmtDate(s.created_at)}</p>}
                       {eff === "paused" && (
                         <p className="text-[10px] text-blue-600 font-bold mt-0.5">
@@ -690,15 +692,15 @@ export default function CenterTCFStudentsPage() {
                           {s.access_pause_reason ? ` · Motif : ${s.access_pause_reason}` : ""}
                         </p>
                       )}
-                      {eff === "inactive" && <p className="text-[10px] text-red-600 font-bold mt-0.5">Accès révoqué</p>}
+                      {eff === "inactive" && <p className={`text-[10px] font-bold mt-0.5 ${ACTION_TONE.negativeText}`}>Accès révoqué</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {eff === "pending" && <span className="px-2 py-1 rounded text-[9px] font-black uppercase bg-amber-50 text-amber-700 border border-amber-200">En attente</span>}
-                    {eff === "active" && <span className="px-2 py-1 rounded text-[9px] font-black uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">Actif</span>}
-                    {eff === "expired" && <span className="px-2 py-1 rounded text-[9px] font-black uppercase bg-red-50 text-red-700 border border-red-200">Expiré</span>}
+                    {eff === "pending" && <span className={ACTION_TONE.warningPill}>En attente</span>}
+                    {eff === "active" && <span className={ACTION_TONE.positivePill}>Actif</span>}
+                    {eff === "expired" && <span className={ACTION_TONE.negativePill}>Expiré</span>}
                     {eff === "paused" && <span className="px-2 py-1 rounded text-[9px] font-black uppercase bg-blue-50 text-blue-700 border border-blue-200">En pause</span>}
-                    {eff === "inactive" && <span className="px-2 py-1 rounded text-[9px] font-black uppercase bg-red-50 text-red-700 border border-red-200">Révoqué</span>}
+                    {eff === "inactive" && <span className={ACTION_TONE.negativePill}>Révoqué</span>}
 
                     {eff === "pending" && (
                       <>
@@ -706,7 +708,7 @@ export default function CenterTCFStudentsPage() {
                           <Eye size={12} /> Voir
                         </button>
                         <button onClick={() => setActivateTarget(s)} className="h-9 px-4 rounded-xl text-[10px] font-black uppercase text-white hover:opacity-90" style={{ backgroundColor: ORANGE }}>Valider</button>
-                        <button onClick={() => rejectStudent(s.student_id)} className="h-9 px-3 rounded-xl text-[10px] font-black uppercase text-red-500 border border-red-200 hover:bg-red-50">Refuser</button>
+                        <button onClick={() => rejectStudent(s.student_id)} className={ACTION_TONE.negativeOutline}>Refuser</button>
                       </>
                     )}
                     {eff === "active" && (
@@ -722,7 +724,7 @@ export default function CenterTCFStudentsPage() {
                         </button>
                         <button
                           onClick={() => revokeAccess(s.student_id)}
-                          className="h-9 px-3 rounded-xl text-[10px] font-black uppercase border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 flex items-center gap-1.5 transition-colors"
+                          className={`${ACTION_TONE.negativeOutline} h-9 px-3 rounded-xl text-[10px] font-black uppercase flex items-center gap-1.5`}
                         >
                           <Trash2 size={12} /> Supprimer
                         </button>
@@ -966,6 +968,7 @@ function ActivateModal({ student, centerId, onClose, onActivated }: {
   const [couponApplied, setCouponApplied] = useState<{ discount: number; label: string } | null>(null);
   const [couponError, setCouponError] = useState("");
   const [checkingCoupon, setCheckingCoupon] = useState(false);
+  const [availableCoupons, setAvailableCoupons] = useState<CouponListItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [groupe, setGroupe] = useState("");
@@ -1037,16 +1040,55 @@ function ActivateModal({ student, centerId, onClose, onActivated }: {
   }, [centerId]);
 
   useEffect(() => {
-    setCouponApplied(null);
+    if (!centerId) return;
+    void fetchUsableCoupons(supabase, centerId).then(setAvailableCoupons);
+  }, [centerId]);
+
+  useEffect(() => {
     setCouponError("");
-  }, [durationValue, durationUnit, baseTotal, useAgreedPrice, agreedPrice]);
+    if (!couponCode.trim()) {
+      setCouponApplied(null);
+      return;
+    }
+    const coupon = availableCoupons.find((c) => c.code === couponCode);
+    if (!coupon) {
+      setCouponApplied(null);
+      return;
+    }
+    const discount = coupon.type === "percentage"
+      ? Math.round(baseTotal * Number(coupon.value) / 100)
+      : Math.min(Number(coupon.value), baseTotal);
+    setCouponApplied({
+      discount,
+      label: coupon.type === "percentage" ? `-${coupon.value}%` : `-${fmtFCFA(coupon.value)} F`,
+    });
+  }, [durationValue, durationUnit, baseTotal, useAgreedPrice, agreedPrice, couponCode, availableCoupons]);
+
+  const applyCouponFromList = (code: string) => {
+    setCouponCode(code);
+    setCouponError("");
+    setCouponApplied(null);
+    if (!code.trim()) return;
+    const coupon = availableCoupons.find((c) => c.code === code);
+    if (!coupon) return;
+    const discount = coupon.type === "percentage"
+      ? Math.round(baseTotal * Number(coupon.value) / 100)
+      : Math.min(Number(coupon.value), baseTotal);
+    setCouponApplied({
+      discount,
+      label: coupon.type === "percentage" ? `-${coupon.value}%` : `-${fmtFCFA(coupon.value)} F`,
+    });
+  };
 
   const checkCoupon = async () => {
     if (!couponCode.trim()) return;
     setCheckingCoupon(true); setCouponError(""); setCouponApplied(null);
     const { data: coupon } = await supabase.from("coupons").select("id, type, value, max_uses, uses_count, expires_at, is_active").eq("center_id", centerId).eq("code", couponCode.trim().toUpperCase()).single();
     if (!coupon || !coupon.is_active) { setCouponError("Coupon invalide."); setCheckingCoupon(false); return; }
-    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) { setCouponError("Coupon expiré."); setCheckingCoupon(false); return; }
+    if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+      await supabase.from("coupons").update({ is_active: false }).eq("id", coupon.id);
+      setCouponError("Coupon expiré."); setCheckingCoupon(false); return;
+    }
     if (coupon.max_uses && coupon.uses_count >= coupon.max_uses) { setCouponError("Coupon épuisé."); setCheckingCoupon(false); return; }
     const discount = coupon.type === "percentage" ? Math.round(baseTotal * coupon.value / 100) : Math.min(coupon.value, baseTotal);
     setCouponApplied({ discount, label: coupon.type === "percentage" ? `-${coupon.value}%` : `-${fmtFCFA(coupon.value)} F` });
@@ -1222,13 +1264,27 @@ function ActivateModal({ student, centerId, onClose, onActivated }: {
           <div>
             <label className="text-[9px] font-black uppercase text-neutral-400 tracking-widest block mb-1.5 flex items-center gap-1"><Tag size={10} /> Code promo</label>
             <div className="flex gap-2">
-              <input value={couponCode} onChange={e => { setCouponCode(e.target.value.toUpperCase()); setCouponApplied(null); setCouponError(""); }} placeholder="RENTREE2026" className="flex-1 h-10 px-3 rounded-xl border bg-neutral-50 text-xs font-black uppercase outline-none" style={{ color: BLUE }} />
-              <button onClick={checkCoupon} disabled={checkingCoupon || !couponCode.trim()} className="h-10 px-4 rounded-xl border text-xs font-bold hover:bg-neutral-50 disabled:opacity-40">
-                {checkingCoupon ? <Loader2 size={14} className="animate-spin" /> : "Vérifier"}
-              </button>
+              <select
+                value={couponCode}
+                onChange={(e) => applyCouponFromList(e.target.value)}
+                className="flex-1 h-10 px-3 rounded-xl border bg-neutral-50 text-xs font-black uppercase outline-none"
+                style={{ color: BLUE }}
+              >
+                <option value="">{availableCoupons.length ? "— Aucun —" : "Aucun coupon disponible"}</option>
+                {availableCoupons.map((c) => (
+                  <option key={c.id} value={c.code}>
+                    {c.code} ({c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value)} F`})
+                  </option>
+                ))}
+              </select>
+              {couponCode && (
+                <button onClick={checkCoupon} disabled={checkingCoupon} className="h-10 px-4 rounded-xl border text-xs font-bold hover:bg-neutral-50 disabled:opacity-40">
+                  {checkingCoupon ? <Loader2 size={14} className="animate-spin" /> : "Vérifier"}
+                </button>
+              )}
             </div>
-            {couponApplied && <p className="text-[10px] font-bold text-emerald-600 mt-1">✓ {couponApplied.label} ({fmtFCFA(couponApplied.discount)} FCFA)</p>}
-            {couponError && <p className="text-[10px] font-bold text-red-500 mt-1">{couponError}</p>}
+            {couponApplied && <p className={`text-[10px] font-bold mt-1 ${ACTION_TONE.positiveText}`}>✓ {couponApplied.label} ({fmtFCFA(couponApplied.discount)} FCFA)</p>}
+            {couponError && <p className={`text-[10px] font-bold mt-1 ${ACTION_TONE.negativeText}`}>{couponError}</p>}
           </div>
 
           <div className="bg-neutral-50 border rounded-xl p-4 space-y-2">
@@ -1361,11 +1417,15 @@ function ActivateModal({ student, centerId, onClose, onActivated }: {
 // ============================================================
 // MODAL DOSSIER ÉTUDIANT
 // ============================================================
-function DossierField({ label, value }: { label: string; value: string }) {
+function DossierField({ label, value, tone }: { label: string; value: string; tone?: "positive" | "negative" | "neutral" }) {
+  const color =
+    tone === "positive" ? ACTION_TONE.positiveHex
+    : tone === "negative" ? ACTION_TONE.negativeHex
+    : BLUE;
   return (
     <div className="flex justify-between gap-4 py-2.5 border-b border-neutral-100 last:border-0">
       <span className="text-[10px] font-black uppercase text-neutral-400 shrink-0">{label}</span>
-      <span className="text-xs font-bold text-right break-words" style={{ color: BLUE }}>{value || "—"}</span>
+      <span className="text-xs font-bold text-right break-words" style={{ color }}>{value || "—"}</span>
     </div>
   );
 }
@@ -1439,8 +1499,8 @@ function StudentDossierModal({ student, docConfig, onClose }: { student: TCFStud
               <p className="text-[9px] font-black uppercase text-emerald-700 tracking-widest mb-2 flex items-center gap-1">
                 <Wallet size={10} /> Finance
               </p>
-              <DossierField label="Payé" value={`${fmtFCFA(student.tuition_paid || 0)} FCFA`} />
-              <DossierField label="Reste à payer" value={`${fmtFCFA(reste)} FCFA`} />
+              <DossierField label="Payé" value={`${fmtFCFA(student.tuition_paid || 0)} FCFA`} tone="positive" />
+              <DossierField label="Reste à payer" value={`${fmtFCFA(reste)} FCFA`} tone={reste > 0 ? "negative" : "positive"} />
               <DossierField label="Statut" value={financeStatusLabel(student.financial_status)} />
             </section>
           )}
