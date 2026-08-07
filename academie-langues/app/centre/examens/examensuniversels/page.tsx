@@ -6,6 +6,7 @@ import Link from "next/link";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { supabase } from "@/app/utils/supabase";
 import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import {
   BLUE,
   SURFACE,
@@ -29,6 +30,7 @@ function HubCard({
   disabled?: boolean;
   disabledHint?: string;
 }) {
+  const { t } = useI18n();
   const inner = (
     <div
       className={`rounded-xl border h-full flex flex-col justify-between p-5 sm:p-6 transition-colors ${
@@ -49,7 +51,7 @@ function HubCard({
           </div>
           {disabled ? (
             <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg border border-neutral-200 bg-white text-neutral-400 inline-flex items-center gap-1 shrink-0">
-              <Lock size={10} /> Indispo.
+              <Lock size={10} /> {t("centre", "examensUnavailableShort")}
             </span>
           ) : null}
         </div>
@@ -67,11 +69,11 @@ function HubCard({
       {disabled ? (
         <p className="mt-6 text-xs font-semibold text-neutral-400 inline-flex items-center gap-1.5">
           <Lock size={12} className="shrink-0" />
-          {disabledHint || "Pas encore disponible"}
+          {disabledHint || t("centre", "examensNotYetAvailable")}
         </p>
       ) : (
         <div className="mt-6 flex items-center text-xs font-semibold" style={{ color: BLUE }}>
-          <span>Ouvrir</span>
+          <span>{t("centre", "examensOpen")}</span>
           <ArrowRight className="ml-1.5 h-4 w-4" />
         </div>
       )}
@@ -87,6 +89,7 @@ function HubCard({
 }
 
 export default function ExamensHubPage() {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [centerType, setCenterType] = useState<string | null>(null);
 
@@ -120,12 +123,12 @@ export default function ExamensHubPage() {
   if (loading) return <CenterPageLoading className="bg-[#FFFBF7]" />;
 
   return (
-    <CenterPageLayout header={<CenterPageHeader title="Examens & Notes" />}>
+    <CenterPageLayout header={<CenterPageHeader title={t("centre", "examensAndGrades")} />}>
       <CenterPageBody>
         <p className="text-sm text-neutral-500 font-medium -mt-1 mb-1">
           {isTcf
             ? "Planifiez les examens complets et suivez les résultats de vos apprenants."
-            : "Saisissez les notes et gérez les évaluations de vos apprenants."}
+            : t("centre", "examensNonTcfIntro")}
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -147,17 +150,17 @@ export default function ExamensHubPage() {
           ) : (
             <>
               <HubCard
-                title="Carnet de notes"
-                description="Saisissez les notes par matière et par période. Grille rapide pour toute une classe."
+                title={t("centre", "examensGradebook")}
+                description={t("centre", "examensGradebookDesc")}
                 href="/centre/examens/notes"
                 icon={<BookOpen className="h-6 w-6" style={{ color: BLUE }} />}
               />
               <HubCard
-                title="Organisation des examens"
-                description="Planification TCF, convocations et déblocages — réservé aux centres TCF Canada."
+                title={t("centre", "examensOrganization")}
+                description={t("centre", "examensOrganizationDesc")}
                 icon={<ClipboardList className="h-6 w-6 text-neutral-400" />}
                 disabled
-                disabledHint="Réservé aux centres TCF Canada"
+                disabledHint={t("centre", "examensTcfOnly")}
               />
             </>
           )}

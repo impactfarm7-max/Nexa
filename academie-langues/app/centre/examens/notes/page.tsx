@@ -23,6 +23,7 @@ import {
 } from "@/app/utils/gradesCalc";
 import { downloadClassGradeSheetPdf } from "@/app/utils/centerPdfExport";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 import {
   BLUE,
@@ -141,17 +142,18 @@ function FilterPill({
 }
 
 function ProgrammeTypeBadge({ type }: { type: "cursus" | "formation_courte" | null }) {
+  const { t } = useI18n();
   if (type === "cursus") {
     return (
       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border border-[#11224E]/15 bg-[#11224E]/[0.06] text-[#11224E]">
-        Cursus
+        {t("centre", "programsCourse")}
       </span>
     );
   }
   if (type === "formation_courte") {
     return (
       <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md border border-orange-200 bg-orange-50 text-orange-700">
-        Formation courte
+        {t("centre", "programsShortCourse")}
       </span>
     );
   }
@@ -200,6 +202,7 @@ function scoreFieldClass(scoreStr: string, bareme: number, dirty: boolean, locke
 }
 
 export default function GradeBookPage() {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [centerType, setCenterType] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -254,23 +257,23 @@ export default function GradeBookPage() {
 
   const formulaHint = useMemo(() => {
     if (!hasCustomGradeWeights(subjectWeights)) {
-      return "Moyenne = moyenne simple des notes";
+      return t("centre", "notesSimpleAverage");
     }
     const parts: string[] = [];
     if (subjectWeights![PRINCIPAL_WEIGHT_KEY]) {
-      parts.push(`Note principale (${subjectWeights![PRINCIPAL_WEIGHT_KEY]} %)`);
+      parts.push(`${t("centre", "gradesMainGrade")} (${subjectWeights![PRINCIPAL_WEIGHT_KEY]} %)`);
     }
     for (const [k, v] of Object.entries(subjectWeights!)) {
       if (k === PRINCIPAL_WEIGHT_KEY) continue;
       parts.push(`${k} (${v} %)`);
     }
-    if (parts.length === 0) return "Moyenne = moyenne simple des notes";
-    return `Moyenne = ${parts.join(" + ")}`;
-  }, [subjectWeights]);
+    if (parts.length === 0) return t("centre", "notesSimpleAverage");
+    return `${t("centre", "notesAverage")} = ${parts.join(" + ")}`;
+  }, [subjectWeights, t]);
 
   const formulaKeys = useMemo(() => {
     const keys: { key: string; label: string }[] = [
-      { key: PRINCIPAL_WEIGHT_KEY, label: "Note principale" },
+      { key: PRINCIPAL_WEIGHT_KEY, label: t("centre", "gradesMainGrade") },
     ];
     const seen = new Set<string>([PRINCIPAL_WEIGHT_KEY]);
     for (const col of suplColumns) {
@@ -285,12 +288,12 @@ export default function GradeBookPage() {
         seen.add(k);
         keys.push({
           key: k,
-          label: k === PRINCIPAL_WEIGHT_KEY ? "Note principale" : k,
+          label: k === PRINCIPAL_WEIGHT_KEY ? t("centre", "gradesMainGrade") : k,
         });
       }
     }
     return keys;
-  }, [suplColumns, subjectWeights]);
+  }, [suplColumns, subjectWeights, t]);
 
   const openFormulaEditor = () => {
     const custom = hasCustomGradeWeights(subjectWeights);
@@ -794,7 +797,7 @@ export default function GradeBookPage() {
     const max = parseFloat(editMaxScore);
     const coeff = parseFloat(editCoefficient);
     if (isNaN(max) || max <= 0 || isNaN(coeff) || coeff <= 0) {
-      setError("Barème et coefficient doivent être > 0.");
+      setError(t("centre", "notesScaleCoeffPositive"));
       return;
     }
     setSavingMeta(true);
@@ -837,7 +840,7 @@ export default function GradeBookPage() {
           const score = parseFloat(row.new_score);
           if (isNaN(score) || score < 0) continue;
           if (score > maxScore) {
-            throw new Error(`${row.nom} ${row.prenom} : note > barème /${maxScore}`);
+            throw new Error(`${row.nom} ${row.prenom} : ${t("centre", "notesScoreAboveScale", { scale: String(maxScore) })}`);
           }
           if (row.existing_grade_id) {
             const { error: upErr } = await supabase
@@ -893,7 +896,7 @@ export default function GradeBookPage() {
           }
 
           if (!title) {
-            throw new Error(`Intitulé requis en tête de colonne pour la note supl.`);
+            throw new Error(t("centre", "notesExtraColumnTitleRequired"));
           }
           if (!hasScore) {
             keptExtras.push({ ...ex, dirty: false });
@@ -980,8 +983,8 @@ export default function GradeBookPage() {
     if (formulaMode === "weighted" && !formulaCanSave) {
       setError(
         formulaSumOk
-          ? "Chaque colonne doit avoir un poids > 0."
-          : `La somme doit être exactement 100 % (actuellement ${formulaSum.toFixed(1)} %).`,
+          ? t("centre", "notesEachColumnWeightPositive")
+          : t("centre", "notesSumMustBe100", { sum: formulaSum.toFixed(1) }),
       );
       return;
     }
@@ -1002,9 +1005,7 @@ export default function GradeBookPage() {
         .eq("id", selectedSubject.filiere_matiere_id);
       if (upErr) {
         if (/grade_weights/i.test(upErr.message)) {
-          throw new Error(
-            "Colonne grade_weights absente. Exécutez supabase-grades-weights.sql dans Supabase.",
-          );
+          throw new Error(t("centre", "notesGradeWeightsColumnMissing"));
         }
         throw new Error(upErr.message);
       }
@@ -1102,7 +1103,7 @@ export default function GradeBookPage() {
         matiereName: selectedSubject.discipline_name,
         periodLabel: selectedPeriod
           ? (selectedPeriod.parent_name ? `${selectedPeriod.parent_name} → ${selectedPeriod.name}` : selectedPeriod.name)
-          : "Période",
+          : t("centre", "reportsPeriod"),
         bareme,
         coefficient: selectedSubject.coefficient,
         classAverage: classAvg !== null ? classAvg.toFixed(2) : "—",
@@ -1124,7 +1125,7 @@ export default function GradeBookPage() {
         signatures,
       });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Export PDF impossible.");
+      setError(e instanceof Error ? e.message : t("centre", "notesPdfExportImpossible"));
     } finally {
       setExportingClass(false);
     }
@@ -1155,10 +1156,10 @@ export default function GradeBookPage() {
       <div className={`${centerNotoSans.className} min-h-[100dvh] flex items-center justify-center p-12 text-center`} style={{ backgroundColor: PAGE_BG }}>
         <div>
           <p className="text-sm font-semibold text-neutral-500">
-            Le carnet de notes n&apos;est pas disponible pour les centres TCF Canada.
+            {t("centre", "notesTcfUnavailable")}
           </p>
           <a href="/centre/examens/examensuniversels" className="mt-4 inline-block text-xs font-bold uppercase tracking-wider hover:underline" style={{ color: ORANGE }}>
-            Retour aux examens
+            {t("centre", "notesBackToExams")}
           </a>
         </div>
       </div>
@@ -1175,7 +1176,7 @@ export default function GradeBookPage() {
                 type="button"
                 onClick={resetToFilieres}
                 className="h-9 w-9 rounded-lg border border-black/[0.08] bg-white hover:bg-black/[0.03] text-neutral-500 transition-colors shrink-0 inline-flex items-center justify-center"
-                aria-label="Retour aux programmes"
+                aria-label={t("centre", "notesBackToPrograms")}
               >
                 <ArrowLeft size={16} />
               </button>
@@ -1183,14 +1184,14 @@ export default function GradeBookPage() {
               <a
                 href="/centre/examens/examensuniversels"
                 className="h-9 w-9 rounded-lg border border-black/[0.08] bg-white hover:bg-black/[0.03] text-neutral-500 transition-colors shrink-0 inline-flex items-center justify-center"
-                aria-label="Retour"
+                aria-label={t("centre", "financeBack")}
               >
                 <ArrowLeft size={16} />
               </a>
             )}
             <div className="min-w-0 flex items-center gap-2">
               <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight truncate" style={{ color: BLUE }}>
-                {selectedFiliere ? selectedFiliere.name : "Choisir un programme"}
+                {selectedFiliere ? selectedFiliere.name : t("centre", "notesChooseProgram")}
               </h1>
               {selectedFiliere && <ProgrammeTypeBadge type={selectedFiliere.type} />}
             </div>
@@ -1200,11 +1201,11 @@ export default function GradeBookPage() {
             <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
               {saveSuccess && (
                 <span className="flex items-center gap-1 text-[10px] font-semibold text-neutral-600">
-                  <CheckCircle2 size={12} /> Enregistré · notes verrouillées
+                  <CheckCircle2 size={12} /> {t("centre", "notesSavedLocked")}
                 </span>
               )}
               {dirtyCount > 0 && !notesLocked && (
-                <span className="text-[10px] font-semibold text-neutral-500">{dirtyCount} modifié{dirtyCount > 1 ? "s" : ""}</span>
+                <span className="text-[10px] font-semibold text-neutral-500">{t("centre", "notesModifiedCount", { count: String(dirtyCount) })}</span>
               )}
               <button
                 type="button"
@@ -1288,10 +1289,10 @@ export default function GradeBookPage() {
                 <span className="w-px h-4 bg-black/[0.08] shrink-0" />
                 <div className="relative min-w-[200px] max-w-xs flex-1" ref={subjectPickerRef}>
                   <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider block mb-1">
-                    Matière
+                    {t("centre", "planningSubject")}
                   </span>
                   {subjectsForContext.length === 0 ? (
-                    <span className="text-[10px] text-neutral-400 italic">Aucune matière</span>
+                    <span className="text-[10px] text-neutral-400 italic">{t("centre", "notesNoSubject")}</span>
                   ) : (
                     <div className="relative">
                       <button
@@ -1300,7 +1301,7 @@ export default function GradeBookPage() {
                         className="w-full h-8 px-2.5 rounded-lg border border-black/[0.08] bg-white text-left text-xs font-semibold text-[#11224E] flex items-center justify-between gap-2 hover:border-[#11224E]/30"
                       >
                         <span className="truncate">
-                          {selectedSubject?.discipline_name || "Rechercher une matière…"}
+                          {selectedSubject?.discipline_name || t("centre", "notesSearchSubjectPlaceholder")}
                         </span>
                         <span className="text-[10px] font-bold text-neutral-400 shrink-0 tabular-nums">
                           {subjectsForContext.length}
@@ -1315,14 +1316,14 @@ export default function GradeBookPage() {
                                 autoFocus
                                 value={subjectQuery}
                                 onChange={(e) => setSubjectQuery(e.target.value)}
-                                placeholder="Filtrer les matières…"
+                                placeholder={t("centre", "notesFilterSubjectsPlaceholder")}
                                 className="flex-1 bg-transparent text-xs outline-none font-medium"
                               />
                             </div>
                           </div>
                           <ul className="max-h-52 overflow-y-auto py-1">
                             {filteredSubjectsForPicker.length === 0 ? (
-                              <li className="px-3 py-2.5 text-xs text-neutral-400">Aucune matière trouvée.</li>
+                              <li className="px-3 py-2.5 text-xs text-neutral-400">{t("centre", "notesNoSubjectFound")}</li>
                             ) : (
                               filteredSubjectsForPicker.map((s) => {
                                 const active = selectedSubjectId === s.filiere_matiere_id;
@@ -1368,7 +1369,7 @@ export default function GradeBookPage() {
                     onChange={(e) => setSelectedPeriodId(e.target.value)}
                     className="h-8 px-2.5 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 outline-none focus:border-[#11224E]/40"
                   >
-                    <option value="">Période…</option>
+                    <option value="">{t("centre", "notesPeriodEllipsis")}</option>
                     {periods.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.parent_name ? `${p.parent_name} → ` : ""}{p.name}
@@ -1387,16 +1388,16 @@ export default function GradeBookPage() {
           <div className="nexa-center-shell py-6 sm:py-8">
             <p className="text-sm text-neutral-500 font-medium mb-5">
               {selectedFiliereId
-                ? "Programme sélectionné — choisissez niveau, classe, matière et période ci-dessus."
-                : "Sélectionnez un programme (cursus ou formation courte) pour saisir les notes par classe."}
+                ? t("centre", "notesProgramSelectedHelp")
+                : t("centre", "notesSelectProgramHelp")}
             </p>
             {filieres.length === 0 ? (
               <div className="text-center py-16 text-neutral-400">
                 <GitBranch size={40} className="mx-auto mb-3 opacity-40" />
-                <p className="text-xs font-bold uppercase tracking-wider">Aucun programme / matière disponible</p>
+                <p className="text-xs font-bold uppercase tracking-wider">{t("centre", "notesNoProgramSubject")}</p>
                 {userRole === "trainer" && (
                   <p className="text-[11px] text-neutral-400 mt-2 max-w-sm mx-auto leading-relaxed">
-                    Aucune matière ne vous est assignée. Demandez à un responsable de vous affecter des matières dans Staff → Académique.
+                    {t("centre", "notesNoSubjectAssigned")}
                   </p>
                 )}
               </div>
@@ -1453,8 +1454,8 @@ export default function GradeBookPage() {
                 <Users size={32} className="mb-2.5 opacity-40" />
                 <p className="text-xs font-semibold uppercase tracking-wider">
                   {niveaux.length > 0 && !selectedNiveauId
-                    ? "Choisissez un niveau puis une classe"
-                    : "Choisissez une classe"}
+                    ? t("centre", "notesChooseLevelThenClass")
+                    : t("centre", "planningChooseClass")}
                 </p>
               </div>
             )}
@@ -1464,8 +1465,8 @@ export default function GradeBookPage() {
                 <Calendar size={32} className="mb-2.5 opacity-40" />
                 <p className="text-xs font-semibold uppercase tracking-wider">
                   {subjectsForContext.length === 0
-                    ? "Aucune matière pour ce niveau"
-                    : "Choisissez une matière et une période"}
+                    ? t("centre", "notesNoSubjectForLevel")
+                    : t("centre", "notesChooseSubjectAndPeriod")}
                 </p>
               </div>
             )}
@@ -1480,7 +1481,7 @@ export default function GradeBookPage() {
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Rechercher un élève…"
+                  placeholder={t("centre", "notesSearchStudentPlaceholder")}
                   className="flex-1 bg-transparent text-sm font-medium outline-none"
                 />
               </div>
@@ -1488,7 +1489,7 @@ export default function GradeBookPage() {
               <div className="flex items-center gap-2 flex-wrap text-[10px]">
                 <div className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white flex items-center gap-2 font-semibold text-neutral-600">
                   <Users size={12} className="text-neutral-400" />
-                  {filledCount}/{studentRows.length} notés
+                  {filledCount}/{studentRows.length} {t("centre", "notesGraded")}
                   <span className="text-neutral-300">·</span>
                   <span style={{ color: BLUE }}>{completionPct}%</span>
                 </div>
@@ -1498,11 +1499,11 @@ export default function GradeBookPage() {
                     onClick={() => { setNotesLocked(false); setSaveSuccess(false); }}
                     className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-700 hover:bg-black/[0.03] flex items-center gap-1.5"
                   >
-                    <Lock size={11} /> Modifier
+                    <Lock size={11} /> {t("centre", "planningEdit")}
                   </button>
                 ) : (
                   <span className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-600 flex items-center gap-1.5">
-                    <Pencil size={11} /> Édition
+                    <Pencil size={11} /> {t("centre", "notesEditing")}
                   </span>
                 )}
                 {canEditMeta && (
@@ -1511,7 +1512,7 @@ export default function GradeBookPage() {
                     onClick={openFormulaEditor}
                     className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-600 hover:bg-black/[0.03]"
                   >
-                    Formule
+                    {t("centre", "notesFormula")}
                   </button>
                 )}
                 {canEditMeta ? (
@@ -1526,12 +1527,12 @@ export default function GradeBookPage() {
                         onClick={() => setMetaLocked(false)}
                         className="ml-1 h-6 px-2 rounded-md bg-neutral-100 text-[10px] font-bold uppercase text-neutral-600 hover:bg-neutral-200 flex items-center gap-1"
                       >
-                        <Pencil size={10} /> Barème
+                        <Pencil size={10} /> {t("centre", "notesScale")}
                       </button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-neutral-400 font-bold">Barème</span>
+                      <span className="text-neutral-400 font-bold">{t("centre", "notesScale")}</span>
                       <input
                         type="number"
                         min={1}
@@ -1619,7 +1620,7 @@ export default function GradeBookPage() {
                         : "bg-white text-neutral-600 border-neutral-200"
                     }`}
                   >
-                    Pondérée %
+                    {t("centre", "notesWeighted")}
                   </button>
                   {formulaMode === "weighted" && (
                     <span
@@ -1629,7 +1630,7 @@ export default function GradeBookPage() {
                     >
                       {formulaSum.toFixed(formulaSum % 1 === 0 ? 0 : 1)}/100
                       {!formulaSumOk && formulaSum < 100
-                        ? ` · reste ${(100 - formulaSum).toFixed(1)}`
+                        ? ` · ${t("centre", "notesRemaining", { amount: (100 - formulaSum).toFixed(1) })}`
                         : !formulaSumOk
                           ? ` · +${(formulaSum - 100).toFixed(1)}`
                           : ""}
@@ -1652,7 +1653,7 @@ export default function GradeBookPage() {
                           value={formulaDraft[key] ?? ""}
                           onChange={(e) => setFormulaWeight(key, e.target.value)}
                           className="w-12 h-6 px-1 rounded border border-neutral-200 bg-white text-center text-[11px] font-black outline-none focus:border-orange-400"
-                          aria-label={`Poids ${label}`}
+                          aria-label={`${t("centre", "notesWeightOf")} ${label}`}
                         />
                         <span className="text-[9px] font-black text-neutral-400 pr-1">%</span>
                       </div>
@@ -1667,7 +1668,7 @@ export default function GradeBookPage() {
                     className="h-8 px-3 rounded-full text-[9px] font-black uppercase text-white disabled:opacity-40"
                     style={{ backgroundColor: ORANGE }}
                   >
-                    {savingFormula ? <Loader2 size={11} className="animate-spin inline" /> : "Enregistrer"}
+                    {savingFormula ? <Loader2 size={11} className="animate-spin inline" /> : t("centre", "accountSave")}
                   </button>
                 </div>
               </div>
@@ -1689,12 +1690,12 @@ export default function GradeBookPage() {
                 <Users size={36} className="mb-3 opacity-40" />
                 <p className="text-xs font-semibold uppercase tracking-wider">
                   {studentRows.length === 0
-                    ? "Aucun étudiant dans cette classe"
-                    : "Aucun résultat pour cette recherche"}
+                    ? t("centre", "notesNoStudentInClass")
+                    : t("centre", "notesNoSearchResult")}
                 </p>
                 {studentRows.length === 0 && (
                   <p className="text-[11px] text-neutral-400 mt-2 max-w-sm text-center">
-                    Vérifiez que des élèves actifs sont inscrits dans la classe sélectionnée.
+                    {t("centre", "notesCheckActiveEnrollments")}
                   </p>
                 )}
               </div>
@@ -1704,14 +1705,14 @@ export default function GradeBookPage() {
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-black/[0.06] bg-white px-4 py-2.5">
                     <p className="text-xs font-medium text-neutral-500 inline-flex items-center gap-1.5">
                       <Lock size={13} className="text-neutral-400" />
-                      Notes verrouillées — cliquez sur Modifier pour éditer la grille.
+                      {t("centre", "notesLockedClickEdit")}
                     </p>
                     <button
                       type="button"
                       onClick={() => { setNotesLocked(false); setSaveSuccess(false); }}
                       className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-700 hover:bg-black/[0.03] flex items-center gap-1.5"
                     >
-                      <Pencil size={11} /> Modifier
+                      <Pencil size={11} /> {t("centre", "planningEdit")}
                     </button>
                   </div>
                 )}
@@ -1722,7 +1723,7 @@ export default function GradeBookPage() {
                     disabled={notesLocked}
                     className="h-8 px-3 rounded-lg border border-dashed border-black/[0.12] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 hover:bg-black/[0.02] bg-white disabled:opacity-40 disabled:pointer-events-none text-neutral-600"
                   >
-                    <Plus size={13} /> Ajouter note supl.
+                    <Plus size={13} /> {t("centre", "notesAddExtraGrade")}
                   </button>
                 </div>
               <div className="bg-white border border-black/[0.06] rounded-xl overflow-hidden shadow-sm max-h-[calc(100vh-260px)] overflow-y-auto overflow-x-auto">
@@ -1731,16 +1732,16 @@ export default function GradeBookPage() {
                     className="grid gap-2 px-4 py-2.5 border-b border-black/[0.06] items-end sticky top-0 z-10"
                     style={{ gridTemplateColumns: gridTemplate, backgroundColor: SURFACE }}
                   >
-                    <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 pb-1.5">Élève</span>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 pb-1.5">{t("centre", "notesStudent")}</span>
                     <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 text-center pb-1.5">
-                      Note principale
+                      {t("centre", "gradesMainGrade")}
                     </span>
                     {suplColumns.map((col) => (
                       <div key={col.colKey} className="flex items-center gap-0.5 w-full">
                         <input
                           value={col.title}
                           onChange={(e) => updateColumnTitle(col.colKey, e.target.value)}
-                          placeholder="Intitulé"
+                          placeholder={t("centre", "gradesLabel")}
                           readOnly={notesLocked}
                           className={`w-full h-8 px-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wide text-center outline-none focus:border-orange-400 ${
                             notesLocked
@@ -1755,7 +1756,7 @@ export default function GradeBookPage() {
                             type="button"
                             onClick={() => removeSuplColumn(col.colKey)}
                             className="w-7 h-7 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 shrink-0"
-                            title="Supprimer la colonne"
+                            title={t("centre", "notesDeleteColumn")}
                           >
                             <Trash2 size={12} />
                           </button>
@@ -1763,9 +1764,9 @@ export default function GradeBookPage() {
                       </div>
                     ))}
                     <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 text-center pb-1.5">
-                      Moyenne
+                      {t("centre", "notesAverage")}
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 text-center pb-1.5" title="Relevé PDF">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 text-center pb-1.5" title={t("centre", "notesPdfTranscript")}>
                       PDF
                     </span>
                   </div>
@@ -1838,7 +1839,7 @@ export default function GradeBookPage() {
                           <div className="flex justify-center">
                             <button
                               type="button"
-                              title="Télécharger le relevé (modèle Paramètres)"
+                              title={t("centre", "notesDownloadTranscript")}
                               onClick={() => setBulletinEnrollment({
                                 id: row.enrollment_id,
                                 label: selectedFiliere?.name || "",
@@ -1872,7 +1873,7 @@ export default function GradeBookPage() {
                   style={{ backgroundColor: BLUE }}
                 >
                   {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-                  Enregistrer
+                  {t("centre", "accountSave")}
                 </button>
               </div>
             )}

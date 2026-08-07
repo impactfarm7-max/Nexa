@@ -11,6 +11,7 @@ import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { BLUE, ORANGE, PAGE_BG } from "@/app/centre/center-page-ui";
 import Link from "next/link";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 function toDatetimeLocal(iso: string): string {
   const d = new Date(iso);
@@ -53,6 +54,7 @@ type DayEntry = {
 };
 
 export default function TcfExamPlanningPage() {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [centerType, setCenterType] = useState("generic");
   const [month, setMonth] = useState(() => {
@@ -270,9 +272,9 @@ export default function TcfExamPlanningPage() {
   if (!isTcfCanadaCenter(centerType)) {
     return (
       <div className="min-h-[100dvh] p-12 text-center" style={{ backgroundColor: PAGE_BG }}>
-          <p className="text-sm font-semibold text-neutral-500">Planning examens réservé aux centres TCF Canada.</p>
+          <p className="text-sm font-semibold text-neutral-500">{t("centre", "examensPlanningTcfOnly")}</p>
           <Link href="/centre/examens/examensuniversels" className="mt-4 inline-block text-xs font-bold uppercase tracking-wider hover:underline" style={{ color: BLUE }}>
-            Retour
+            {t("centre", "financeBack")}
           </Link>
       </div>
     );
