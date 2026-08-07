@@ -20,7 +20,6 @@ import { useReportPage } from "./hooks/useReportPage";
 import { useReportPdfExport } from "./hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtMoneyBar, fmtNum } from "@/app/utils/reports-export";
 import { useI18n } from "@/app/i18n/I18nProvider";
-import { formatShort } from "@/app/utils/reports-period";
 
 type SyntheseReport = {
   period: { label: string };
@@ -57,10 +56,11 @@ type SyntheseReport = {
 };
 
 function SyntheseContent() {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange, reportHref,
+    periodLabel,
   } = useReportPage<SyntheseReport>("synthese");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
 
@@ -69,17 +69,17 @@ function SyntheseContent() {
   const exportCsv = useCallback(() => {
     if (!report) return;
     downloadCsv(
-      `synthese-${report.period.label.replace(/\s+/g, "-")}.csv`,
+      `synthese-${periodLabel.replace(/\s+/g, "-")}.csv`,
       [t("centre", "summaryDomain"), t("centre", "summaryIndicator"), t("centre", "summaryValue")],
       report.summaryTable.map((r) => [r.domaine, r.indicateur, r.valeur]),
     );
-  }, [report, t]);
+  }, [report, t, periodLabel]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
       title: t("centre", "summaryTitle"),
-      periodLabel: report.period.label,
+      periodLabel,
       kpis: [
         { label: t("centre", "summaryActiveLearners"), value: fmtNum(report.kpis.apprenantsActifs) },
         { label: t("centre", "summaryCollectedPeriod"), value: fmtFCFA(report.kpis.encaissePeriode) },
@@ -93,15 +93,13 @@ function SyntheseContent() {
           rows: report.summaryTable.map((r) => [r.domaine, r.indicateur, r.valeur]),
         },
       ],
-      filename: `synthese-${report.period.label.replace(/\s+/g, "-")}.pdf`,
+      filename: `synthese-${periodLabel.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf, t]);
+  }, [report, exportPdf, t, periodLabel]);
 
   if (loading && !report) {
     return <CenterPageLoading />;
   }
-
-  const periodLabel = from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}`;
 
   return (
     <ReportsShell
@@ -228,7 +226,7 @@ function SyntheseContent() {
               </div>
             </Panel>
 
-            <Panel title="Finance" href={reportHref("/centre/rapports/recouvrement")}>
+            <Panel title={t("centre", "reportsSectionFinance")} href={reportHref("/centre/rapports/recouvrement")}>
               <dl className="divide-y divide-neutral-100">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-baseline py-2.5">
                   <dt className="text-sm text-neutral-500 font-medium">{t("centre", "summaryInvoicedRevenue")}</dt>

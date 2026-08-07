@@ -137,6 +137,7 @@ const SHORT_MANAGER_NAV: NavItem[] = [
   TCF_FORMATION_ITEM,
   { label: "navExamensNotes",  icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
   { label: "navFinance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
+  { label: "navRapports",      icon: BarChart3,       path: "/centre/rapports",                   permKey: "rapports" },
   { label: "navCommunaute",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
   { label: "navSessionsLive",  icon: Video,           path: "/centre/lives",                      permKey: "lives" },
   { label: "navParametres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },

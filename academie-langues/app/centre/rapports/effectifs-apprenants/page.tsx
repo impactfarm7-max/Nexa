@@ -13,7 +13,6 @@ import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtNum } from "@/app/utils/reports-export";
 import { useI18n } from "@/app/i18n/I18nProvider";
-import { formatShort } from "@/app/utils/reports-period";
 
 type EffectifsReport = {
   period: { label: string };
@@ -51,13 +50,14 @@ function EffectifsContent() {
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
+  periodLabel,
   } = useReportPage<EffectifsReport>("effectifs-apprenants");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
 
   const exportCsv = useCallback(() => {
     if (!report) return;
     downloadCsv(
-      `effectifs-${report.period.label.replace(/\s+/g, "-")}.csv`,
+      `effectifs-${periodLabel.replace(/\s+/g, "-")}.csv`,
       [t("centre", "enrollmentFirstName"), t("centre", "enrollmentLastName"), t("centre", "enrollmentProgram"), t("centre", "enrollmentLevel"), t("centre", "enrollmentClass"), t("centre", "enrollmentStatus"), t("centre", "enrollmentCenterStatus")],
       report.rows.map((r) => [
         r.prenom,
@@ -69,13 +69,13 @@ function EffectifsContent() {
         statusLabel(r.centerStatus),
       ]),
     );
-  }, [report, t]);
+  }, [report, t, periodLabel]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
       title: t("centre", "enrollmentTitle"),
-      periodLabel: report.period.label,
+      periodLabel,
       kpis: [
         { label: t("centre", "enrollmentTotal"), value: fmtNum(report.kpis.total) },
         { label: t("centre", "summaryActive"), value: fmtNum(report.kpis.active) },
@@ -98,9 +98,9 @@ function EffectifsContent() {
           ]),
         },
       ],
-      filename: `effectifs-${report.period.label.replace(/\s+/g, "-")}.pdf`,
+      filename: `effectifs-${periodLabel.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf, t]);
+  }, [report, exportPdf, t, periodLabel]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -109,7 +109,7 @@ function EffectifsContent() {
       activeSlug="effectifs-apprenants"
       centerType={centerType}
       title={t("centre", "enrollmentTitle")}
-      periodLabel={from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}`}
+      periodLabel={periodLabel}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
@@ -137,7 +137,7 @@ function EffectifsContent() {
               { label: t("centre", "summaryPending"), value: fmtNum(report.kpis.draft), sub: t("centre", "enrollmentDraft") },
               { label: t("centre", "enrollmentCompletedPlural"), value: fmtNum(report.kpis.completed) },
               { label: t("centre", "summarySuspended"), value: fmtNum(report.kpis.paused), sub: t("centre", "enrollmentCenterProfile") },
-              { label: t("centre", "enrollmentNewPeriod"), value: fmtNum(report.kpis.newInPeriod), sub: from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}` },
+              { label: t("centre", "enrollmentNewPeriod"), value: fmtNum(report.kpis.newInPeriod), sub: periodLabel },
             ]}
           />
 

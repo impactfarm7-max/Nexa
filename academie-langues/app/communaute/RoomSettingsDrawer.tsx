@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { X, Copy, RefreshCcw, Crown, ShieldCheck, UserMinus, Camera, Check, CalendarClock, Plus, Trash2 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import type { CommunityRoom } from "./useRooms";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BRAND = { blue: "#11224E", orange: "#F87B1B" };
 
@@ -25,6 +26,13 @@ type ScheduleEvent = {
 
 type Option = { id: string; name: string };
 
+const EVENT_TYPE_KEYS = {
+  cours: "communauteEventTypeCours",
+  live: "communauteEventTypeLive",
+  examen: "communauteEventTypeExamen",
+  autre: "communauteEventTypeAutre",
+} as const;
+
 export default function RoomSettingsDrawer({
   room,
   isGlobalAdmin,
@@ -38,6 +46,8 @@ export default function RoomSettingsDrawer({
   onRegenerateCode: (roomId: string) => Promise<string>;
   onRoomUpdated: () => void;
 }) {
+  const { t, locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -73,7 +83,7 @@ export default function RoomSettingsDrawer({
       (data || []).map((m: any) => ({
         user_id: m.user_id,
         role: m.role,
-        prenom: m.profiles?.prenom || "Étudiant",
+        prenom: m.profiles?.prenom || t("dashboard", "sidebarDefaultStudentName"),
         avatar_url: m.profiles?.avatar_url || null,
       })),
     );
@@ -130,7 +140,7 @@ export default function RoomSettingsDrawer({
   };
 
   const removeMember = async (userId: string) => {
-    if (!window.confirm("Retirer ce membre de la salle ?")) return;
+    if (!window.confirm(t("dashboard", "communauteRemoveMemberConfirm"))) return;
     await supabase.from("community_room_members").delete().eq("room_id", room.id).eq("user_id", userId);
     fetchMembers();
   };
@@ -145,7 +155,7 @@ export default function RoomSettingsDrawer({
       await supabase.from("community_rooms").update({ photo_url: data.publicUrl }).eq("id", room.id);
       onRoomUpdated();
     } else {
-      alert("Erreur lors de l'envoi de la photo : " + error.message);
+      alert(t("dashboard", "communautePhotoUploadError", { message: error.message }));
     }
     setUploading(false);
   };
@@ -164,14 +174,14 @@ export default function RoomSettingsDrawer({
 
   const handleCreateEvent = async () => {
     setEvError("");
-    if (!evTitle.trim()) return setEvError("Le titre est requis.");
-    if (!evStart || !evEnd) return setEvError("Date de début et de fin requises.");
-    if (evType === "examen" && !evExamTemplateId) return setEvError("Choisis le modèle d'examen.");
+    if (!evTitle.trim()) return setEvError(t("dashboard", "communauteTitleRequired"));
+    if (!evStart || !evEnd) return setEvError(t("dashboard", "communauteDatesRequired"));
+    if (evType === "examen" && !evExamTemplateId) return setEvError(t("dashboard", "communauteExamTemplateRequired"));
 
     setEvSaving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(t("dashboard", "communauteSessionExpired"));
 
       const { error } = await supabase.from("schedule_events").insert({
         room_id: room.id,
@@ -191,17 +201,24 @@ export default function RoomSettingsDrawer({
       resetEventForm();
       setAddEventOpen(false);
     } catch (e: any) {
-      setEvError(e.message || "Erreur lors de la création.");
+      setEvError(e.message || t("dashboard", "communauteCreateError"));
     } finally {
       setEvSaving(false);
     }
   };
 
   const deleteEvent = async (id: string) => {
-    if (!window.confirm("Supprimer ce créneau ?")) return;
+    if (!window.confirm(t("dashboard", "communauteDeleteSlotConfirm"))) return;
     await supabase.from("schedule_events").delete().eq("id", id);
     setEvents((prev) => prev.filter((e) => e.id !== id));
   };
+
+  const roomTypeLabel =
+    room.type === "classroom"
+      ? t("centre", "communityClassroom")
+      : room.type === "announcement"
+        ? t("centre", "communityAnnouncements")
+        : t("dashboard", "communauteStudyGroup");
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -225,7 +242,7 @@ export default function RoomSettingsDrawer({
           <div className="flex-1 min-w-0">
             <p className="font-bold text-slate-900 truncate">{room.name}</p>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-              {room.type === "classroom" ? "Salle de classe" : room.type === "announcement" ? "Annonces" : "Groupe éphémère"}
+              {roomTypeLabel}
             </p>
           </div>
           <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100">
@@ -235,17 +252,17 @@ export default function RoomSettingsDrawer({
 
         {canManage && (
           <div className="px-5 py-4 border-b border-slate-100 space-y-2 shrink-0">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lien d'invitation</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("dashboard", "communauteInviteLink")}</p>
             <div className="flex items-center gap-2 bg-slate-100 rounded-xl px-3 py-2.5">
               <p className="flex-1 text-xs font-bold text-slate-700 truncate">{room.invite_code}</p>
-              <button onClick={copyLink} className="p-1.5 text-slate-500 hover:text-orange-600" title="Copier le code">
+              <button onClick={copyLink} className="p-1.5 text-slate-500 hover:text-orange-600" title={t("dashboard", "communauteCopyCode")}>
                 {copied ? <Check size={14} /> : <Copy size={14} />}
               </button>
-              <button onClick={regenerate} className="p-1.5 text-slate-500 hover:text-orange-600" title="Régénérer le lien">
+              <button onClick={regenerate} className="p-1.5 text-slate-500 hover:text-orange-600" title={t("dashboard", "communauteRegenerateLink")}>
                 <RefreshCcw size={14} />
               </button>
             </div>
-            {uploading && <p className="text-[10px] text-slate-400">Envoi de la photo...</p>}
+            {uploading && <p className="text-[10px] text-slate-400">{t("dashboard", "communauteUploadingPhoto")}</p>}
           </div>
         )}
 
@@ -255,7 +272,7 @@ export default function RoomSettingsDrawer({
             <div className="px-5 py-4 border-b border-slate-100">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-1.5">
-                  <CalendarClock size={12} /> Emploi du temps
+                  <CalendarClock size={12} /> {t("dashboard", "communauteSchedule")}
                 </p>
                 {canManage && (
                   <button
@@ -263,7 +280,7 @@ export default function RoomSettingsDrawer({
                     className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-full"
                     style={{ color: BRAND.orange, backgroundColor: "#FFF3E8" }}
                   >
-                    <Plus size={10} /> Créneau
+                    <Plus size={10} /> {t("dashboard", "communauteSlot")}
                   </button>
                 )}
               </div>
@@ -271,34 +288,34 @@ export default function RoomSettingsDrawer({
               {addEventOpen && (
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 mb-3 space-y-2.5">
                   <div className="flex gap-2">
-                    {(["cours", "live", "examen", "autre"] as const).map((t) => (
+                    {(["cours", "live", "examen", "autre"] as const).map((typeKey) => (
                       <button
-                        key={t}
-                        onClick={() => setEvType(t)}
-                        className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors ${evType === t ? "bg-slate-900 text-white" : "bg-white text-slate-500 border border-slate-200"}`}
+                        key={typeKey}
+                        onClick={() => setEvType(typeKey)}
+                        className={`flex-1 py-2 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-colors ${evType === typeKey ? "bg-slate-900 text-white" : "bg-white text-slate-500 border border-slate-200"}`}
                       >
-                        {t}
+                        {t("dashboard", EVENT_TYPE_KEYS[typeKey])}
                       </button>
                     ))}
                   </div>
                   <input
                     value={evTitle}
                     onChange={(e) => setEvTitle(e.target.value)}
-                    placeholder="Titre (ex : Cours de grammaire)"
+                    placeholder={t("dashboard", "communauteEventTitlePlaceholder")}
                     className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium outline-none focus:ring-2 focus:ring-orange-200"
                   />
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[9px] font-black uppercase text-slate-400">Début</label>
+                      <label className="text-[9px] font-black uppercase text-slate-400">{t("dashboard", "communauteStart")}</label>
                       <input type="datetime-local" value={evStart} onChange={(e) => setEvStart(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-orange-200" />
                     </div>
                     <div>
-                      <label className="text-[9px] font-black uppercase text-slate-400">Fin</label>
+                      <label className="text-[9px] font-black uppercase text-slate-400">{t("dashboard", "communauteEnd")}</label>
                       <input type="datetime-local" value={evEnd} onChange={(e) => setEvEnd(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-orange-200" />
                     </div>
                   </div>
                   <select value={evDisciplineId} onChange={(e) => setEvDisciplineId(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-200">
-                    <option value="">Matière (optionnel)</option>
+                    <option value="">{t("dashboard", "communauteSubjectOptional")}</option>
                     {disciplines.map((d) => (
                       <option key={d.id} value={d.id}>{d.name}</option>
                     ))}
@@ -307,15 +324,15 @@ export default function RoomSettingsDrawer({
                     <input
                       value={evMeetingUrl}
                       onChange={(e) => setEvMeetingUrl(e.target.value)}
-                      placeholder="Lien de la visio"
+                      placeholder={t("dashboard", "communauteMeetingLink")}
                       className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-200"
                     />
                   )}
                   {evType === "examen" && (
                     <select value={evExamTemplateId} onChange={(e) => setEvExamTemplateId(e.target.value)} className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-200">
-                      <option value="">Choisir le modèle d'examen...</option>
-                      {templates.map((t) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
+                      <option value="">{t("dashboard", "communauteChooseExamTemplate")}</option>
+                      {templates.map((tpl) => (
+                        <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
                       ))}
                     </select>
                   )}
@@ -323,7 +340,7 @@ export default function RoomSettingsDrawer({
                     <input
                       value={evLocation}
                       onChange={(e) => setEvLocation(e.target.value)}
-                      placeholder="Lieu (optionnel)"
+                      placeholder={t("dashboard", "communauteLocationOptional")}
                       className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-200"
                     />
                   )}
@@ -334,15 +351,15 @@ export default function RoomSettingsDrawer({
                     className="w-full py-2.5 text-white rounded-lg text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
                     style={{ backgroundColor: BRAND.orange }}
                   >
-                    {evSaving ? "Publication..." : "Publier le créneau"}
+                    {evSaving ? t("dashboard", "communautePublishing") : t("dashboard", "communautePublishSlot")}
                   </button>
                 </div>
               )}
 
               {eventsLoading ? (
-                <p className="text-xs text-slate-400 text-center py-3">Chargement...</p>
+                <p className="text-xs text-slate-400 text-center py-3">{t("centre", "communityLoading")}</p>
               ) : events.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-3">Aucun créneau publié pour l'instant.</p>
+                <p className="text-xs text-slate-400 text-center py-3">{t("dashboard", "communauteNoSlots")}</p>
               ) : (
                 <div className="space-y-1.5">
                   {events.map((ev) => (
@@ -350,7 +367,7 @@ export default function RoomSettingsDrawer({
                       <div className="min-w-0 flex-1">
                         <p className="text-xs font-bold text-slate-800 truncate">{ev.title}</p>
                         <p className="text-[10px] text-slate-400 font-medium">
-                          {new Date(ev.starts_at).toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" })} · {new Date(ev.starts_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                          {new Date(ev.starts_at).toLocaleDateString(dateLocale, { weekday: "short", day: "2-digit", month: "short" })} · {new Date(ev.starts_at).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}
                           {ev.disciplineName ? ` · ${ev.disciplineName}` : ""}
                         </p>
                       </div>
@@ -369,10 +386,10 @@ export default function RoomSettingsDrawer({
           {/* ── MEMBRES ── */}
           <div className="px-5 py-4">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-3">
-              {members.length} membre{members.length > 1 ? "s" : ""}
+              {t("centre", "communityMemberCount", { count: members.length })}
             </p>
             {loading ? (
-              <p className="text-sm text-slate-400 text-center py-8">Chargement...</p>
+              <p className="text-sm text-slate-400 text-center py-8">{t("centre", "communityLoading")}</p>
             ) : (
               <div className="space-y-1.5">
                 {members.map((m) => (
@@ -387,11 +404,11 @@ export default function RoomSettingsDrawer({
                       <div className="flex items-center gap-1 shrink-0">
                         {m.role === "member" ? (
                           <button onClick={() => setRole(m.user_id, "room_admin")} className="text-[10px] font-bold text-orange-600 px-2 py-1 rounded-lg hover:bg-orange-50">
-                            Nommer admin
+                            {t("dashboard", "communauteMakeAdmin")}
                           </button>
                         ) : (
                           <button onClick={() => setRole(m.user_id, "member")} className="text-[10px] font-bold text-slate-400 px-2 py-1 rounded-lg hover:bg-slate-50">
-                            Retirer admin
+                            {t("dashboard", "communauteRemoveAdmin")}
                           </button>
                         )}
                         <button onClick={() => removeMember(m.user_id)} className="p-1.5 text-slate-300 hover:text-red-500">

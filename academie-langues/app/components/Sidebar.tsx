@@ -221,7 +221,9 @@ export default function Sidebar() {
 
   const navItems = getStudentNavItems({ centerId, centerType });
   const isTcfExperience = centerType === "tcf_canada" || pathname?.startsWith("/tcf-canada");
-  const navLabel = (label: string) => {
+  const navLabel = (item: { label: string; labelKey?: string } | string) => {
+    if (typeof item !== "string" && item.labelKey) return t("dashboard", item.labelKey);
+    const label = typeof item === "string" ? item : item.label;
     const keys: Record<string, string> = {
       "Tableau de bord": "navDashboard", Accueil: "navHome",
       "Mon tuteur": "navTutor", Tuteur: "navTutorShort",
@@ -229,7 +231,6 @@ export default function Sidebar() {
       "Cours et Quiz": "navCoursesQuiz", "Mes cours": "navCourses", Cours: "navCoursesShort",
       "Mes Devoirs": "navHomework", Devoirs: "navHomeworkShort",
       "Bibliothèque": "navLibrary", "Mode Examen": "navExamMode", Examen: "navExamShort",
-      "Communauté": "navCommunity", "Dashboard Admin": "navAdmin", Admin: "navAdmin",
     };
     return keys[label] ? t("dashboard", keys[label]) : label;
   };
@@ -485,7 +486,7 @@ export default function Sidebar() {
 
               href={item.path}
 
-              title={isCollapsed ? navLabel(item.label) : undefined}
+              title={isCollapsed ? navLabel(item) : undefined}
 
               className={itemCls(isActive)}
 
@@ -509,7 +510,7 @@ export default function Sidebar() {
 
               {!isCollapsed && (
 
-                <span className={`${STUDENT_TEXT.sidebarItem} truncate flex-1 min-w-0`}>{navLabel(item.label)}</span>
+                <span className={`${STUDENT_TEXT.sidebarItem} truncate flex-1 min-w-0`}>{navLabel(item)}</span>
 
               )}
 

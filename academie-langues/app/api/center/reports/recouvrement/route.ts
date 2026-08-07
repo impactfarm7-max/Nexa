@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getReportsContext, loadCampuses, loadFilieres } from "../shared";
+import { getReportsContext, loadCampuses, loadFilieres, reportsCatchError } from "../shared";
 import { buildRecouvrementReport } from "@/app/utils/reports-data.server";
 
 export async function GET(req: Request) {
@@ -15,7 +15,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ report, campuses, filieres });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Erreur serveur";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return reportsCatchError(req, e);
   }
 }

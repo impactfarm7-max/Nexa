@@ -12,7 +12,6 @@ import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtNum } from "@/app/utils/reports-export";
 import { useI18n } from "@/app/i18n/I18nProvider";
-import { formatShort } from "@/app/utils/reports-period";
 
 type ReductionsReport = {
   period: { label: string };
@@ -36,32 +35,28 @@ type ReductionsReport = {
 };
 
 function ReductionsContent() {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
+  periodLabel,
   } = useReportPage<ReductionsReport>("reductions-coupons");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
-  const localizedPeriod = from === to
-    ? formatShort(from, locale)
-    : locale === "en"
-      ? `${formatShort(from, locale)} to ${formatShort(to, locale)}`
-      : `${formatShort(from, locale)} — ${formatShort(to, locale)}`;
 
   const exportCsv = useCallback(() => {
     if (!report) return;
     downloadCsv(
-      `reductions-${report.period.label.replace(/\s+/g, "-")}.csv`,
+      `reductions-${periodLabel.replace(/\s+/g, "-")}.csv`,
       [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "discountReason"), t("centre", "discountEnrollment")],
       report.rows.map((r) => [r.student, r.filiere, r.amount, r.reason, r.enrolledAt]),
     );
-  }, [report, t]);
+  }, [report, t, periodLabel]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
       title: t("centre", "discountTitle"),
-      periodLabel: localizedPeriod,
+      periodLabel,
       kpis: [
         { label: t("centre", "discountTotal"), value: fmtFCFA(report.kpis.totalReductions) },
         { label: t("centre", "discountAffectedRecords"), value: fmtNum(report.kpis.nbDossiers) },
@@ -79,9 +74,9 @@ function ReductionsContent() {
           rows: report.rows.map((r) => [r.student, r.filiere, fmtFCFA(r.amount), r.reason]),
         },
       ],
-      filename: `reductions-${report.period.label.replace(/\s+/g, "-")}.pdf`,
+      filename: `reductions-${periodLabel.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf, t]);
+  }, [report, exportPdf, t, periodLabel]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -90,7 +85,7 @@ function ReductionsContent() {
       activeSlug="reductions-coupons"
       centerType={centerType}
       title={t("centre", "discountTitle")}
-      periodLabel={localizedPeriod}
+      periodLabel={periodLabel}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
@@ -113,7 +108,7 @@ function ReductionsContent() {
         <>
           <ReportKpiGrid
             items={[
-              { label: t("centre", "discountTotal"), value: fmtFCFA(report.kpis.totalReductions), sub: localizedPeriod },
+              { label: t("centre", "discountTotal"), value: fmtFCFA(report.kpis.totalReductions), sub: periodLabel },
               { label: t("centre", "discountAffectedRecords"), value: fmtNum(report.kpis.nbDossiers) },
               { label: t("centre", "discountActiveCoupons"), value: fmtNum(report.kpis.nbCouponsActifs) },
               { label: t("centre", "discountCouponUses"), value: fmtNum(report.kpis.utilisationsCoupons) },

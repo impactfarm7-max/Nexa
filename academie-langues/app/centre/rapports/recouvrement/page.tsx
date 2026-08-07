@@ -12,7 +12,6 @@ import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtNum } from "@/app/utils/reports-export";
 import { useI18n } from "@/app/i18n/I18nProvider";
-import { formatShort } from "@/app/utils/reports-period";
 
 type RecouvrementReport = {
   period: { label: string };
@@ -38,7 +37,7 @@ type RecouvrementReport = {
 };
 
 function RecouvrementContent() {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const debtStatus = (status: string) => {
     const normalized = status.toLowerCase().trim();
     if (["soldé", "solde", "paid"].includes(normalized)) return t("centre", "recoveryStatusPaid");
@@ -49,18 +48,14 @@ function RecouvrementContent() {
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
+  periodLabel,
   } = useReportPage<RecouvrementReport>("recouvrement");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
-  const localizedPeriod = from === to
-    ? formatShort(from, locale)
-    : locale === "en"
-      ? `${formatShort(from, locale)} to ${formatShort(to, locale)}`
-      : `${formatShort(from, locale)} — ${formatShort(to, locale)}`;
 
   const exportCsv = useCallback(() => {
     if (!report) return;
     downloadCsv(
-      `recouvrement-${report.period.label.replace(/\s+/g, "-")}.csv`,
+      `recouvrement-${periodLabel.replace(/\s+/g, "-")}.csv`,
       [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "enrollmentLevel"), t("centre", "enrollmentClass"), t("centre", "recoveryRevenue"), t("centre", "recoveryCollected"), t("centre", "summaryBalance"), t("centre", "settingsStatus")],
       report.rows.map((r) => [
         r.student,
@@ -73,13 +68,13 @@ function RecouvrementContent() {
         debtStatus(r.statut),
       ]),
     );
-  }, [report, t]);
+  }, [report, t, periodLabel]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
       title: t("centre", "recoveryTitle"),
-      periodLabel: localizedPeriod,
+      periodLabel,
       kpis: [
         { label: t("centre", "summaryInvoicedRevenue"), value: fmtFCFA(report.kpis.caFacture) },
         { label: t("centre", "recoveryCollected"), value: fmtFCFA(report.kpis.encaisse) },
@@ -97,9 +92,9 @@ function RecouvrementContent() {
           rows: report.rows.map((r) => [r.student, r.filiere, fmtFCFA(r.reste)]),
         },
       ],
-      filename: `recouvrement-${report.period.label.replace(/\s+/g, "-")}.pdf`,
+      filename: `recouvrement-${periodLabel.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf, t]);
+  }, [report, exportPdf, t, periodLabel]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -108,7 +103,7 @@ function RecouvrementContent() {
       activeSlug="recouvrement"
       centerType={centerType}
       title={t("centre", "recoveryTitle")}
-      periodLabel={localizedPeriod}
+      periodLabel={periodLabel}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}

@@ -39,25 +39,26 @@ function PersonnelContent() {
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
+    periodLabel,
   } = useReportPage<PersonnelReport>("effectifs-personnel");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
 
   const exportCsv = useCallback(() => {
     if (!report) return;
     downloadCsv(
-      `personnel-${report.period.label.replace(/\s+/g, "-")}.csv`,
+      `personnel-${periodLabel.replace(/\s+/g, "-")}.csv`,
       [t("centre", "staffName"), t("centre", "staffRole"), t("centre", "staffCategory"), t("centre", "settingsStatus"), t("centre", "staffPosition"), t("centre", "staffBaseSalary")],
       report.rows.map((r) => [
         r.name, r.role, r.category, r.status, r.jobTitle, r.baseSalary,
       ]),
     );
-  }, [report, t]);
+  }, [report, t, periodLabel]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
       title: t("centre", "staffReportTitle"),
-      periodLabel: report.period.label,
+      periodLabel,
       kpis: [
         { label: t("centre", "enrollmentTotal"), value: fmtNum(report.kpis.total) },
         { label: t("centre", "summaryActive"), value: fmtNum(report.kpis.active) },
@@ -70,9 +71,9 @@ function PersonnelContent() {
           rows: report.rows.map((r) => [r.name, r.role, r.category, r.status]),
         },
       ],
-      filename: `personnel-${report.period.label.replace(/\s+/g, "-")}.pdf`,
+      filename: `personnel-${periodLabel.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf, t]);
+  }, [report, exportPdf, t, periodLabel]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -81,7 +82,7 @@ function PersonnelContent() {
       activeSlug="effectifs-personnel"
       centerType={centerType}
       title={t("centre", "staffReportTitle")}
-      periodLabel={report?.period?.label}
+      periodLabel={periodLabel}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}

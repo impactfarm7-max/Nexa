@@ -1,9 +1,9 @@
 export const HUB_FILTERS = [
-  { id: "all", label: "Tout" },
-  { id: "announcements", label: "Annonces" },
-  { id: "forums", label: "Filières" },
-  { id: "classes", label: "Classes" },
-  { id: "groups", label: "Groupes" },
+  { id: "all" },
+  { id: "announcements" },
+  { id: "forums" },
+  { id: "classes" },
+  { id: "groups" },
 ];
 
 function norm(s) {
@@ -15,14 +15,14 @@ function matchesQuery(q, ...parts) {
   return parts.some((p) => norm(p).includes(q));
 }
 
-function niveauLabel(niveau, levelLabel = "Niveau") {
+function niveauLabel(niveau, levelLabel = "") {
   if (!niveau) return "";
   const nom = niveau.nom?.trim();
   if (nom) return nom;
-  return `${levelLabel} ${niveau.annee}`;
+  return levelLabel ? `${levelLabel} ${niveau.annee}` : String(niveau.annee ?? "");
 }
 
-function rowFromRoom({ room, kind, title, meta, lastMessages, unreadCounts, noMessage = "Aucun message" }) {
+function rowFromRoom({ room, kind, title, meta, lastMessages, unreadCounts, noMessage = "" }) {
   const last = lastMessages[room.id];
   return {
     id: room.id,
@@ -52,11 +52,17 @@ export function buildCommunauteInbox(input) {
     labels = {},
   } = input;
   const text = {
-    center: labels.center || "Centre", announcements: labels.announcements || "Annonces",
-    program: labels.program || "Filière", forum: labels.forum || "Forum", level: labels.level || "Niveau",
-    classroom: labels.classroom || "Classe", classSingular: labels.classSingular || "classe",
-    classPlural: labels.classPlural || "classes", group: labels.group || "Groupe",
-    freeGroups: labels.freeGroups || "Groupes libres", noMessage: labels.noMessage || "Aucun message",
+    center: labels.center || "",
+    announcements: labels.announcements || "",
+    program: labels.program || "",
+    forum: labels.forum || "",
+    level: labels.level || "",
+    classroom: labels.classroom || "",
+    classSingular: labels.classSingular || "",
+    classPlural: labels.classPlural || "",
+    group: labels.group || "",
+    freeGroups: labels.freeGroups || "",
+    noMessage: labels.noMessage || "",
   };
 
   const q = norm(searchQuery);

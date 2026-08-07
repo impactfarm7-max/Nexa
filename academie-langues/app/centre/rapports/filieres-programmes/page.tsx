@@ -43,25 +43,26 @@ function FilieresContent() {
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
+  periodLabel,
   } = useReportPage<FilieresReport>("filieres-programmes");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
 
   const exportCsv = useCallback(() => {
     if (!report) return;
     downloadCsv(
-      `filieres-${report.period.label.replace(/\s+/g, "-")}.csv`,
+      `filieres-${periodLabel.replace(/\s+/g, "-")}.csv`,
       [t("centre", "enrollmentProgram"), t("centre", "programType"), t("centre", "settingsStatus"), t("centre", "programMode"), t("centre", "programLevels"), t("centre", "programActiveEnrollment"), t("centre", "programPrice"), t("centre", "programCreatedAt")],
       report.rows.map((r) => [
         r.name, r.type, r.status, r.mode, r.niveaux, r.effectifActif, r.tuition, r.createdAt,
       ]),
     );
-  }, [report, t]);
+  }, [report, t, periodLabel]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
       title: t("centre", "programReportTitle"),
-      periodLabel: report.period.label,
+      periodLabel,
       kpis: [
         { label: t("centre", "enrollmentTotal"), value: fmtNum(report.kpis.total) },
         { label: t("centre", "programPublished"), value: fmtNum(report.kpis.published) },
@@ -74,9 +75,9 @@ function FilieresContent() {
           rows: report.rows.map((r) => [r.name, r.type, r.status, r.effectifActif]),
         },
       ],
-      filename: `filieres-${report.period.label.replace(/\s+/g, "-")}.pdf`,
+      filename: `filieres-${periodLabel.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf, t]);
+  }, [report, exportPdf, t, periodLabel]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -85,7 +86,7 @@ function FilieresContent() {
       activeSlug="filieres-programmes"
       centerType={centerType}
       title={t("centre", "programReportTitle")}
-      periodLabel={report?.period?.label}
+      periodLabel={periodLabel}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
@@ -113,7 +114,7 @@ function FilieresContent() {
               { label: t("centre", "enrollmentDraft"), value: fmtNum(report.kpis.draft) },
               { label: t("centre", "programCurricula"), value: fmtNum(report.kpis.cursus) },
               { label: t("centre", "programShortCourses"), value: fmtNum(report.kpis.formationCourte) },
-              { label: t("centre", "programNewPeriod"), value: fmtNum(report.kpis.newInPeriod), sub: report.period.label },
+              { label: t("centre", "programNewPeriod"), value: fmtNum(report.kpis.newInPeriod), sub: periodLabel },
             ]}
           />
           <div className="grid md:grid-cols-2 gap-4">

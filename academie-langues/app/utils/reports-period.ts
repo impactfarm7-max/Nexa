@@ -1,5 +1,7 @@
 export type PeriodPreset = "today" | "week" | "month" | "quarter" | "year" | "custom";
 
+export type ReportLocale = "fr" | "en";
+
 export type ReportPeriod = {
   preset: PeriodPreset;
   from: string;
@@ -41,10 +43,32 @@ function getMonday(d: Date) {
   return copy;
 }
 
+export function formatShort(iso: string, locale: ReportLocale = "fr") {
+  const d = new Date(iso + "T12:00:00");
+  return d.toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/** Label de période pour UI / PDF / CSV (client ou serveur). */
+export function formatReportPeriodLabel(
+  from: string,
+  to: string,
+  locale: ReportLocale = "fr",
+) {
+  if (from === to) return formatShort(from, locale);
+  return locale === "en"
+    ? `${formatShort(from, locale)} to ${formatShort(to, locale)}`
+    : `${formatShort(from, locale)} — ${formatShort(to, locale)}`;
+}
+
 export function resolveReportPeriod(
   preset: string | null,
   fromParam: string | null,
   toParam: string | null,
+  locale: ReportLocale = "fr",
 ): ReportPeriod {
   if (fromParam && toParam) {
     const from = fromParam.slice(0, 10);
@@ -55,22 +79,33 @@ export function resolveReportPeriod(
       preset: "custom",
       from: fromDate,
       to: toDate,
-      label: fromDate === toDate ? formatShort(fromDate) : `${formatShort(fromDate)} — ${formatShort(toDate)}`,
+      label: formatReportPeriodLabel(fromDate, toDate, locale),
     };
   }
 
   const now = new Date();
   const p = (preset || "month") as PeriodPreset;
+  const loc = locale === "en" ? "en-US" : "fr-FR";
 
   if (p === "today") {
     const iso = toIsoDate(now);
-    return { preset: "today", from: iso, to: iso, label: "Aujourd'hui" };
+    return {
+      preset: "today",
+      from: iso,
+      to: iso,
+      label: locale === "en" ? "Today" : "Aujourd'hui",
+    };
   }
 
   if (p === "week") {
     const from = toIsoDate(getMonday(now));
     const to = toIsoDate(now);
-    return { preset: "week", from, to, label: "Cette semaine" };
+    return {
+      preset: "week",
+      from,
+      to,
+      label: locale === "en" ? "This week" : "Cette semaine",
+    };
   }
 
   if (p === "quarter") {
@@ -80,7 +115,7 @@ export function resolveReportPeriod(
       preset: "quarter",
       from: toIsoDate(start),
       to: toIsoDate(now),
-      label: `T${q + 1} ${now.getFullYear()}`,
+      label: locale === "en" ? `Q${q + 1} ${now.getFullYear()}` : `T${q + 1} ${now.getFullYear()}`,
     };
   }
 
@@ -99,13 +134,8 @@ export function resolveReportPeriod(
     preset: "month",
     from: toIsoDate(start),
     to: toIsoDate(now),
-    label: now.toLocaleDateString("fr-FR", { month: "long", year: "numeric" }),
+    label: now.toLocaleDateString(loc, { month: "long", year: "numeric" }),
   };
-}
-
-export function formatShort(iso: string, locale: "fr" | "en" = "fr") {
-  const d = new Date(iso + "T12:00:00");
-  return d.toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export function periodStartIso(from: string) {
@@ -116,11 +146,12 @@ export function periodEndIso(to: string) {
   return endOfDay(new Date(to + "T00:00:00")).toISOString();
 }
 
-export function parseReportFilters(url: URL) {
+export function parseReportFilters(url: URL, locale: ReportLocale = "fr") {
   const period = resolveReportPeriod(
     url.searchParams.get("preset"),
     url.searchParams.get("from"),
     url.searchParams.get("to"),
+    locale,
   );
   return {
     period,

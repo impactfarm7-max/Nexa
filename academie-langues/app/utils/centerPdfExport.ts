@@ -1019,6 +1019,7 @@ export async function downloadBulletinNotesPdf(params: BulletinNotesPdfParams) {
 // ── Fiche générale de classe (matière + période) ─────────────────────────────
 
 export type ClassGradeSheetPdfParams = {
+  locale?: "fr" | "en";
   filiereName: string;
   niveauLabel?: string | null;
   classeName: string;
@@ -1041,9 +1042,12 @@ export type ClassGradeSheetPdfParams = {
 };
 
 export async function downloadClassGradeSheetPdf(params: ClassGradeSheetPdfParams) {
+  const locale = params.locale || "fr";
+  const isEn = locale === "en";
   const { doc, autoTable, startY, cfg } = await createDoc(
-    params.config?.title || "Relevé de classe",
+    params.config?.title || (isEn ? "Class grade sheet" : "Relevé de classe"),
     params.config,
+    locale,
   );
 
   let y = startY;
@@ -1068,7 +1072,9 @@ export async function downloadClassGradeSheetPdf(params: ClassGradeSheetPdfParam
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...cfg.blueRgb);
   doc.text(
-    `Barème /${params.bareme} · Coeff. ×${params.coefficient} · Moy. classe : ${params.classAverage}/${params.bareme}`,
+    isEn
+      ? `Scale /${params.bareme} · Coeff. ×${params.coefficient} · Class avg. : ${params.classAverage}/${params.bareme}`
+      : `Barème /${params.bareme} · Coeff. ×${params.coefficient} · Moy. classe : ${params.classAverage}/${params.bareme}`,
     14,
     y,
   );
@@ -1076,7 +1082,14 @@ export async function downloadClassGradeSheetPdf(params: ClassGradeSheetPdfParam
 
   autoTable(doc, {
     startY: y,
-    head: [["#", "Nom", "Note principale", ...params.suplTitles, "Moyenne", "Rang"]],
+    head: [[
+      "#",
+      isEn ? "Name" : "Nom",
+      isEn ? "Main grade" : "Note principale",
+      ...params.suplTitles,
+      isEn ? "Average" : "Moyenne",
+      isEn ? "Rank" : "Rang",
+    ]],
     body: params.rows.map((r, i) => [
       String(i + 1),
       r.studentName,
@@ -1099,7 +1112,7 @@ export async function downloadClassGradeSheetPdf(params: ClassGradeSheetPdfParam
     .replace(/[^\w\- ]+/g, "")
     .trim()
     .replace(/\s+/g, "_") || "classe";
-  doc.save(`releve_classe_${safe}.pdf`);
+  doc.save(`${isEn ? "class_grades" : "releve_classe"}_${safe}.pdf`);
 }
 
 // ── Attestation de réussite ─────────────────────────────────────────────────

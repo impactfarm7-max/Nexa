@@ -2,6 +2,7 @@
 
 import { Globe, GraduationCap, Users, Plus, Crown, ShieldCheck } from "lucide-react";
 import type { CommunityRoom } from "./useRooms";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const TYPE_ICON: Record<string, any> = {
   announcement: Globe,
@@ -20,6 +21,8 @@ export default function RoomSwitcher({
   onSelect: (room: CommunityRoom) => void;
   onOpenCreateOrJoin: () => void;
 }) {
+  const { t } = useI18n();
+
   return (
     <div className="flex overflow-x-auto hide-scrollbar px-4 pb-3 gap-2 border-t border-slate-100 pt-3 bg-slate-50/50 max-w-5xl mx-auto">
       {rooms.map((room) => {
@@ -49,11 +52,11 @@ export default function RoomSwitcher({
 
       <button
         onClick={onOpenCreateOrJoin}
-        title="Créer ou rejoindre une salle"
+        title={t("dashboard", "communauteCreateOrJoin")}
         className="flex items-center gap-1.5 px-4 py-2.5 rounded-full text-xs font-bold transition-all whitespace-nowrap border-2 border-dashed border-slate-300 text-slate-400 hover:border-orange-400 hover:text-orange-600 shrink-0"
       >
         <Plus size={14} />
-        Salle
+        {t("dashboard", "communauteRoom")}
       </button>
     </div>
   );

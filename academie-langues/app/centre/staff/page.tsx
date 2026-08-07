@@ -18,6 +18,7 @@ import StaffPayrollTab from "@/app/components/StaffPayrollTab";
 import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHeader";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { centre as centreMessages } from "@/app/i18n/messages/centre";
 import { localizeCountryName } from "@/app/utils/countryI18n";
 import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
 import {
@@ -177,7 +178,10 @@ const PERMISSION_GROUP_EN: Record<string, string> = {
   effectifs: "People",
   pilotage: "Management",
 };
-const permissionLabel = (key: string, fallback: string, en: boolean) => en ? (PERMISSION_EN[key] || fallback) : fallback;
+const permissionLabel = (key: string, fallback: string, en: boolean) => {
+  if (key === "communaute") return centreMessages[en ? "en" : "fr"].navCommunaute;
+  return en ? (PERMISSION_EN[key] || fallback) : fallback;
+};
 const permissionGroupLabel = (id: string, fallback: string, en: boolean) => en ? (PERMISSION_GROUP_EN[id] || fallback) : fallback;
 
 const ADMIN_ROLES    = ["campus_manager", "staff"];

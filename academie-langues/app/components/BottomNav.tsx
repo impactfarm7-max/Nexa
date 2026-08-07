@@ -38,7 +38,9 @@ export default function BottomNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const tutorLock = useTutorGlobalLock(isAdmin);
 
-  const navLabel = (label: string) => {
+  const navLabel = (item: { label: string; labelKey?: string } | string) => {
+    if (typeof item !== "string" && item.labelKey) return t("dashboard", item.labelKey);
+    const label = typeof item === "string" ? item : item.label;
     const keys: Record<string, string> = {
       "Tableau de bord": "navDashboard", Accueil: "navHome",
       "Mon tuteur": "navTutor", Tuteur: "navTutorShort",
@@ -46,7 +48,6 @@ export default function BottomNav() {
       "Cours et Quiz": "navCoursesQuiz", "Mes cours": "navCourses", Cours: "navCoursesShort",
       "Mes Devoirs": "navHomework", Devoirs: "navHomeworkShort",
       "Bibliothèque": "navLibrary", "Mode Examen": "navExamMode", Examen: "navExamShort",
-      "Communauté": "navCommunity", "Dashboard Admin": "navAdmin", Admin: "navAdmin",
     };
     return keys[label] ? t("dashboard", keys[label]) : label;
   };
@@ -158,7 +159,10 @@ export default function BottomNav() {
           </span>
         )}
         <span className={`text-[10px] mt-1 text-center leading-tight transition-colors truncate max-w-full ${isActive ? "text-[#11224E] font-bold" : "text-slate-400 font-medium"}`}>
-          {navLabel(item.shortLabel ?? item.label)}
+          {navLabel({
+            label: item.shortLabel ?? item.label,
+            labelKey: item.shortLabelKey ?? item.labelKey,
+          })}
         </span>
       </Link>
     );
@@ -218,7 +222,7 @@ export default function BottomNav() {
                         J-{tutorLock.daysRemaining}
                       </span>
                     )}
-                    <span className="text-xs font-bold text-slate-700 text-center leading-tight">{navLabel(item.label)}</span>
+                    <span className="text-xs font-bold text-slate-700 text-center leading-tight">{navLabel(item)}</span>
                   </Link>
                 );
               })}

@@ -20,15 +20,40 @@ import {
 } from "@/app/utils/short-pricing";
 import { parseGradeWeights } from "@/app/utils/gradesCalc";
 
+type PassageLocale = "fr" | "en";
+
+function reqLocale(req: Request): PassageLocale {
+  return req.headers.get("x-nexa-locale") === "en" ? "en" : "fr";
+}
+
+function msg(locale: PassageLocale, fr: string, en: string) {
+  return locale === "en" ? en : fr;
+}
+
+function jsonErr(
+  locale: PassageLocale,
+  status: number,
+  fr: string,
+  en: string,
+  code?: string,
+) {
+  return NextResponse.json(
+    { error: msg(locale, fr, en), ...(code ? { code } : {}) },
+    { status },
+  );
+}
+
 /**
  * POST /api/centre/passage-niveau
  * Cursus uniquement — décision de fin de niveau (admis / redouble / ajourne).
  * action: "reopen" → annule uniquement un ajournement (pas de nouvelle inscription créée).
  * N'altère pas TCF ni formation_courte.
+ * Locale: header x-nexa-locale=en|fr
  */
 export async function POST(req: NextRequest) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+  const locale = reqLocale(req);
 
   try {
     const body = await req.json();
@@ -36,7 +61,7 @@ export async function POST(req: NextRequest) {
     const action = typeof body.action === "string" ? body.action.trim() : "";
 
     if (!enrollmentId) {
-      return NextResponse.json({ error: "enrollment_id requis." }, { status: 400 });
+      return jsonErr(locale, 400, "enrollment_id requis.", "enrollment_id is required.", "MISSING_ENROLLMENT_ID");
     }
 
     // ── Annuler un ajournement uniquement (réouvre l'inscription) ───────────
@@ -51,23 +76,29 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (srcErr || !source) {
-        return NextResponse.json({ error: "Inscription introuvable." }, { status: 404 });
+        return jsonErr(locale, 404, "Inscription introuvable.", "Enrollment not found.", "NOT_FOUND");
       }
 
       const filiere = source.filieres as unknown as { center_id: string; type: string };
       if (filiere.center_id !== ctx!.centerId) {
-        return NextResponse.json({ error: "Hors de votre centre." }, { status: 403 });
+        return jsonErr(locale, 403, "Hors de votre centre.", "Outside your center.", "FORBIDDEN");
       }
       if (filiere.type !== "cursus") {
-        return NextResponse.json(
-          { error: "Le passage de niveau concerne uniquement les cursus pluriannuels." },
-          { status: 400 },
+        return jsonErr(
+          locale,
+          400,
+          "Le passage de niveau concerne uniquement les cursus pluriannuels.",
+          "Level progression only applies to multi-year programs.",
+          "NOT_CURSUS",
         );
       }
       if (source.passage_decision !== "ajourne") {
-        return NextResponse.json(
-          { error: "Seule une décision « ajourné » peut être annulée ainsi (aucune nouvelle inscription créée)." },
-          { status: 409 },
+        return jsonErr(
+          locale,
+          409,
+          "Seule une décision « ajourné » peut être annulée ainsi (aucune nouvelle inscription créée).",
+          "Only a deferred decision can be cancelled this way (no new enrollment is created).",
+          "REOPEN_NOT_DEFERRED",
         );
       }
 
@@ -112,16 +143,25 @@ export async function POST(req: NextRequest) {
     const campusId = body.campus_id || null;
 
     if (!isPassageDecision(decisionRaw)) {
-      return NextResponse.json(
-        { error: "enrollment_id et decision (admis|redouble|ajourne) requis." },
-        { status: 400 },
+      return jsonErr(
+        locale,
+        400,
+        "enrollment_id et decision (admis|redouble|ajourne) requis.",
+        "enrollment_id and decision (admis|redouble|ajourne) are required.",
+        "INVALID_DECISION",
       );
     }
     const decision: PassageDecision = decisionRaw;
 
     const reasonNorm = normalizePassageReason(decision, body.reason ?? body.passage_reason);
     if (!reasonNorm.ok) {
-      return NextResponse.json({ error: reasonNorm.error }, { status: 400 });
+      return jsonErr(
+        locale,
+        400,
+        "Indiquez un motif (3 caractères minimum) pour cette décision.",
+        "Enter a reason (at least 3 characters) for this decision.",
+        reasonNorm.code,
+      );
     }
     const passageReason = reasonNorm.reason;
 
@@ -137,7 +177,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (srcErr || !source) {
-      return NextResponse.json({ error: "Inscription introuvable." }, { status: 404 });
+      return jsonErr(locale, 404, "Inscription introuvable.", "Enrollment not found.", "NOT_FOUND");
     }
 
     const filiere = source.filieres as unknown as {
@@ -156,22 +196,28 @@ export async function POST(req: NextRequest) {
     } | null;
 
     if (filiere.center_id !== ctx!.centerId) {
-      return NextResponse.json({ error: "Hors de votre centre." }, { status: 403 });
+      return jsonErr(locale, 403, "Hors de votre centre.", "Outside your center.", "FORBIDDEN");
     }
     if (filiere.type !== "cursus") {
-      return NextResponse.json(
-        { error: "Le passage de niveau concerne uniquement les cursus pluriannuels." },
-        { status: 400 },
+      return jsonErr(
+        locale,
+        400,
+        "Le passage de niveau concerne uniquement les cursus pluriannuels.",
+        "Level progression only applies to multi-year programs.",
+        "NOT_CURSUS",
       );
     }
     if (source.passage_decision) {
-      return NextResponse.json(
-        { error: "Une décision a déjà été prise pour cette inscription." },
-        { status: 409 },
+      return jsonErr(
+        locale,
+        409,
+        "Une décision a déjà été prise pour cette inscription.",
+        "A decision has already been made for this enrollment.",
+        "ALREADY_DECIDED",
       );
     }
     if (!source.niveau_id || !niveau) {
-      return NextResponse.json({ error: "Niveau manquant sur cette inscription." }, { status: 400 });
+      return jsonErr(locale, 400, "Niveau manquant sur cette inscription.", "Level missing on this enrollment.", "MISSING_LEVEL");
     }
 
     // Moyenne informative (ne bloque pas la décision manager)
@@ -243,9 +289,12 @@ export async function POST(req: NextRequest) {
     if (decision === "admis") {
       const currentAnnee = niveau.annee;
       if (currentAnnee == null) {
-        return NextResponse.json(
-          { error: "Impossible de déterminer le niveau suivant." },
-          { status: 400 },
+        return jsonErr(
+          locale,
+          400,
+          "Impossible de déterminer le niveau suivant.",
+          "Unable to determine the next level.",
+          "NEXT_LEVEL_UNKNOWN",
         );
       }
       const { data: nextNiv } = await supabaseAdmin
@@ -267,9 +316,12 @@ export async function POST(req: NextRequest) {
             passage_decided_by: null,
           })
           .eq("id", enrollmentId);
-        return NextResponse.json(
-          { error: `Aucun niveau Année ${currentAnnee + 1} configuré pour ce programme.` },
-          { status: 400 },
+        return jsonErr(
+          locale,
+          400,
+          `Aucun niveau Année ${currentAnnee + 1} configuré pour ce programme.`,
+          `No Year ${currentAnnee + 1} level is configured for this program.`,
+          "NEXT_LEVEL_MISSING",
         );
       }
       targetNiveauId = nextNiv.id;
@@ -328,9 +380,12 @@ export async function POST(req: NextRequest) {
           passage_decided_by: null,
         })
         .eq("id", enrollmentId);
-      return NextResponse.json(
-        { error: "Échec de la nouvelle inscription : " + (enrollErr?.message || "inconnu") },
-        { status: 500 },
+      return jsonErr(
+        locale,
+        500,
+        "Échec de la nouvelle inscription : " + (enrollErr?.message || "inconnu"),
+        "Failed to create the new enrollment: " + (enrollErr?.message || "unknown"),
+        "ENROLL_FAILED",
       );
     }
 
@@ -381,8 +436,9 @@ export async function POST(req: NextRequest) {
       target_niveau_id: targetNiveauId,
     });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "Erreur serveur.";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const fallback = msg(locale, "Erreur serveur.", "Server error.");
+    const raw = e instanceof Error ? e.message : fallback;
+    return NextResponse.json({ error: raw, code: "SERVER_ERROR" }, { status: 500 });
   }
 }
 
@@ -390,10 +446,11 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+  const locale = reqLocale(req);
 
   const enrollmentId = new URL(req.url).searchParams.get("enrollment_id");
   if (!enrollmentId) {
-    return NextResponse.json({ error: "enrollment_id requis." }, { status: 400 });
+    return jsonErr(locale, 400, "enrollment_id requis.", "enrollment_id is required.", "MISSING_ENROLLMENT_ID");
   }
 
   type PassageSource = {
@@ -438,15 +495,15 @@ export async function GET(req: NextRequest) {
   }
 
   if (!source) {
-    return NextResponse.json({ error: "Inscription introuvable." }, { status: 404 });
+    return jsonErr(locale, 404, "Inscription introuvable.", "Enrollment not found.", "NOT_FOUND");
   }
 
   const filiere = source.filieres as unknown as { center_id: string; type: string };
   if (filiere.center_id !== ctx!.centerId) {
-    return NextResponse.json({ error: "Hors de votre centre." }, { status: 403 });
+    return jsonErr(locale, 403, "Hors de votre centre.", "Outside your center.", "FORBIDDEN");
   }
   if (filiere.type !== "cursus") {
-    return NextResponse.json({ error: "Pas un cursus." }, { status: 400 });
+    return jsonErr(locale, 400, "Pas un cursus.", "Not a multi-year program.", "NOT_CURSUS");
   }
 
   const niveau = source.niveaux as unknown as {

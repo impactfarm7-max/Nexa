@@ -17,7 +17,7 @@ import StudentFinanceTab from "@/app/components/centre/students/StudentFinanceTa
 import PassageNiveauPanel from "@/app/components/centre/students/PassageNiveauPanel";
 import BulletinDynamique from "@/app/components/BulletinDynamique";
 import {
-  passageDecisionLabelFr,
+  passageDecisionLabel,
 } from "@/app/utils/cursus-passage";
 import {
   CenterPageLayout,
@@ -831,13 +831,13 @@ function StudentViewModal({
   onClose: () => void;
   onOpenDossier: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const primary = student.enrollments[0];
   const statusLabel =
     student.center_status === "active" ? t("centre", "campusActive")
     : student.center_status === "paused" ? t("centre", "summarySuspended")
     : t("centre", "studentsRevoked");
-  const passageLabel = (decision: string) => decision === "admis" ? t("centre", "studentsPassed") : decision === "redouble" ? t("centre", "studentsRepeats") : decision === "ajourne" ? t("centre", "studentsDeferred") : passageDecisionLabelFr(decision);
+  const passageLabel = (decision: string) => passageDecisionLabel(decision, locale);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>

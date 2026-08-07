@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getReportsContext } from "../shared";
+import { getReportsContext, reportsCatchError } from "../shared";
 import { buildReportsBundle } from "@/app/utils/reports-data.server";
 
 export async function GET(req: Request) {
@@ -11,7 +11,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json(bundle);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Erreur serveur";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return reportsCatchError(req, e);
   }
 }

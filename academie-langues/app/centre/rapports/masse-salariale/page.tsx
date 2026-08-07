@@ -42,25 +42,26 @@ function PaieContent() {
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
+    periodLabel,
   } = useReportPage<PaieReport>("masse-salariale");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
 
   const exportCsv = useCallback(() => {
     if (!report?.available) return;
     downloadCsv(
-      `paie-${report.period.label.replace(/\s+/g, "-")}.csv`,
+      `paie-${periodLabel.replace(/\s+/g, "-")}.csv`,
       [t("centre", "payrollStaff"), t("centre", "reportsPeriod"), t("centre", "staffBase"), t("centre", "payrollBonuses"), t("centre", "payrollDeductions"), t("centre", "payrollNet"), t("centre", "payrollPaid"), t("centre", "settingsStatus")],
       report.rows.map((r) => [
         r.staff, r.period, r.base, r.primes, r.retenues, r.net, r.paid, statusLabel(String(r.status)),
       ]),
     );
-  }, [report, t]);
+  }, [report, t, periodLabel]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report?.available) return;
     await exportPdf({
       title: t("centre", "payrollTitle"),
-      periodLabel: report.period.label,
+      periodLabel,
       kpis: [
         { label: t("centre", "payrollNetTotal"), value: fmtFCFA(report.kpis.netTotal) },
         { label: t("centre", "payrollPaid"), value: fmtFCFA(report.kpis.paidTotal) },
@@ -73,9 +74,9 @@ function PaieContent() {
           rows: report.rows.map((r) => [r.staff, r.period, fmtFCFA(Number(r.net)), statusLabel(String(r.status))]),
         },
       ],
-      filename: `paie-${report.period.label.replace(/\s+/g, "-")}.pdf`,
+      filename: `paie-${periodLabel.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf, t]);
+  }, [report, exportPdf, t, periodLabel]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -84,7 +85,7 @@ function PaieContent() {
       activeSlug="masse-salariale"
       centerType={centerType}
       title={t("centre", "payrollTitle")}
-      periodLabel={report?.period?.label}
+      periodLabel={periodLabel}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
@@ -115,7 +116,7 @@ function PaieContent() {
         <>
           <ReportKpiGrid
             items={[
-              { label: t("centre", "payrollNetTotal"), value: fmtFCFA(report.kpis.netTotal), sub: report.period.label },
+              { label: t("centre", "payrollNetTotal"), value: fmtFCFA(report.kpis.netTotal), sub: periodLabel },
               { label: t("centre", "payrollGrossTotal"), value: fmtFCFA(report.kpis.brutTotal) },
               { label: t("centre", "payrollTotalPaid"), value: fmtFCFA(report.kpis.paidTotal) },
               { label: t("centre", "payrollBonuses"), value: fmtFCFA(report.kpis.primesTotal) },

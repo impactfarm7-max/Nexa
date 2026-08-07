@@ -19,6 +19,9 @@ import {
 export type StudentNavItem = {
   label: string;
   shortLabel?: string;
+  /** Stable dashboard.ts key — preferred over FR label string-matching. */
+  labelKey?: string;
+  shortLabelKey?: string;
   icon: LucideIcon;
   path: string;
   tutorLockBadge?: boolean;
@@ -46,7 +49,7 @@ function getTcfLikeNavItems(centerId: string | null): StudentNavItem[] {
     { label: "Mes Devoirs", shortLabel: "Devoirs", icon: FileText, path: navPaths.missions },
     { label: "Bibliothèque", shortLabel: "Bibliothèque", icon: Library, path: "/bibliotheque" },
     { label: "Mode Examen", shortLabel: "Examen", icon: Timer, path: "/tcf-canada/simulateur/examen" },
-    { label: "Communauté", shortLabel: "Communauté", icon: Users, path: navPaths.communaute },
+    { label: "Communauté", shortLabel: "Communauté", labelKey: "navCommunity", shortLabelKey: "navCommunity", icon: Users, path: navPaths.communaute },
   ];
 }
 
@@ -59,7 +62,7 @@ function getPluriannualNavItems(centerId: string | null): StudentNavItem[] {
     { label: "Session Live", shortLabel: "Live", icon: Video, path: navPaths.coaching },
     { label: "Mes cours", shortLabel: "Cours", icon: BookOpen, path: "/tcf-canada/cours?tab=centre" },
     { label: "Mes Devoirs", shortLabel: "Devoirs", icon: FileText, path: navPaths.missions },
-    { label: "Communauté", shortLabel: "Communauté", icon: Users, path: navPaths.communaute },
+    { label: "Communauté", shortLabel: "Communauté", labelKey: "navCommunity", shortLabelKey: "navCommunity", icon: Users, path: navPaths.communaute },
   ];
 }
 
@@ -82,6 +85,8 @@ export function getStudentNavItems(
 export const STUDENT_ADMIN_NAV_ITEM: StudentNavItem = {
   label: "Dashboard Admin",
   shortLabel: "Admin",
+  labelKey: "navAdmin",
+  shortLabelKey: "navAdmin",
   icon: ShieldCheck,
   path: "/admin",
 };

@@ -54,7 +54,7 @@ export function getCenterBottomBarItems(isTCF: boolean): {
       ],
       right: [
         { label: "Finance", shortLabel: "Finance", icon: CreditCard, path: "/centre/finance" },
-        { label: "Communauté", shortLabel: "Communauté", icon: MessageSquare, path: "/centre/communaute" },
+        { label: "bottomCommunity", shortLabel: "bottomCommunityShort", icon: MessageSquare, path: "/centre/communaute" },
       ],
     };
   }
@@ -66,7 +66,7 @@ export function getCenterBottomBarItems(isTCF: boolean): {
     ],
     right: [
       { label: "Finance", shortLabel: "Finance", icon: CreditCard, path: "/centre/finance" },
-      { label: "Communauté", shortLabel: "Communauté", icon: MessageSquare, path: "/centre/communaute" },
+      { label: "bottomCommunity", shortLabel: "bottomCommunityShort", icon: MessageSquare, path: "/centre/communaute" },
     ],
   };
 }

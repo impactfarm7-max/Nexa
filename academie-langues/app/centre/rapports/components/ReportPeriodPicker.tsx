@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Calendar, ChevronDown, X } from "lucide-react";
-import { formatShort } from "@/app/utils/reports-period";
+import { formatReportPeriodLabel } from "@/app/utils/reports-period";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
@@ -17,8 +17,9 @@ export default function ReportPeriodPicker({ from, to, onApply }: Props) {
   const { t, locale } = useI18n();
   const periodLabel = () => {
     if (!from || !to) return t("centre", "reportsChoosePeriod");
-    if (from === to) return formatShort(from, locale);
-    return `${formatShort(from, locale)} → ${formatShort(to, locale)}`;
+    if (from === to) return formatReportPeriodLabel(from, to, locale === "en" ? "en" : "fr");
+    const base = formatReportPeriodLabel(from, to, locale === "en" ? "en" : "fr");
+    return base.replace(" — ", " → ").replace(" to ", " → ");
   };
   const [open, setOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(from);

@@ -45,6 +45,7 @@ function ExamensContent() {
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
+  periodLabel,
   } = useReportPage<ExamensReport>("examens");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
 
@@ -68,7 +69,7 @@ function ExamensContent() {
           t("centre", "reportsExamStatus"),
         ];
     downloadCsv(
-      `examens-${report.period.label.replace(/\s+/g, "-")}.csv`,
+      `examens-${periodLabel.replace(/\s+/g, "-")}.csv`,
       headers,
       report.rows.map((r) =>
         report.source === "tcf"
@@ -76,13 +77,13 @@ function ExamensContent() {
           : [r.student || "—", r.examenId, r.date, r.heure, r.type, r.status],
       ),
     );
-  }, [report, t]);
+  }, [report, t, periodLabel]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
       title: isTcfCanadaCenter(centerType) ? t("centre", "reportsExamTitleTcf") : t("centre", "reportsExamTitleGeneric"),
-      periodLabel: report.period.label,
+      periodLabel,
       kpis: [
         { label: t("centre", "reportsExamSessionsPeriod"), value: fmtNum(report.kpis.totalSessions) },
         { label: t("centre", "reportsExamCompleted"), value: fmtNum(report.kpis.realises) },
@@ -95,9 +96,9 @@ function ExamensContent() {
           rows: report.byStatus.map((x) => [x.label, x.count]),
         },
       ],
-      filename: `examens-${report.period.label.replace(/\s+/g, "-")}.pdf`,
+      filename: `examens-${periodLabel.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf, centerType, t]);
+  }, [report, exportPdf, centerType, t, periodLabel]);
 
   const examTrend = useMemo(() => {
     if (!report) return [];
@@ -122,7 +123,7 @@ function ExamensContent() {
       activeSlug="examens"
       centerType={centerType}
       title={isTcf ? t("centre", "reportsExamTitleTcf") : t("centre", "reportsExamTitleGeneric")}
-      periodLabel={report?.period?.label}
+      periodLabel={periodLabel}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
@@ -148,7 +149,7 @@ function ExamensContent() {
           </p>
           <ReportKpiGrid
             items={[
-              { label: t("centre", "reportsExamSessionsPeriod"), value: fmtNum(report.kpis.totalSessions), sub: report.period.label },
+              { label: t("centre", "reportsExamSessionsPeriod"), value: fmtNum(report.kpis.totalSessions), sub: periodLabel },
               { label: isTcf ? t("centre", "reportsExamScheduled") : t("centre", "reportsExamInProgress"), value: fmtNum(report.kpis.programmes) },
               { label: t("centre", "reportsExamInProgress"), value: fmtNum(report.kpis.enCours) },
               { label: t("centre", "reportsExamCompleted"), value: fmtNum(report.kpis.realises) },

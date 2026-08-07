@@ -4,10 +4,19 @@ import { hexToRgb } from "@/app/utils/documentConfig";
 const BLUE_RGB: [number, number, number] = [17, 34, 78];
 const ORANGE_RGB: [number, number, number] = [235, 103, 14];
 
-function resolveConfig(config?: Partial<DocumentExportConfig>): DocumentExportConfig {
+type PdfLocale = "fr" | "en";
+
+function rtl(locale: PdfLocale, fr: string, en: string) {
+  return locale === "en" ? en : fr;
+}
+
+function resolveConfig(
+  config: Partial<DocumentExportConfig> | undefined,
+  locale: PdfLocale,
+): DocumentExportConfig {
   const accentRgb = config?.accentRgb || (config?.accentColor ? hexToRgb(config.accentColor) : ORANGE_RGB);
   return {
-    title: config?.title || "Rapport",
+    title: config?.title || rtl(locale, "Rapport", "Report"),
     accentColor: config?.accentColor || "#eb670e",
     accentRgb,
     blueRgb: config?.blueRgb || BLUE_RGB,
@@ -50,12 +59,18 @@ async function addPdfLogo(doc: any, logoUrl: string | null, x: number, y: number
   doc.addImage(dataUrl, format, x, y, size, size);
 }
 
-async function createReportDoc(title: string, periodLabel: string | undefined, config?: Partial<DocumentExportConfig>) {
-  const cfg = resolveConfig({ ...config, title: config?.title || title });
+async function createReportDoc(
+  title: string,
+  periodLabel: string | undefined,
+  config: Partial<DocumentExportConfig> | undefined,
+  locale: PdfLocale,
+) {
+  const cfg = resolveConfig({ ...config, title: config?.title || title }, locale);
   const { default: jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
 
   let headerX = 14;
   if (cfg.showLogo && cfg.logoUrl) {
@@ -66,19 +81,25 @@ async function createReportDoc(title: string, periodLabel: string | undefined, c
   doc.setTextColor(...cfg.blueRgb);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
-  doc.text(cfg.legalName || "Centre", headerX, 18);
+  doc.text(cfg.legalName || rtl(locale, "Centre", "Center"), headerX, 18);
 
   doc.setTextColor(...cfg.accentRgb);
   doc.setFontSize(9);
   doc.text(title.toUpperCase(), headerX, 24);
 
   const metaLines: string[] = [];
-  if (periodLabel) metaLines.push(`Période : ${periodLabel}`);
+  if (periodLabel) {
+    metaLines.push(`${rtl(locale, "Période", "Period")} : ${periodLabel}`);
+  }
   if (cfg.showAddress && cfg.address) metaLines.push(cfg.address);
-  if (cfg.showPhone && cfg.phone) metaLines.push(`Tél : ${cfg.phone}`);
+  if (cfg.showPhone && cfg.phone) {
+    metaLines.push(`${rtl(locale, "Tél", "Phone")} : ${cfg.phone}`);
+  }
   if (cfg.showRccm && cfg.rccmNumber) metaLines.push(`RCCM : ${cfg.rccmNumber}`);
   if (cfg.showNiu && cfg.niuNumber) metaLines.push(`NIU : ${cfg.niuNumber}`);
-  metaLines.push(`Généré le ${new Date().toLocaleString("fr-FR")}`);
+  metaLines.push(
+    `${rtl(locale, "Généré le", "Generated on")} ${new Date().toLocaleString(dateLocale)}`,
+  );
 
   let metaY = 14;
   doc.setFont("helvetica", "normal");
@@ -119,10 +140,17 @@ export type ReportPdfOptions = {
   sections: ReportPdfSection[];
   filename: string;
   config?: Partial<DocumentExportConfig>;
+  locale?: PdfLocale;
 };
 
 export async function exportReportPdf(opts: ReportPdfOptions) {
-  const { doc, autoTable, startY, cfg } = await createReportDoc(opts.title, opts.periodLabel, opts.config);
+  const locale: PdfLocale = opts.locale === "en" ? "en" : "fr";
+  const { doc, autoTable, startY, cfg } = await createReportDoc(
+    opts.title,
+    opts.periodLabel,
+    opts.config,
+    locale,
+  );
 
   let y = startY;
 
@@ -130,7 +158,7 @@ export async function exportReportPdf(opts: ReportPdfOptions) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     doc.setTextColor(...cfg.blueRgb);
-    doc.text("Indicateurs clés", 14, y);
+    doc.text(rtl(locale, "Indicateurs clés", "Key indicators"), 14, y);
     y += 5;
 
     doc.setFont("helvetica", "normal");

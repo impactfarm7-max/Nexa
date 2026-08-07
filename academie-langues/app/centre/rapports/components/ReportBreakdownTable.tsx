@@ -2,6 +2,7 @@
 
 import { TableProperties } from "lucide-react";
 import { BLUE } from "@/app/centre/dashboard/dashboard-ui";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Col = { key: string; label: string; align?: "left" | "right" };
 
@@ -16,8 +17,11 @@ export default function ReportBreakdownTable({
   title,
   columns,
   rows,
-  emptyLabel = "No data for this period.",
+  emptyLabel,
 }: Props) {
+  const { t } = useI18n();
+  const empty = emptyLabel || t("centre", "reportsNoDataForPeriod");
+
   return (
     <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden">
       {title && (
@@ -46,7 +50,7 @@ export default function ReportBreakdownTable({
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-10 text-center">
-                  <p className="text-neutral-400 text-sm">{emptyLabel}</p>
+                  <p className="text-neutral-400 text-sm">{empty}</p>
                 </td>
               </tr>
             ) : (
@@ -75,7 +79,7 @@ export default function ReportBreakdownTable({
       </div>
       {rows.length > 100 && (
         <p className="px-4 py-2.5 text-[10px] text-neutral-400 border-t border-neutral-100 bg-neutral-50/50">
-          Display limited to 100 rows — export the CSV for the full list.
+          {t("centre", "reportsTableLimited")}
         </p>
       )}
     </div>

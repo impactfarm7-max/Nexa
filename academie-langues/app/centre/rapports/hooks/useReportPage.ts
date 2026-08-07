@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "@/app/utils/supabase";
 import { loadCenterBootstrap, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import { resolveDashboardModules } from "@/app/centre/dashboard/utils";
-import { defaultReportPeriodRange } from "@/app/utils/reports-period";
+import { defaultReportPeriodRange, formatReportPeriodLabel } from "@/app/utils/reports-period";
 import { isReportHiddenForTcf, type ReportSlug } from "../config/p0-reports";
 import { fetchReportsBundle, peekReportsBundle } from "./reports-bundle-client";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -87,7 +87,7 @@ export function useReportPage<T>(slug: ReportSlug) {
   const load = useCallback(async () => {
     setError(null);
 
-    const cached = peekReportsBundle(queryParams);
+    const cached = peekReportsBundle(queryParams, locale);
     const hasCachedSlice = Boolean(cached?.reports[slug]);
 
     if (hasCachedSlice && cached) {
@@ -144,6 +144,7 @@ export function useReportPage<T>(slug: ReportSlug) {
 
       const bundle = await fetchReportsBundle(session.access_token, queryParams, {
         force: !hasCachedSlice,
+        locale,
       });
 
       applyBundle(bundle);
@@ -152,7 +153,7 @@ export function useReportPage<T>(slug: ReportSlug) {
         setError(t("centre", "reportsDataUnavailable"));
       }
     } catch (e) {
-      setError(locale === "en" ? t("centre", "reportsLoadingError") : (e instanceof Error ? e.message : t("centre", "reportsLoadingError")));
+      setError(e instanceof Error && e.message ? e.message : t("centre", "reportsLoadingError"));
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -162,6 +163,11 @@ export function useReportPage<T>(slug: ReportSlug) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const periodLabel = useMemo(
+    () => formatReportPeriodLabel(from, to, locale === "en" ? "en" : "fr"),
+    [from, to, locale],
+  );
 
   return {
     loading,
@@ -177,6 +183,7 @@ export function useReportPage<T>(slug: ReportSlug) {
     filiereId,
     centerType,
     centerId,
+    periodLabel,
     querySuffix,
     reportHref,
     setFilter,

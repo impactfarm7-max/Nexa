@@ -13,7 +13,6 @@ import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtNum } from "@/app/utils/reports-export";
 import { useI18n } from "@/app/i18n/I18nProvider";
-import { formatShort } from "@/app/utils/reports-period";
 
 type EncaissementsReport = {
   period: { label: string };
@@ -37,28 +36,24 @@ function EncaissementsContent() {
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
+  periodLabel,
   } = useReportPage<EncaissementsReport>("encaissements");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
-  const localizedPeriod = from === to
-    ? formatShort(from, locale)
-    : locale === "en"
-      ? `${formatShort(from, locale)} to ${formatShort(to, locale)}`
-      : `${formatShort(from, locale)} — ${formatShort(to, locale)}`;
 
   const exportCsv = useCallback(() => {
     if (!report) return;
     downloadCsv(
-      `encaissements-${report.period.label.replace(/\s+/g, "-")}.csv`,
+      `encaissements-${periodLabel.replace(/\s+/g, "-")}.csv`,
       [t("centre", "reportsDate"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "collectionsMethod")],
       report.rows.map((r) => [r.date, r.student, r.filiere, r.amount, methodLabel(r.method)]),
     );
-  }, [report, t]);
+  }, [report, t, periodLabel]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
       title: t("centre", "collectionsTitle"),
-      periodLabel: localizedPeriod,
+      periodLabel,
       kpis: [
         { label: t("centre", "collectionsTotal"), value: fmtFCFA(report.kpis.totalEncaisse) },
         { label: t("centre", "collectionsPayments"), value: fmtNum(report.kpis.nbPaiements) },
@@ -71,9 +66,9 @@ function EncaissementsContent() {
           rows: report.rows.map((r) => [r.date, r.student, r.filiere, fmtFCFA(r.amount), methodLabel(r.method)]),
         },
       ],
-      filename: `encaissements-${report.period.label.replace(/\s+/g, "-")}.pdf`,
+      filename: `encaissements-${periodLabel.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf, t]);
+  }, [report, exportPdf, t, periodLabel]);
 
   if (loading && !report) return <CenterPageLoading />;
 
@@ -82,7 +77,7 @@ function EncaissementsContent() {
       activeSlug="encaissements"
       centerType={centerType}
       title={t("centre", "collectionsTitle")}
-      periodLabel={localizedPeriod}
+      periodLabel={periodLabel}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
@@ -105,7 +100,7 @@ function EncaissementsContent() {
         <>
           <ReportKpiGrid
             items={[
-              { label: t("centre", "collectionsTotal"), value: fmtFCFA(report.kpis.totalEncaisse), sub: localizedPeriod },
+              { label: t("centre", "collectionsTotal"), value: fmtFCFA(report.kpis.totalEncaisse), sub: periodLabel },
               { label: t("centre", "collectionsPaymentCount"), value: fmtNum(report.kpis.nbPaiements) },
               { label: t("centre", "collectionsAverageAmount"), value: fmtFCFA(report.kpis.panierMoyen) },
             ]}

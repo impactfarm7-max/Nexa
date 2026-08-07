@@ -88,6 +88,7 @@ import { usePushNotifications } from "@/app/hooks/usePushNotifications";
 import { useSimulationLimit } from "@/app/hooks/useSimulationLimit";
 import { useStudentCenterContext } from "@/app/hooks/useStudentCenterContext";
 import { addCalendarMonths } from "@/app/utils/examCompletUnlock";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 // Message de la notif in-app envoyée le jour où l'examen complet se débloque
 const EXAM_COMPLET_UNLOCK_MSG =
@@ -249,6 +250,7 @@ type DisciplineStats = {
 export default function Dashboard() {
   const router = useRouter();
   const greeting = useGreeting();
+  const { t } = useI18n();
 
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -1283,7 +1285,7 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-display font-black text-sm md:text-base xl:text-lg 2xl:text-xl flex items-center gap-2" style={{ color: BRAND.blue }}>
                   <NotebookPen className="w-4 h-4" style={{ color: BRAND.orange }} />
-                  {isPluriannual ? "Mes notes" : "Mes notes de la semaine"}
+                  {isPluriannual ? t("dashboard", "gradesWidgetTitle") : "Mes notes de la semaine"}
                 </h3>
                 {!isPluriannual && (
                 <a href="/tcf-canada/simulateur/examen" className="text-[11px] font-bold text-neutral-400 hover:text-orange-500 transition-colors">Tout voir →</a>
@@ -1291,12 +1293,16 @@ export default function Dashboard() {
               </div>
               {isPluriannual ? (
                 <>
-                  <p className="text-[10px] text-neutral-400 font-medium mb-4">Notes de vos cours et évaluations du centre.</p>
+                  <p className="text-[10px] text-neutral-400 font-medium mb-4">{t("dashboard", "gradesWidgetHint")}</p>
                   {widgetsLoading ? (
                     <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-12 bg-neutral-100 rounded-xl animate-pulse" />)}</div>
                   ) : (
                     <p className="text-sm text-neutral-400 font-medium py-6 text-center">
-                      Consultez vos notes dans <a href="/tcf-canada/cours?tab=notes" className="font-bold text-orange-500 hover:underline">Mes cours → Notes</a>.
+                      {t("dashboard", "gradesWidgetConsultPrefix")}{" "}
+                      <a href="/tcf-canada/cours?tab=notes" className="font-bold text-orange-500 hover:underline">
+                        {t("dashboard", "gradesWidgetCoursesNotesLink")}
+                      </a>
+                      .
                     </p>
                   )}
                 </>

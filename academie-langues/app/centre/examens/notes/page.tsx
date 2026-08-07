@@ -202,7 +202,7 @@ function scoreFieldClass(scoreStr: string, bareme: number, dirty: boolean, locke
 }
 
 export default function GradeBookPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [loading, setLoading] = useState(true);
   const [centerType, setCenterType] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
@@ -655,13 +655,13 @@ export default function GradeBookPage() {
         if (!principalByEnroll.has(g.enrollment_id)) {
           principalByEnroll.set(g.enrollment_id, { id: g.id, score: g.score });
         } else {
-          const t = "Note";
-          if (!titleToCol.has(t)) {
+          const noteTitle = t("centre", "gradesMainGrade");
+          if (!titleToCol.has(noteTitle)) {
             const colKey = newLocalKey();
-            titleToCol.set(t, colKey);
-            titleOrder.push(t);
+            titleToCol.set(noteTitle, colKey);
+            titleOrder.push(noteTitle);
           }
-          const colKey = titleToCol.get(t)!;
+          const colKey = titleToCol.get(noteTitle)!;
           if (!suplByEnroll.has(g.enrollment_id)) suplByEnroll.set(g.enrollment_id, new Map());
           suplByEnroll.get(g.enrollment_id)!.set(colKey, { id: g.id, score: g.score });
         }
@@ -903,7 +903,7 @@ export default function GradeBookPage() {
             continue;
           }
           if (score < 0 || score > maxScore) {
-            throw new Error(`${row.nom} ${row.prenom} (${title}) : note invalide /${maxScore}`);
+            throw new Error(`${row.nom} ${row.prenom} (${title}) : ${t("centre", "gradesAboveScale", { scale: String(maxScore) })}`);
           }
 
           if (ex.id) {
@@ -938,7 +938,7 @@ export default function GradeBookPage() {
       setSaveSuccess(true);
       setNotesLocked(true);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur d'enregistrement.");
+      setError(e instanceof Error ? e.message : t("centre", "notesSaveError"));
     } finally {
       setSaving(false);
     }
@@ -1016,7 +1016,7 @@ export default function GradeBookPage() {
       ));
       setFormulaOpen(false);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur formule.");
+      setError(e instanceof Error ? e.message : t("centre", "notesFormulaError"));
     } finally {
       setSavingFormula(false);
     }
@@ -1097,8 +1097,8 @@ export default function GradeBookPage() {
       await downloadClassGradeSheetPdf({
         filiereName: selectedFiliere?.name || "",
         niveauLabel: selectedNiveau
-          ? (selectedNiveau.nom?.trim() || (selectedNiveau.annee != null ? `Niveau ${selectedNiveau.annee}` : null))
-          : (selectedSubject.niveau_annee != null ? `Niveau ${selectedSubject.niveau_annee}` : null),
+          ? (selectedNiveau.nom?.trim() || (selectedNiveau.annee != null ? t("centre", "notesLevelNumber", { number: selectedNiveau.annee }) : null))
+          : (selectedSubject.niveau_annee != null ? t("centre", "notesLevelNumber", { number: selectedSubject.niveau_annee }) : null),
         classeName: selectedGroupe.nom,
         matiereName: selectedSubject.discipline_name,
         periodLabel: selectedPeriod
@@ -1123,6 +1123,7 @@ export default function GradeBookPage() {
         }),
         config,
         signatures,
+        locale,
       });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("centre", "notesPdfExportImpossible"));
@@ -1214,7 +1215,7 @@ export default function GradeBookPage() {
                 className="h-8 px-3 rounded-lg text-xs font-semibold border border-black/[0.08] bg-white text-neutral-700 flex items-center gap-1.5 disabled:opacity-40 hover:bg-black/[0.03]"
               >
                 {exportingClass ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
-                Exporter
+                {t("centre", "notesExport")}
               </button>
               <button
                 onClick={saveAll}
@@ -1223,7 +1224,7 @@ export default function GradeBookPage() {
                 style={{ backgroundColor: ORANGE }}
               >
                 {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                Enregistrer
+                {t("centre", "identitySave")}
               </button>
             </div>
           )}
@@ -1233,7 +1234,7 @@ export default function GradeBookPage() {
           <div className="nexa-center-shell pb-2.5 flex items-center gap-2 flex-wrap">
             {niveaux.length > 0 && (
               <div className="flex gap-1 flex-wrap items-center">
-                <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Niveau</span>
+                <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">{t("centre", "planningLevel")}</span>
                 {niveaux.map((n) => (
                   <FilterPill
                     key={n.id}
@@ -1249,7 +1250,7 @@ export default function GradeBookPage() {
                       setSubjectMenuOpen(false);
                     }}
                   >
-                    {n.nom?.trim() || (n.annee != null ? `Niv. ${n.annee}` : n.mois != null ? `${n.mois}m` : "Niveau")}
+                    {n.nom?.trim() || (n.annee != null ? t("centre", "notesLevelAbbrNumber", { number: n.annee }) : n.mois != null ? t("centre", "notesMonthsAbbr", { count: n.mois }) : t("centre", "planningLevel"))}
                   </FilterPill>
                 ))}
               </div>
@@ -1259,9 +1260,9 @@ export default function GradeBookPage() {
               <>
                 {niveaux.length > 0 && <span className="w-px h-4 bg-black/[0.08] shrink-0" />}
                 <div className="flex gap-1 flex-wrap items-center">
-                  <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Classe</span>
+                  <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">{t("centre", "identityClass")}</span>
                   {groupes.length === 0 ? (
-                    <span className="text-[10px] text-neutral-400 italic">Aucune classe</span>
+                    <span className="text-[10px] text-neutral-400 italic">{t("centre", "notesNoClass")}</span>
                   ) : (
                     groupes.map((g) => (
                       <FilterPill
@@ -1438,10 +1439,10 @@ export default function GradeBookPage() {
                       </div>
                       <p className="text-base font-extrabold tracking-tight mb-2" style={{ color: BLUE }}>{f.name}</p>
                       <p className="text-[11px] font-semibold text-neutral-500 tabular-nums">
-                        {count} matière{count !== 1 ? "s" : ""}
+                        {t("centre", count === 1 ? "notesSubjectCountOne" : "notesSubjectCountMany", { count })}
                       </p>
                       <p className="text-[11px] font-semibold text-neutral-600 tabular-nums mt-0.5">
-                        {f.student_count} apprenant{f.student_count !== 1 ? "s" : ""}
+                        {t("centre", f.student_count === 1 ? "notesLearnerCountOne" : "notesLearnerCountMany", { count: f.student_count })}
                       </p>
                     </button>
                   );
@@ -1540,7 +1541,7 @@ export default function GradeBookPage() {
                         onChange={(e) => setEditMaxScore(e.target.value)}
                         className="w-14 h-8 px-2 rounded-full border bg-white text-xs font-black text-center outline-none"
                       />
-                      <span className="text-neutral-400 font-bold">Coeff.</span>
+                      <span className="text-neutral-400 font-bold">{t("centre", "notesCoeff")}</span>
                       <input
                         type="number"
                         min={0.25}
@@ -1556,7 +1557,7 @@ export default function GradeBookPage() {
                         className="h-8 px-3 rounded-full text-[10px] font-black uppercase text-white disabled:opacity-40"
                         style={{ backgroundColor: ORANGE }}
                       >
-                        {savingMeta ? <Loader2 size={12} className="animate-spin" /> : "Valider"}
+                        {savingMeta ? <Loader2 size={12} className="animate-spin" /> : t("centre", "studentsValidate")}
                       </button>
                       <button
                         type="button"
@@ -1567,7 +1568,7 @@ export default function GradeBookPage() {
                         }}
                         className="h-8 px-3 rounded-full border border-neutral-200 text-[10px] font-black uppercase text-neutral-500"
                       >
-                        Annuler
+                        {t("centre", "identityCancel")}
                       </button>
                     </div>
                   )
@@ -1578,7 +1579,7 @@ export default function GradeBookPage() {
                   <>
                     <span className="text-neutral-300">·</span>
                     <span className={`font-black ${scoreToneTextClass(scoreTone(classAvg, bareme))}`}>
-                      Moy. classe {classAvg.toFixed(2)}/{bareme}
+                      {t("centre", "notesClassAverage", { avg: classAvg.toFixed(2), scale: bareme })}
                     </span>
                   </>
                 )}
@@ -1589,14 +1590,14 @@ export default function GradeBookPage() {
               <div className="mb-3 p-3 bg-white border border-neutral-200 rounded-xl shadow-sm space-y-2">
                 <div className="flex items-center justify-between gap-2 min-w-0">
                   <p className="text-[11px] font-black truncate" style={{ color: BLUE }}>
-                    Formule — {selectedSubject?.discipline_name}
+                    {t("centre", "notesFormulaTitle", { name: selectedSubject?.discipline_name || "" })}
                   </p>
                   <button
                     type="button"
                     onClick={() => setFormulaOpen(false)}
                     className="shrink-0 text-[9px] font-black uppercase text-neutral-400 hover:text-neutral-600"
                   >
-                    Fermer
+                    {t("centre", "bulletinClose")}
                   </button>
                 </div>
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -1609,7 +1610,7 @@ export default function GradeBookPage() {
                         : "bg-white text-neutral-600 border-neutral-200"
                     }`}
                   >
-                    Simple ÷ N
+                    {t("centre", "notesFormulaSimple")}
                   </button>
                   <button
                     type="button"
@@ -1767,7 +1768,7 @@ export default function GradeBookPage() {
                       {t("centre", "notesAverage")}
                     </span>
                     <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 text-center pb-1.5" title={t("centre", "notesPdfTranscript")}>
-                      PDF
+                      {t("centre", "notesPdfColumn")}
                     </span>
                   </div>
 
@@ -1862,7 +1863,7 @@ export default function GradeBookPage() {
             {filteredRows.length > 0 && (
               <div className="flex items-center justify-between mt-4 px-1">
                 <p className="text-[10px] font-bold text-neutral-400 max-w-xl leading-snug">
-                  {filteredRows.length} élève{filteredRows.length > 1 ? "s" : ""}
+                  {t("centre", filteredRows.length === 1 ? "notesStudentCountOne" : "notesStudentCountMany", { count: filteredRows.length })}
                   {" — "}
                   {formulaHint}
                 </p>

@@ -17,8 +17,12 @@ function cacheKey(params: Record<string, string>) {
   return new URLSearchParams(params).toString();
 }
 
-export function peekReportsBundle(params: Record<string, string>): ReportsBundle | null {
-  if (cached?.key === cacheKey(params)) return cached.data;
+export function peekReportsBundle(
+  params: Record<string, string>,
+  locale: "fr" | "en" = "fr",
+): ReportsBundle | null {
+  const key = cacheKey({ ...params, locale: locale === "en" ? "en" : "fr" });
+  if (cached?.key === key) return cached.data;
   return null;
 }
 
@@ -30,9 +34,11 @@ export function invalidateReportsBundle() {
 export async function fetchReportsBundle(
   token: string,
   params: Record<string, string>,
-  opts?: { force?: boolean },
+  opts?: { force?: boolean; locale?: "fr" | "en" },
 ): Promise<ReportsBundle> {
-  const key = cacheKey(params);
+  const locale = opts?.locale === "en" ? "en" : "fr";
+  const keyedParams = { ...params, locale };
+  const key = cacheKey(keyedParams);
 
   if (!opts?.force && cached?.key === key) return cached.data;
 
@@ -41,8 +47,9 @@ export async function fetchReportsBundle(
   inflight = (async () => {
     try {
       const data = await fetchCenterApi<ReportsBundle>(BUNDLE_PATH, token, {
-        params,
+        params: keyedParams,
         force: true,
+        headers: { "X-Nexa-Locale": locale },
       });
       cached = { key, data };
       return data;

@@ -5,7 +5,7 @@ import { Loader2, Layers } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import {
-  passageDecisionLabelFr,
+  passageDecisionLabel,
   type PassageDecision,
 } from "@/app/utils/cursus-passage";
 
@@ -56,20 +56,25 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
       if (!session) throw new Error(t("centre", "passageSessionExpired"));
       const res = await fetch(
         `/api/centre/passage-niveau?enrollment_id=${encodeURIComponent(enrollmentId)}`,
-        { headers: { Authorization: `Bearer ${session.access_token}` } },
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "x-nexa-locale": locale,
+          },
+        },
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(locale === "en" ? t("centre", "passageLoadError") : (data.error || t("centre", "passageLoadError")));
+      if (!res.ok) throw new Error(data.error || t("centre", "passageLoadError"));
       setPreview(data);
       setAcademicYear(data.proposed_academic_year || "");
       setReason("");
     } catch (e: unknown) {
-      setError(locale === "en" ? t("centre", "passageError") : (e instanceof Error ? e.message : t("centre", "passageError")));
+      setError(e instanceof Error ? e.message : t("centre", "passageError"));
       setPreview(null);
     } finally {
       setLoading(false);
     }
-  }, [enrollmentId, t]);
+  }, [enrollmentId, locale, t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -93,6 +98,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
+          "x-nexa-locale": locale,
         },
         body: JSON.stringify({
           enrollment_id: enrollmentId,
@@ -102,7 +108,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(locale === "en" ? t("centre", "passageDecisionError") : (data.error || t("centre", "passageDecisionError")));
+      if (!res.ok) throw new Error(data.error || t("centre", "passageDecisionError"));
       setDoneMsg(
         decision === "admis"
           ? t("centre", "passageAdmittedSuccess")
@@ -113,7 +119,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
       await load();
       onDone();
     } catch (e: unknown) {
-      setError(locale === "en" ? t("centre", "passageError") : (e instanceof Error ? e.message : t("centre", "passageError")));
+      setError(e instanceof Error ? e.message : t("centre", "passageError"));
     } finally {
       setSaving(false);
     }
@@ -132,6 +138,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${session.access_token}`,
+          "x-nexa-locale": locale,
         },
         body: JSON.stringify({
           enrollment_id: enrollmentId,
@@ -139,12 +146,12 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(locale === "en" ? t("centre", "passageCancelDeferredError") : (data.error || t("centre", "passageCancelDeferredError")));
+      if (!res.ok) throw new Error(data.error || t("centre", "passageCancelDeferredError"));
       setDoneMsg(t("centre", "passageDeferredCancelled"));
       await load();
       onDone();
     } catch (e: unknown) {
-      setError(locale === "en" ? t("centre", "passageError") : (e instanceof Error ? e.message : t("centre", "passageError")));
+      setError(e instanceof Error ? e.message : t("centre", "passageError"));
     } finally {
       setSaving(false);
     }
@@ -238,7 +245,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
         {preview.passage_decision && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 space-y-1">
             <p className="text-sm font-semibold text-emerald-900">
-              {t("centre", "passageDecision")} {locale === "fr" ? passageDecisionLabelFr(preview.passage_decision) : preview.passage_decision === "admis" ? t("centre", "studentsPassed") : preview.passage_decision === "redouble" ? t("centre", "studentsRepeats") : t("centre", "studentsDeferred")}
+              {t("centre", "passageDecision")} {passageDecisionLabel(preview.passage_decision, locale)}
             </p>
             {preview.passage_reason && (
               <p className="text-sm font-medium text-emerald-800">{t("centre", "passageReason")} {preview.passage_reason}</p>

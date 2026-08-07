@@ -26,7 +26,7 @@ type CenterProfile = {
 };
 
 const ROLE_KEYS: Record<string, string> = {
-  center_manager: "membersRoleDirector", campus_manager: "membersRoleCampusDirector", staff: "staffAdministrative",
+  center_manager: "membersRoleDirector", campus_manager: "membersRoleCampusDirector", staff: "roleAdministratif",
   trainer: "accountRoleTrainer", student: "membersRoleStudent", admin: "membersRoleNexaAdmin",
 };
 

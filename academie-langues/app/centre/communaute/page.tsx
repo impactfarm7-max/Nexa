@@ -26,7 +26,7 @@ type MsgParsed = { type: "text" | "image" | "file"; content: string; filename?: 
 function formatTime(d: string, locale = "fr") {
   return new Date(d).toLocaleTimeString(locale === "en" ? "en-US" : "fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
-function formatDateSep(d: string, locale = "fr", today = "Aujourd'hui", yesterday = "Hier") {
+function formatDateSep(d: string, locale: string, today: string, yesterday: string) {
   const dt = new Date(d);
   const now = new Date();
   const yest = new Date(); yest.setDate(yest.getDate() - 1);
@@ -47,7 +47,7 @@ function parseMsg(raw: string): MsgParsed {
   if (raw.startsWith("__img__:")) return { type: "image", content: raw.slice(8) };
   if (raw.startsWith("__file__:")) {
     const idx = raw.indexOf("::", 9);
-    return { type: "file", content: raw.slice(9, idx < 0 ? undefined : idx), filename: idx >= 0 ? raw.slice(idx + 2) : "Fichier" };
+    return { type: "file", content: raw.slice(9, idx < 0 ? undefined : idx), filename: idx >= 0 ? raw.slice(idx + 2) : "" };
   }
   return { type: "text", content: raw };
 }
@@ -511,7 +511,7 @@ function CommunauteCenterContent() {
         <a href={parsed.content} target="_blank" rel="noopener noreferrer"
           className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-xs font-bold transition-colors ${isMe ? "bg-white/10 border-white/20 text-white hover:bg-white/20" : "bg-neutral-50 border-neutral-200 text-neutral-700 hover:bg-neutral-100"}`}>
           <FileText size={18} className="shrink-0 opacity-80" />
-          <span className="truncate max-w-[160px]">{parsed.filename}</span>
+          <span className="truncate max-w-[160px]">{parsed.filename || t("centre", "communityFile")}</span>
           <Download size={13} className="shrink-0 opacity-60" />
         </a>
       );
@@ -553,7 +553,7 @@ function CommunauteCenterContent() {
                 value={newGroupName}
                 onChange={e => setNewGroupName(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && createAdminGroup()}
-                placeholder="Ex. Staff, Promo 2025, Alumni…"
+                placeholder={t("centre", "communityGroupNamePlaceholder")}
                 autoFocus
                 className="w-full h-10 px-3 rounded-lg border border-neutral-200 bg-white text-sm text-neutral-800 outline-none mb-4 focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400"
               />
@@ -695,7 +695,7 @@ function CommunauteCenterContent() {
                                 <span className="text-[10px] font-bold text-neutral-500">{authorName}</span>
                                 {isStaffMsg && (
                                   <span className="text-[8px] px-1.5 py-0.5 rounded font-black uppercase" style={{ backgroundColor: BLUE, color: ORANGE }}>
-                                    {authorRole === "trainer" ? "Prof" : "Staff"}
+                                    {authorRole === "trainer" ? t("centre", "communityTrainerBadge") : t("centre", "communityStaffBadge")}
                                   </span>
                                 )}
                               </div>
@@ -823,7 +823,7 @@ function CommunauteCenterContent() {
               value={newGroupName}
               onChange={e => setNewGroupName(e.target.value)}
               onKeyDown={e => e.key === "Enter" && createAdminGroup()}
-              placeholder="Ex. Staff, Promo 2025, Alumni…"
+              placeholder={t("centre", "communityGroupNamePlaceholder")}
               autoFocus
               className="w-full h-10 px-3 rounded-lg border border-neutral-200 bg-white text-sm text-neutral-800 outline-none mb-4 focus:ring-2 focus:ring-neutral-900/10 focus:border-neutral-400"
             />

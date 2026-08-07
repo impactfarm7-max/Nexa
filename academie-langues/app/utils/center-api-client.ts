@@ -20,7 +20,11 @@ export function clearCenterApiCache(prefix?: string) {
 export async function fetchCenterApi<T>(
   path: string,
   token: string,
-  options?: { force?: boolean; params?: Record<string, string> },
+  options?: {
+    force?: boolean;
+    params?: Record<string, string>;
+    headers?: Record<string, string>;
+  },
 ): Promise<T> {
   const key = cacheKey(path, options?.params);
   if (!options?.force) {
@@ -34,13 +38,21 @@ export async function fetchCenterApi<T>(
   }
 
   const res = await fetch(url.toString(), {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(options?.headers || {}),
+    },
     cache: "no-store",
   });
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error || `Erreur ${res.status}`);
+    const headerLocale = options?.headers?.["X-Nexa-Locale"] ?? options?.headers?.["x-nexa-locale"];
+    const isEn = headerLocale === "en";
+    throw new Error(
+      (body as { error?: string }).error ||
+        (isEn ? `Error ${res.status}` : `Erreur ${res.status}`),
+    );
   }
 
   const data = (await res.json()) as T;

@@ -34,6 +34,7 @@ export default function ReportsHubNav({ activeSlug, centerType = null, querySuff
     recouvrement: { label: "reportsNavRecovery", description: "reportsDescRecovery" },
     retards: { label: "reportsNavOverdue", description: "reportsDescOverdue" },
     "reductions-coupons": { label: "reportsNavDiscounts", description: "reportsDescDiscounts" },
+    examens: { label: "reportsNavExams", description: "reportsDescExams" },
   };
   const cards = filterReportHub(centerType);
   const liveBySection = SECTION_ORDER.map((section) => ({

@@ -126,7 +126,10 @@ test("aucune salle → emptyReason none", () => {
 });
 
 test("row preview utilise lastMessages ou fallback", () => {
-  const { sections } = buildCommunauteInbox(base);
+  const { sections } = buildCommunauteInbox({
+    ...base,
+    labels: { noMessage: "Aucun message" },
+  });
   const centerRow = sections[0].rows[0];
   assert.equal(centerRow.preview, "Bienvenue");
   assert.ok(centerRow.time);

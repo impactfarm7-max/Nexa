@@ -19,7 +19,19 @@ export type ReportFilters = {
   period: ReportPeriod;
   campusId: string | null;
   filiereId: string | null;
+  locale?: "fr" | "en";
 };
+
+export type ReportLocale = "fr" | "en";
+
+export function reportLocale(filters: ReportFilters | null | undefined): ReportLocale {
+  return filters?.locale === "en" ? "en" : "fr";
+}
+
+/** Bilingual label helper for report payloads. */
+export function rtl(locale: ReportLocale, fr: string, en: string) {
+  return locale === "en" ? en : fr;
+}
 
 type EnrollRow = {
   id: string;
@@ -340,11 +352,12 @@ export async function buildRetardsReport(centerId: string, filters: ReportFilter
   const montantRetard = sum(lateRows.map((r) => r.reste_a_payer));
 
   const agingKeys = ["current", "30d", "60d", "90d_plus"] as const;
+  const loc = reportLocale(filters);
   const agingLabels: Record<string, string> = {
-    current: "Courant",
-    "30d": "1–30 j",
-    "60d": "31–60 j",
-    "90d_plus": "90 j +",
+    current: rtl(loc, "Courant", "Current"),
+    "30d": rtl(loc, "1–30 j", "1–30 d"),
+    "60d": rtl(loc, "31–60 j", "31–60 d"),
+    "90d_plus": rtl(loc, "90 j +", "90 d +"),
   };
 
   const unpaid = rows.filter((r) => r.financial_status !== "paid" && r.financial_status !== "exempt");
@@ -424,39 +437,60 @@ function assembleSyntheseReport(
   const { effectifs, encaissements, recouvrement, retards, examens, filieres, personnel, paie } = parts;
 
   const alertes: { level: "danger" | "warning"; label: string; href: string }[] = [];
+  const loc = reportLocale(filters);
 
   if (retards.kpis.nbEnRetard > 0) {
     alertes.push({
       level: retards.kpis.montantRetard > 500_000 ? "danger" : "warning",
-      label: `${retards.kpis.nbEnRetard} dossier(s) en retard (${retards.kpis.montantRetard.toLocaleString("fr-FR")} FCFA)`,
+      label: rtl(
+        loc,
+        `${retards.kpis.nbEnRetard} dossier(s) en retard (${retards.kpis.montantRetard.toLocaleString("fr-FR")} FCFA)`,
+        `${retards.kpis.nbEnRetard} overdue record(s) (${retards.kpis.montantRetard.toLocaleString("en-US")} FCFA)`,
+      ),
       href: "/centre/rapports/retards",
     });
   }
   if (recouvrement.kpis.tauxRecouvrement < 70 && recouvrement.kpis.caFacture > 0) {
     alertes.push({
       level: "warning",
-      label: `Taux de recouvrement : ${recouvrement.kpis.tauxRecouvrement} %`,
+      label: rtl(
+        loc,
+        `Taux de recouvrement : ${recouvrement.kpis.tauxRecouvrement} %`,
+        `Recovery rate: ${recouvrement.kpis.tauxRecouvrement} %`,
+      ),
       href: "/centre/rapports/recouvrement",
     });
   }
   if (effectifs.kpis.draft > 0) {
     alertes.push({
       level: "warning",
-      label: `${effectifs.kpis.draft} inscription(s) en attente de validation`,
+      label: rtl(
+        loc,
+        `${effectifs.kpis.draft} inscription(s) en attente de validation`,
+        `${effectifs.kpis.draft} enrollment(s) awaiting validation`,
+      ),
       href: "/centre/rapports/effectifs-apprenants",
     });
   }
   if (filieres && filieres.kpis.draft > 0) {
     alertes.push({
       level: "warning",
-      label: `${filieres.kpis.draft} filière(s) en brouillon`,
+      label: rtl(
+        loc,
+        `${filieres.kpis.draft} filière(s) en brouillon`,
+        `${filieres.kpis.draft} draft program(s)`,
+      ),
       href: "/centre/rapports/filieres-programmes",
     });
   }
   if (personnel && personnel.kpis.suspended > 0) {
     alertes.push({
       level: "warning",
-      label: `${personnel.kpis.suspended} membre(s) du personnel suspendu(s)`,
+      label: rtl(
+        loc,
+        `${personnel.kpis.suspended} membre(s) du personnel suspendu(s)`,
+        `${personnel.kpis.suspended} suspended staff member(s)`,
+      ),
       href: "/centre/rapports/effectifs-personnel",
     });
   }
@@ -522,9 +556,9 @@ function assembleSyntheseReport(
         value: x.count,
       })),
       financeSplit: [
-        { label: "CA facturé", value: recouvrement.kpis.caFacture },
-        { label: "Encaissé", value: recouvrement.kpis.encaisse },
-        { label: "Reste", value: recouvrement.kpis.resteARecouvrer },
+        { label: rtl(loc, "CA facturé", "Invoiced revenue"), value: recouvrement.kpis.caFacture },
+        { label: rtl(loc, "Encaissé", "Collected"), value: recouvrement.kpis.encaisse },
+        { label: rtl(loc, "Reste", "Balance"), value: recouvrement.kpis.resteARecouvrer },
       ],
       recouvrementByFiliere: recouvrement.byFiliere.map((x) => ({
         label: x.label,
@@ -532,13 +566,13 @@ function assembleSyntheseReport(
       })),
     },
     summaryTable: [
-      { domaine: "Apprenants", indicateur: "Actifs", valeur: String(effectifs.kpis.active) },
-      { domaine: "Apprenants", indicateur: "Nouvelles inscriptions", valeur: String(effectifs.kpis.newInPeriod) },
-      { domaine: "Finance", indicateur: "Encaissé (période)", valeur: String(encaissements.kpis.totalEncaisse) },
-      { domaine: "Finance", indicateur: "Taux recouvrement", valeur: `${recouvrement.kpis.tauxRecouvrement} %` },
-      { domaine: "Finance", indicateur: "Reste à recouvrer", valeur: String(recouvrement.kpis.resteARecouvrer) },
-      { domaine: "Finance", indicateur: "Dossiers en retard", valeur: String(retards.kpis.nbEnRetard) },
-      { domaine: "Activité", indicateur: "Examens programmés", valeur: String(examens.kpis.programmes) },
+      { domaine: rtl(loc, "Apprenants", "Learners"), indicateur: rtl(loc, "Actifs", "Active"), valeur: String(effectifs.kpis.active) },
+      { domaine: rtl(loc, "Apprenants", "Learners"), indicateur: rtl(loc, "Nouvelles inscriptions", "New enrollments"), valeur: String(effectifs.kpis.newInPeriod) },
+      { domaine: rtl(loc, "Finance", "Finance"), indicateur: rtl(loc, "Encaissé (période)", "Collected (period)"), valeur: String(encaissements.kpis.totalEncaisse) },
+      { domaine: rtl(loc, "Finance", "Finance"), indicateur: rtl(loc, "Taux recouvrement", "Recovery rate"), valeur: `${recouvrement.kpis.tauxRecouvrement} %` },
+      { domaine: rtl(loc, "Finance", "Finance"), indicateur: rtl(loc, "Reste à recouvrer", "Outstanding"), valeur: String(recouvrement.kpis.resteARecouvrer) },
+      { domaine: rtl(loc, "Finance", "Finance"), indicateur: rtl(loc, "Dossiers en retard", "Overdue records"), valeur: String(retards.kpis.nbEnRetard) },
+      { domaine: rtl(loc, "Activité", "Activity"), indicateur: rtl(loc, "Examens programmés", "Scheduled exams"), valeur: String(examens.kpis.programmes) },
     ],
   };
 }
@@ -719,10 +753,12 @@ export async function buildFilieresReport(centerId: string, filters: ReportFilte
   const campusNameById = new Map((campusRows || []).map((c) => [c.id, c.name]));
 
   const byCampusMap = new Map<string, number>();
+  const loc = reportLocale(filters);
+  const unassigned = rtl(loc, "Non assigné", "Unassigned");
   for (const f of filieres) {
     const links = f.filiere_campus || [];
     if (links.length === 0) {
-      byCampusMap.set("Non assigné", (byCampusMap.get("Non assigné") || 0) + 1);
+      byCampusMap.set(unassigned, (byCampusMap.get(unassigned) || 0) + 1);
       continue;
     }
     for (const link of links) {
@@ -747,8 +783,12 @@ export async function buildFilieresReport(centerId: string, filters: ReportFilte
 
   const flatRows = filieres.map((f) => ({
     name: f.name,
-    type: f.type === "cursus" ? "Cursus" : f.type === "formation_courte" ? "Formation courte" : f.type || "—",
-    status: f.status === "published" ? "Publié" : "Brouillon",
+    type: f.type === "cursus"
+      ? rtl(loc, "Cursus", "Curriculum")
+      : f.type === "formation_courte"
+        ? rtl(loc, "Formation courte", "Short course")
+        : f.type || "—",
+    status: f.status === "published" ? rtl(loc, "Publié", "Published") : rtl(loc, "Brouillon", "Draft"),
     mode: f.mode || "—",
     niveaux: f.nb_niveaux ?? "—",
     effectifActif: activeByFiliere.get(f.id) || 0,
@@ -767,12 +807,12 @@ export async function buildFilieresReport(centerId: string, filters: ReportFilte
       newInPeriod,
     },
     byStatus: [
-      { label: "Publiées", count: published },
-      { label: "Brouillon", count: draft },
+      { label: rtl(loc, "Publiées", "Published"), count: published },
+      { label: rtl(loc, "Brouillon", "Draft"), count: draft },
     ],
     byType: [
-      { label: "Cursus", count: cursus },
-      { label: "Formation courte", count: courte },
+      { label: rtl(loc, "Cursus", "Curriculum"), count: cursus },
+      { label: rtl(loc, "Formation courte", "Short course"), count: courte },
     ],
     byCampus,
     rows: flatRows,
@@ -820,17 +860,20 @@ export async function buildPersonnelReport(centerId: string, filters: ReportFilt
     else suspended += 1;
   }
 
+  const loc = reportLocale(filters);
   const ROLE_LABEL: Record<string, string> = {
-    trainer: "Formateur",
-    staff: "Agent administratif",
-    campus_manager: "Directeur de campus",
+    trainer: rtl(loc, "Formateur", "Trainer"),
+    staff: rtl(loc, "Agent administratif", "Administrative staff"),
+    campus_manager: rtl(loc, "Directeur de campus", "Campus manager"),
   };
 
   const rows = staff.map((s) => ({
     name: `${s.prenom || ""} ${s.nom || ""}`.trim(),
     role: ROLE_LABEL[s.role] || s.role,
-    category: ACADEMIC_ROLES.has(s.role) ? "Académique" : "Administratif",
-    status: s.center_status === "active" ? "Actif" : "Suspendu",
+    category: ACADEMIC_ROLES.has(s.role)
+      ? rtl(loc, "Académique", "Academic")
+      : rtl(loc, "Administratif", "Administrative"),
+    status: s.center_status === "active" ? rtl(loc, "Actif", "Active") : rtl(loc, "Suspendu", "Suspended"),
     jobTitle: s.job_title || "—",
     baseSalary: Number(s.base_salary) || 0,
   }));
@@ -846,8 +889,8 @@ export async function buildPersonnelReport(centerId: string, filters: ReportFilt
     },
     byRole: groupCount(rows, (r) => r.role, (r) => r.role),
     byCategory: [
-      { label: "Académique", count: academic },
-      { label: "Administratif", count: administrative },
+      { label: rtl(loc, "Académique", "Academic"), count: academic },
+      { label: rtl(loc, "Administratif", "Administrative"), count: administrative },
     ],
     rows,
   };
@@ -871,10 +914,15 @@ export async function buildMasseSalarialeReport(centerId: string, filters: Repor
     .order("period_ym", { ascending: false });
 
   if (pErr && isMissingPayrollTable(pErr)) {
+    const loc = reportLocale(filters);
     return {
       period: filters.period,
       available: false as const,
-      message: "Tables paie absentes — exécutez supabase-staff-payroll.sql dans Supabase.",
+      message: rtl(
+        loc,
+        "Tables paie absentes — exécutez supabase-staff-payroll.sql dans Supabase.",
+        "Payroll tables missing — run supabase-staff-payroll.sql in Supabase.",
+      ),
       kpis: {
         netTotal: 0,
         brutTotal: 0,
@@ -998,10 +1046,11 @@ export async function buildMasseSalarialeReport(centerId: string, filters: Repor
     });
   }
 
+  const loc = reportLocale(filters);
   const STATUS_LABEL: Record<string, string> = {
-    draft: "Brouillon",
-    validated: "Validé",
-    paid: "Payé",
+    draft: rtl(loc, "Brouillon", "Draft"),
+    validated: rtl(loc, "Validé", "Validated"),
+    paid: rtl(loc, "Payé", "Paid"),
   };
 
   return {
@@ -1085,11 +1134,12 @@ export async function buildExamensReport(
       participations = (assigns || []).filter((a) => a.status === "completed").length;
     }
 
+    const loc = reportLocale(filters);
     const STATUS_UI: Record<string, string> = {
-      planned: "Programmé",
-      open: "Ouvert",
-      closed: "Réalisé",
-      cancelled: "Annulé",
+      planned: rtl(loc, "Programmé", "Scheduled"),
+      open: rtl(loc, "Ouvert", "Open"),
+      closed: rtl(loc, "Réalisé", "Completed"),
+      cancelled: rtl(loc, "Annulé", "Cancelled"),
     };
 
     return {
@@ -1106,20 +1156,22 @@ export async function buildExamensReport(
         totalSessions: sessions.length,
       },
       byStatus: [
-        { label: "Programmés", count: programmes },
-        { label: "En cours", count: enCours },
-        { label: "Réalisés", count: realises },
-        { label: "Annulés", count: annules },
+        { label: rtl(loc, "Programmés", "Scheduled"), count: programmes },
+        { label: rtl(loc, "En cours", "In progress"), count: enCours },
+        { label: rtl(loc, "Réalisés", "Completed"), count: realises },
+        { label: rtl(loc, "Annulés", "Cancelled"), count: annules },
       ],
       rows: sessions.map((s) => ({
         title: s.title,
         examenId: s.examen_id,
         date: s.scheduled_at.slice(0, 10),
-        heure: new Date(s.scheduled_at).toLocaleTimeString("fr-FR", {
+        heure: new Date(s.scheduled_at).toLocaleTimeString(loc === "en" ? "en-US" : "fr-FR", {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        type: s.session_type === "exceptional" ? "Exceptionnel" : "Planifié",
+        type: s.session_type === "exceptional"
+          ? rtl(loc, "Exceptionnel", "Exceptional")
+          : rtl(loc, "Planifié", "Planned"),
         status: STATUS_UI[s.status] || s.status,
         student: "—",
       })),
@@ -1182,10 +1234,11 @@ export async function buildExamensReport(
     else enCours += 1;
   }
 
+  const loc = reportLocale(filters);
   const STATUS_UI: Record<string, string> = {
-    in_progress: "En cours",
-    completed: "Réalisé",
-    abandoned: "Abandonné",
+    in_progress: rtl(loc, "En cours", "In progress"),
+    completed: rtl(loc, "Réalisé", "Completed"),
+    abandoned: rtl(loc, "Abandonné", "Abandoned"),
   };
 
   return {
@@ -1202,21 +1255,21 @@ export async function buildExamensReport(
       totalSessions: genericSessions.length,
     },
     byStatus: [
-      { label: "En cours", count: enCours },
-      { label: "Réalisés", count: realises },
-      { label: "Abandonnés", count: annules },
+      { label: rtl(loc, "En cours", "In progress"), count: enCours },
+      { label: rtl(loc, "Réalisés", "Completed"), count: realises },
+      { label: rtl(loc, "Abandonnés", "Abandoned"), count: annules },
     ],
     rows: genericSessions.map((s) => {
       const p = profileMap.get(s.user_id);
       return {
-        title: `Examen n° ${s.examen_id}`,
+        title: rtl(loc, `Examen n° ${s.examen_id}`, `Exam #${s.examen_id}`),
         examenId: s.examen_id,
         date: s.started_at.slice(0, 10),
-        heure: new Date(s.started_at).toLocaleTimeString("fr-FR", {
+        heure: new Date(s.started_at).toLocaleTimeString(loc === "en" ? "en-US" : "fr-FR", {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        type: "Simulateur",
+        type: rtl(loc, "Simulateur", "Simulator"),
         status: STATUS_UI[s.status] || s.status,
         student: p ? `${p.prenom || ""} ${p.nom || ""}`.trim() : "—",
       };

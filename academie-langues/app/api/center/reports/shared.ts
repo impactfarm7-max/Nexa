@@ -4,12 +4,32 @@ import { parseReportFilters } from "@/app/utils/reports-period";
 
 const FULL_ACCESS_ROLES = new Set(["admin", "center_manager", "campus_manager", "manager"]);
 
+type ReportLocale = "fr" | "en";
+
+function reqLocale(req: Request): ReportLocale {
+  return req.headers.get("x-nexa-locale") === "en" ? "en" : "fr";
+}
+
+function msg(locale: ReportLocale, fr: string, en: string) {
+  return locale === "en" ? en : fr;
+}
+
+export function reportsCatchError(req: Request, e: unknown) {
+  const locale = reqLocale(req);
+  const message =
+    e instanceof Error ? e.message : msg(locale, "Erreur serveur", "Server error");
+  return NextResponse.json({ error: message }, { status: 500 });
+}
+
 export async function getReportsContext(req: Request) {
+  const locale = reqLocale(req);
   const { ctx, error } = await getCenterStaffContext(req);
-  if (error) return { ctx: null, filters: null, error };
+  if (error) return { ctx: null, filters: null, locale, error };
+
+  const filters = { ...parseReportFilters(new URL(req.url), locale), locale };
 
   if (FULL_ACCESS_ROLES.has(ctx!.role)) {
-    return { ctx, filters: parseReportFilters(new URL(req.url)), error: null };
+    return { ctx, filters, locale, error: null };
   }
 
   const { data: membership } = await supabaseAdmin
@@ -31,12 +51,16 @@ export async function getReportsContext(req: Request) {
       return {
         ctx: null,
         filters: null,
-        error: NextResponse.json({ error: "Accès rapports refusé." }, { status: 403 }),
+        locale,
+        error: NextResponse.json(
+          { error: msg(locale, "Accès rapports refusé.", "Reports access denied.") },
+          { status: 403 },
+        ),
       };
     }
   }
 
-  return { ctx, filters: parseReportFilters(new URL(req.url)), error: null };
+  return { ctx, filters, locale, error: null };
 }
 
 export type FinanceSummaryRow = {

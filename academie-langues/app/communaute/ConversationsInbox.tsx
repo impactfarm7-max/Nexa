@@ -28,7 +28,8 @@ export default function ConversationsInbox({
   initialOpenUserId?: string | null;
   onUnreadCountChange?: (count: number) => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [activeOtherId, setActiveOtherId] = useState<string | null>(null);
@@ -218,7 +219,7 @@ export default function ConversationsInbox({
                 {showDate && (
                   <div className="text-center my-2">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1 rounded-full">
-                      {new Date(msg.created_at).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short" })}
+                      {new Date(msg.created_at).toLocaleDateString(dateLocale, { weekday: "short", day: "numeric", month: "short" })}
                     </span>
                   </div>
                 )}
@@ -226,8 +227,8 @@ export default function ConversationsInbox({
                   <div className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-sm ${isMe ? "bg-slate-900 text-white rounded-br-sm" : "bg-white border border-slate-200 text-slate-800 rounded-bl-sm"}`}>
                     <p className="leading-relaxed">{msg.message}</p>
                     <p className="text-[10px] mt-1 text-slate-400">
-                      {new Date(msg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                      {isMe && msg.read_at && <span className="ml-1">· Lu</span>}
+                      {new Date(msg.created_at).toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" })}
+                      {isMe && msg.read_at && <span className="ml-1">· {t("dashboard", "messagesReadIndicator")}</span>}
                     </p>
                   </div>
                 </div>
@@ -244,7 +245,7 @@ export default function ConversationsInbox({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            placeholder={`Message à ${activeOtherInfo?.prenom || ""}...`}
+            placeholder={t("dashboard", "communauteMessageTo", { name: activeOtherInfo?.prenom || "" })}
             className="flex-1 bg-slate-100 rounded-3xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-slate-900/10 resize-none overflow-y-auto"
             style={{ maxHeight: "200px", minHeight: "40px" }}
           />
@@ -264,17 +265,17 @@ export default function ConversationsInbox({
           <button onClick={() => setPickerOpen(false)} className="p-2 -ml-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100">
             <ChevronLeft size={18} />
           </button>
-          <p className="font-bold text-slate-900 text-sm">Nouvelle conversation</p>
+          <p className="font-bold text-slate-900 text-sm">{t("dashboard", "communauteNewConversation")}</p>
         </div>
         <div className="px-4 py-3 border-b border-slate-100">
           <div className="flex items-center gap-2 bg-slate-100 rounded-2xl px-3 py-2">
             <Search size={14} className="text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher..." className="flex-1 bg-transparent outline-none text-sm" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("dashboard", "communauteSearchEllipsis")} className="flex-1 bg-transparent outline-none text-sm" />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {filteredUsers.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-10 font-medium px-6">Aucun contact partagé pour l'instant — rejoins une salle pour pouvoir écrire à quelqu'un.</p>
+            <p className="text-sm text-slate-400 text-center py-10 font-medium px-6">{t("dashboard", "communauteNoSharedContacts")}</p>
           ) : (
             filteredUsers.map((u) => (
               <button key={u.id} onClick={() => openConversation(u.id, u)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left border-b border-slate-50">
@@ -283,7 +284,7 @@ export default function ConversationsInbox({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-800 truncate">{u.prenom}</p>
-                  {isProfessor(u.role) && <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">Professeur</p>}
+                  {isProfessor(u.role) && <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">{t("dashboard", "communauteProfessor")}</p>}
                 </div>
               </button>
             ))
@@ -297,7 +298,7 @@ export default function ConversationsInbox({
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
-        <p className="font-bold text-slate-900 text-sm">Messages privés</p>
+        <p className="font-bold text-slate-900 text-sm">{t("dashboard", "communautePrivateMessages")}</p>
         <button onClick={openPicker} className="p-2 bg-orange-50 text-orange-600 rounded-full hover:bg-orange-100">
           <MessageCircle size={16} />
         </button>
@@ -306,13 +307,13 @@ export default function ConversationsInbox({
         {loadingList ? (
           <div className="flex items-center justify-center py-16 gap-2 text-slate-400">
             <RefreshCcw size={16} className="animate-spin" />
-            <span className="text-sm">Chargement...</span>
+            <span className="text-sm">{t("centre", "communityLoading")}</span>
           </div>
         ) : conversations.length === 0 ? (
           <div className="text-center py-16 space-y-3 px-6">
             <MessageCircle size={32} className="mx-auto text-slate-300" />
-            <p className="font-bold text-slate-700 text-sm">Aucune conversation</p>
-            <button onClick={openPicker} className="text-xs font-bold text-orange-600">Démarrer une conversation →</button>
+            <p className="font-bold text-slate-700 text-sm">{t("dashboard", "communauteNoConversations")}</p>
+            <button onClick={openPicker} className="text-xs font-bold text-orange-600">{t("dashboard", "communauteStartConversation")}</button>
           </div>
         ) : (
           conversations.map((c) => (
@@ -323,7 +324,7 @@ export default function ConversationsInbox({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-bold text-slate-900 truncate">{c.prenom}</p>
-                  <span className="text-[10px] text-slate-400 shrink-0">{new Date(c.lastAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}</span>
+                  <span className="text-[10px] text-slate-400 shrink-0">{new Date(c.lastAt).toLocaleDateString(dateLocale, { day: "2-digit", month: "2-digit" })}</span>
                 </div>
                 <p className="text-xs text-slate-400 truncate">{c.lastMessage}</p>
               </div>

@@ -14,12 +14,9 @@ import ProfileAvatar from "@/app/components/ProfileAvatar";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
 import RoomSettingsDrawer from "./RoomSettingsDrawer";
+import ConversationsInbox from "./ConversationsInbox";
 const EDIT_WINDOW_MS = 2 * 60 * 1000;
-const PIN_DURATIONS = [
-  { days: 1, label: "1 jour" },
-  { days: 15, label: "15 jours" },
-  { days: 30, label: "30 jours" },
-];
+const PIN_DURATION_DAYS = [15, 30];
 
 function isMessagePinned(msg: any) {
   if (!msg.pinned) return false;
@@ -47,19 +44,18 @@ function formatTime(dateStr: string, locale = "fr") {
   return new Date(dateStr).toLocaleTimeString(locale === "en" ? "en-US" : "fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatDateSeparator(dateStr: string, locale = "fr") {
+function formatDateSeparator(dateStr: string, locale = "fr", todayLabel: string, yesterdayLabel: string) {
   const d = new Date(dateStr);
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return locale === "en" ? "Today" : "Aujourd'hui";
-  if (d.toDateString() === yesterday.toDateString()) return locale === "en" ? "Yesterday" : "Hier";
+  if (d.toDateString() === today.toDateString()) return todayLabel;
+  if (d.toDateString() === yesterday.toDateString()) return yesterdayLabel;
   return d.toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { weekday: "long", day: "numeric", month: "long" });
 }
 
 function CommunauteContent() {
-  const { locale } = useI18n();
-  const en = locale === "en";
+  const { t, locale } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -68,11 +64,11 @@ function CommunauteContent() {
   const [user, setUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [centerId, setCenterId] = useState<string | null>(null);
-  const [centerName, setCenterName] = useState("votre établissement");
+  const [centerName, setCenterName] = useState("");
   const [centerType, setCenterType] = useState<string | null>(null);
   const [userRole, setUserRole] = useState("student");
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
-  const [userPrenom, setUserPrenom] = useState("Étudiant");
+  const [userPrenom, setUserPrenom] = useState("");
   const [loading, setLoading] = useState(true);
   const [sidebarSearch, setSidebarSearch] = useState("");
 
@@ -107,6 +103,7 @@ function CommunauteContent() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [pinnedModalOpen, setPinnedModalOpen] = useState(false);
   const [didApplyDeepLink, setDidApplyDeepLink] = useState(false);
+  const [privateInboxOpen, setPrivateInboxOpen] = useState(false);
 
   const [newMessage, setNewMessage] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -148,12 +145,12 @@ function CommunauteContent() {
         if (profile.center_id) {
           setCenterId(profile.center_id);
           const center = profile.centers as { name?: string; center_type?: string } | null;
-          setCenterName(center?.name || "votre établissement");
+          setCenterName(center?.name || t("dashboard", "communauteYourEstablishment"));
           setCenterType(center?.center_type || null);
         }
       }
 
-      await supabase.from("profiles").update({ current_activity: "Dans la Communauté 💬" }).eq("id", session.user.id);
+      await supabase.from("profiles").update({ current_activity: t("dashboard", "communauteActivity") }).eq("id", session.user.id);
       logClientActivity("Ouverture communaute");
 
       setLoading(false);
@@ -251,7 +248,7 @@ function CommunauteContent() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_messages", filter: `room_id=eq.${activeRoom.id}` },
         async (payload) => {
           const { data: profileData } = await supabase.from("profiles").select("prenom, role, avatar_url").eq("id", payload.new.user_id).single();
-          let newMsg: any = { ...payload.new, profiles: profileData || { prenom: "Inconnu", role: "student", avatar_url: null } };
+          let newMsg: any = { ...payload.new, profiles: profileData || { prenom: t("centre", "communityUnknown"), role: "student", avatar_url: null } };
           if (payload.new.replied_to_id) {
             const { data: parentData } = await supabase
               .from("community_messages")
@@ -321,7 +318,7 @@ function CommunauteContent() {
         if (!error) {
           setMessages((prev) => prev.map((m) => (m.id === editingId ? { ...m, message: newMessage.trim(), edited: true } : m)));
           logClientActivity("Message communaute modifie");
-        } else alert("Erreur lors de la modification.");
+        } else alert(t("dashboard", "communauteEditError"));
         setEditingId(null);
       } else {
         const { error } = await supabase.from("community_messages").insert([{
@@ -331,7 +328,7 @@ function CommunauteContent() {
           center_id: activeRoom.center_id,
           replied_to_id: repliedToMessage?.id || null,
         }]);
-    if (error) alert(`${en ? "Send error" : "Erreur d'envoi"} : ${error.message}`);
+    if (error) alert(`${t("dashboard", "communauteSendError")} : ${error.message}`);
         else logClientActivity("Message communaute envoye");
       }
       setNewMessage("");
@@ -352,10 +349,10 @@ function CommunauteContent() {
 
   const deleteMessage = async (messageId: string) => {
     setOpenMenuId(null);
-    if (!window.confirm(en ? "Are you sure you want to delete this message?" : "Voulez-vous vraiment supprimer ce message ?")) return;
+    if (!window.confirm(t("centre", "communityDeleteConfirm"))) return;
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
     const { error } = await supabase.from("community_messages").delete().eq("id", messageId);
-    if (error) { alert("Erreur lors de la suppression."); if (activeRoom) fetchMessages(activeRoom.id); }
+    if (error) { alert(t("dashboard", "communauteDeleteError")); if (activeRoom) fetchMessages(activeRoom.id); }
   };
 
   const updateMessagePin = async (msg: any, durationDays: number | null) => {
@@ -381,7 +378,13 @@ function CommunauteContent() {
   };
 
   const handleSelectRoom = (room: CommunityRoom) => {
+    setPrivateInboxOpen(false);
     setActiveRoom(room);
+    setMobileRoomsOpen(false);
+  };
+
+  const openPrivateInbox = () => {
+    setPrivateInboxOpen(true);
     setMobileRoomsOpen(false);
   };
 
@@ -390,7 +393,7 @@ function CommunauteContent() {
 
   const renderSidebarRoom = (room: CommunityRoom, sectionLabel: string) => {
     if (!matchesSidebarSearch(room.name) && !matchesSidebarSearch(sectionLabel)) return null;
-    const isActive = activeRoom?.id === room.id;
+    const isActive = !privateInboxOpen && activeRoom?.id === room.id;
     const iconEl =
       room.type === "announcement" ? (
         <Hash size={16} style={{ color: BRAND.orange }} />
@@ -425,7 +428,7 @@ function CommunauteContent() {
             className={`${STUDENT_TEXT.sidebarMeta} truncate mt-0.5`}
             style={{ color: isActive ? BRAND.orange : "#a3a3a3" }}
           >
-            {room.type === "announcement" ? (en ? "Center announcements" : "Annonces du centre") : (en ? "Classroom" : "Salle de classe")}
+            {room.type === "announcement" ? t("dashboard", "communauteCenterAnnouncements") : t("centre", "communityClassroom")}
           </p>
         </div>
       </button>
@@ -445,9 +448,9 @@ function CommunauteContent() {
       <div className="min-h-[100dvh] bg-[#FFFBF7] flex items-center justify-center p-6 font-sans">
         <div className="bg-white border border-orange-200 rounded-xl p-8 max-w-md text-center">
           <Users size={36} className="mx-auto text-orange-300 mb-4" />
-          <h2 className={`${STUDENT_TEXT.cardTitle} mb-2`} style={{ color: BRAND.blue }}>{en ? "Center community" : "Communauté centre"}</h2>
+          <h2 className={`${STUDENT_TEXT.cardTitle} mb-2`} style={{ color: BRAND.blue }}>{t("dashboard", "communauteCenterTitle")}</h2>
           <p className="text-sm text-neutral-500 leading-relaxed">
-            {en ? "The community space is reserved for students enrolled at a partner center." : "L’espace communautaire est réservé aux étudiants inscrits dans un centre partenaire."}
+            {t("dashboard", "communauteReservedBody")}
           </p>
         </div>
       </div>
@@ -476,8 +479,8 @@ function CommunauteContent() {
                 <Pin size={18} className="text-orange-600" />
               </div>
               <div className="flex-1">
-                <p className={`${STUDENT_TEXT.cardTitle} truncate`} style={{ color: BRAND.blue }}>{en ? "Pinned messages" : "Messages épinglés"}</p>
-                <p className="text-xs text-neutral-400">{getPinnedMessages().length} {en ? `message${getPinnedMessages().length !== 1 ? "s" : ""}` : `message${getPinnedMessages().length > 1 ? "s" : ""}`}</p>
+                <p className={`${STUDENT_TEXT.cardTitle} truncate`} style={{ color: BRAND.blue }}>{t("dashboard", "communautePinnedMessages")}</p>
+                <p className="text-xs text-neutral-400">{t("dashboard", "communauteMessageCount", { count: getPinnedMessages().length })}</p>
               </div>
               <button onClick={() => setPinnedModalOpen(false)} className="p-2 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-orange-50">
                 <X size={18} />
@@ -487,20 +490,20 @@ function CommunauteContent() {
               {getPinnedMessages().length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3 text-neutral-400">
                   <Pin size={36} className="opacity-20" />
-                  <p className="text-sm font-semibold">{en ? "No pinned messages" : "Aucun message épinglé"}</p>
+                  <p className="text-sm font-semibold">{t("dashboard", "communauteNoPinned")}</p>
                 </div>
               ) : getPinnedMessages().map((msg) => (
                 <button key={msg.id} onClick={() => scrollToMessage(msg.id)} className="w-full text-left p-4 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-colors group">
                   <div className="flex items-start gap-3 mb-2">
                     <ProfileAvatar
                       url={msg.profiles?.avatar_url}
-                      name={msg.profiles?.prenom || "Étudiant"}
+                      name={msg.profiles?.prenom || t("dashboard", "sidebarDefaultStudentName")}
                       role={msg.profiles?.role}
                       size="w-8 h-8"
                       rounded="rounded-lg"
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-neutral-600">{msg.profiles?.prenom || "Étudiant"}</p>
+                      <p className="text-xs font-bold text-neutral-600">{msg.profiles?.prenom || t("dashboard", "sidebarDefaultStudentName")}</p>
                       <p className="text-[10px] text-neutral-400">{formatTime(msg.created_at, locale)}</p>
                     </div>
                   </div>
@@ -524,14 +527,14 @@ function CommunauteContent() {
                 <MessageCircle size={18} style={{ color: BRAND.orange }} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`${STUDENT_TEXT.pageTitle} truncate`} style={{ color: BRAND.blue }}>{en ? "Rooms" : "Salles"} · {centerName}</p>
+                <p className={`${STUDENT_TEXT.pageTitle} truncate`} style={{ color: BRAND.blue }}>{t("dashboard", "communauteRooms")} · {centerName || t("dashboard", "communauteYourEstablishment")}</p>
                 <p className={STUDENT_TEXT.sidebarMeta} style={{ color: BRAND.orange }}>
-                  {visibleRooms.length} salle{visibleRooms.length > 1 ? "s" : ""}
+                  {t("dashboard", "communauteRoomCount", { count: visibleRooms.length })}
                 </p>
               </div>
               <button
                 onClick={() => setMobileRoomsOpen(false)}
-                aria-label={en ? "Close room list" : "Fermer la liste des salles"}
+                aria-label={t("dashboard", "communauteCloseRoomList")}
                 className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-orange-50 text-neutral-500"
               >
                 <X size={18} />
@@ -543,7 +546,7 @@ function CommunauteContent() {
                 <input
                   value={sidebarSearch}
                   onChange={(e) => setSidebarSearch(e.target.value)}
-                  placeholder={en ? "Search for a room…" : "Rechercher une salle…"}
+                  placeholder={t("dashboard", "communauteSearchRoom")}
                   className="w-full h-11 pl-9 pr-3 rounded-lg bg-[#FFFBF7] border border-orange-100 text-sm font-medium outline-none focus:border-orange-300 transition-colors"
                 />
               </div>
@@ -555,7 +558,7 @@ function CommunauteContent() {
                     className={`${STUDENT_TEXT.cardLabel} px-3 pt-2 pb-1.5 flex items-center gap-2`}
                     style={{ color: BRAND.orange }}
                   >
-                    <Megaphone size={12} style={{ color: BRAND.orange }} /> {en ? "Center group" : "Groupe du centre"}
+                    <Megaphone size={12} style={{ color: BRAND.orange }} /> {t("dashboard", "communauteCenterGroup")}
                   </p>
                   {centerForumRooms.map((r) => renderSidebarRoom(r, centerName))}
                 </div>
@@ -566,16 +569,34 @@ function CommunauteContent() {
                     className={`${STUDENT_TEXT.cardLabel} px-3 pt-2 pb-1.5 flex items-center gap-2`}
                     style={{ color: BRAND.blue }}
                   >
-                    <GraduationCap size={12} style={{ color: BRAND.blue }} /> {en ? "Classroom" : "Salle de classe"}
+                    <GraduationCap size={12} style={{ color: BRAND.blue }} /> {t("centre", "communityClassroom")}
                   </p>
-                  {classroomRooms.map((r) => renderSidebarRoom(r, en ? "Classroom" : "Salle de classe"))}
+                  {classroomRooms.map((r) => renderSidebarRoom(r, t("centre", "communityClassroom")))}
                 </div>
               )}
               {visibleRooms.length === 0 && (
                 <p className="text-sm text-neutral-400 text-center px-4 py-8 leading-relaxed">
-                  {en ? "No rooms are available at the moment." : "Aucune salle disponible pour le moment."}
+                  {t("dashboard", "communauteNoRooms")}
                 </p>
               )}
+            </div>
+            <div className="px-3 py-3 border-t border-orange-100 shrink-0">
+              <button
+                type="button"
+                onClick={openPrivateInbox}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left ${
+                  privateInboxOpen
+                    ? "bg-orange-50 border-orange-200"
+                    : "border-orange-100 bg-white hover:bg-orange-50/50"
+                }`}
+              >
+                <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0">
+                  <MessageCircle size={16} style={{ color: BRAND.orange }} />
+                </div>
+                <p className={`${STUDENT_TEXT.sidebarItem} ${STUDENT_TEXT.sidebarItemActive}`} style={{ color: BRAND.blue }}>
+                  {t("dashboard", "communautePrivateMessages")}
+                </p>
+              </button>
             </div>
           </div>
         </div>
@@ -589,8 +610,8 @@ function CommunauteContent() {
               <MessageCircle size={20} style={{ color: BRAND.orange }} />
             </div>
             <div className="min-w-0">
-              <p className={`${STUDENT_TEXT.cardLabel} leading-none mb-0.5`} style={{ color: BRAND.orange }}>{en ? "Community" : "Communauté"}</p>
-              <h2 className={`${STUDENT_TEXT.pageTitle} leading-tight truncate`} style={{ color: BRAND.blue }}>{centerName}</h2>
+              <p className={`${STUDENT_TEXT.cardLabel} leading-none mb-0.5`} style={{ color: BRAND.orange }}>{t("centre", "communityTitle")}</p>
+              <h2 className={`${STUDENT_TEXT.pageTitle} leading-tight truncate`} style={{ color: BRAND.blue }}>{centerName || t("dashboard", "communauteYourEstablishment")}</h2>
             </div>
           </div>
           <div className="relative">
@@ -598,7 +619,7 @@ function CommunauteContent() {
             <input
               value={sidebarSearch}
               onChange={(e) => setSidebarSearch(e.target.value)}
-              placeholder={en ? "Search…" : "Rechercher…"}
+              placeholder={t("dashboard", "communauteSearch")}
               className="w-full h-9 pl-8 pr-3 rounded-lg bg-[#FFFBF7] border border-orange-100 text-xs font-medium outline-none focus:border-orange-300 transition-colors"
             />
           </div>
@@ -611,7 +632,7 @@ function CommunauteContent() {
                 className={`${STUDENT_TEXT.cardLabel} px-3 pt-3 pb-1.5 flex items-center gap-2`}
                 style={{ color: BRAND.orange }}
               >
-                <Megaphone size={12} style={{ color: BRAND.orange }} /> {en ? "Center group" : "Groupe du centre"}
+                <Megaphone size={12} style={{ color: BRAND.orange }} /> {t("dashboard", "communauteCenterGroup")}
               </p>
               {centerForumRooms.map((r) => renderSidebarRoom(r, centerName))}
             </div>
@@ -623,32 +644,38 @@ function CommunauteContent() {
                 className={`${STUDENT_TEXT.cardLabel} px-3 pt-2 pb-1.5 flex items-center gap-2`}
                 style={{ color: BRAND.blue }}
               >
-                <GraduationCap size={12} style={{ color: BRAND.blue }} /> {en ? "Classroom" : "Salle de classe"}
+                <GraduationCap size={12} style={{ color: BRAND.blue }} /> {t("centre", "communityClassroom")}
               </p>
-              {classroomRooms.map((r) => renderSidebarRoom(r, en ? "Classroom" : "Salle de classe"))}
+              {classroomRooms.map((r) => renderSidebarRoom(r, t("centre", "communityClassroom")))}
             </div>
           )}
 
           {visibleRooms.length === 0 && (
             <p className="text-[11px] text-neutral-400 text-center px-4 py-6 leading-relaxed">
-              {en ? "No rooms are available at the moment. Contact your center if needed." : "Aucune salle disponible pour le moment. Contactez votre centre si besoin."}
+              {t("dashboard", "communauteNoRoomsContact")}
             </p>
           )}
         </div>
 
         <div className="px-3 py-3 border-t border-orange-100">
-          <div
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-orange-100 bg-neutral-50 opacity-75 cursor-not-allowed"
-            title={en ? "Coming soon" : "Bientôt disponible"}
+          <button
+            type="button"
+            onClick={openPrivateInbox}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-all text-left ${
+              privateInboxOpen
+                ? "bg-orange-50 border-orange-200"
+                : "border-orange-100 bg-white hover:bg-orange-50/50"
+            }`}
           >
-            <div className="w-10 h-10 rounded-xl bg-white border border-orange-100 flex items-center justify-center shrink-0">
-              <Lock size={16} className="text-neutral-400" />
+            <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0">
+              <MessageCircle size={16} style={{ color: BRAND.orange }} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`${STUDENT_TEXT.sidebarItem} ${STUDENT_TEXT.sidebarItemActive} text-neutral-500`}>{en ? "Private messages" : "Messages privés"}</p>
-              <p className={`${STUDENT_TEXT.sidebarMeta} text-neutral-400`}>{en ? "Coming soon" : "Bientôt disponible"}</p>
+              <p className={`${STUDENT_TEXT.sidebarItem} ${STUDENT_TEXT.sidebarItemActive}`} style={{ color: BRAND.blue }}>
+                {t("dashboard", "communautePrivateMessages")}
+              </p>
             </div>
-          </div>
+          </button>
         </div>
       </aside>
 
@@ -660,7 +687,7 @@ function CommunauteContent() {
             <button
               type="button"
               onClick={() => router.push("/dashboard")}
-              aria-label={en ? "Back to dashboard" : "Retour au tableau de bord"}
+              aria-label={t("dashboard", "supportBack")}
               className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-orange-200 bg-white text-neutral-700 active:scale-95 transition-transform"
             >
               <ArrowLeft size={18} />
@@ -668,7 +695,7 @@ function CommunauteContent() {
             <button
               type="button"
               onClick={() => setMobileRoomsOpen(true)}
-              aria-label={en ? "Open room list" : "Ouvrir la liste des salles"}
+              aria-label={t("dashboard", "communauteOpenRoomList")}
               className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-orange-200 bg-orange-50 text-neutral-700 active:scale-95 transition-transform"
             >
               <PanelLeft size={18} />
@@ -680,30 +707,46 @@ function CommunauteContent() {
                   type="button"
                   onClick={() => handleSelectRoom(room)}
                   className={`shrink-0 min-h-[44px] px-3.5 py-2 rounded-xl ${STUDENT_TEXT.tab} border transition-colors ${
-                    activeRoom?.id === room.id
+                    !privateInboxOpen && activeRoom?.id === room.id
                       ? `${STUDENT_TEXT.tabActive} bg-orange-500 text-white border-orange-500`
                       : "bg-white text-neutral-600 border-orange-200"
                   }`}
-                  style={activeRoom?.id === room.id ? undefined : { color: BRAND.blue }}
+                  style={!privateInboxOpen && activeRoom?.id === room.id ? undefined : { color: BRAND.blue }}
                 >
                   {room.name}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={openPrivateInbox}
+                className={`shrink-0 min-h-[44px] px-3.5 py-2 rounded-xl ${STUDENT_TEXT.tab} border transition-colors ${
+                  privateInboxOpen
+                    ? `${STUDENT_TEXT.tabActive} bg-orange-500 text-white border-orange-500`
+                    : "bg-white text-neutral-600 border-orange-200"
+                }`}
+                style={privateInboxOpen ? undefined : { color: BRAND.blue }}
+              >
+                {t("dashboard", "communautePrivateMessages")}
+              </button>
             </div>
           </div>
         </div>
 
-        {!activeRoom ? (
+        {privateInboxOpen && user ? (
+          <div className="flex-1 flex flex-col min-h-0 bg-white">
+            <ConversationsInbox userId={user.id} centerId={centerId} />
+          </div>
+        ) : !activeRoom ? (
           <main className="flex-1 flex items-center justify-center px-6">
             <div className="text-center max-w-sm">
               <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center mx-auto mb-4">
                 <MessageCircle size={28} style={{ color: BRAND.orange }} />
               </div>
-              <h3 className={`${STUDENT_TEXT.sectionTitle} mb-2`} style={{ color: BRAND.blue }}>{en ? "Community" : "Communauté"} {centerName}</h3>
+              <h3 className={`${STUDENT_TEXT.sectionTitle} mb-2`} style={{ color: BRAND.blue }}>{t("centre", "communityTitle")} {centerName || t("dashboard", "communauteYourEstablishment")}</h3>
               <p className="text-sm text-neutral-500 leading-relaxed">
                 {isTcfCenterStudent
-                  ? en ? "Select your center group or class to join the discussions." : "Sélectionnez le groupe de votre centre ou votre classe pour participer aux discussions."
-                  : en ? "Select a room from the left panel." : "Sélectionnez une salle dans le panneau de gauche."}
+                  ? t("dashboard", "communauteSelectRoomGrouped")
+                  : t("dashboard", "communauteSelectRoom")}
               </p>
             </div>
           </main>
@@ -725,7 +768,7 @@ function CommunauteContent() {
                   className={STUDENT_TEXT.sidebarMeta}
                   style={{ color: activeRoom.type === "announcement" ? BRAND.orange : BRAND.blue }}
                 >
-                  {activeRoom.type === "announcement" ? `${en ? "Group" : "Groupe"} · ${centerName}` : (en ? "Classroom" : "Salle de classe")}
+                  {activeRoom.type === "announcement" ? t("dashboard", "communauteGroupOf", { name: centerName || t("dashboard", "communauteYourEstablishment") }) : t("centre", "communityClassroom")}
                 </p>
               </div>
               {canModerateRoom && (
@@ -741,9 +784,7 @@ function CommunauteContent() {
               <Pin size={16} className="text-orange-700 shrink-0" />
               <div className="flex-1 text-left w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto">
                 <p className="text-xs font-black text-orange-700 uppercase tracking-wider">
-                  {en
-                    ? `${getPinnedMessages().length} pinned message${getPinnedMessages().length !== 1 ? "s" : ""}`
-                    : `${getPinnedMessages().length} message${getPinnedMessages().length > 1 ? "s" : ""} épinglé${getPinnedMessages().length > 1 ? "s" : ""}`}
+                  {t("dashboard", "communautePinnedCount", { count: getPinnedMessages().length })}
                 </p>
                 <p className="text-sm font-semibold text-orange-900 line-clamp-1">{getPinnedMessages()[getPinnedMessages().length - 1]?.message}</p>
               </div>
@@ -755,7 +796,7 @@ function CommunauteContent() {
             <div className="w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto flex flex-col space-y-3">
               <div className="text-center my-4">
                 <span className="px-4 py-2 bg-slate-200 text-slate-500 text-[9px] font-black uppercase tracking-[0.2em] rounded-full shadow-inner">
-                  {en ? "Start of history" : "Début de l'historique"} · {activeRoom.name}
+                  {t("dashboard", "communauteHistoryStart")} · {activeRoom.name}
                 </span>
               </div>
 
@@ -766,8 +807,8 @@ function CommunauteContent() {
               ) : messages.length === 0 ? (
                 <div className="text-center py-20 bg-white rounded-[2rem] border border-dashed border-slate-300 max-w-md mx-auto w-full">
                   <Users size={32} className="mx-auto text-slate-300 mb-4" />
-                  <h3 className="text-lg font-black text-slate-900 mb-1">{en ? "No messages yet!" : "Silence absolu !"}</h3>
-                  <p className="text-slate-400 font-medium text-xs">{en ? "Be the first to start the discussion." : "Soyez le premier à lancer la discussion."}</p>
+                  <h3 className="text-lg font-black text-slate-900 mb-1">{t("dashboard", "communauteEmptyTitle")}</h3>
+                  <p className="text-slate-400 font-medium text-xs">{t("dashboard", "communauteEmptyBody")}</p>
                 </div>
               ) : (() => {
                 let lastDateStr = "";
@@ -798,41 +839,41 @@ function CommunauteContent() {
                       {showPinnedSep && (
                         <div className="flex items-center justify-center my-4">
                           <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-orange-100 text-orange-700 text-[9px] font-black uppercase tracking-[0.18em] rounded-full border border-orange-200">
-                            <Pin size={11} /> Messages épinglés
+                            <Pin size={11} /> {t("dashboard", "communautePinnedMessages")}
                           </span>
                         </div>
                       )}
                       {showDateSep && (
                         <div className="flex items-center justify-center my-4">
                           <span className="px-4 py-1.5 bg-slate-200/80 text-slate-500 text-[9px] font-black uppercase tracking-[0.18em] rounded-full">
-                            {formatDateSeparator(msg.created_at, locale)}
+                            {formatDateSeparator(msg.created_at, locale, t("centre", "financeToday"), t("centre", "communityYesterday"))}
                           </span>
                         </div>
                       )}
                       {msg.replied_to && (
                         <div className={`mb-2 ${isMe ? "mr-12" : "ml-12"}`}>
                           <div className="border-l-4 border-slate-300 bg-slate-50 rounded-r px-3 py-2">
-                            <p className="text-[10px] font-bold text-slate-500">{msg.replied_to.profiles?.prenom || (en ? "Student" : "Étudiant")}</p>
+                            <p className="text-[10px] font-bold text-slate-500">{msg.replied_to.profiles?.prenom || t("dashboard", "sidebarDefaultStudentName")}</p>
                             <p className="text-sm text-slate-600 line-clamp-2">{msg.replied_to.message}</p>
                           </div>
                         </div>
                       )}
                       <div className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                         <div className={`flex items-center gap-2 mb-1 ${isMe ? "mr-2" : "ml-12"}`}>
-                          <span className="text-[10px] font-bold text-slate-400">{isMe ? (en ? "You" : "Vous") : msg.profiles?.prenom || (en ? "Student" : "Étudiant")}</span>
+                          <span className="text-[10px] font-bold text-slate-400">{isMe ? t("dashboard", "communauteYou") : msg.profiles?.prenom || t("dashboard", "sidebarDefaultStudentName")}</span>
                           {isCoach && !isMe && (
                             <span className="text-[8px] px-2 py-0.5 rounded-md uppercase font-bold tracking-wider" style={{ backgroundColor: BRAND.blue, color: BRAND.orange }}>
-                              {en ? "Center team" : "Équipe centre"}
+                              {t("dashboard", "communauteCenterTeam")}
                             </span>
                           )}
                           {!isCoach && isRoomMod && !isMe && (
                             <span className="inline-flex items-center gap-1 text-[8px] px-2 py-0.5 bg-orange-100 text-orange-700 rounded-md uppercase font-black tracking-widest">
-                              <ShieldCheck size={9} /> {en ? "Room admin" : "Admin salle"}
+                              <ShieldCheck size={9} /> {t("centre", "membersRoomAdmin")}
                             </span>
                           )}
                           {isPinned && (
                             <span className="inline-flex items-center gap-1 text-[8px] px-2 py-0.5 bg-orange-100 text-orange-700 rounded-md uppercase font-black tracking-widest">
-                              <Pin size={9} /> {en ? "Pinned" : "Épinglé"}
+                              <Pin size={9} /> {t("dashboard", "communautePinnedBadge")}
                             </span>
                           )}
                         </div>
@@ -840,7 +881,7 @@ function CommunauteContent() {
                         <div className={`flex items-end gap-3 max-w-[92%] sm:max-w-[85%] md:max-w-[70%] xl:max-w-[65%] ${isMe ? "flex-row-reverse" : ""}`}>
                           <ProfileAvatar
                             url={isMe ? userAvatarUrl : msg.profiles?.avatar_url}
-                            name={isMe ? userPrenom : msg.profiles?.prenom || "Étudiant"}
+                            name={isMe ? (userPrenom || t("dashboard", "sidebarDefaultStudentName")) : msg.profiles?.prenom || t("dashboard", "sidebarDefaultStudentName")}
                             role={isMe ? userRole : authorGlobalRole}
                             size="w-9 h-9"
                             rounded="rounded-[14px]"
@@ -892,25 +933,25 @@ function CommunauteContent() {
                                       {canAct && (
                                         <>
                                           <button onMouseDown={(e) => { e.stopPropagation(); startEdit(msg); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
-                                            <Pencil size={15} className="text-slate-400 shrink-0" /> {en ? "Edit" : "Modifier"}
+                                            <Pencil size={15} className="text-slate-400 shrink-0" /> {t("dashboard", "communauteEdit")}
                                           </button>
                                           <div className="h-px bg-slate-100 mx-3" />
                                         </>
                                       )}
                                       {canPin && (
                                         <button onMouseDown={(e) => { e.stopPropagation(); setOpenMenuId(null); setPinSubMenuMsgId(msg.id); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
-                                          <Pin size={15} className="text-orange-500 shrink-0" /> {isPinned ? (en ? "Unpin" : "Désépingler") : (en ? "Pin" : "Épingler")}
+                                          <Pin size={15} className="text-orange-500 shrink-0" /> {isPinned ? t("centre", "communityUnpin") : t("centre", "communityPin")}
                                         </button>
                                       )}
                                       {canPin && <div className="h-px bg-slate-100 mx-3" />}
                                       <button onMouseDown={(e) => { e.stopPropagation(); setRepliedToMessage(msg); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
-                                        <MessageCircle size={15} className="text-slate-400 shrink-0" /> {en ? "Reply" : "Répondre"}
+                                        <MessageCircle size={15} className="text-slate-400 shrink-0" /> {t("dashboard", "communauteReply")}
                                       </button>
                                       {canDelete && (
                                         <>
                                           <div className="h-px bg-slate-100 mx-3" />
                                           <button onMouseDown={(e) => { e.stopPropagation(); deleteMessage(msg.id); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-red-500 hover:bg-red-50 text-left">
-                                            <Trash2 size={15} className="shrink-0" /> {en ? "Delete" : "Supprimer"}
+                                            <Trash2 size={15} className="shrink-0" /> {t("dashboard", "communauteDelete")}
                                           </button>
                                         </>
                                       )}
@@ -923,16 +964,16 @@ function CommunauteContent() {
                                       style={{ boxShadow: "0 10px 40px rgba(0,0,0,0.15)", maxHeight: "400px" }}
                                     >
                                       <button onMouseDown={(e) => { e.stopPropagation(); setPinSubMenuMsgId(null); setOpenMenuId(msg.id); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
-                                        <X size={15} className="text-slate-400 shrink-0" /> {en ? "Back" : "Retour"}
+                                        <X size={15} className="text-slate-400 shrink-0" /> {t("dashboard", "communauteBack")}
                                       </button>
                                       <div className="h-px bg-slate-100 mx-3" />
                                       {isPinned ? (
                                         <button onMouseDown={(e) => { e.stopPropagation(); updateMessagePin(msg, null); setPinSubMenuMsgId(null); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-red-500 hover:bg-red-50 text-left">
-                                          <Pin size={15} className="shrink-0" /> {en ? "Unpin" : "Désépingler"}
+                                          <Pin size={15} className="shrink-0" /> {t("centre", "communityUnpin")}
                                         </button>
-                                      ) : PIN_DURATIONS.slice(1).map((d) => (
-                                        <button key={d.days} onMouseDown={(e) => { e.stopPropagation(); updateMessagePin(msg, d.days); setPinSubMenuMsgId(null); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
-                                          <Pin size={15} className="text-orange-500 shrink-0" /> {en ? `Pin for ${d.days} days` : `Épingler ${d.label}`}
+                                      ) : PIN_DURATION_DAYS.map((days) => (
+                                        <button key={days} onMouseDown={(e) => { e.stopPropagation(); updateMessagePin(msg, days); setPinSubMenuMsgId(null); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
+                                          <Pin size={15} className="text-orange-500 shrink-0" /> {t("dashboard", "communautePinForDays", { days })}
                                         </button>
                                       ))}
                                     </div>
@@ -941,7 +982,7 @@ function CommunauteContent() {
                               )}
                             </div>
                             <div className={`flex items-center gap-1 ${isMe ? "mr-1" : "ml-1"}`}>
-                              {msg.edited && <span className="text-[9px] text-slate-400 italic">{en ? "edited" : "modifié"} ·</span>}
+                              {msg.edited && <span className="text-[9px] text-slate-400 italic">{t("centre", "communityEdited")} ·</span>}
                               <span className="text-[10px] font-semibold text-slate-400">{formatTime(msg.created_at, locale)}</span>
                             </div>
                           </div>
@@ -961,7 +1002,7 @@ function CommunauteContent() {
                 <div className="flex items-center justify-between bg-orange-50 border-l-4 border-orange-400 rounded-r-2xl pl-4 pr-3 py-2.5">
                   <div className="flex items-center gap-2">
                     <Pencil size={12} className="text-orange-500 shrink-0" />
-                    <span className="text-xs font-bold text-orange-700">{en ? "Editing message" : "Modification du message"}</span>
+                    <span className="text-xs font-bold text-orange-700">{t("centre", "communityEditing")}</span>
                   </div>
                   <button onClick={cancelEdit} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-orange-100 text-orange-500"><X size={13} /></button>
                 </div>
@@ -969,7 +1010,7 @@ function CommunauteContent() {
               {repliedToMessage && (
                 <div className="flex items-start justify-between bg-slate-50 border-l-4 border-slate-400 rounded-r-2xl pl-4 pr-3 py-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-slate-600">{en ? "Reply to" : "Réponse à"} {repliedToMessage.profiles?.prenom || (en ? "Student" : "Étudiant")}</p>
+                    <p className="text-xs font-bold text-slate-600">{t("dashboard", "communauteReplyTo")} {repliedToMessage.profiles?.prenom || t("dashboard", "sidebarDefaultStudentName")}</p>
                     <p className="text-sm text-slate-700 line-clamp-2 leading-relaxed mt-1">{repliedToMessage.message}</p>
                   </div>
                   <button onClick={() => setRepliedToMessage(null)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 shrink-0 ml-3"><X size={13} /></button>
@@ -978,14 +1019,14 @@ function CommunauteContent() {
               {isReadOnly ? (
                 <div className="flex items-center justify-center gap-3 h-14 bg-slate-100 rounded-full px-6 border-2 border-slate-200">
                   <Lock size={14} className="text-slate-400 shrink-0" />
-                  <p className="text-xs font-bold text-slate-500">{en ? "This room is reserved for announcements." : "Cette salle est réservée aux annonces."}</p>
+                  <p className="text-xs font-bold text-slate-500">{t("dashboard", "communauteReadOnly")}</p>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="flex items-end gap-3">
                   <textarea
                     ref={inputRef}
                     rows={1}
-                    placeholder={editingId ? (en ? "Edit your message..." : "Modifier votre message...") : (en ? `Write in ${activeRoom.name}...` : `Écrire dans ${activeRoom.name}...`)}
+                    placeholder={editingId ? t("dashboard", "communauteEditPlaceholder") : t("dashboard", "communauteWriteIn", { room: activeRoom.name })}
                     className={`flex-1 border-2 focus:bg-white outline-none rounded-2xl px-5 py-3 text-sm font-medium text-neutral-900 placeholder:text-neutral-400 transition-all resize-none overflow-y-auto ${editingId ? "bg-orange-50 border-orange-300 focus:border-orange-500" : "bg-[#FFFBF7] border-orange-100 focus:border-orange-400"}`}
                     style={{ maxHeight: "200px", minHeight: "44px" }}
                     value={newMessage}

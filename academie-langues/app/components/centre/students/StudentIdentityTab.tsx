@@ -14,7 +14,7 @@ import {
   resolveStudentCountryCode,
   type StudentCountryRef,
 } from "@/app/data/studentLocalisation";
-import { passageDecisionLabelFr } from "@/app/utils/cursus-passage";
+import { passageDecisionLabel } from "@/app/utils/cursus-passage";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 import { downloadAttestationReussitePdf } from "@/app/utils/centerPdfExport";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -675,7 +675,7 @@ export default function StudentIdentityTab({
                   <div className="bg-white rounded-lg p-3 border border-black/[0.06] col-span-2">
                     <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityProgressionDecision")}</p>
                     <p className="font-semibold mt-0.5" style={{ color: BLUE }}>
-                      {locale === "fr" ? passageDecisionLabelFr(enrollmentInfo.passage_decision) : enrollmentInfo.passage_decision === "admis" ? t("centre", "studentsPassed") : enrollmentInfo.passage_decision === "redouble" ? t("centre", "studentsRepeats") : t("centre", "studentsDeferred")}
+                      {passageDecisionLabel(enrollmentInfo.passage_decision, locale)}
                     </p>
                     {enrollmentInfo.passage_reason && (
                       <p className="text-sm font-medium text-neutral-600 mt-1">

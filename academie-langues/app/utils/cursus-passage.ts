@@ -20,25 +20,33 @@ export function isPassageDecision(raw: unknown): raw is PassageDecision {
   return raw === "admis" || raw === "redouble" || raw === "ajourne";
 }
 
-export function passageDecisionLabelFr(raw: string | null | undefined): string {
-  if (raw === "admis") return "Admis";
-  if (raw === "redouble") return "Redouble";
-  if (raw === "ajourne") return "Ajourné";
+export function passageDecisionLabel(
+  raw: string | null | undefined,
+  locale: "fr" | "en" = "fr",
+): string {
+  const en = locale === "en";
+  if (raw === "admis") return en ? "Passed" : "Admis";
+  if (raw === "redouble") return en ? "Repeats" : "Redouble";
+  if (raw === "ajourne") return en ? "Deferred" : "Ajourné";
   return raw ? String(raw) : "—";
 }
+
+/** @deprecated Prefer passageDecisionLabel(raw, locale) */
+export function passageDecisionLabelFr(raw: string | null | undefined): string {
+  return passageDecisionLabel(raw, "fr");
+}
+
+export type PassageReasonFailCode = "REASON_REQUIRED";
 
 /** Motif obligatoire pour redouble / ajourne (min. 3 caractères). */
 export function normalizePassageReason(
   decision: PassageDecision,
   raw: unknown,
-): { ok: true; reason: string | null } | { ok: false; error: string } {
+): { ok: true; reason: string | null } | { ok: false; code: PassageReasonFailCode } {
   const reason = typeof raw === "string" ? raw.trim() : "";
   if (decision === "redouble" || decision === "ajourne") {
     if (reason.length < 3) {
-      return {
-        ok: false,
-        error: "Indiquez un motif (3 caractères minimum) pour cette décision.",
-      };
+      return { ok: false, code: "REASON_REQUIRED" };
     }
     return { ok: true, reason: reason.slice(0, 500) };
   }
