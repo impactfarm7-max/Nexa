@@ -39,6 +39,8 @@ import {
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
+import { useI18n } from "@/app/i18n/I18nProvider";
+import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
 
 type Center = {
   id: string;
@@ -50,6 +52,7 @@ type Center = {
   phone: string | null;
   email: string | null;
   status: string;
+  center_type?: string | null;
 };
 
 type CenterStudent = {
@@ -151,6 +154,7 @@ const DEFAULT_TRAINER_TAB_ORDER = ["students", "trainers", "overview", "radar", 
 
 export default function CenterDashboardPage() {
   const router = useRouter();
+  const { locale } = useI18n();
   const [center, setCenter] = useState<Center | null>(null);
   const [students, setStudents] = useState<CenterStudent[]>([]);
   const [trainers, setTrainers] = useState<CenterTrainer[]>([]);
@@ -256,7 +260,7 @@ export default function CenterDashboardPage() {
   const centerSignupRef = center?.signup_slug || center?.code;
   const centerSignupParam = center?.signup_slug ? "centre" : "centerCode";
   const centerSignupLink = centerSignupRef && typeof window !== "undefined"
-    ? `${window.location.origin}/login?signup=1&${centerSignupParam}=${encodeURIComponent(centerSignupRef)}`
+    ? `${window.location.origin}/login?signup=1&${centerSignupParam}=${encodeURIComponent(centerSignupRef)}${isTcfCanadaCenter(center?.center_type) ? "" : `&lang=${locale}`}`
     : "";
 
   const copyCenterSignupLink = async () => {

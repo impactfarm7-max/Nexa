@@ -13,6 +13,7 @@ import type {
   GenericDashboardStats,
   TcfDashboardStats,
 } from "../types";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const EMPTY_GENERIC: GenericDashboardStats = {
   fin: { ca: 0, paid: 0, pending: 0, late: 0 },
@@ -69,6 +70,7 @@ function applyBootstrap(
 
 export function useCenterDashboard() {
   const router = useRouter();
+  const { locale } = useI18n();
   const [statsLoading, setStatsLoading] = useState(true);
   const [staffPrenom, setStaffPrenom] = useState("Directeur");
   const [center, setCenter] = useState<CenterInfo | null>(null);
@@ -143,7 +145,7 @@ export function useCenterDashboard() {
 
   const copyLink = async () => {
     if (typeof window === "undefined") return;
-    const url = buildCenterSignupUrl(window.location.origin, center);
+    const url = buildCenterSignupUrl(window.location.origin, center, isTCF ? undefined : locale);
     if (!url) return;
     await navigator.clipboard.writeText(url);
     setCopied(true);

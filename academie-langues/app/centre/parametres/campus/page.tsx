@@ -17,28 +17,28 @@ const STATUS_OPTIONS = [
 ];
 
 /** Pays, drapeau et indicatif téléphonique */
-const COUNTRY_DATA: { name: string; flag: string; dial: string }[] = [
-  { name: "Cameroun",       flag: "🇨🇲", dial: "+237" },
-  { name: "Côte d'Ivoire",  flag: "🇨🇮", dial: "+225" },
-  { name: "Sénégal",        flag: "🇸🇳", dial: "+221" },
-  { name: "Gabon",          flag: "🇬🇦", dial: "+241" },
-  { name: "Congo",          flag: "🇨🇬", dial: "+242" },
-  { name: "RD Congo",       flag: "🇨🇩", dial: "+243" },
-  { name: "Tchad",          flag: "🇹🇩", dial: "+235" },
-  { name: "Burkina Faso",   flag: "🇧🇫", dial: "+226" },
-  { name: "Mali",           flag: "🇲🇱", dial: "+223" },
-  { name: "Bénin",          flag: "🇧🇯", dial: "+229" },
-  { name: "Togo",           flag: "🇹🇬", dial: "+228" },
-  { name: "Niger",          flag: "🇳🇪", dial: "+227" },
-  { name: "Guinée",         flag: "🇬🇳", dial: "+224" },
-  { name: "Centrafrique",   flag: "🇨🇫", dial: "+236" },
-  { name: "Maroc",          flag: "🇲🇦", dial: "+212" },
-  { name: "Algérie",        flag: "🇩🇿", dial: "+213" },
-  { name: "Tunisie",        flag: "🇹🇳", dial: "+216" },
-  { name: "Nigeria",        flag: "🇳🇬", dial: "+234" },
-  { name: "Ghana",          flag: "🇬🇭", dial: "+233" },
-  { name: "Kenya",          flag: "🇰🇪", dial: "+254" },
-  { name: "France",         flag: "🇫🇷", dial: "+33"  },
+const COUNTRY_DATA: { name: string; code: string; flag: string; dial: string }[] = [
+  { name: "Cameroun",       code: "CM", flag: "🇨🇲", dial: "+237" },
+  { name: "Côte d'Ivoire",  code: "CI", flag: "🇨🇮", dial: "+225" },
+  { name: "Sénégal",        code: "SN", flag: "🇸🇳", dial: "+221" },
+  { name: "Gabon",          code: "GA", flag: "🇬🇦", dial: "+241" },
+  { name: "Congo",          code: "CG", flag: "🇨🇬", dial: "+242" },
+  { name: "RD Congo",       code: "CD", flag: "🇨🇩", dial: "+243" },
+  { name: "Tchad",          code: "TD", flag: "🇹🇩", dial: "+235" },
+  { name: "Burkina Faso",   code: "BF", flag: "🇧🇫", dial: "+226" },
+  { name: "Mali",           code: "ML", flag: "🇲🇱", dial: "+223" },
+  { name: "Bénin",          code: "BJ", flag: "🇧🇯", dial: "+229" },
+  { name: "Togo",           code: "TG", flag: "🇹🇬", dial: "+228" },
+  { name: "Niger",          code: "NE", flag: "🇳🇪", dial: "+227" },
+  { name: "Guinée",         code: "GN", flag: "🇬🇳", dial: "+224" },
+  { name: "Centrafrique",   code: "CF", flag: "🇨🇫", dial: "+236" },
+  { name: "Maroc",          code: "MA", flag: "🇲🇦", dial: "+212" },
+  { name: "Algérie",        code: "DZ", flag: "🇩🇿", dial: "+213" },
+  { name: "Tunisie",        code: "TN", flag: "🇹🇳", dial: "+216" },
+  { name: "Nigeria",        code: "NG", flag: "🇳🇬", dial: "+234" },
+  { name: "Ghana",          code: "GH", flag: "🇬🇭", dial: "+233" },
+  { name: "Kenya",          code: "KE", flag: "🇰🇪", dial: "+254" },
+  { name: "France",         code: "FR", flag: "🇫🇷", dial: "+33"  },
 ];
 
 const COUNTRIES = COUNTRY_DATA.map((c) => c.name);
@@ -58,7 +58,14 @@ type Campus = {
 };
 
 export default function CampusSettingsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const countryNames = new Intl.DisplayNames([locale], { type: "region" });
+  const countryLabel = (name: string | null | undefined) => {
+    if (!name) return name;
+    if (locale === "fr") return name;
+    const meta = COUNTRY_DATA.find((c) => c.name === name);
+    return (meta && countryNames.of(meta.code)) || name;
+  };
   const statusLabel = (status: string) => t("centre", status === "en_construction" ? "campusUnderConstruction" : "campusActive");
   const [centerId, setCenterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -511,7 +518,7 @@ export default function CampusSettingsPage() {
                           <div className="grid sm:grid-cols-2 gap-4">
                             <ReadField label={t("centre", "settingsCountry")}>
                               <p className="text-sm font-semibold text-neutral-700 py-2 px-3.5 rounded-lg border border-black/[0.06] flex items-center gap-2" style={{ backgroundColor: SURFACE }}>
-                                {countryMeta(selected.country)?.flag || ""} {selected.country || "—"}
+                                {countryMeta(selected.country)?.flag || ""} {countryLabel(selected.country) || "—"}
                               </p>
                             </ReadField>
                             <ReadField label={t("centre", "settingsCity")} value={selected.city || "—"} />
@@ -587,7 +594,7 @@ export default function CampusSettingsPage() {
                                 className="w-full h-10 px-3.5 rounded-lg border border-black/[0.08] bg-white text-sm font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
                               >
                                 <option value="">—</option>
-                                {COUNTRY_DATA.map((c) => <option key={c.name} value={c.name}>{c.flag} {c.name}</option>)}
+                                {COUNTRY_DATA.map((c) => <option key={c.name} value={c.name}>{c.flag} {countryLabel(c.name)}</option>)}
                               </select>
                             </div>
                             <BlurField label={t("centre", "settingsCity")} defaultValue={selected.city || ""} onCommit={(v) => patchCampus(selected.id, { city: v.trim() || null })} />

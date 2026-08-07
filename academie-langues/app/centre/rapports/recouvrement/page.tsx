@@ -51,6 +51,11 @@ function RecouvrementContent() {
     from, to, campusId, filiereId, setFilter, setPeriodRange,
   } = useReportPage<RecouvrementReport>("recouvrement");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
+  const localizedPeriod = from === to
+    ? formatShort(from, locale)
+    : locale === "en"
+      ? `${formatShort(from, locale)} to ${formatShort(to, locale)}`
+      : `${formatShort(from, locale)} — ${formatShort(to, locale)}`;
 
   const exportCsv = useCallback(() => {
     if (!report) return;
@@ -74,7 +79,7 @@ function RecouvrementContent() {
     if (!report) return;
     await exportPdf({
       title: t("centre", "recoveryTitle"),
-      periodLabel: report.period.label,
+      periodLabel: localizedPeriod,
       kpis: [
         { label: t("centre", "summaryInvoicedRevenue"), value: fmtFCFA(report.kpis.caFacture) },
         { label: t("centre", "recoveryCollected"), value: fmtFCFA(report.kpis.encaisse) },
@@ -103,7 +108,7 @@ function RecouvrementContent() {
       activeSlug="recouvrement"
       centerType={centerType}
       title={t("centre", "recoveryTitle")}
-      periodLabel={from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}`}
+      periodLabel={localizedPeriod}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}

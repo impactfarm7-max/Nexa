@@ -130,25 +130,25 @@ const TCF_EXTRA_TRAINER_ITEMS: NavItem[] = [
 
 /* ─── Formation courte : shell type TCF, sans routes / contenu TCF ───────── */
 const SHORT_MANAGER_NAV: NavItem[] = [
-  { label: "Dashboard",     icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
-  { label: "Staff",         icon: GraduationCap,   path: "/centre/staff",                      permKey: "staff" },
-  { label: "Étudiants",     icon: Users,           path: "/centre/etudiants",                  permKey: "etudiants" },
-  { label: "Programmes",    icon: GitBranch,       path: "/centre/filieres",                   permKey: "filieres" },
+  { label: "navDashboard",     icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
+  { label: "navStaff",         icon: GraduationCap,   path: "/centre/staff",                      permKey: "staff" },
+  { label: "navEtudiants",     icon: Users,           path: "/centre/etudiants",                  permKey: "etudiants" },
+  { label: "navProgrammes",    icon: GitBranch,       path: "/centre/filieres",                   permKey: "filieres" },
   TCF_FORMATION_ITEM,
-  { label: "Examens / Notes", icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
-  { label: "Finance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
-  { label: "Communauté",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
-  { label: "Sessions Live", icon: Video,           path: "/centre/lives",                      permKey: "lives" },
-  { label: "Paramètres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
+  { label: "navExamensNotes",  icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
+  { label: "navFinance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
+  { label: "navCommunaute",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
+  { label: "navSessionsLive",  icon: Video,           path: "/centre/lives",                      permKey: "lives" },
+  { label: "navParametres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
 const SHORT_EXTRA_TRAINER_ITEMS: NavItem[] = [
-  { label: "Étudiants",  icon: Users,         path: "/centre/etudiants",             permKey: "etudiants" },
-  { label: "Programmes", icon: GitBranch,     path: "/centre/filieres",              permKey: "filieres" },
-  { label: "Finance",    icon: CreditCard,    path: "/centre/finance",               permKey: "finance" },
-  { label: "Staff",      icon: GraduationCap, path: "/centre/staff",                 permKey: "staff" },
-  { label: "Rapports",   icon: BarChart3,     path: "/centre/rapports",              permKey: "rapports" },
-  { label: "Paramètres", icon: Settings2,     path: "/centre/parametres/entreprise", permKey: "parametres" },
+  { label: "navEtudiants",  icon: Users,         path: "/centre/etudiants",             permKey: "etudiants" },
+  { label: "navProgrammes", icon: GitBranch,     path: "/centre/filieres",              permKey: "filieres" },
+  { label: "navFinance",    icon: CreditCard,    path: "/centre/finance",               permKey: "finance" },
+  { label: "navStaff",      icon: GraduationCap, path: "/centre/staff",                 permKey: "staff" },
+  { label: "navRapports",   icon: BarChart3,     path: "/centre/rapports",              permKey: "rapports" },
+  { label: "navParametres", icon: Settings2,     path: "/centre/parametres/entreprise", permKey: "parametres" },
 ];
 
 function hasPermForNavItem(item: NavItem, perms: string[]): boolean {

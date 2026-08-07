@@ -1033,7 +1033,7 @@ function NouveauProgrammeForm() {
       try {
         await hydrateProgramForEdit(editFiliereId, cId);
       } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : (en ? "Unable to load the program." : "Impossible de charger le programme.");
+      const msg = en ? "Unable to load the program." : (e instanceof Error ? e.message : "Impossible de charger le programme.");
         setErrorMsg(msg);
       }
     }
@@ -1396,7 +1396,7 @@ function NouveauProgrammeForm() {
   const submitQuickTrainer = async () => {
     if (!qtPrenom.trim()) { setQtError(en ? "First name is required." : "Le prénom est requis."); return; }
     if (!qtNom.trim()) { setQtError(en ? "Last name is required." : "Le nom est requis."); return; }
-    if (!qtEmail.trim()) { setQtError("L'email est requis."); return; }
+    if (!qtEmail.trim()) { setQtError(en ? "Email is required." : "L'email est requis."); return; }
     if (!centerId) return;
     setQtSaving(true); setQtError(""); setQtResult(null);
     try {
@@ -1441,7 +1441,7 @@ function NouveauProgrammeForm() {
         temporaryPassword: data.temporaryPassword as string | undefined,
       });
     } catch (e: any) {
-      setQtError(e.message || (en ? "An error occurred while creating the trainer." : "Erreur lors de la création."));
+      setQtError(en ? "An error occurred while creating the trainer." : (e.message || "Erreur lors de la création."));
     } finally {
       setQtSaving(false);
     }
@@ -1901,7 +1901,7 @@ function NouveauProgrammeForm() {
       setCreated({ id: filiereId, name: name.trim() });
       }
     } catch (e: any) {
-      setErrorMsg(e.message || (en ? "An error occurred while saving." : "Erreur lors de l'enregistrement."));
+      setErrorMsg(en ? "An error occurred while saving." : (e.message || "Erreur lors de l'enregistrement."));
     } finally {
       setSaving(false);
     }
@@ -2029,7 +2029,7 @@ function NouveauProgrammeForm() {
       const cfg = await fetchDocumentExportConfig(supabase, centerId);
       await downloadProgrammePdf(buildProgrammePdfData(), cfg, locale);
     } catch (e: any) {
-      const msg = e.message || (en ? "Unable to export PDF." : "Export PDF impossible.");
+      const msg = en ? "Unable to export PDF." : (e.message || "Export PDF impossible.");
       setErrorMsg(msg);
       if (created) window.alert(msg);
     } finally {
@@ -2409,7 +2409,7 @@ function NouveauProgrammeForm() {
                   inputMode="decimal"
                   value={niveauActuel.seuil_passage}
                   onChange={(e) => updateNiveau(niveauActuel.numero, { seuil_passage: e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".") })}
-                  placeholder="Ex. 10"
+                  placeholder={en ? "E.g. 10" : "Ex. 10"}
                   className={`${FIELD_INPUT_SM} w-40`}
                 />
                 <p className={FIELD_HINT}>{en ? "Leave empty for a fully manual decision at the end of the year." : "Vide = décision 100 % manuelle à la fin d’année."}</p>

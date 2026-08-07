@@ -14,7 +14,7 @@ export type CampusOption = { id: string; name: string };
 export type FiliereOption = { id: string; name: string; status: string };
 
 export function useReportPage<T>(slug: ReportSlug) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -152,12 +152,12 @@ export function useReportPage<T>(slug: ReportSlug) {
         setError(t("centre", "reportsDataUnavailable"));
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : t("centre", "reportsLoadingError"));
+      setError(locale === "en" ? t("centre", "reportsLoadingError") : (e instanceof Error ? e.message : t("centre", "reportsLoadingError")));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [slug, queryParams, querySuffix, router, applyBundle, t]);
+  }, [slug, queryParams, querySuffix, router, applyBundle, t, locale]);
 
   useEffect(() => {
     void load();

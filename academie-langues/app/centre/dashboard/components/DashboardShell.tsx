@@ -60,7 +60,7 @@ export default function DashboardShell({
 
   const signupUrl =
     typeof window !== "undefined"
-      ? buildCenterSignupUrl(window.location.origin, center)
+      ? buildCenterSignupUrl(window.location.origin, center, isTCF ? undefined : locale)
       : null;
 
   // ── TCF : shell existant (structure inchangée) + police Noto ─────────────

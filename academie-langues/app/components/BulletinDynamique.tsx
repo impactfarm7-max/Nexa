@@ -107,7 +107,7 @@ export default function BulletinDynamique({
         supabase.from("bulletin_signatures").select("id, name, title, label").eq("center_id", centerId).order("display_order"),
       ]);
       setDocConfig(exportConfig);
-      setSignatures(filterSignatures(sigRows || [], exportConfig.signatureIds));
+      setSignatures(filterSignatures(sigRows || [], exportConfig.signatureIds, locale));
 
       const { data: periodData } = await supabase.rpc("get_center_periods", { p_center_id: centerId });
       const activePeriods: PeriodCol[] = (periodData || [])

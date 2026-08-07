@@ -587,7 +587,7 @@ export default function CenterFilieresPage() {
             <input
               value={waPhone}
               onChange={(e) => setWaPhone(e.target.value)}
-              placeholder="ex. 2376XXXXXXXX"
+              placeholder={locale === "en" ? "e.g. 2376XXXXXXXX" : "ex. 2376XXXXXXXX"}
               inputMode="tel"
               className="w-full h-10 px-3 rounded-lg border border-black/[0.08] text-[13px] font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
               style={{ backgroundColor: SURFACE }}
@@ -1041,7 +1041,9 @@ function InstallmentsPreviewList({ installments }: { installments: InstallmentRo
         <div key={`${idx}-${inst.montant}-${inst.jours}`} className="flex items-center justify-between text-[11px]">
           <span className="font-medium text-neutral-500">
             {t("centre", "programsInstallment", { count: idx + 1 })}
-            {inst.jours > 0 ? ` — ${t("centre", "programsDayOffset", { count: inst.jours })}` : ` — ${t("centre", "programsUponEnrollment")}`}
+            {inst.jours > 0
+              ? `${locale === "en" ? ": " : " — "}${t("centre", "programsDayOffset", { count: inst.jours })}`
+              : `${locale === "en" ? ": " : " — "}${t("centre", "programsUponEnrollment")}`}
           </span>
           <span className="font-bold text-neutral-700">{fcfa(inst.montant, locale)}</span>
         </div>

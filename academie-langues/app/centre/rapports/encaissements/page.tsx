@@ -39,6 +39,11 @@ function EncaissementsContent() {
     from, to, campusId, filiereId, setFilter, setPeriodRange,
   } = useReportPage<EncaissementsReport>("encaissements");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
+  const localizedPeriod = from === to
+    ? formatShort(from, locale)
+    : locale === "en"
+      ? `${formatShort(from, locale)} to ${formatShort(to, locale)}`
+      : `${formatShort(from, locale)} — ${formatShort(to, locale)}`;
 
   const exportCsv = useCallback(() => {
     if (!report) return;
@@ -53,7 +58,7 @@ function EncaissementsContent() {
     if (!report) return;
     await exportPdf({
       title: t("centre", "collectionsTitle"),
-      periodLabel: report.period.label,
+      periodLabel: localizedPeriod,
       kpis: [
         { label: t("centre", "collectionsTotal"), value: fmtFCFA(report.kpis.totalEncaisse) },
         { label: t("centre", "collectionsPayments"), value: fmtNum(report.kpis.nbPaiements) },
@@ -77,7 +82,7 @@ function EncaissementsContent() {
       activeSlug="encaissements"
       centerType={centerType}
       title={t("centre", "collectionsTitle")}
-      periodLabel={from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}`}
+      periodLabel={localizedPeriod}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
@@ -100,7 +105,7 @@ function EncaissementsContent() {
         <>
           <ReportKpiGrid
             items={[
-              { label: t("centre", "collectionsTotal"), value: fmtFCFA(report.kpis.totalEncaisse), sub: from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}` },
+              { label: t("centre", "collectionsTotal"), value: fmtFCFA(report.kpis.totalEncaisse), sub: localizedPeriod },
               { label: t("centre", "collectionsPaymentCount"), value: fmtNum(report.kpis.nbPaiements) },
               { label: t("centre", "collectionsAverageAmount"), value: fmtFCFA(report.kpis.panierMoyen) },
             ]}

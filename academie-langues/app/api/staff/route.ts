@@ -399,6 +399,7 @@ export async function POST(req: NextRequest) {
     const centerType = await getCenterType(callerProfile.center_id);
 
     // Lien center_users pour /api/center/me et connexion unifiée /login
+    const emailLocale = centerType === "tcf_canada" ? "fr" : (body.locale === "en" ? "en" : "fr");
     let staffPermissions = role === "staff"
       ? sanitizeModulePermissions(permissions || [])
       : role === "campus_manager"
@@ -465,13 +466,16 @@ export async function POST(req: NextRequest) {
 
     // Envoi synchrone (comme /api/etudiants) : `after()` + void ne garde pas
     // le runtime assez longtemps pour finir le SMTP Gmail.
-    const loginBase = process.env.NEXT_PUBLIC_SITE_URL || "https://nexa.fr";
+    const loginBase = (process.env.NEXT_PUBLIC_SITE_URL || "https://nexa.fr").replace(/\/$/, "");
+    const loginUrl = `${loginBase}/login?lang=${emailLocale}`;
     let emailResult = { sent: false, skipped: false };
     try {
       emailResult = await sendEmail({
         to: normalizedEmail,
-        subject: "Vos accès Nexa Academy",
-        text: `Bonjour ${prenom},\n\nVotre compte personnel a été créé.\nIdentifiant : ${normalizedEmail}\nMot de passe temporaire : ${password}\n\nConnectez-vous sur : ${loginBase}/login\n\nVous devrez modifier votre mot de passe à la première connexion.`,
+        subject: emailLocale === "en" ? "Your Nexa Academy access" : "Vos accès Nexa Academy",
+        text: emailLocale === "en"
+          ? `Hello ${prenom},\n\nYour staff account has been created.\nEmail: ${normalizedEmail}\nTemporary password: ${password}\n\nSign in here: ${loginUrl}\n\nYou will be asked to change your password the first time you sign in.`
+          : `Bonjour ${prenom},\n\nVotre compte personnel a été créé.\nIdentifiant : ${normalizedEmail}\nMot de passe temporaire : ${password}\n\nConnectez-vous sur : ${loginUrl}\n\nVous devrez modifier votre mot de passe à la première connexion.`,
       });
       if (!emailResult.sent) {
         console.error("[staff] email non envoyé:", emailResult.skipped ? "GMAIL_* manquant" : "échec SMTP");

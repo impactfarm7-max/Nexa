@@ -641,7 +641,7 @@ export default function StaffAcademicTab({
       closeProgrammeCard();
       onUpdate?.();
     } catch (e: any) {
-      setCardError(e.message || (en ? "Unable to save." : "Enregistrement impossible."));
+      setCardError(en ? "Unable to save." : (e.message || "Enregistrement impossible."));
     } finally {
       setSavingCard(false);
     }

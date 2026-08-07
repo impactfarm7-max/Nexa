@@ -64,7 +64,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
       setAcademicYear(data.proposed_academic_year || "");
       setReason("");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("centre", "passageError"));
+      setError(locale === "en" ? t("centre", "passageError") : (e instanceof Error ? e.message : t("centre", "passageError")));
       setPreview(null);
     } finally {
       setLoading(false);
@@ -113,7 +113,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
       await load();
       onDone();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("centre", "passageError"));
+      setError(locale === "en" ? t("centre", "passageError") : (e instanceof Error ? e.message : t("centre", "passageError")));
     } finally {
       setSaving(false);
     }
@@ -144,7 +144,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
       await load();
       onDone();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("centre", "passageError"));
+      setError(locale === "en" ? t("centre", "passageError") : (e instanceof Error ? e.message : t("centre", "passageError")));
     } finally {
       setSaving(false);
     }

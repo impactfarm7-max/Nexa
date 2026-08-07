@@ -189,7 +189,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
       applyBundle(json);
       setHistory(json.history || []);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("centre", "staffPayrollError"));
+      setError(locale === "en" ? t("centre", "staffPayrollError") : (e instanceof Error ? e.message : t("centre", "staffPayrollError")));
     } finally {
       setLoading(false);
     }
@@ -232,7 +232,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
       }
       return true;
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("centre", "staffPayrollError"));
+      setError(locale === "en" ? t("centre", "staffPayrollError") : (e instanceof Error ? e.message : t("centre", "staffPayrollError")));
       return false;
     } finally {
       setSaving(false);
@@ -356,7 +356,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         config,
       });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("centre", "staffPayrollDownloadError"));
+      setError(locale === "en" ? t("centre", "staffPayrollDownloadError") : (e instanceof Error ? e.message : t("centre", "staffPayrollDownloadError")));
     } finally {
       setDownloading(false);
     }

@@ -249,9 +249,12 @@ export function QuickAction({
 }
 
 export function PendingBanner() {
+  const { locale } = useI18n();
   return (
     <p className="text-[9px] sm:text-[10px] font-black text-amber-700 uppercase tracking-widest leading-snug">
-      En attente d&apos;activation par Nexa — vous pouvez configurer votre espace librement.
+      {locale === "en"
+        ? "Pending activation by Nexa. You can configure your space freely."
+        : <>En attente d&apos;activation par Nexa — vous pouvez configurer votre espace librement.</>}
     </p>
   );
 }

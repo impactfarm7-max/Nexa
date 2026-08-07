@@ -6,9 +6,28 @@ import { supabase } from "@/app/utils/supabase";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHeader";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeInstallmentLabel } from "@/app/utils/financeI18n";
+import { localizeCountryName } from "@/app/utils/countryI18n";
+import { getStudentCountryOptions, resolveStudentCountryCode } from "@/app/data/studentLocalisation";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
+const COUNTRY_OPTIONS = getStudentCountryOptions();
+
+function localizedCountryName(country: string | null, dial: string | null, locale: "fr" | "en") {
+  if (!country) return "—";
+  const code = resolveStudentCountryCode(COUNTRY_OPTIONS, { country, country_code: dial });
+  return localizeCountryName(code, country, locale);
+}
+
+function enrollmentStatusLabel(status: string, locale: "fr" | "en") {
+  if (locale === "fr") return status === "active" ? "Actif" : status === "draft" ? "En attente" : status;
+  const labels: Record<string, string> = {
+    active: "Active", draft: "Pending", completed: "Completed",
+    cancelled: "Canceled", paused: "Suspended", revoked: "Removed",
+  };
+  return labels[status] || status;
+}
 
 type Props = {
   studentId: string;
@@ -149,7 +168,7 @@ function formatFicheModalitesLines(enr: any, instRows: any[] | null, locale: "fr
     return deduped.map((inst, idx) => {
       const posName = `${isEn ? "Installment" : "Échéance"} ${inst.position || idx + 1}`;
       const label = inst.label && inst.label.trim() && !/^échéance \d+$/i.test(inst.label.trim())
-        ? inst.label.trim()
+        ? localizeInstallmentLabel(inst.label, locale)
         : posName;
       const amtStr = fmtPdfFCFA(inst.amount);
       const dateStr = inst.due_date
@@ -170,7 +189,9 @@ function formatFicheModalitesLines(enr: any, instRows: any[] | null, locale: "fr
       const obj = plan as any;
       if (Array.isArray(obj.installments) && obj.installments.length > 0) {
         return obj.installments.map((item: any, idx: number) => {
-          const lbl = item.label || (idx === 0 ? (isEn ? "Installment 1 (Deposit)" : "Échéance 1 (Acompte)") : `${isEn ? "Installment" : "Échéance"} ${idx + 1}`);
+          const lbl = item.label
+            ? localizeInstallmentLabel(String(item.label), locale)
+            : (idx === 0 ? (isEn ? "Installment 1 (Deposit)" : "Échéance 1 (Acompte)") : `${isEn ? "Installment" : "Échéance"} ${idx + 1}`);
           const amt = Number(item.montant || item.amount) || 0;
           const amtFormatted = amt > 0 ? fmtPdfFCFA(amt) : "";
           const jours = Number(item.jours) || 0;
@@ -283,7 +304,7 @@ async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExpo
     body: [
       [labels.lastName, (data.nom || "").toUpperCase(), labels.firstName, (data.prenom || "").toUpperCase()],
       [labels.email, data.email || "", `${labels.phone} :`, data.phone ? `${data.country_code ?? ""} ${data.phone}` : "—"],
-      [labels.country, data.country || "—", labels.region, data.region || "—"],
+      [labels.country, localizedCountryName(data.country, data.country_code, locale), labels.region, data.region || "—"],
     ],
     styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2 },
     columnStyles: {
@@ -334,7 +355,7 @@ async function downloadFicheInscriptionPdf(data: FicheData, config: DocumentExpo
   doc.text(labels.enrollmentFinance, 14, currentY);
   currentY += 4;
 
-  const statusLabel = data.enrollment_status === "active" ? labels.active : data.enrollment_status === "draft" ? labels.pending : data.enrollment_status;
+  const statusLabel = enrollmentStatusLabel(data.enrollment_status, locale);
   const niveauOrDuree = data.niveau_annee ? `${labels.year} ${data.niveau_annee}` : (data.duration_label || "—");
 
   const modalitesFormatted = data.modalitesLines.join("\n");
@@ -615,7 +636,7 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
                 <Field label={t("centre", "enrollmentFormFirstName")} value={(data.prenom || "").toUpperCase()} />
                 <Field label={t("centre", "enrollmentFormEmail")} value={data.email} />
                 <Field label={t("centre", "enrollmentFormPhone")} value={data.phone ? `${data.country_code ?? ""} ${data.phone}` : "—"} />
-                <Field label={t("centre", "enrollmentFormCountry")} value={data.country ?? "—"} />
+                <Field label={t("centre", "enrollmentFormCountry")} value={localizedCountryName(data.country, data.country_code, locale)} />
                 <Field label={t("centre", "enrollmentFormRegion")} value={data.region ?? "—"} />
               </div>
             </div>
@@ -659,9 +680,7 @@ export default function FicheInscriptionModal({ studentId, enrollmentId, onClose
               <Field
                 label={t("centre", "enrollmentFormStatus")}
                 value={
-                  data.enrollment_status === "active" ? t("centre", "identityActive")
-                  : data.enrollment_status === "draft" ? t("centre", "enrollmentFormPending")
-                  : data.enrollment_status
+                  enrollmentStatusLabel(data.enrollment_status, locale)
                 }
               />
             </div>

@@ -53,6 +53,9 @@ import {
   NEXA_STUDENT_QUOTAS,
   type NexaStudentQuotas,
 } from "@/app/data/nexaOffers";
+import { useI18n } from "@/app/i18n/I18nProvider";
+import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
+import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/financeI18n";
 
 type StudentAccount = {
   user: { id: string; email: string | null; created_at: string | null };
@@ -93,6 +96,7 @@ type StudentAccount = {
     code: string | null;
     city: string | null;
     status: string;
+    center_type?: string | null;
   };
   nexaQuotas?: NexaStudentQuotas | null;
   nexaOffer?: string;
@@ -144,6 +148,7 @@ type StudentAccount = {
 };
 
 export default function CenterStudentProfil() {
+  const { locale } = useI18n();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -178,6 +183,14 @@ export default function CenterStudentProfil() {
   const [canInstallApp, setCanInstallApp] = useState(false);
   const [installBusy, setInstallBusy] = useState(false);
   const [iosInstallOpen, setIosInstallOpen] = useState(false);
+  const financeEn = locale === "en" && !isTcfCanadaCenter(account?.center.center_type);
+  const financeLocale = financeEn ? "en-US" : "fr-FR";
+  const financeDate = (value?: string | null) => value
+    ? new Date(value).toLocaleString(financeLocale, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "—";
+  const localizedFinanceStatus = (status?: string | null) => financeEn
+    ? ({ pending: "Awaiting payment", current: "In progress", paid: "Paid in full", late: "Overdue", exempt: "Exempt" } as Record<string, string>)[status || ""] || status || "—"
+    : financeStatusLabel(status);
 
   const readJson = async (res: Response) => {
     const text = await res.text();
@@ -900,7 +913,7 @@ export default function CenterStudentProfil() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-lg sm:text-xl font-black">Finance</p>
-                  <p className="text-[11px] sm:text-xs font-bold text-slate-400">Paiements, montants et statut de votre dossier.</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-slate-400">{financeEn ? "Payments, amounts and financial status." : "Paiements, montants et statut de votre dossier."}</p>
                 </div>
               </div>
               {account.finance ? (
@@ -913,7 +926,7 @@ export default function CenterStudentProfil() {
                         : "border-orange-100 bg-orange-50 text-orange-600"
                   }`}
                 >
-                  {financeStatusLabel(account.finance.financial_status)}
+                  {localizedFinanceStatus(account.finance.financial_status)}
                 </span>
               ) : null}
             </div>
@@ -921,17 +934,17 @@ export default function CenterStudentProfil() {
             {account.finance ? (
               <>
                 <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <FinanceCard label="Coût programme" value={`${account.finance.tuition_fee.toLocaleString("fr-FR")} FCFA`} />
-                  <FinanceCard label="Versé" value={`${account.finance.tuition_paid.toLocaleString("fr-FR")} FCFA`} accent="emerald" />
-                  <FinanceCard label="Reste à payer" value={`${account.finance.remaining.toLocaleString("fr-FR")} FCFA`} accent="orange" />
+                  <FinanceCard label={financeEn ? "Program cost" : "Coût programme"} value={`${account.finance.tuition_fee.toLocaleString(financeLocale)} FCFA`} />
+                  <FinanceCard label={financeEn ? "Paid" : "Versé"} value={`${account.finance.tuition_paid.toLocaleString(financeLocale)} FCFA`} accent="emerald" />
+                  <FinanceCard label={financeEn ? "Balance due" : "Reste à payer"} value={`${account.finance.remaining.toLocaleString(financeLocale)} FCFA`} accent="orange" />
                 </div>
 
                 {(account.finance.discount_amount || 0) > 0 && (
                   <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Réduction</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">{financeEn ? "Discount" : "Réduction"}</p>
                     <p className="mt-1 text-sm font-black text-amber-900">
-                      −{(account.finance.discount_amount || 0).toLocaleString("fr-FR")} FCFA
-                      {account.finance.discount_reason ? ` — ${account.finance.discount_reason}` : ""}
+                      −{(account.finance.discount_amount || 0).toLocaleString(financeLocale)} FCFA
+                      {account.finance.discount_reason ? `${financeEn ? ": " : " — "}${account.finance.discount_reason}` : ""}
                     </p>
                   </div>
                 )}
@@ -939,11 +952,11 @@ export default function CenterStudentProfil() {
                 <div className="mb-5 rounded-2xl border border-neutral-100 bg-neutral-50 px-3 sm:px-4 py-4">
                   <div className="flex flex-wrap items-end justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Statut financier</p>
-                      <p className="mt-1 text-sm font-black text-slate-900">{financeStatusLabel(account.finance.financial_status)}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{financeEn ? "Financial status" : "Statut financier"}</p>
+                      <p className="mt-1 text-sm font-black text-slate-900">{localizedFinanceStatus(account.finance.financial_status)}</p>
                     </div>
                     <div className="text-left sm:text-right">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Progression</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{financeEn ? "Progress" : "Progression"}</p>
                       <p className="mt-1 text-sm font-black text-slate-900">
                         {account.finance.tuition_fee > 0
                           ? `${Math.min(100, Math.round((account.finance.tuition_paid / account.finance.tuition_fee) * 100))} %`
@@ -968,7 +981,7 @@ export default function CenterStudentProfil() {
 
                 {(account.installments?.length || 0) > 0 && (
                   <div className="mb-5">
-                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Échéancier</p>
+                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{financeEn ? "Payment schedule" : "Échéancier"}</p>
                     <div className="space-y-2">
                       {account.installments!.map((inst) => {
                         const deferred = !!inst.original_due_date && inst.original_due_date !== inst.due_date;
@@ -978,29 +991,29 @@ export default function CenterStudentProfil() {
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <p className="text-sm font-black text-slate-900">{inst.label || "Échéance"}</p>
+                                  <p className="text-sm font-black text-slate-900">{localizeInstallmentLabel(inst.label, financeEn ? "en" : "fr") || (financeEn ? "Installment" : "Échéance")}</p>
                                   {deferred && (
                                     <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-blue-600">
-                                      Reporté
+                                      {financeEn ? "Deferred" : "Reporté"}
                                     </span>
                                   )}
                                   {sold && (
                                     <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-700">
-                                      Soldé
+                                      {financeEn ? "Paid" : "Soldé"}
                                     </span>
                                   )}
                                 </div>
                                 <p className="mt-1 text-xs font-bold text-slate-500">
-                                  Échéance : {formatDateTimeFr(inst.due_date)}
+                                  {financeEn ? "Due date" : "Échéance"} : {financeDate(inst.due_date)}
                                   {deferred && inst.original_due_date
-                                    ? ` · initiale ${formatDateTimeFr(inst.original_due_date)}`
+                                    ? ` · ${financeEn ? "initially" : "initiale"} ${financeDate(inst.original_due_date)}`
                                     : ""}
                                 </p>
                                 {inst.deferral_reason && (
-                                  <p className="mt-0.5 text-[11px] font-medium text-blue-600">Motif : {inst.deferral_reason}</p>
+                                  <p className="mt-0.5 text-[11px] font-medium text-blue-600">{financeEn ? "Reason" : "Motif"} : {inst.deferral_reason}</p>
                                 )}
                               </div>
-                              <p className="text-sm font-black whitespace-nowrap">{inst.amount.toLocaleString("fr-FR")} FCFA</p>
+                              <p className="text-sm font-black whitespace-nowrap">{inst.amount.toLocaleString(financeLocale)} FCFA</p>
                             </div>
                           </div>
                         );
@@ -1010,7 +1023,7 @@ export default function CenterStudentProfil() {
                 )}
 
                 <div>
-                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Historique des paiements</p>
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{financeEn ? "Payment history" : "Historique des paiements"}</p>
                   {account.payments.length > 0 ? (
                     <div className="space-y-3">
                       {account.payments.map((payment) => (
@@ -1019,15 +1032,15 @@ export default function CenterStudentProfil() {
                           className="flex flex-col gap-2 rounded-2xl border border-neutral-100 bg-neutral-50 p-3 sm:p-4 sm:flex-row sm:items-center sm:justify-between"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm font-black whitespace-nowrap">{payment.amount.toLocaleString("fr-FR")} FCFA</p>
+                            <p className="text-sm font-black whitespace-nowrap">{payment.amount.toLocaleString(financeLocale)} FCFA</p>
                             <p className="text-xs font-bold text-slate-500 break-words">
-                              {formatDateTimeFr(payment.payment_date)}
-                              {payment.payment_method ? ` · ${payment.payment_method}` : ""}
+                              {financeDate(payment.payment_date)}
+                              {payment.payment_method ? ` · ${localizePaymentMethod(payment.payment_method, financeEn ? "en" : "fr")}` : ""}
                             </p>
                           </div>
                           <div className="text-left sm:text-right shrink-0">
                             <span className="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">
-                              Enregistré
+                              {financeEn ? "Recorded" : "Enregistré"}
                             </span>
                             {payment.receipt_number ? (
                               <p className="mt-1 text-[10px] font-bold text-slate-400 break-all">{payment.receipt_number}</p>
@@ -1038,24 +1051,24 @@ export default function CenterStudentProfil() {
                     </div>
                   ) : (
                     <p className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-6 text-center text-sm font-bold text-slate-500">
-                      Aucun paiement enregistré pour le moment.
+                      {financeEn ? "No payment has been recorded yet." : "Aucun paiement enregistré pour le moment."}
                     </p>
                   )}
                 </div>
 
                 {(account.financeEvents?.length || 0) > 0 && (
                   <div className="mt-5">
-                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">Reports & réductions</p>
+                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{financeEn ? "Deferrals and discounts" : "Reports & réductions"}</p>
                     <div className="space-y-2">
                       {account.financeEvents!.map((ev) => (
                         <div key={ev.id} className="rounded-2xl border border-neutral-100 bg-white px-4 py-3">
                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {ev.type === "deferral" ? "Report" : ev.type === "discount" ? "Réduction" : ev.type}
-                            {" · "}{formatDateTimeFr(ev.created_at)}
+                            {ev.type === "deferral" ? (financeEn ? "Deferral" : "Report") : ev.type === "discount" ? (financeEn ? "Discount" : "Réduction") : ev.type === "payment_note" ? (financeEn ? "Payment note" : "Note de paiement") : ev.type}
+                            {" · "}{financeDate(ev.created_at)}
                           </p>
                           <p className="mt-1 text-sm font-bold text-slate-800">
                             {ev.type === "discount" && ev.amount != null
-                              ? `−${Number(ev.amount).toLocaleString("fr-FR")} FCFA — `
+                              ? `−${Number(ev.amount).toLocaleString(financeLocale)} FCFA${financeEn ? ": " : " — "}`
                               : ""}
                             {ev.reason || "—"}
                           </p>
@@ -1067,7 +1080,7 @@ export default function CenterStudentProfil() {
               </>
             ) : (
               <p className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-6 text-center text-sm font-bold text-slate-500">
-                Votre dossier financier sera disponible après validation de votre inscription par le centre.
+                {financeEn ? "Your financial record will be available after the center validates your enrollment." : "Votre dossier financier sera disponible après validation de votre inscription par le centre."}
               </p>
             )}
           </section>

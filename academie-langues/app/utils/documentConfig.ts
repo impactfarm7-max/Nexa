@@ -124,12 +124,13 @@ export type SignatureRow = { id: string; label: string; signatureUrl?: string | 
 
 export function filterSignatures(
   all: Array<{ id: string; name?: string | null; title?: string | null; label?: string | null; signature_url?: string | null }>,
-  signatureIds: string[]
+  signatureIds: string[],
+  locale: "fr" | "en" = "fr",
 ): SignatureRow[] {
   const picked = signatureIds.length > 0 ? all.filter((s) => signatureIds.includes(s.id)) : all;
   return picked.map((s) => ({
     id: s.id,
-    label: s.label || [s.name, s.title].filter(Boolean).join(" · ") || "Signataire",
+    label: s.label || [s.name, s.title].filter(Boolean).join(" · ") || (locale === "en" ? "Signatory" : "Signataire"),
     signatureUrl: s.signature_url ?? null,
   }));
 }
@@ -138,12 +139,13 @@ export function filterSignatures(
 export function buildDocumentFooterLines(opts: {
   footerText?: string | null;
   billingAgentName?: string | null;
+  locale?: "fr" | "en";
 }): string[] {
   const lines: string[] = [];
   const custom = opts.footerText?.trim();
   if (custom) lines.push(custom);
   if (opts.billingAgentName?.trim()) {
-    lines.push(`Encaissé par ${opts.billingAgentName.trim()}`);
+    lines.push(`${opts.locale === "en" ? "Collected by" : "Encaissé par"} ${opts.billingAgentName.trim()}`);
   }
   return lines;
 }

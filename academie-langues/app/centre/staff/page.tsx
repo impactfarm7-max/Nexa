@@ -18,6 +18,7 @@ import StaffPayrollTab from "@/app/components/StaffPayrollTab";
 import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHeader";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeCountryName } from "@/app/utils/countryI18n";
 import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
 import {
   TCF_TEACHING_SUBJECTS,
@@ -149,6 +150,14 @@ const idTypeDisplayLabel = (type: string, en: boolean) => en
 const roleDisplayLabel = (role: string, en: boolean) => en
   ? ({ campus_manager: "Campus manager", trainer: "Trainer", staff: "Administrative officer" }[role] || role)
   : (ROLE_LABELS[role] || role);
+
+function genderDisplayLabel(value: string | null | undefined, en: boolean) {
+  if (!value || !en) return value || "—";
+  if (value === "Homme") return "Male";
+  if (value === "Femme") return "Female";
+  if (value === "Autre") return "Other";
+  return value;
+}
 
 const PERMISSION_EN: Record<string, string> = {
   filieres: "Programs",
@@ -724,7 +733,7 @@ export default function CenterStaffPage() {
               <input
                 value={waPhone}
                 onChange={(e) => setWaPhone(e.target.value)}
-                placeholder="ex. 2376XXXXXXXX"
+                placeholder={en ? "e.g. 2376XXXXXXXX" : "ex. 2376XXXXXXXX"}
                 inputMode="tel"
                 className="w-full h-10 px-3 rounded-lg border border-black/[0.08] text-[13px] font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
                 style={{ backgroundColor: SURFACE }}
@@ -1217,7 +1226,7 @@ function StaffViewModal({
             {staff.phone && <p className="text-sm text-neutral-500 font-medium">{staff.phone}</p>}
             {(staff.genre || staff.birth_date) && (
               <p className="text-sm text-neutral-500 font-medium mt-1">
-                {[staff.genre, (() => {
+                {[genderDisplayLabel(staff.genre, en), (() => {
                   const age = ageFromBirthDate(staff.birth_date);
                   return age != null ? `${age} ${en ? "years old" : "ans"}` : null;
                 })()].filter(Boolean).join(" · ")}
@@ -1270,6 +1279,10 @@ function StaffRHTab({
 }) {
   const { locale } = useI18n();
   const en = locale === "en";
+  const staffCountryRef = AFRICA_54.find((country) => country.name === staff.country || country.dial === staff.country_code);
+  const staffCountryLabel = staff.country
+    ? localizeCountryName(staffCountryRef?.code || "", staff.country, locale)
+    : "—";
   const [saving,     setSaving]     = useState(false);
   const [uploading,  setUploading]  = useState(false);
   const [showId,     setShowId]     = useState(!!staff.id_type);
@@ -1505,7 +1518,7 @@ function StaffRHTab({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <InfoField label={en ? "Gender" : "Genre"} value={staff.genre || "—"} />
+            <InfoField label={en ? "Gender" : "Genre"} value={genderDisplayLabel(staff.genre, en)} />
             <InfoField
               label={en ? "Age" : "Âge"}
               value={(() => {
@@ -1538,7 +1551,7 @@ function StaffRHTab({
           description={en ? "Country, region, city, and neighborhood." : "Pays, région, ville et quartier."}
         >
           <div className="grid grid-cols-2 gap-3">
-            <InfoField label={en ? "Country" : "Pays"} value={staff.country ? `${staff.country_code ? `(${staff.country_code}) ` : ""}${staff.country}` : "—"} />
+            <InfoField label={en ? "Country" : "Pays"} value={staff.country ? `${staff.country_code ? `(${staff.country_code}) ` : ""}${staffCountryLabel}` : "—"} />
             <InfoField label={en ? "Region" : "Région"} value={staff.region || "—"} />
             <InfoField label={en ? "City" : "Ville"} value={staff.city || "—"} />
             <InfoField label={en ? "Neighborhood" : "Quartier"} value={staff.neighborhood || "—"} />
@@ -1576,7 +1589,7 @@ function StaffRHTab({
                     <span className="font-semibold" style={{ color: BLUE }}>{idTypeDisplayLabel(staff.id_type, en)}</span>
                   </div>
                   <div>
-                    <span className="text-neutral-500 font-medium">N° : </span>
+                    <span className="text-neutral-500 font-medium">{en ? "No." : "N°"} : </span>
                     <span className="font-semibold font-mono" style={{ color: BLUE }}>{staff.id_number || "—"}</span>
                   </div>
                 </div>
@@ -1703,7 +1716,7 @@ function StaffRHTab({
           <FField label={en ? "Country" : "Pays"}>
             <select value={selCode} onChange={(e) => handleCountryChange(e.target.value)} className={selectCls}>
               <option value="">{en ? "Select..." : "Sélectionner..."}</option>
-              {AFRICA_54.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.dial})</option>)}
+              {AFRICA_54.map((c) => <option key={c.code} value={c.code}>{c.flag} {localizeCountryName(c.code, c.name, en ? "en" : "fr")} ({c.dial})</option>)}
             </select>
           </FField>
           <FField label={en ? "Region" : "Région"}>
@@ -1874,7 +1887,7 @@ function StaffAccessTab({
       setEditing(false);
       onUpdate();
     } catch (e: any) {
-      setSaveError(e.message || (en ? "Error while saving." : "Erreur lors de la sauvegarde."));
+      setSaveError(en ? "Error while saving." : (e.message || "Erreur lors de la sauvegarde."));
     } finally {
       setSaving(false);
     }
@@ -2233,6 +2246,10 @@ function StaffPrintModal({
   const isManager = staff.role === "campus_manager";
   const permLabels = PERMISSION_OPTIONS.filter((o) => staff.permissions.includes(o.key));
   const isTrainer = staff.role === "trainer";
+  const staffCountryRef = AFRICA_54.find((country) => country.name === staff.country || country.dial === staff.country_code);
+  const staffCountryLabel = staff.country
+    ? localizeCountryName(staffCountryRef?.code || "", staff.country, en ? "en" : "fr")
+    : "—";
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex flex-col">
@@ -2301,7 +2318,7 @@ function StaffPrintModal({
               <PSection title={en ? "Personal information" : "Informations personnelles"}>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
                   <PField label={en ? "Phone" : "Téléphone"} value={staff.phone || "—"} />
-                  <PField label={en ? "Country" : "Pays"} value={staff.country ? `${staff.country_code ? `(${staff.country_code}) ` : ""}${staff.country}` : "—"} />
+                  <PField label={en ? "Country" : "Pays"} value={staff.country ? `${staff.country_code ? `(${staff.country_code}) ` : ""}${staffCountryLabel}` : "—"} />
                   <PField label={en ? "Region" : "Région"} value={staff.region || "—"} />
                   <PField label={en ? "City" : "Ville"} value={staff.city || "—"} />
                   <PField label={en ? "Neighborhood" : "Quartier"} value={staff.neighborhood || "—"} />
@@ -2599,6 +2616,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
           campus_ids: selCampuses,
           permissions: needsPermissions ? selPerms : [],
           tcf_subjects: needsTcfSubjects ? selTcfSubjects : [],
+          locale: isTCF ? "fr" : (en ? "en" : "fr"),
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -2610,7 +2628,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
         temporaryPassword: data.temporaryPassword,
       });
     } catch (e: any) {
-      setError(e.message || (en ? "Error while creating the profile." : "Erreur lors de la création."));
+      setError(en ? "Error while creating the profile." : (e.message || "Erreur lors de la création."));
     } finally {
       setSaving(false);
     }
@@ -2619,7 +2637,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
   if (result) {
     const fullName = `${prenom.trim()} ${nom.trim()}`.trim();
     const roleLabel = jobTitle.trim() || roleDisplayLabel(role, en) || (en ? "Staff member" : "Collaborateur");
-    const loginUrl = typeof window !== "undefined" ? `${window.location.origin}/login` : "/login";
+    const loginUrl = typeof window !== "undefined" ? `${window.location.origin}/login?lang=${en ? "en" : "fr"}` : `/login?lang=${en ? "en" : "fr"}`;
     const accessLines = [
       `${en ? "Hello" : "Bonjour"} ${prenom.trim()},`,
       "",
@@ -2784,7 +2802,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
               <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 flex items-center gap-1"><Globe size={11} /> {en ? "Country" : "Pays"}</p>
               <select value={selCountry} onChange={(e) => handleCountrySelect(e.target.value)} className={selectCls}>
                 <option value="">{en ? "Select a country..." : "Sélectionner un pays..."}</option>
-                {AFRICA_54.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.dial})</option>)}
+                {AFRICA_54.map((c) => <option key={c.code} value={c.code}>{c.flag} {localizeCountryName(c.code, c.name, en ? "en" : "fr")} ({c.dial})</option>)}
               </select>
             </div>
 

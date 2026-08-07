@@ -787,7 +787,7 @@ export default function CenterStudentsPage() {
             <input
               value={waPhone}
               onChange={(e) => setWaPhone(e.target.value)}
-              placeholder="ex. 2376XXXXXXXX"
+              placeholder={locale === "en" ? "e.g. 2376XXXXXXXX" : "ex. 2376XXXXXXXX"}
               inputMode="tel"
               className="w-full h-12 px-4 rounded-lg border border-black/[0.08] bg-white text-base font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
               style={{ backgroundColor: SURFACE }}
@@ -1091,7 +1091,7 @@ function GradesTab({
   userId: string;
   onPassageDone?: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [matieres,       setMatieres]       = useState<FiliereMatiereRow[]>([]);
   const [gradesByMatiere, setGradesByMatiere] = useState<Record<string, GradeRow[]>>({});
   const [periods,        setPeriods]        = useState<Period[]>([]);
@@ -1171,7 +1171,9 @@ function GradesTab({
       title: titleTrim || null,
       comment: comment.trim() || null,
     });
-    if (insErr) return setError(insErr.message.includes("policy") ? t("centre", "gradesUnauthorized") : insErr.message);
+    if (insErr) return setError(insErr.message.includes("policy")
+      ? t("centre", "gradesUnauthorized")
+      : locale === "en" ? t("centre", "passageError") : insErr.message);
     setAddingFor(null); setScore(""); setComment(""); setPeriodId(""); setTitle("");
     await load();
   };

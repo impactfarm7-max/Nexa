@@ -18,6 +18,7 @@ import { passageDecisionLabelFr } from "@/app/utils/cursus-passage";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 import { downloadAttestationReussitePdf } from "@/app/utils/centerPdfExport";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeCountryName } from "@/app/utils/countryI18n";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -129,6 +130,19 @@ export default function StudentIdentityTab({
   onEnrollmentUpdated,
 }: Props) {
   const { locale, t } = useI18n();
+  const localizedCountry = (country: string | null, dial: string | null) => {
+    if (!country) return "";
+    const code = resolveStudentCountryCode(COUNTRY_OPTIONS, { country, country_code: dial });
+    return localizeCountryName(code, country, locale);
+  };
+  const enrollmentStatusLabel = (status: string) => {
+    if (locale === "fr") return status === "draft" ? t("centre", "identityDraft") : status === "active" ? t("centre", "identityActive") : status;
+    const keys: Record<string, "enrollmentStatus_active" | "enrollmentStatus_draft" | "enrollmentStatus_completed" | "enrollmentStatus_cancelled" | "enrollmentStatus_paused" | "enrollmentStatus_revoked"> = {
+      active: "enrollmentStatus_active", draft: "enrollmentStatus_draft", completed: "enrollmentStatus_completed",
+      cancelled: "enrollmentStatus_cancelled", paused: "enrollmentStatus_paused", revoked: "enrollmentStatus_revoked",
+    };
+    return keys[status] ? t("centre", keys[status]) : status;
+  };
   const idTypeLabels: Record<string, string> = {
     cni: t("centre", "identityTypeNationalCard"), passeport: t("centre", "identityTypePassport"),
     carte_sejour: t("centre", "identityTypeResidenceCard"), autre: t("centre", "identityTypeOther"),
@@ -416,7 +430,7 @@ export default function StudentIdentityTab({
       setEditingPlacement(false);
       onEnrollmentUpdated?.();
     } catch (e: unknown) {
-      setPlacementError(e instanceof Error ? e.message : t("centre", "passageError"));
+      setPlacementError(locale === "en" ? t("centre", "passageError") : (e instanceof Error ? e.message : t("centre", "passageError")));
     } finally {
       setPlacementSaving(false);
     }
@@ -437,7 +451,7 @@ export default function StudentIdentityTab({
         .select("stamp_url")
         .eq("center_id", centerId)
         .maybeSingle();
-      const signatures = filterSignatures(sigRows || [], config.signatureIds);
+      const signatures = filterSignatures(sigRows || [], config.signatureIds, locale);
       await downloadAttestationReussitePdf({
         locale,
         studentName: studentName,
@@ -451,7 +465,7 @@ export default function StudentIdentityTab({
         stampUrl: branding?.stamp_url || null,
       });
     } catch (e) {
-      alert(e instanceof Error ? e.message : t("centre", "identityAttestationError"));
+      alert(locale === "en" ? t("centre", "identityAttestationError") : (e instanceof Error ? e.message : t("centre", "identityAttestationError")));
     } finally {
       setAttestationBusy(false);
     }
@@ -534,7 +548,7 @@ export default function StudentIdentityTab({
             {details.country && (
               <p className="text-sm text-neutral-500 font-medium flex items-center gap-1.5 pt-1">
                 <Globe size={14} className="text-neutral-400" />
-                {details.country}{details.region ? `, ${details.region}` : ""}
+                {localizedCountry(details.country, details.country_code)}{details.region ? `, ${details.region}` : ""}
               </p>
             )}
           </div>
@@ -677,7 +691,7 @@ export default function StudentIdentityTab({
                 <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
                   <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityStatus")}</p>
                   <p className="font-semibold mt-0.5" style={{ color: BLUE }}>
-                    {enrollmentInfo.status === "draft" ? t("centre", "identityDraft") : enrollmentInfo.status === "active" ? t("centre", "identityActive") : enrollmentInfo.status}
+                    {enrollmentStatusLabel(enrollmentInfo.status)}
                   </p>
                 </div>
                 {enrollmentInfo.enrolled_at && (
@@ -748,7 +762,7 @@ export default function StudentIdentityTab({
             </div>
           ) : details.country ? (
             <p className="text-sm font-semibold" style={{ color: BLUE }}>
-              {details.country}{details.region ? ` · ${details.region}` : ""}
+              {localizedCountry(details.country, details.country_code)}{details.region ? ` · ${details.region}` : ""}
             </p>
           ) : (
             <p className="text-sm text-neutral-400 italic">{t("centre", "identityNotProvided")}</p>

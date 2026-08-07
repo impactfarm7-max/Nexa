@@ -1,6 +1,8 @@
 import type { DocumentExportConfig } from "@/app/utils/documentConfig";
 import { hexToRgb } from "@/app/utils/documentConfig";
 import { amountInWordsFr } from "@/app/utils/amountInWordsFr";
+import { amountInWordsEn } from "@/app/utils/amountInWordsEn";
+import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/financeI18n";
 
 const BLUE_RGB: [number, number, number] = [17, 34, 78];
 const ORANGE_RGB: [number, number, number] = [235, 103, 14];
@@ -184,7 +186,7 @@ export async function downloadJournalPdf(
       p.receipt_number || "—",
       p.student_name,
       p.filiere_name,
-      isEn ? ({ "Espèces": "Cash", "Virement": "Bank transfer", "Chèque": "Check", "Carte": "Card" }[p.payment_method] || p.payment_method) : p.payment_method,
+      localizePaymentMethod(p.payment_method, locale),
       `${fmtFCFA(p.amount)} F`,
     ]),
     styles: { fontSize: 8, cellPadding: 2, overflow: "linebreak" },
@@ -303,14 +305,16 @@ export async function buildStatementPdf(params: StatementPdfParams): Promise<{ b
     y
   );
 
-  if (params.resteAPayer > 0 && !isEn) {
+  if (params.resteAPayer > 0) {
     const pageWidth = doc.internal.pageSize.getWidth();
     y += 5;
     doc.setFont("helvetica", "italic");
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
     const words = doc.splitTextToSize(
-      `En lettres : ${amountInWordsFr(params.resteAPayer)}`,
+      isEn
+        ? `In words: ${amountInWordsEn(params.resteAPayer)}`
+        : `En lettres : ${amountInWordsFr(params.resteAPayer)}`,
       pageWidth - 28
     );
     doc.text(words, 14, y);
@@ -323,7 +327,7 @@ export async function buildStatementPdf(params: StatementPdfParams): Promise<{ b
       startY: y + 8,
       head: [[isEn ? "Installment" : "Échéance", "Date", isEn ? "Due" : "Dû", isEn ? "Paid" : "Payé", isEn ? "Status" : "Statut"]],
       body: params.installments.map((inst) => [
-        inst.label,
+        localizeInstallmentLabel(inst.label, locale),
         fmtDate(inst.due_date, locale),
         `${fmtFCFA(inst.amount)} F`,
         `${fmtFCFA(inst.paid_amount)} F`,
@@ -350,14 +354,14 @@ export async function buildStatementPdf(params: StatementPdfParams): Promise<{ b
         ? [
             fmtDate(p.payment_date, locale),
             p.receipt_number || "—",
-            isEn ? ({ "Espèces": "Cash", "Virement": "Bank transfer", "Chèque": "Check", "Carte": "Card" }[p.payment_method] || p.payment_method) : p.payment_method,
+            localizePaymentMethod(p.payment_method, locale),
             p.recorded_by_name || "—",
             `+${fmtFCFA(p.amount)} F`,
           ]
         : [
             fmtDate(p.payment_date, locale),
             p.receipt_number || "—",
-            isEn ? ({ "Espèces": "Cash", "Virement": "Bank transfer", "Chèque": "Check", "Carte": "Card" }[p.payment_method] || p.payment_method) : p.payment_method,
+            localizePaymentMethod(p.payment_method, locale),
             `+${fmtFCFA(p.amount)} F`,
           ]),
       ...(showAgent
@@ -404,7 +408,7 @@ export async function shareStatementPdf(params: StatementPdfParams): Promise<"sh
 
     await navigator.share({
       title: params.locale === "en" ? "Account statement" : "Relevé de compte",
-      text: `${params.locale === "en" ? "Account statement" : "Relevé de compte"} — ${params.studentName}`,
+      text: `${params.locale === "en" ? "Account statement: " : "Relevé de compte — "}${params.studentName}`,
       files: [file],
     });
     return "shared";
@@ -705,11 +709,12 @@ export async function downloadProgrammePdf(
       doc.setFont("helvetica", "italic");
       doc.setFontSize(8);
       doc.setTextColor(70, 70, 70);
-      if (!en) {
-        const words = doc.splitTextToSize(`En lettres : ${niv.totalWords}`, pageWidth - 28);
-        doc.text(words, 14, y);
-        y += words.length * 4 + 2;
-      }
+      const words = doc.splitTextToSize(
+        en ? `In words: ${amountInWordsEn(niv.total)}` : `En lettres : ${niv.totalWords}`,
+        pageWidth - 28,
+      );
+      doc.text(words, 14, y);
+      y += words.length * 4 + 2;
       if (niv.installments.length) {
         autoTable(doc, {
           startY: y,
@@ -751,11 +756,12 @@ export async function downloadProgrammePdf(
     doc.setFont("helvetica", "italic");
     doc.setFontSize(9);
     doc.setTextColor(60, 60, 60);
-    if (!en) {
-      const gWords = doc.splitTextToSize(`En lettres : ${data.globalTotalWords}`, pageWidth - 28);
-      doc.text(gWords, 14, y);
-      y += gWords.length * 4.5 + 4;
-    }
+    const gWords = doc.splitTextToSize(
+      en ? `In words: ${amountInWordsEn(data.globalTotal)}` : `En lettres : ${data.globalTotalWords}`,
+      pageWidth - 28,
+    );
+    doc.text(gWords, 14, y);
+    y += gWords.length * 4.5 + 4;
     if (data.globalInstallments.length) {
       autoTable(doc, {
         startY: y,

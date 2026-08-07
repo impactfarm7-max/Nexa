@@ -10,6 +10,7 @@ import { supabase } from "@/app/utils/supabase";
 import { downloadStatementPdf } from "@/app/utils/centerPdfExport";
 import { fetchDocumentExportConfig } from "@/app/utils/documentConfig";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/financeI18n";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -330,7 +331,7 @@ export default function StudentFinanceTab({
         filiereName: filiereName.trim() || t("centre", "studentFinanceProgram"),
         resteAPayer: remaining,
         installments: installments.map((i) => ({
-          label: i.label || t("centre", "studentFinanceInstallment"),
+          label: localizeInstallmentLabel(i.label, locale) || t("centre", "studentFinanceInstallment"),
           due_date: i.due_date || "",
           amount: i.amount,
           paid_amount: Number(i.paid_amount) || 0,
@@ -339,7 +340,7 @@ export default function StudentFinanceTab({
         payments: payments.map((p) => ({
           payment_date: p.payment_date || "",
           receipt_number: p.receipt_number,
-          payment_method: p.payment_method || t("centre", "studentFinancePayment"),
+          payment_method: localizePaymentMethod(p.payment_method, locale) || t("centre", "studentFinancePayment"),
           amount: p.amount,
           recorded_by_name: p.recorded_by_name,
         })),
@@ -350,7 +351,7 @@ export default function StudentFinanceTab({
       });
     } catch (e: unknown) {
       console.error(e);
-      alert(e instanceof Error ? e.message : t("centre", "studentFinanceDownloadError"));
+      alert(locale === "en" ? t("centre", "studentFinanceDownloadError") : (e instanceof Error ? e.message : t("centre", "studentFinanceDownloadError")));
     } finally {
       setPdfBusy(false);
     }
@@ -387,7 +388,7 @@ export default function StudentFinanceTab({
       await load();
       onPaid();
     } catch (e: unknown) {
-      setCouponError(e instanceof Error ? e.message : t("centre", "passageError"));
+      setCouponError(locale === "en" ? t("centre", "passageError") : (e instanceof Error ? e.message : t("centre", "passageError")));
     } finally {
       setCouponApplying(false);
     }
@@ -420,7 +421,7 @@ export default function StudentFinanceTab({
       await load();
       onPaid();
     } catch (e: unknown) {
-      setDeferError(e instanceof Error ? e.message : t("centre", "passageError"));
+      setDeferError(locale === "en" ? t("centre", "passageError") : (e instanceof Error ? e.message : t("centre", "passageError")));
     } finally {
       setDeferSaving(false);
     }
@@ -522,7 +523,7 @@ export default function StudentFinanceTab({
             <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-1">{t("centre", "studentFinanceDiscountApplied")}</p>
             <p className="text-sm font-semibold text-amber-900">
               −{fmtFCFA(summary.discount_amount, locale)} FCFA
-              {summary.discount_reason ? ` — ${summary.discount_reason}` : ""}
+              {summary.discount_reason ? `${locale === "en" ? ": " : " — "}${summary.discount_reason}` : ""}
             </p>
           </div>
         )}
@@ -543,7 +544,7 @@ export default function StudentFinanceTab({
                   }}
                   className={`${FIELD_INPUT} flex-1 uppercase text-sm`}
                 >
-                  <option value="">{t("centre", "studentFinanceSelectCoupon")}</option>
+                  <option value="">{locale === "en" ? "Select a center coupon" : t("centre", "studentFinanceSelectCoupon")}</option>
                   {availableCoupons.map((c) => (
                     <option key={c.id} value={c.code}>
                       {c.code} ({c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value, locale)} FCFA`})
@@ -597,10 +598,10 @@ export default function StudentFinanceTab({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-bold text-neutral-800">
-                        {inst.label || (inst.position ? `${t("centre", "studentFinanceInstallment")} ${inst.position}` : t("centre", "studentFinanceInstallment"))}
+                        {localizeInstallmentLabel(inst.label, locale) || (inst.position ? `${t("centre", "studentFinanceInstallment")} ${inst.position}` : t("centre", "studentFinanceInstallment"))}
                       </p>
                       <span className="text-xs font-semibold text-neutral-500">
-                        — {fmtDate(inst.due_date, locale)}
+                        {locale === "en" ? ": " : " — "}{fmtDate(inst.due_date, locale)}
                       </span>
                       {deferred && (
                         <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
@@ -657,7 +658,7 @@ export default function StudentFinanceTab({
                     <ArrowDownCircle size={14} className="text-emerald-600" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-bold" style={{ color: BLUE }}>{p.payment_method || t("centre", "studentFinancePayment")}</p>
+                    <p className="text-sm font-bold" style={{ color: BLUE }}>{localizePaymentMethod(p.payment_method, locale) || t("centre", "studentFinancePayment")}</p>
                     <p className="text-xs text-neutral-500 font-medium">
                       {fmtDate(p.payment_date, locale)}
                       {p.recorded_by_name && ` · ${t("centre", "studentFinanceBy")} ${p.recorded_by_name}`}
@@ -682,12 +683,18 @@ export default function StudentFinanceTab({
             {events.map((ev) => (
               <div key={ev.id} className="py-3.5 px-1">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                  {ev.type === "deferral" ? t("centre", "studentFinanceDefer") : ev.type === "discount" ? t("centre", "financeDiscount") : ev.type}
+                  {ev.type === "deferral"
+                    ? t("centre", "studentFinanceDefer")
+                    : ev.type === "discount"
+                      ? t("centre", "financeDiscount")
+                      : ev.type === "payment_note"
+                        ? t("centre", "studentFinancePaymentNote")
+                        : ev.type}
                   {" · "}{fmtDate(ev.created_at, locale)}
                   {ev.created_by_name && ` · ${ev.created_by_name}`}
                 </p>
                 <p className="text-sm font-semibold mt-0.5" style={{ color: BLUE }}>
-                  {ev.type === "discount" && ev.amount != null ? `−${fmtFCFA(Number(ev.amount), locale)} F — ` : ""}
+                  {ev.type === "discount" && ev.amount != null ? `−${fmtFCFA(Number(ev.amount), locale)} F${locale === "en" ? ": " : " — "}` : ""}
                   {ev.reason || "—"}
                 </p>
               </div>
@@ -701,7 +708,7 @@ export default function StudentFinanceTab({
           <div className="bg-white rounded-2xl w-full max-w-md p-5 sm:p-6 space-y-4 shadow-xl border border-black/[0.06]">
             <div className="flex items-center justify-between gap-3">
               <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>
-                {t("centre", "studentFinanceDefer")} — {deferTarget.label || t("centre", "studentFinanceInstallment")}
+                {t("centre", "studentFinanceDefer")}{locale === "en" ? ": " : " — "}{localizeInstallmentLabel(deferTarget.label, locale) || t("centre", "studentFinanceInstallment")}
               </h3>
               <button
                 type="button"

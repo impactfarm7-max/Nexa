@@ -342,6 +342,7 @@ export async function POST(req: NextRequest) {
 
     const isPluri = Boolean(callerCenterId) && isPluriannualCenter(centerTypeRaw);
     const centerType = normalizeCenterType(centerTypeRaw);
+    const emailLocale = centerTypeRaw === "tcf_canada" ? "fr" : (body.locale === "en" ? "en" : "fr");
 
     // Centres libres (generic) : genre + date de naissance obligatoires — sans toucher TCF / courte
     const genreRaw = typeof body.genre === "string" ? body.genre.trim() : "";
@@ -618,10 +619,14 @@ export async function POST(req: NextRequest) {
     // ---- 8. Envoyer les accès ----
     let emailResult = { sent: false };
     try {
+      const loginBase = (process.env.NEXT_PUBLIC_SITE_URL || "https://nexa.fr").replace(/\/$/, "");
+      const loginUrl = `${loginBase}/login?lang=${emailLocale}`;
       emailResult = await sendEmail({
         to: normalizedEmail,
-        subject: "Vos accès Nexa Academy",
-        text: `Bonjour ${prenom},\n\nVotre compte étudiant a été créé.\nIdentifiant : ${normalizedEmail}\nMot de passe temporaire : ${password}\n\nConnectez-vous sur : ${process.env.NEXT_PUBLIC_SITE_URL || "https://nexa.fr"}/login\n\nIl vous sera demandé de le changer à la première connexion.`,
+        subject: emailLocale === "en" ? "Your Nexa Academy access" : "Vos accès Nexa Academy",
+        text: emailLocale === "en"
+          ? `Hello ${prenom},\n\nYour learner account has been created.\nEmail: ${normalizedEmail}\nTemporary password: ${password}\n\nSign in here: ${loginUrl}\n\nYou will be asked to change your password the first time you sign in.`
+          : `Bonjour ${prenom},\n\nVotre compte étudiant a été créé.\nIdentifiant : ${normalizedEmail}\nMot de passe temporaire : ${password}\n\nConnectez-vous sur : ${loginUrl}\n\nIl vous sera demandé de le changer à la première connexion.`,
       });
     } catch (mailErr) {
       console.error("[etudiants] email échoué (non bloquant):", mailErr);

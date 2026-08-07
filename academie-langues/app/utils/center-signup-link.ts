@@ -14,9 +14,11 @@ export function getCenterSignupRef(center: CenterSignupRef | null | undefined): 
 export function buildCenterSignupUrl(
   origin: string,
   center: CenterSignupRef | null | undefined,
+  locale?: "fr" | "en",
 ): string | null {
   const ref = getCenterSignupRef(center);
   if (!ref) return null;
   const param = center?.signup_slug ? "centre" : "centerCode";
-  return `${origin}/login?signup=1&${param}=${encodeURIComponent(ref)}`;
+  const languageParam = locale ? `&lang=${locale}` : "";
+  return `${origin}/login?signup=1&${param}=${encodeURIComponent(ref)}${languageParam}`;
 }

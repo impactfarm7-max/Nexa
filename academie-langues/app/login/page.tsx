@@ -38,7 +38,7 @@ const ORANGE = "#eb670e";
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useI18n();
+  const { t, setLocale } = useI18n();
 
   const [step, setStep] = useState<Step>("LOGIN");
   const [loading, setLoading] = useState(false);
@@ -82,6 +82,9 @@ function LoginPageContent() {
   const supportPhone = "+237683375069";
 
   useEffect(() => {
+    const linkLocale = searchParams.get("lang");
+    if (linkLocale === "fr" || linkLocale === "en") setLocale(linkLocale);
+
     supabase
       .from("countries_ref")
       .select("code, name, phone_code")
@@ -171,7 +174,7 @@ function LoginPageContent() {
       loadCenter({ code: codeFromLink });
     }
 
-  }, [searchParams]);
+  }, [searchParams, setLocale]);
 
   const handleCallSupport = () => {
     setShowSupportMenu(false);

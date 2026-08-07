@@ -1,6 +1,7 @@
 "use client";
 
 import { amountInWordsFr } from "@/app/utils/amountInWordsFr";
+import { amountInWordsEn } from "@/app/utils/amountInWordsEn";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
 function parsePositiveAmount(amount: number | string | null | undefined): number {
@@ -23,10 +24,9 @@ export function AmountInWords({
   const { locale } = useI18n();
   const n = parsePositiveAmount(amount);
   if (n <= 0) return null;
-  if (locale === "en") return null;
   return (
     <p className={className ?? "text-[11px] text-neutral-500 italic mt-1.5 leading-snug"}>
-      En lettres : {amountInWordsFr(n)}
+      {locale === "en" ? `In words: ${amountInWordsEn(n)}` : `En lettres : ${amountInWordsFr(n)}`}
     </p>
   );
 }

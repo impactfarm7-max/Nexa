@@ -22,6 +22,7 @@ import {
 } from "@/app/utils/cursus-passage";
 import { isPluriannualCenter } from "@/app/data/center-types";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeCountryName } from "@/app/utils/countryI18n";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -366,6 +367,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         groupe_id: groupeId || null,
         campus_id: campusId || null,
         tuition_fee: parseFloat(tuitionFee) || 0,
+        locale: isLibreCenter ? locale : "fr",
       };
       if (isLibreCenter) {
         body.genre = genre.trim();
@@ -479,17 +481,17 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={FIELD_LABEL}>{t("centre", "createStudentFirstName")}</label>
-                <input type="text" placeholder="ex. Jean" value={prenom} onChange={(e) => setPrenom(e.target.value)} className={FIELD_INPUT} />
+                <input type="text" placeholder={locale === "en" ? "e.g. John" : "ex. Jean"} value={prenom} onChange={(e) => setPrenom(e.target.value)} className={FIELD_INPUT} />
               </div>
               <div>
                 <label className={FIELD_LABEL}>{t("centre", "createStudentLastName")}</label>
-                <input type="text" placeholder="ex. Dupont" value={nom} onChange={(e) => setNom(e.target.value)} className={FIELD_INPUT} />
+                <input type="text" placeholder={locale === "en" ? "e.g. Smith" : "ex. Dupont"} value={nom} onChange={(e) => setNom(e.target.value)} className={FIELD_INPUT} />
               </div>
             </div>
 
             <div>
               <label className={FIELD_LABEL}>Email *</label>
-              <input type="email" placeholder="jean.dupont@example.com" value={email} onChange={(e) => setEmail(e.target.value)} className={FIELD_INPUT} />
+              <input type="email" placeholder={locale === "en" ? "john.smith@example.com" : "jean.dupont@example.com"} value={email} onChange={(e) => setEmail(e.target.value)} className={FIELD_INPUT} />
             </div>
 
             {isLibreCenter && (
@@ -521,7 +523,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
               <select value={countryCode} onChange={(e) => handleCountryChange(e.target.value)} className={FIELD_INPUT}>
                 <option value="">{t("centre", "createStudentSelectCountry")}</option>
                 {AFRICA_54.map((c) => (
-                  <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.dial})</option>
+                  <option key={c.code} value={c.code}>{c.flag} {localizeCountryName(c.code, c.name, locale)} ({c.dial})</option>
                 ))}
               </select>
             </div>
@@ -554,7 +556,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={FIELD_LABEL}>{t("centre", "identityGuardianName")} <span className="font-normal text-neutral-400">{t("centre", "createStudentOptional")}</span></label>
-                  <input type="text" placeholder="ex. Jean Dupont" value={guardianName} onChange={(e) => setGuardianName(e.target.value)} className={FIELD_INPUT} />
+                  <input type="text" placeholder={locale === "en" ? "e.g. John Smith" : "ex. Jean Dupont"} value={guardianName} onChange={(e) => setGuardianName(e.target.value)} className={FIELD_INPUT} />
                 </div>
                 <div>
                   <label className={FIELD_LABEL}>{t("centre", "identityRelationship")} <span className="font-normal text-neutral-400">{t("centre", "createStudentOptional")}</span></label>
@@ -571,7 +573,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                   <label className={FIELD_LABEL_INLINE}><Globe size={14} /> {t("centre", "identityGuardianCountry")}</label>
                   <select value={guardianCountryCode} onChange={(e) => handleGuardianCountryChange(e.target.value)} className={FIELD_INPUT}>
                     {AFRICA_54.map((c) => (
-                      <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.dial})</option>
+                      <option key={c.code} value={c.code}>{c.flag} {localizeCountryName(c.code, c.name, locale)} ({c.dial})</option>
                     ))}
                   </select>
                 </div>
@@ -612,7 +614,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                 <label className={FIELD_LABEL_INLINE}><MapPin size={14} /> {t("centre", "createStudentCampusRequired")}</label>
                 <select value={campusId} onChange={(e) => setCampusId(e.target.value)} className={FIELD_INPUT}>
                   <option value="">{t("centre", "createStudentChooseCampus")}</option>
-                  {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}{c.city ? ` — ${c.city}` : ""}</option>)}
+                  {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}{c.city ? `${locale === "en" ? ": " : " — "}${c.city}` : ""}</option>)}
                 </select>
               </div>
             )}

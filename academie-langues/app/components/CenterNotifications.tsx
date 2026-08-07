@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { usePushNotifications } from "@/app/hooks/usePushNotifications";
 import { BLUE } from "@/app/centre/center-page-ui";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeNotificationMessage } from "@/app/utils/notificationI18n";
 
 type NotificationRow = {
   id: string;
@@ -25,6 +26,16 @@ export default function CenterNotifications() {
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [open, setOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (panelRef.current && !panelRef.current.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("pointerdown", closeOutside);
+    return () => document.removeEventListener("pointerdown", closeOutside);
+  }, [open]);
 
   useEffect(() => {
     const init = async () => {
@@ -79,7 +90,7 @@ export default function CenterNotifications() {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={panelRef}>
       <button
         type="button"
         onClick={() => {
@@ -128,7 +139,7 @@ export default function CenterNotifications() {
             ) : (
               notifications.map((notification) => (
                 <div key={notification.id} className="rounded-lg p-3 hover:bg-[#11224E]/[0.03]">
-                  <p className="text-[14px] font-semibold text-neutral-800">{notification.message}</p>
+                  <p className="text-[14px] font-semibold text-neutral-800">{localizeNotificationMessage(notification.message, locale)}</p>
                   <p className="mt-1 text-[12px] font-medium text-neutral-400">
                     {new Date(notification.created_at).toLocaleString(locale === "fr" ? "fr-FR" : "en-US", {
                       dateStyle: "short",

@@ -18,6 +18,7 @@ import { buildDocumentFooterLines } from "@/app/utils/documentConfig";
 import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHeader";
 import { AmountInWords } from "@/app/components/AmountInWords";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/financeI18n";
 import {
   CenterPageLayout,
   CenterPageHeader,
@@ -171,11 +172,13 @@ function docPreviewStyle(format: PrintFormat): React.CSSProperties {
 
 function financeDocumentFooter(
   docConfig: DocumentExportConfig | null,
+  locale: "fr" | "en",
   billingAgentName?: string | null,
 ) {
   return buildDocumentFooterLines({
     footerText: docConfig?.footerText,
     billingAgentName,
+    locale,
   });
 }
 
@@ -467,7 +470,10 @@ export default function CenterFinancePage() {
         }>("/api/center/finance-ledger", session.access_token);
         setBranding(data.branding);
         setDocConfig(data.docConfig);
-        setSignatures(data.signatures || []);
+        setSignatures((data.signatures || []).map((signature) => ({
+          ...signature,
+          label: locale === "en" && signature.label === "Signataire" ? "Signatory" : signature.label,
+        })));
         setRecords(data.records || []);
       } finally {
         setDataLoading(false);
@@ -503,7 +509,10 @@ export default function CenterFinancePage() {
 
         setBranding(data.branding);
         setDocConfig(data.docConfig);
-        setSignatures(data.signatures || []);
+        setSignatures((data.signatures || []).map((signature) => ({
+          ...signature,
+          label: locale === "en" && signature.label === "Signataire" ? "Signatory" : signature.label,
+        })));
         setRecords(data.records || []);
       } finally {
         setDataLoading(false);
@@ -1024,7 +1033,7 @@ export default function CenterFinancePage() {
                         p.payment_date,
                         p.receipt_number || "",
                         p.student_name,
-                        p.payment_method,
+                        paymentMethodLabel(p.payment_method),
                         String(Math.round(p.amount)),
                       ]),
                     ];
@@ -1073,7 +1082,7 @@ export default function CenterFinancePage() {
             <FinanceKpiCard label={t("centre", "summaryOpenReceivables")} value={`${fmtFCFA(totalImpayes)} F`} tone="red" />
             <FinanceKpiCard label={t("centre", "summaryRecovery")} value={`${tauxRecouvrement} %`} tone="blue" />
             <FinanceKpiCard label={t("centre", "financeOverdue")} value={String(lateCount)} tone={lateCount > 0 ? "red" : "blue"} />
-            <FinanceKpiCard label="C.A." value={`${fmtFCFA(totalCA)} F`} tone="blue" />
+            <FinanceKpiCard label={locale === "en" ? t("centre", "summaryInvoicedRevenue") : "C.A."} value={`${fmtFCFA(totalCA)} F`} tone="blue" />
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
@@ -1174,11 +1183,11 @@ export default function CenterFinancePage() {
                   <span>{t("centre", "financeCurrent")}</span>
                 </span>
                 <StatSep />
-                <span className="font-semibold text-amber-700">{fmtFCFA(agingAmounts.d30)} F</span> 30j
+                <span className="font-semibold text-amber-700">{fmtFCFA(agingAmounts.d30)} F</span> {locale === "en" ? "30d" : "30j"}
                 <StatSep />
-                <span className="font-semibold text-red-600">{fmtFCFA(agingAmounts.d60)} F</span> 60j
+                <span className="font-semibold text-red-600">{fmtFCFA(agingAmounts.d60)} F</span> {locale === "en" ? "60d" : "60j"}
                 <StatSep />
-                <span className="font-semibold text-red-600">{fmtFCFA(agingAmounts.d90)} F</span> 90+j
+                <span className="font-semibold text-red-600">{fmtFCFA(agingAmounts.d90)} F</span> {locale === "en" ? "90+d" : "90+j"}
               </p>
 
               {([
@@ -1322,7 +1331,7 @@ export default function CenterFinancePage() {
                   </div>
                   {journalByMethod.map(m => (
                     <div key={m.method} className="bg-white p-3 rounded-xl border flex items-center gap-2">
-                      <p className="text-[9px] font-black uppercase text-neutral-400">{m.method}</p>
+                      <p className="text-[9px] font-black uppercase text-neutral-400">{localizePaymentMethod(m.method, locale)}</p>
                       <p className="text-sm font-black text-emerald-600">{fmtFCFA(m.total)} F</p>
                     </div>
                   ))}
@@ -1515,7 +1524,7 @@ export default function CenterFinancePage() {
                   >
                     <option value="">{t("centre", "financeAutomaticAllocation")}</option>
                     {payInstallments.map(inst => (
-                      <option key={inst.id} value={inst.id}>{inst.label} — {fmtFCFA(Math.max(0, inst.amount - (inst.paid_amount || 0)))} F {t("centre", "financeRemainingLower")} ({t("centre", "financeDueLower")} {fmtDateShort(inst.due_date, locale)})</option>
+                      <option key={inst.id} value={inst.id}>{localizeInstallmentLabel(inst.label, locale)}{locale === "en" ? ": " : " — "}{fmtFCFA(Math.max(0, inst.amount - (inst.paid_amount || 0)))} F {t("centre", "financeRemainingLower")} ({t("centre", "financeDueLower")} {fmtDateShort(inst.due_date, locale)})</option>
                     ))}
                   </select>
                   <p className="text-[9px] text-neutral-400 mt-1">
@@ -1571,7 +1580,7 @@ export default function CenterFinancePage() {
                 </p>
                 <AmountInWords amount={paymentSuccess.amount} className="text-[11px] text-neutral-500 italic mt-1 leading-snug" />
                 <p className="mt-1 text-xs font-mono text-neutral-500">
-                  N° {paymentSuccess.receiptNumber}
+                  {locale === "en" ? "No." : "N°"} {paymentSuccess.receiptNumber}
                 </p>
                 {paymentSuccess.resteApres > 0 ? (
                   <>
@@ -1698,7 +1707,7 @@ export default function CenterFinancePage() {
                 <p className="text-[10px] font-bold uppercase tracking-wider text-violet-600 mb-0.5">{t("centre", "financeCouponDiscount")}</p>
                 <p className="text-xs font-semibold text-violet-800">
                   −{fmtFCFA(appliedDiscount(invoiceModal))} F
-                  {invoiceModal.discount_reason ? ` — ${invoiceModal.discount_reason}` : ""}
+                  {invoiceModal.discount_reason ? `${locale === "en" ? ": " : " — "}${invoiceModal.discount_reason}` : ""}
                 </p>
               </div>
             )}
@@ -1723,7 +1732,7 @@ export default function CenterFinancePage() {
                       return (
                       <tr key={inst.id} className={inst.status === "late" ? "bg-red-50/50" : ""}>
                         <td className="p-2.5 font-semibold" style={{ color: BLUE }}>
-                          {inst.label}
+                          {localizeInstallmentLabel(inst.label, locale)}
                           {deferred && (
                             <span className="ml-1.5 text-[8px] font-bold uppercase px-1.5 py-0.5 rounded bg-sky-50 text-sky-700">{t("centre", "financeDeferred")}</span>
                           )}
@@ -1808,7 +1817,7 @@ export default function CenterFinancePage() {
             )}
 
             <div className="text-center pt-3 border-t border-black/[0.06] text-neutral-400 space-y-0.5 font-medium" style={{ fontSize: printFormat === "ticket" ? "7px" : "9px" }}>
-              {financeDocumentFooter(docConfig).map((line) => (
+              {financeDocumentFooter(docConfig, locale).map((line) => (
                 <p key={line}>{line}</p>
               ))}
             </div>
@@ -1882,7 +1891,7 @@ export default function CenterFinancePage() {
             <input
               value={waPhone}
               onChange={(e) => setWaPhone(e.target.value)}
-              placeholder="ex. 2376XXXXXXXX"
+              placeholder={locale === "en" ? "e.g. 2376XXXXXXXX" : "ex. 2376XXXXXXXX"}
               inputMode="tel"
               className="w-full h-10 px-3 rounded-lg border border-black/[0.08] text-[13px] font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
               style={{ backgroundColor: SURFACE }}

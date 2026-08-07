@@ -12,6 +12,7 @@ import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtFCFA, fmtNum } from "@/app/utils/reports-export";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { formatShort } from "@/app/utils/reports-period";
 
 type ReductionsReport = {
   period: { label: string };
@@ -35,12 +36,17 @@ type ReductionsReport = {
 };
 
 function ReductionsContent() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
   } = useReportPage<ReductionsReport>("reductions-coupons");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
+  const localizedPeriod = from === to
+    ? formatShort(from, locale)
+    : locale === "en"
+      ? `${formatShort(from, locale)} to ${formatShort(to, locale)}`
+      : `${formatShort(from, locale)} — ${formatShort(to, locale)}`;
 
   const exportCsv = useCallback(() => {
     if (!report) return;
@@ -55,7 +61,7 @@ function ReductionsContent() {
     if (!report) return;
     await exportPdf({
       title: t("centre", "discountTitle"),
-      periodLabel: report.period.label,
+      periodLabel: localizedPeriod,
       kpis: [
         { label: t("centre", "discountTotal"), value: fmtFCFA(report.kpis.totalReductions) },
         { label: t("centre", "discountAffectedRecords"), value: fmtNum(report.kpis.nbDossiers) },
@@ -84,7 +90,7 @@ function ReductionsContent() {
       activeSlug="reductions-coupons"
       centerType={centerType}
       title={t("centre", "discountTitle")}
-      periodLabel={report?.period?.label}
+      periodLabel={localizedPeriod}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
@@ -107,7 +113,7 @@ function ReductionsContent() {
         <>
           <ReportKpiGrid
             items={[
-              { label: t("centre", "discountTotal"), value: fmtFCFA(report.kpis.totalReductions), sub: report.period.label },
+              { label: t("centre", "discountTotal"), value: fmtFCFA(report.kpis.totalReductions), sub: localizedPeriod },
               { label: t("centre", "discountAffectedRecords"), value: fmtNum(report.kpis.nbDossiers) },
               { label: t("centre", "discountActiveCoupons"), value: fmtNum(report.kpis.nbCouponsActifs) },
               { label: t("centre", "discountCouponUses"), value: fmtNum(report.kpis.utilisationsCoupons) },

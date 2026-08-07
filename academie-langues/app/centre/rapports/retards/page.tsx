@@ -40,6 +40,11 @@ function RetardsContent() {
     from, to, campusId, filiereId, setFilter, setPeriodRange,
   } = useReportPage<RetardsReport>("retards");
   const { exportPdf, pdfLoading } = useReportPdfExport(centerId);
+  const localizedPeriod = from === to
+    ? formatShort(from, locale)
+    : locale === "en"
+      ? `${formatShort(from, locale)} to ${formatShort(to, locale)}`
+      : `${formatShort(from, locale)} — ${formatShort(to, locale)}`;
 
   const exportCsv = useCallback(() => {
     if (!report) return;
@@ -61,7 +66,7 @@ function RetardsContent() {
     if (!report) return;
     await exportPdf({
       title: t("centre", "overdueTitle"),
-      periodLabel: report.period.label,
+      periodLabel: localizedPeriod,
       kpis: [
         { label: t("centre", "summaryOverdueRecords"), value: fmtNum(report.kpis.nbEnRetard) },
         { label: t("centre", "collectionsAmount"), value: fmtFCFA(report.kpis.montantRetard) },
@@ -90,7 +95,7 @@ function RetardsContent() {
       activeSlug="retards"
       centerType={centerType}
       title={t("centre", "overdueTitle")}
-      periodLabel={from === to ? formatShort(from, locale) : `${formatShort(from, locale)} — ${formatShort(to, locale)}`}
+      periodLabel={localizedPeriod}
       dateFrom={from}
       dateTo={to}
       onPeriodChange={setPeriodRange}
