@@ -45,7 +45,7 @@ function RetardsContent() {
     if (!report) return;
     downloadCsv(
       `retards-${report.period.label.replace(/\s+/g, "-")}.csv`,
-      [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance"), "Aging", t("centre", "recoveryNextDueDate"), t("centre", "overdueLateInstallments")],
+      [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance"), t("centre", "overdueAging"), t("centre", "recoveryNextDueDate"), t("centre", "overdueLateInstallments")],
       report.rows.map((r) => [
         r.student,
         r.filiere,
@@ -70,7 +70,7 @@ function RetardsContent() {
       sections: [
         {
           title: t("centre", "overdueList"),
-          columns: [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance"), "Aging"],
+          columns: [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance"), t("centre", "overdueAging")],
           rows: report.rows.map((r) => [
             r.student,
             r.filiere,
@@ -172,7 +172,7 @@ function RetardsContent() {
               { key: "student", label: t("centre", "enrollmentLearner") },
               { key: "filiere", label: t("centre", "enrollmentProgram") },
               { key: "reste", label: t("centre", "summaryBalance"), align: "right" },
-              { key: "aging", label: "Aging" },
+              { key: "aging", label: t("centre", "overdueAging") },
               { key: "nextDue", label: t("centre", "overdueNextDueShort") },
             ]}
             rows={report.rows.map((row) => ({

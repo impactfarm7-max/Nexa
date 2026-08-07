@@ -245,7 +245,7 @@ export default function StudentFinanceTab({
         { headers: { Authorization: `Bearer ${session.access_token}` } },
       );
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || t("centre", "studentFinanceLoadError"));
+      if (!res.ok) throw new Error(locale === "en" ? t("centre", "studentFinanceLoadError") : (json.error || t("centre", "studentFinanceLoadError")));
 
       const s = json.summary || {};
       setSummary({
@@ -381,7 +381,7 @@ export default function StudentFinanceTab({
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || t("centre", "studentFinanceCouponInvalid"));
+      if (!res.ok) throw new Error(locale === "en" ? t("centre", "studentFinanceCouponInvalid") : (json.error || t("centre", "studentFinanceCouponInvalid")));
       setCouponCode("");
       setCouponSuccess(t("centre", "studentFinanceCouponSuccess", { amount: fmtFCFA(Number(json.discount_amount) || 0, locale) }));
       await load();
@@ -413,7 +413,7 @@ export default function StudentFinanceTab({
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || t("centre", "studentFinanceDeferralError"));
+      if (!res.ok) throw new Error(locale === "en" ? t("centre", "studentFinanceDeferralError") : (json.error || t("centre", "studentFinanceDeferralError")));
       setDeferTarget(null);
       setDeferDate("");
       setDeferReason("");

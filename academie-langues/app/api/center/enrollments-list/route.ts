@@ -142,7 +142,7 @@ export async function GET(req: Request) {
         } else if (niv?.annee) {
           dur = `Année ${niv.annee}`;
         }
-        const nameRaw = e.filieres?.name ?? "Aucune filière";
+        const nameRaw = e.filieres?.name ?? "";
         return {
           id: e.id,
           filiere_id: e.filiere_id,

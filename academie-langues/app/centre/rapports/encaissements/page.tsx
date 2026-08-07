@@ -31,7 +31,7 @@ function EncaissementsContent() {
     if (["espèces", "especes", "cash"].includes(normalized)) return t("centre", "collectionsMethodCash");
     if (["virement", "bank transfer", "transfer"].includes(normalized)) return t("centre", "collectionsMethodTransfer");
     if (["carte", "card", "carte bancaire"].includes(normalized)) return t("centre", "collectionsMethodCard");
-    if (["mobile money", "mobile_money", "momo"].includes(normalized)) return "Mobile Money";
+    if (["mobile money", "mobile_money", "momo"].includes(normalized)) return t("centre", "collectionsMethodMobileMoney");
     return method;
   };
   const {

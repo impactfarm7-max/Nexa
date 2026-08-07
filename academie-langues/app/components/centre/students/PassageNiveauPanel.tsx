@@ -59,7 +59,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
         { headers: { Authorization: `Bearer ${session.access_token}` } },
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("centre", "passageLoadError"));
+      if (!res.ok) throw new Error(locale === "en" ? t("centre", "passageLoadError") : (data.error || t("centre", "passageLoadError")));
       setPreview(data);
       setAcademicYear(data.proposed_academic_year || "");
       setReason("");
@@ -102,7 +102,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("centre", "passageDecisionError"));
+      if (!res.ok) throw new Error(locale === "en" ? t("centre", "passageDecisionError") : (data.error || t("centre", "passageDecisionError")));
       setDoneMsg(
         decision === "admis"
           ? t("centre", "passageAdmittedSuccess")
@@ -139,7 +139,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("centre", "passageCancelDeferredError"));
+      if (!res.ok) throw new Error(locale === "en" ? t("centre", "passageCancelDeferredError") : (data.error || t("centre", "passageCancelDeferredError")));
       setDoneMsg(t("centre", "passageDeferredCancelled"));
       await load();
       onDone();

@@ -17,6 +17,7 @@ import StaffAcademicTab from "@/app/components/StaffAcademicTab";
 import StaffPayrollTab from "@/app/components/StaffPayrollTab";
 import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHeader";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
 import {
   TCF_TEACHING_SUBJECTS,
@@ -142,6 +143,33 @@ const ID_TYPE_LABELS: Record<string, string> = {
   carte_sejour:"Carte de séjour",
   autre:       "Autre document",
 };
+const idTypeDisplayLabel = (type: string, en: boolean) => en
+  ? ({ cni: "National identity card", passeport: "Passport", carte_sejour: "Residence permit", autre: "Other document" }[type] || type)
+  : (ID_TYPE_LABELS[type] || type);
+const roleDisplayLabel = (role: string, en: boolean) => en
+  ? ({ campus_manager: "Campus manager", trainer: "Trainer", staff: "Administrative officer" }[role] || role)
+  : (ROLE_LABELS[role] || role);
+
+const PERMISSION_EN: Record<string, string> = {
+  filieres: "Programs",
+  cours: "Courses and assignments",
+  planning: "Schedule",
+  examens: "Exams and grades",
+  etudiants: "Students",
+  staff: "Staff management",
+  finance: "Finance",
+  rapports: "Reports",
+  communaute: "Community",
+  lives: "Live sessions",
+  parametres: "Settings",
+};
+const PERMISSION_GROUP_EN: Record<string, string> = {
+  pedagogie: "Academics",
+  effectifs: "People",
+  pilotage: "Management",
+};
+const permissionLabel = (key: string, fallback: string, en: boolean) => en ? (PERMISSION_EN[key] || fallback) : fallback;
+const permissionGroupLabel = (id: string, fallback: string, en: boolean) => en ? (PERMISSION_GROUP_EN[id] || fallback) : fallback;
 
 const ADMIN_ROLES    = ["campus_manager", "staff"];
 const ACADEMIC_ROLES = ["trainer"];
@@ -156,15 +184,16 @@ type ExportStaffRow = {
   statut: string;
 };
 
-function toStaffExportRows(list: StaffRow[]): ExportStaffRow[] {
+function toStaffExportRows(list: StaffRow[], locale: "fr" | "en"): ExportStaffRow[] {
+  const en = locale === "en";
   return list.map((s) => ({
     nom: s.nom,
     prenom: s.prenom,
     email: s.email || "",
     telephone: s.phone || "",
-    type: ACADEMIC_ROLES.includes(s.role) ? "Académique" : "Administratif",
-    role: s.job_title || ROLE_LABELS[s.role] || s.role,
-    statut: s.center_status === "active" ? "Actif" : "Suspendu",
+    type: ACADEMIC_ROLES.includes(s.role) ? (en ? "Academic" : "Académique") : (en ? "Administrative" : "Administratif"),
+    role: s.job_title || roleDisplayLabel(s.role, en),
+    statut: s.center_status === "active" ? (en ? "Active" : "Actif") : (en ? "Suspended" : "Suspendu"),
   }));
 }
 
@@ -172,15 +201,17 @@ function staffFilterCaption(
   search: string,
   filter: "all" | "administratif" | "academique",
   count: number,
+  locale: "fr" | "en",
 ) {
+  const en = locale === "en";
   const cat =
-    filter === "all" ? "Toutes catégories"
-    : filter === "academique" ? "Académique"
-    : "Administratif";
+    filter === "all" ? (en ? "All categories" : "Toutes catégories")
+    : filter === "academique" ? (en ? "Academic" : "Académique")
+    : (en ? "Administrative" : "Administratif");
   const parts = [cat];
   const q = search.trim();
-  if (q) parts.push(`Recherche: ${q}`);
-  parts.push(`${count} ligne${count > 1 ? "s" : ""}`);
+  if (q) parts.push(`${en ? "Search" : "Recherche"}: ${q}`);
+  parts.push(en ? `${count} row${count === 1 ? "" : "s"}` : `${count} ligne${count > 1 ? "s" : ""}`);
   return parts.join(" · ");
 }
 
@@ -191,8 +222,10 @@ function staffPdfFilename() {
   return `staff-${new Date().toISOString().slice(0, 10)}.pdf`;
 }
 
-function downloadStaffCsv(rows: ExportStaffRow[]) {
-  const header = ["Nom", "Prénom", "Email", "Téléphone", "Type", "Rôle", "Statut"];
+function downloadStaffCsv(rows: ExportStaffRow[], locale: "fr" | "en") {
+  const header = locale === "en"
+    ? ["Last name", "First name", "Email", "Phone", "Type", "Role", "Status"]
+    : ["Nom", "Prénom", "Email", "Téléphone", "Type", "Rôle", "Statut"];
   const lines = [
     header,
     ...rows.map((r) => [r.nom, r.prenom, r.email, r.telephone, r.type, r.role, r.statut]),
@@ -209,7 +242,8 @@ function downloadStaffCsv(rows: ExportStaffRow[]) {
   URL.revokeObjectURL(url);
 }
 
-async function buildStaffPdfDoc(rows: ExportStaffRow[], filterCaption: string) {
+async function buildStaffPdfDoc(rows: ExportStaffRow[], filterCaption: string, locale: "fr" | "en") {
+  const en = locale === "en";
   const { default: jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -224,8 +258,8 @@ async function buildStaffPdfDoc(rows: ExportStaffRow[], filterCaption: string) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
-  doc.text(`Filtre: ${filterCaption}`, 14, 25, { maxWidth: pageWidth - 28 });
-  doc.text(`Genere le ${new Date().toLocaleString("fr-FR")}`, 14, 31);
+  doc.text(`${en ? "Filter" : "Filtre"}: ${filterCaption}`, 14, 25, { maxWidth: pageWidth - 28 });
+  doc.text(`${en ? "Generated on" : "Généré le"} ${new Date().toLocaleString(en ? "en-GB" : "fr-FR")}`, 14, 31);
 
   doc.setDrawColor(...blue);
   doc.setLineWidth(0.4);
@@ -233,7 +267,7 @@ async function buildStaffPdfDoc(rows: ExportStaffRow[], filterCaption: string) {
 
   autoTable(doc, {
     startY: 40,
-    head: [["Nom", "Prenom", "Email", "Telephone", "Type", "Role", "Statut"]],
+    head: [en ? ["Last name", "First name", "Email", "Phone", "Type", "Role", "Status"] : ["Nom", "Prénom", "Email", "Téléphone", "Type", "Rôle", "Statut"]],
     body: rows.map((r) => [r.nom, r.prenom, r.email, r.telephone, r.type, r.role, r.statut]),
     styles: { font: "helvetica", fontSize: 8, cellPadding: 2, overflow: "linebreak", textColor: [40, 40, 40] },
     headStyles: { fillColor: blue, textColor: 255, fontStyle: "bold" },
@@ -244,13 +278,13 @@ async function buildStaffPdfDoc(rows: ExportStaffRow[], filterCaption: string) {
   return doc;
 }
 
-async function downloadStaffPdf(rows: ExportStaffRow[], filterCaption: string) {
-  const doc = await buildStaffPdfDoc(rows, filterCaption);
+async function downloadStaffPdf(rows: ExportStaffRow[], filterCaption: string, locale: "fr" | "en") {
+  const doc = await buildStaffPdfDoc(rows, filterCaption, locale);
   doc.save(staffPdfFilename());
 }
 
-async function silentDownloadStaffPdf(rows: ExportStaffRow[], filterCaption: string) {
-  const doc = await buildStaffPdfDoc(rows, filterCaption);
+async function silentDownloadStaffPdf(rows: ExportStaffRow[], filterCaption: string, locale: "fr" | "en") {
+  const doc = await buildStaffPdfDoc(rows, filterCaption, locale);
   const filename = staffPdfFilename();
   const blob = doc.output("blob");
   const url = URL.createObjectURL(blob);
@@ -278,6 +312,8 @@ function openWhatsApp(text: string, phone?: string) {
 // PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════════════════
 export default function CenterStaffPage() {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const [staffList,       setStaffList]       = useState<StaffRow[]>([]);
   const [campuses,        setCampuses]        = useState<Campus[]>([]);
   const [centerId,        setCenterId]        = useState<string | null>(null);
@@ -477,7 +513,7 @@ export default function CenterStaffPage() {
   };
 
   const deleteStaff = async (id: string) => {
-    if (!window.confirm("Supprimer définitivement ce membre du staff ?")) return;
+    if (!window.confirm(en ? "Permanently delete this staff member?" : "Supprimer définitivement ce membre du staff ?")) return;
     await supabase.from("profiles").delete().eq("id", id);
     setStaffList((prev) => prev.filter((s) => s.id !== id));
     setSelectedStaffId(null);
@@ -504,17 +540,17 @@ export default function CenterStaffPage() {
 
   const activeCount = staffList.filter((s) => s.center_status === "active").length;
   const pausedCount = staffList.filter((s) => s.center_status === "paused").length;
-  const exportRows = toStaffExportRows(listStaff);
+  const exportRows = toStaffExportRows(listStaff, locale);
   const canExport = exportRows.length > 0;
-  const filterCaption = staffFilterCaption(search, filter, exportRows.length);
+  const filterCaption = staffFilterCaption(search, filter, exportRows.length, locale);
 
   const sendWhatsAppPdf = async () => {
     if (!canExport) return;
     setShareBusy(true);
     try {
-      const filename = await silentDownloadStaffPdf(exportRows, filterCaption);
+      const filename = await silentDownloadStaffPdf(exportRows, filterCaption, locale);
       openWhatsApp(
-        `Liste du staff Nexa (${exportRows.length}). PDF pret a joindre: ${filename}`,
+        en ? `Nexa staff list (${exportRows.length}). PDF ready to attach: ${filename}` : `Liste du staff Nexa (${exportRows.length}). PDF prêt à joindre : ${filename}`,
         waPhone,
       );
       setWaPhoneOpen(false);
@@ -542,7 +578,7 @@ export default function CenterStaffPage() {
       <CenterPageLayout
         header={
           <CenterPageHeader
-            title="Staff"
+            title={en ? "Staff" : "Personnel"}
             actions={
               <>
                 <StaffShareMenu
@@ -550,13 +586,13 @@ export default function CenterStaffPage() {
                   busy={shareBusy}
                   onCsv={() => {
                     if (!canExport) return;
-                    downloadStaffCsv(exportRows);
+                    downloadStaffCsv(exportRows, locale);
                   }}
                   onPdf={async () => {
                     if (!canExport) return;
                     setShareBusy(true);
                     try {
-                      await downloadStaffPdf(exportRows, filterCaption);
+                      await downloadStaffPdf(exportRows, filterCaption, locale);
                     } finally {
                       setShareBusy(false);
                     }
@@ -569,8 +605,8 @@ export default function CenterStaffPage() {
                 <AgentIaComingSoonButton />
                 <OutlineHeaderButton className="print:hidden" onClick={() => setShowCreate(true)}>
                   <Plus size={15} strokeWidth={2.25} />
-                  <span className="hidden sm:inline">Créer membre</span>
-                  <span className="sm:hidden">Créer</span>
+                  <span className="hidden sm:inline">{en ? "Create member" : "Créer membre"}</span>
+                  <span className="sm:hidden">{en ? "Create" : "Créer"}</span>
                 </OutlineHeaderButton>
               </>
             }
@@ -584,32 +620,35 @@ export default function CenterStaffPage() {
                 className="inline-flex flex-wrap items-center rounded-lg border border-black/[0.06] px-3 py-1.5"
                 style={{ backgroundColor: SURFACE }}
               >
-                <span className="font-bold">{staffList.length}</span> collaborateur{staffList.length > 1 ? "s" : ""}
+                <span className="inline-flex items-center gap-1">
+                  <span className="font-bold">{staffList.length}</span>
+                  <span>{en ? `staff member${staffList.length !== 1 ? "s" : ""}` : `collaborateur${staffList.length > 1 ? "s" : ""}`}</span>
+                </span>
                 <StatSep />
-                <span className="font-semibold text-emerald-700">{activeCount} actif{activeCount > 1 ? "s" : ""}</span>
+                <span className="font-semibold text-emerald-700">{activeCount} {en ? "active" : `actif${activeCount > 1 ? "s" : ""}`}</span>
                 <StatSep />
-                <span className="font-semibold text-red-600">{pausedCount} suspendu{pausedCount > 1 ? "s" : ""}</span>
+                <span className="font-semibold text-red-600">{pausedCount} {en ? "suspended" : `suspendu${pausedCount > 1 ? "s" : ""}`}</span>
               </span>
             }
           >
-            <ToolbarSearch value={search} onChange={setSearch} placeholder="Rechercher…" />
+            <ToolbarSearch value={search} onChange={setSearch} placeholder={en ? "Search…" : "Rechercher…"} />
             <ToolbarSelect
-              label="Filtrer par catégorie"
+              label={en ? "Filter by category" : "Filtrer par catégorie"}
               value={filter}
               onChange={(v) => setFilter(v as typeof filter)}
               minWidth="9rem"
               options={[
-                { value: "all", label: "Toutes catégories" },
-                { value: "academique", label: "Académique" },
-                { value: "administratif", label: "Administratif" },
+                { value: "all", label: en ? "All categories" : "Toutes catégories" },
+                { value: "academique", label: en ? "Academic" : "Académique" },
+                { value: "administratif", label: en ? "Administrative" : "Administratif" },
               ]}
             />
           </CenterToolbar>
 
           {listStaff.length === 0 ? (
-            <EmptyState title="Aucun collaborateur trouvé" hint="Modifiez la recherche ou les filtres." />
+            <EmptyState title={en ? "No staff member found" : "Aucun collaborateur trouvé"} hint={en ? "Change your search or filters." : "Modifiez la recherche ou les filtres."} />
           ) : (
-            <CenterDataTable columns={["Nom", "Type", "Statut", "Rôle", "Actions"]}>
+            <CenterDataTable columns={[en ? "Name" : "Nom", en ? "Type" : "Type", en ? "Status" : "Statut", en ? "Role" : "Rôle", en ? "Actions" : "Actions"]}>
               {listStaff.map((s, i) => {
                 const isAcademic = ACADEMIC_ROLES.includes(s.role);
                 return (
@@ -621,19 +660,19 @@ export default function CenterStaffPage() {
                       <p className="text-[12px] text-neutral-400 font-medium mt-0.5 truncate">{s.email}</p>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap text-[13px] font-medium text-neutral-600">
-                      {isAcademic ? "Académique" : "Administratif"}
+                      {isAcademic ? (en ? "Academic" : "Académique") : (en ? "Administrative" : "Administratif")}
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
                       <span className={`text-[13px] font-semibold ${s.center_status === "active" ? "text-neutral-600" : "text-red-600"}`}>
-                        {s.center_status === "active" ? "Actif" : "Suspendu"}
+                        {s.center_status === "active" ? (en ? "Active" : "Actif") : (en ? "Suspended" : "Suspendu")}
                       </span>
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap text-[13px] font-medium text-neutral-700">
-                      {s.job_title || ROLE_LABELS[s.role]}
+                      {s.job_title || roleDisplayLabel(s.role, en)}
                     </td>
                     <TableActions>
-                      <TableBtnPreview onClick={() => setViewingStaff(s)} />
-                      <TableBtnModify onClick={() => editStaff(s.id)} />
+                      <TableBtnPreview onClick={() => setViewingStaff(s)} label={en ? "Preview" : "Aperçu"} />
+                      <TableBtnModify onClick={() => editStaff(s.id)} label={en ? "Edit" : "Modifier"} />
                     </TableActions>
                   </CenterTableRow>
                 );
@@ -674,14 +713,14 @@ export default function CenterStaffPage() {
             >
               <div className="flex items-start justify-between gap-3 mb-3">
                 <h3 className="text-base font-extrabold tracking-tight" style={{ color: BLUE }}>WhatsApp (PDF)</h3>
-                <button type="button" onClick={() => setWaPhoneOpen(false)} className="text-neutral-400 hover:text-neutral-700" aria-label="Fermer">
+                <button type="button" onClick={() => setWaPhoneOpen(false)} className="text-neutral-400 hover:text-neutral-700" aria-label={en ? "Close" : "Fermer"}>
                   <X size={18} />
                 </button>
               </div>
               <p className="text-[12px] text-neutral-500 font-medium mb-3 leading-relaxed">
-                Le PDF de la liste filtrée est préparé dans l&apos;app, puis WhatsApp s&apos;ouvre pour ce numéro. Joignez ensuite le fichier téléchargé.
+                {en ? "The PDF for the filtered list is prepared in the app, then WhatsApp opens for this number. Attach the downloaded file." : "Le PDF de la liste filtrée est préparé dans l’app, puis WhatsApp s’ouvre pour ce numéro. Joignez ensuite le fichier téléchargé."}
               </p>
-              <label className="block text-[11px] font-semibold text-neutral-500 mb-1.5">Numéro (indicatif pays)</label>
+              <label className="block text-[11px] font-semibold text-neutral-500 mb-1.5">{en ? "Number (country code)" : "Numéro (indicatif pays)"}</label>
               <input
                 value={waPhone}
                 onChange={(e) => setWaPhone(e.target.value)}
@@ -697,7 +736,7 @@ export default function CenterStaffPage() {
                   disabled={shareBusy}
                   className="flex-1 h-10 rounded-lg text-xs font-semibold bg-neutral-100 text-neutral-600"
                 >
-                  Annuler
+                  {en ? "Cancel" : "Annuler"}
                 </button>
                 <button
                   type="button"
@@ -707,7 +746,7 @@ export default function CenterStaffPage() {
                   style={{ backgroundColor: BLUE }}
                 >
                   {shareBusy ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} />}
-                  Ouvrir WhatsApp
+                  {en ? "Open WhatsApp" : "Ouvrir WhatsApp"}
                 </button>
               </div>
             </div>
@@ -719,10 +758,10 @@ export default function CenterStaffPage() {
 
   // ── render : dossier collaborateur ────────────────────────────────────────
   const staffTabs = ([
-    { key: "rh" as const, label: "Dossier", icon: UserCog, show: true },
-    { key: "access" as const, label: "Accès", icon: ShieldCheck, show: true },
-    { key: "academic" as const, label: "Académique", icon: GraduationCap, show: selectedStaff?.role === "trainer" },
-    { key: "payroll" as const, label: "Paie", icon: Wallet, show: true },
+    { key: "rh" as const, label: en ? "Record" : "Dossier", icon: UserCog, show: true },
+    { key: "access" as const, label: en ? "Access" : "Accès", icon: ShieldCheck, show: true },
+    { key: "academic" as const, label: en ? "Academic" : "Académique", icon: GraduationCap, show: selectedStaff?.role === "trainer" },
+    { key: "payroll" as const, label: en ? "Payroll" : "Paie", icon: Wallet, show: true },
   ]).filter((t) => t.show);
 
   return (
@@ -743,7 +782,7 @@ export default function CenterStaffPage() {
                 />
                 <div className="min-w-0">
                   <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-400 leading-none mb-1">
-                    Modifier le dossier
+                    {en ? "Edit record" : "Modifier le dossier"}
                   </p>
                   <h1
                     className="text-xl sm:text-2xl font-extrabold tracking-tight leading-tight truncate"
@@ -775,7 +814,7 @@ export default function CenterStaffPage() {
             </div>
           </header>
         ) : (
-          <CenterPageHeader title="Collaborateur" backButton={<BackButton onClick={() => setSelectedStaffId(null)} />} />
+          <CenterPageHeader title={en ? "Staff member" : "Collaborateur"} backButton={<BackButton onClick={() => setSelectedStaffId(null)} />} />
         )
       }
     >
@@ -783,7 +822,7 @@ export default function CenterStaffPage() {
         {!selectedStaff ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-2 text-neutral-300">
             <Users size={40} strokeWidth={1.5} />
-            <p className="text-xs font-bold uppercase tracking-wider">Sélectionnez un membre</p>
+            <p className="text-xs font-bold uppercase tracking-wider">{en ? "Select a member" : "Sélectionnez un membre"}</p>
           </div>
         ) : (
           <div className="nexa-center-shell pt-4 sm:pt-6 pb-8" style={{ backgroundColor: PAGE_BG }}>
@@ -851,7 +890,7 @@ export default function CenterStaffPage() {
                     }}
                     className="h-10 px-4 rounded-lg border border-black/[0.08] bg-white inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-700 hover:bg-black/[0.03]"
                   >
-                    <Edit3 size={14} /> Modifier
+                    <Edit3 size={14} /> {en ? "Edit" : "Modifier"}
                   </button>
                 )}
                 <button
@@ -859,7 +898,7 @@ export default function CenterStaffPage() {
                   onClick={() => void toggleStatus(selectedStaff.id, selectedStaff.center_status)}
                   className="h-10 px-4 rounded-lg border border-black/[0.08] bg-white text-sm font-semibold text-neutral-700 hover:bg-black/[0.03]"
                 >
-                  {selectedStaff.center_status === "active" ? "Suspendre" : "Réactiver"}
+                  {selectedStaff.center_status === "active" ? (en ? "Suspend" : "Suspendre") : (en ? "Reactivate" : "Réactiver")}
                 </button>
               </div>
             </div>
@@ -907,6 +946,8 @@ function StaffSection({
   accent: "admin" | "academic";
   children: ReactNode;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   return (
     <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5">
       <div className="flex items-center gap-3 mb-4">
@@ -927,7 +968,7 @@ function StaffSection({
         <div className="flex flex-col items-center justify-center py-10 rounded-xl border border-dashed border-neutral-300 bg-white/80 text-neutral-400 gap-2">
           <Users size={24} strokeWidth={1.5} />
           <p className="text-sm font-medium text-neutral-500">{emptyLabel}</p>
-          <p className="text-[10px] text-neutral-400">Utilisez « Créer membre » pour créer un profil</p>
+          <p className="text-[10px] text-neutral-400">{locale === "en" ? "Use Create member to create a profile" : "Utilisez « Créer membre » pour créer un profil"}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -939,6 +980,7 @@ function StaffSection({
 }
 
 function StaffCard({ staff, onSelect }: { staff: StaffRow; onSelect: () => void }) {
+  const { locale } = useI18n();
   const isAcademic = staff.role === "trainer";
   return (
     <button
@@ -956,7 +998,7 @@ function StaffCard({ staff, onSelect }: { staff: StaffRow; onSelect: () => void 
             <ChevronRight size={16} className="text-neutral-300 shrink-0 mt-0.5 group-hover:text-orange-500 transition-colors" />
           </div>
           <p className="text-[11px] font-semibold text-neutral-500 truncate mt-0.5">
-            {staff.job_title || ROLE_LABELS[staff.role]}
+            {staff.job_title || roleDisplayLabel(staff.role, locale === "en")}
           </p>
           <div className="mt-2.5 flex items-center gap-2 flex-wrap">
             <span
@@ -966,7 +1008,7 @@ function StaffCard({ staff, onSelect }: { staff: StaffRow; onSelect: () => void 
                   : "bg-red-50 text-red-600 border-red-200"
               }`}
             >
-              {staff.center_status === "active" ? "Actif" : "Suspendu"}
+              {staff.center_status === "active" ? (locale === "en" ? "Active" : "Actif") : (locale === "en" ? "Suspended" : "Suspendu")}
             </span>
             <span
               className="text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border"
@@ -976,7 +1018,7 @@ function StaffCard({ staff, onSelect }: { staff: StaffRow; onSelect: () => void 
                   : { backgroundColor: `${ORANGE}08`, color: ORANGE, borderColor: `${ORANGE}25` }
               }
             >
-              {isAcademic ? "Académique" : "Admin"}
+              {isAcademic ? (locale === "en" ? "Academic" : "Académique") : (locale === "en" ? "Administrative" : "Admin")}
             </span>
             {staff.campuses?.[0] && (
               <span className="text-[9px] font-bold text-neutral-400 truncate inline-flex items-center gap-1">
@@ -1071,6 +1113,8 @@ function StaffShareMenu({
   onPdf: () => void | Promise<void>;
   onWhatsAppPdf: () => void | Promise<void>;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -1103,7 +1147,7 @@ function StaffShareMenu({
         className="gap-1.5"
       >
         {busy ? <Loader2 size={14} className="animate-spin" /> : <Share2 size={14} strokeWidth={2.25} />}
-        <span className="hidden sm:inline">Partager</span>
+        <span className="hidden sm:inline">{en ? "Share" : "Partager"}</span>
       </OutlineHeaderButton>
       {open && (
         <div
@@ -1149,17 +1193,19 @@ function StaffViewModal({
   onClose: () => void;
   onOpenDossier: () => void;
 }) {
-  const statusLabel = staff.center_status === "active" ? "Actif" : "Suspendu";
+  const { locale } = useI18n();
+  const en = locale === "en";
+  const statusLabel = staff.center_status === "active" ? (en ? "Active" : "Actif") : (en ? "Suspended" : "Suspendu");
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
       <div
         className="bg-white rounded-3xl p-6 md:p-7 max-w-2xl w-full shadow-2xl relative my-8 border border-black/[0.06]"
         onClick={(e) => e.stopPropagation()}
       >
-        <button type="button" onClick={onClose} className="absolute top-6 right-6 text-neutral-400 hover:text-black" aria-label="Fermer">
+        <button type="button" onClick={onClose} className="absolute top-6 right-6 text-neutral-400 hover:text-black" aria-label={en ? "Close" : "Fermer"}>
           <X size={20} />
         </button>
-        <h3 className="text-lg font-extrabold tracking-tight mb-5" style={{ color: BLUE }}>Aperçu du collaborateur</h3>
+        <h3 className="text-lg font-extrabold tracking-tight mb-5" style={{ color: BLUE }}>{en ? "Staff member preview" : "Aperçu du collaborateur"}</h3>
         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
           <StaffAvatar staff={staff} size="lg" />
           <div className="min-w-0 text-center sm:text-left">
@@ -1173,22 +1219,22 @@ function StaffViewModal({
               <p className="text-sm text-neutral-500 font-medium mt-1">
                 {[staff.genre, (() => {
                   const age = ageFromBirthDate(staff.birth_date);
-                  return age != null ? `${age} ans` : null;
+                  return age != null ? `${age} ${en ? "years old" : "ans"}` : null;
                 })()].filter(Boolean).join(" · ")}
               </p>
             )}
             <p className="text-sm font-semibold mt-3" style={{ color: BLUE }}>
-              {staff.job_title || ROLE_LABELS[staff.role]}
+              {staff.job_title || roleDisplayLabel(staff.role, en)}
             </p>
             <p className="text-xs text-neutral-500 font-medium mt-1">
-              {ACADEMIC_ROLES.includes(staff.role) ? "Académique" : "Administratif"}
+              {ACADEMIC_ROLES.includes(staff.role) ? (en ? "Academic" : "Académique") : (en ? "Administrative" : "Administratif")}
               {staff.campuses?.[0] ? ` · ${staff.campuses[0]}` : ""}
             </p>
           </div>
         </div>
         <div className="flex gap-2 pt-6">
           <button type="button" onClick={onClose} className="flex-1 h-11 rounded-xl text-xs font-semibold bg-neutral-100 text-neutral-600">
-            Fermer
+            {en ? "Close" : "Fermer"}
           </button>
           <button
             type="button"
@@ -1196,7 +1242,7 @@ function StaffViewModal({
             className="flex-1 h-11 rounded-xl text-xs font-semibold text-white inline-flex items-center justify-center gap-1.5"
             style={{ backgroundColor: BLUE }}
           >
-            <Edit3 size={14} /> Ouvrir le dossier
+            <Edit3 size={14} /> {en ? "Open record" : "Ouvrir le dossier"}
           </button>
         </div>
       </div>
@@ -1222,6 +1268,8 @@ function StaffRHTab({
   onUpdate: () => void;
   onExport?: () => void;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const [saving,     setSaving]     = useState(false);
   const [uploading,  setUploading]  = useState(false);
   const [showId,     setShowId]     = useState(!!staff.id_type);
@@ -1337,11 +1385,11 @@ function StaffRHTab({
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { alert("Max 2 Mo."); return; }
+    if (file.size > 2 * 1024 * 1024) { alert(en ? "Maximum 2 MB." : "Maximum 2 Mo."); return; }
     setUploading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(en ? "Session expired." : "Session expirée.");
 
       const body = new FormData();
       body.append("file", file);
@@ -1353,11 +1401,11 @@ function StaffRHTab({
         body,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Upload échoué.");
+      if (!res.ok) throw new Error(en ? "Upload failed." : (data.error || "Upload échoué."));
       onUpdate();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Erreur inconnue.";
-      alert("Erreur : " + message);
+      const message = err instanceof Error ? err.message : (en ? "Unknown error." : "Erreur inconnue.");
+      alert((en ? "Error" : "Erreur") + " : " + message);
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -1397,7 +1445,7 @@ function StaffRHTab({
     if (error) {
       const { error: fallbackErr } = await supabase.from("profiles").update(baseUpdate).eq("id", staff.id);
       if (fallbackErr) {
-        alert("Erreur lors de la sauvegarde : " + fallbackErr.message);
+        alert(en ? "Unable to save the changes." : `Erreur lors de la sauvegarde : ${fallbackErr.message}`);
         setSaving(false);
         return;
       }
@@ -1418,8 +1466,8 @@ function StaffRHTab({
 
         <StaffDossierSection
           icon={UserCog}
-          title="Informations générales"
-          description="Photo, coordonnées et fonction du collaborateur."
+          title={en ? "General information" : "Informations générales"}
+          description={en ? "Photo, contact details, and staff member role." : "Photo, coordonnées et fonction du collaborateur."}
           actions={
             onExport ? (
               <button
@@ -1427,7 +1475,7 @@ function StaffRHTab({
                 onClick={onExport}
                 className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors"
               >
-                <Download size={12} /> Télécharger
+                <Download size={12} /> {en ? "Download" : "Télécharger"}
               </button>
             ) : undefined
           }
@@ -1435,7 +1483,7 @@ function StaffRHTab({
           <div
             className="rounded-xl border border-black/[0.06] bg-white p-4 flex items-center gap-4 cursor-pointer hover:border-[#eb670e]/40 transition-colors"
             onClick={() => fileRef.current?.click()}
-            title="Cliquer pour changer la photo"
+            title={en ? "Click to change the photo" : "Cliquer pour changer la photo"}
           >
             <div className="relative shrink-0">
               {staff.avatar_url ? (
@@ -1452,24 +1500,24 @@ function StaffRHTab({
             <div className="min-w-0">
               <p className="font-extrabold text-base tracking-tight truncate" style={{ color: BLUE }}>{staff.prenom} {staff.nom}</p>
               <p className="text-sm text-neutral-500 font-medium truncate">{staff.email}</p>
-              <p className="text-xs text-neutral-500 font-medium mt-0.5">{staff.phone || "Tél. non renseigné"}</p>
+              <p className="text-xs text-neutral-500 font-medium mt-0.5">{staff.phone || (en ? "Phone not provided" : "Tél. non renseigné")}</p>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <InfoField label="Genre" value={staff.genre || "—"} />
+            <InfoField label={en ? "Gender" : "Genre"} value={staff.genre || "—"} />
             <InfoField
-              label="Âge"
+              label={en ? "Age" : "Âge"}
               value={(() => {
                 const age = ageFromBirthDate(staff.birth_date);
-                return age != null ? `${age} ans` : "—";
+                return age != null ? `${age} ${en ? "years" : "ans"}` : "—";
               })()}
             />
-            <InfoField label="Intitulé de poste" value={staff.job_title || "—"} />
-            <InfoField label="Ancienneté" value={`${staff.seniority_years} an(s)`} />
-            <InfoField label="Salaire de base" value={staff.base_salary ? `${staff.base_salary.toLocaleString("fr-FR")} XAF` : "—"} />
-            <InfoField label="Prime / Bonus" value={staff.prime > 0 ? `${staff.prime.toLocaleString("fr-FR")} XAF` : "—"} />
-            <InfoField label="Volume horaire" value={`${weeklyHours} h/semaine`} />
+            <InfoField label={en ? "Job title" : "Intitulé de poste"} value={staff.job_title || "—"} />
+            <InfoField label={en ? "Seniority" : "Ancienneté"} value={`${staff.seniority_years} ${en ? "year(s)" : "an(s)"}`} />
+            <InfoField label={en ? "Base salary" : "Salaire de base"} value={staff.base_salary ? `${staff.base_salary.toLocaleString(en ? "en-US" : "fr-FR")} XAF` : "—"} />
+            <InfoField label={en ? "Bonus" : "Prime / Bonus"} value={staff.prime > 0 ? `${staff.prime.toLocaleString(en ? "en-US" : "fr-FR")} XAF` : "—"} />
+            <InfoField label={en ? "Weekly hours" : "Volume horaire"} value={`${weeklyHours} ${en ? "hours/week" : "h/semaine"}`} />
           </div>
 
           {isTCF && staff.role === "trainer" && (
@@ -1486,21 +1534,21 @@ function StaffRHTab({
 
         <StaffDossierSection
           icon={Globe}
-          title="Localisation"
-          description="Pays, région, ville et quartier."
+          title={en ? "Location" : "Localisation"}
+          description={en ? "Country, region, city, and neighborhood." : "Pays, région, ville et quartier."}
         >
           <div className="grid grid-cols-2 gap-3">
-            <InfoField label="Pays" value={staff.country ? `${staff.country_code ? `(${staff.country_code}) ` : ""}${staff.country}` : "—"} />
-            <InfoField label="Région" value={staff.region || "—"} />
-            <InfoField label="Ville" value={staff.city || "—"} />
-            <InfoField label="Quartier" value={staff.neighborhood || "—"} />
+            <InfoField label={en ? "Country" : "Pays"} value={staff.country ? `${staff.country_code ? `(${staff.country_code}) ` : ""}${staff.country}` : "—"} />
+            <InfoField label={en ? "Region" : "Région"} value={staff.region || "—"} />
+            <InfoField label={en ? "City" : "Ville"} value={staff.city || "—"} />
+            <InfoField label={en ? "Neighborhood" : "Quartier"} value={staff.neighborhood || "—"} />
           </div>
         </StaffDossierSection>
 
         <StaffDossierSection
           icon={CreditCard}
-          title="Pièce d'identité"
-          description="Type et numéro du document d'identité."
+          title={en ? "Identity document" : "Pièce d'identité"}
+          description={en ? "Identity document type and number." : "Type et numéro du document d'identité."}
         >
           <button
             type="button"
@@ -1508,12 +1556,12 @@ function StaffRHTab({
             className="w-full flex items-center justify-between rounded-xl border border-black/[0.06] bg-white px-4 py-3 hover:bg-black/[0.02] transition-colors"
           >
             <span className="text-sm font-semibold text-neutral-600 flex items-center gap-1.5">
-              <CreditCard size={14} /> Document
+              <CreditCard size={14} /> {en ? "Document" : "Document"}
             </span>
             <div className="flex items-center gap-2">
               {!staff.id_type && (
                 <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
-                  Non renseigné
+                  {en ? "Not provided" : "Non renseigné"}
                 </span>
               )}
               {showId ? <ChevronDown size={14} className="text-neutral-400" /> : <ChevronRight size={14} className="text-neutral-400" />}
@@ -1525,7 +1573,7 @@ function StaffRHTab({
                 <div className="flex flex-wrap gap-6 text-sm">
                   <div>
                     <span className="text-neutral-500 font-medium">Type : </span>
-                    <span className="font-semibold" style={{ color: BLUE }}>{ID_TYPE_LABELS[staff.id_type] ?? staff.id_type}</span>
+                    <span className="font-semibold" style={{ color: BLUE }}>{idTypeDisplayLabel(staff.id_type, en)}</span>
                   </div>
                   <div>
                     <span className="text-neutral-500 font-medium">N° : </span>
@@ -1534,7 +1582,7 @@ function StaffRHTab({
                 </div>
               ) : (
                 <p className="text-sm text-neutral-400 italic font-medium">
-                  Cliquez sur « Modifier » pour ajouter une pièce d&apos;identité.
+                  {en ? "Click Edit to add an identity document." : "Cliquez sur « Modifier » pour ajouter une pièce d’identité."}
                 </p>
               )}
             </div>
@@ -1553,7 +1601,7 @@ function StaffRHTab({
           onClick={() => onEditingChange(false)}
           className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 hover:bg-black/[0.03]"
         >
-          Annuler
+          {en ? "Cancel" : "Annuler"}
         </button>
         <button
           type="button"
@@ -1562,25 +1610,25 @@ function StaffRHTab({
           className="h-9 px-3 rounded-lg text-xs font-semibold text-white inline-flex items-center gap-1.5 disabled:opacity-50"
           style={{ backgroundColor: ORANGE }}
         >
-          {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Enregistrer
+          {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} {en ? "Save" : "Enregistrer"}
         </button>
       </div>
 
-      <StaffDossierSection icon={UserCog} title="Identité & contact" description="Coordonnées du collaborateur.">
+      <StaffDossierSection icon={UserCog} title={en ? "Identity & contact" : "Identité & contact"} description={en ? "Staff member contact details." : "Coordonnées du collaborateur."}>
         <div className="grid grid-cols-2 gap-3">
-          <FField label="Prénom"><TInput value={form.prenom} onChange={(v) => f("prenom", v)} /></FField>
-          <FField label="Nom"><TInput value={form.nom} onChange={(v) => f("nom", v)} /></FField>
+          <FField label={en ? "First name" : "Prénom"}><TInput value={form.prenom} onChange={(v) => f("prenom", v)} /></FField>
+          <FField label={en ? "Last name" : "Nom"}><TInput value={form.nom} onChange={(v) => f("nom", v)} /></FField>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <FField label="Genre">
+          <FField label={en ? "Gender" : "Genre"}>
             <select value={form.genre} onChange={(e) => f("genre", e.target.value)} className={selectCls}>
-              <option value="">Choisir…</option>
-              <option value="Homme">Garçon / Homme</option>
-              <option value="Femme">Fille / Femme</option>
-              <option value="Autre">Autre</option>
+              <option value="">{en ? "Choose…" : "Choisir…"}</option>
+              <option value="Homme">{en ? "Male" : "Garçon / Homme"}</option>
+              <option value="Femme">{en ? "Female" : "Fille / Femme"}</option>
+              <option value="Autre">{en ? "Other" : "Autre"}</option>
             </select>
           </FField>
-          <FField label="Date de naissance">
+          <FField label={en ? "Date of birth" : "Date de naissance"}>
             <input
               type="date"
               value={form.birth_date}
@@ -1590,10 +1638,10 @@ function StaffRHTab({
             />
           </FField>
         </div>
-        <FField label="Email (identifiant de connexion)">
+        <FField label={en ? "Email (sign-in ID)" : "Email (identifiant de connexion)"}>
           <input disabled value={staff.email} className="w-full h-12 px-4 rounded-lg border border-black/[0.08] bg-neutral-100 font-semibold text-base text-neutral-400 outline-none cursor-not-allowed" />
         </FField>
-        <FField label="Téléphone">
+        <FField label={en ? "Phone" : "Téléphone"}>
           <div className="flex gap-2">
             <input
               value={form.country_code || selectedAfrica?.dial || ""}
@@ -1605,33 +1653,33 @@ function StaffRHTab({
               type="tel"
               value={phoneLocal}
               onChange={(e) => setPhoneLocal(e.target.value)}
-              placeholder="Numéro"
+              placeholder={en ? "Number" : "Numéro"}
               className={`flex-1 ${inputCls}`}
             />
           </div>
         </FField>
       </StaffDossierSection>
 
-      <StaffDossierSection icon={ClipboardList} title="Contrat & fonction" description="Poste, rémunération et volume horaire.">
-        <FField label="Intitulé exact du poste">
-          <TInput value={form.job_title} onChange={(v) => f("job_title", v)} placeholder="Ex: Chef Comptable Senior" />
+      <StaffDossierSection icon={ClipboardList} title={en ? "Contract and role" : "Contrat & fonction"} description={en ? "Position, compensation, and weekly hours." : "Poste, rémunération et volume horaire."}>
+        <FField label={en ? "Exact job title" : "Intitulé exact du poste"}>
+          <TInput value={form.job_title} onChange={(v) => f("job_title", v)} placeholder={en ? "Example: Senior Accountant" : "Ex: Chef Comptable Senior"} />
         </FField>
         <div className="grid grid-cols-2 gap-3">
-          <FField label="Salaire de base (XAF)">
+          <FField label={en ? "Base salary (XAF)" : "Salaire de base (XAF)"}>
             <NumInput
               value={form.base_salary}
               onChange={(v) => f("base_salary", v)}
               placeholder={String(staff.base_salary || 0)}
             />
           </FField>
-          <FField label="Prime / Bonus (XAF)">
+          <FField label={en ? "Bonus (XAF)" : "Prime / Bonus (XAF)"}>
             <NumInput
               value={form.prime}
               onChange={(v) => f("prime", v)}
               placeholder={String(staff.prime || 0)}
             />
           </FField>
-          <FField label="Volume horaire (h/semaine)">
+          <FField label={en ? "Weekly hours" : "Volume horaire (h/semaine)"}>
             <NumInput
               value={form.weekly_hours}
               onChange={(v) => f("weekly_hours", v)}
@@ -1640,7 +1688,7 @@ function StaffRHTab({
               placeholder={String(weeklyHours)}
             />
           </FField>
-          <FField label="Ancienneté (années)">
+          <FField label={en ? "Seniority (years)" : "Ancienneté (années)"}>
             <NumInput
               value={form.seniority_years}
               onChange={(v) => f("seniority_years", v)}
@@ -1650,39 +1698,39 @@ function StaffRHTab({
         </div>
       </StaffDossierSection>
 
-      <StaffDossierSection icon={Globe} title="Localisation" description="Adresse administrative.">
+      <StaffDossierSection icon={Globe} title={en ? "Location" : "Localisation"} description={en ? "Administrative address." : "Adresse administrative."}>
         <div className="grid grid-cols-2 gap-3">
-          <FField label="Pays">
+          <FField label={en ? "Country" : "Pays"}>
             <select value={selCode} onChange={(e) => handleCountryChange(e.target.value)} className={selectCls}>
-              <option value="">Sélectionner...</option>
+              <option value="">{en ? "Select..." : "Sélectionner..."}</option>
               {AFRICA_54.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.dial})</option>)}
             </select>
           </FField>
-          <FField label="Région">
+          <FField label={en ? "Region" : "Région"}>
             {regions.length > 0 ? (
               <select value={form.region} onChange={(e) => f("region", e.target.value)} className={selectCls}>
-                <option value="">Sélectionner...</option>
+                <option value="">{en ? "Select..." : "Sélectionner..."}</option>
                 {regions.map((r) => <option key={r} value={r}>{r}</option>)}
               </select>
             ) : (
-              <TInput value={form.region} onChange={(v) => f("region", v)} placeholder="Région" />
+              <TInput value={form.region} onChange={(v) => f("region", v)} placeholder={en ? "Region" : "Région"} />
             )}
           </FField>
-          <FField label="Ville"><TInput value={form.city} onChange={(v) => f("city", v)} placeholder="Douala" /></FField>
-          <FField label="Quartier"><TInput value={form.neighborhood} onChange={(v) => f("neighborhood", v)} placeholder="Bonapriso" /></FField>
+          <FField label={en ? "City" : "Ville"}><TInput value={form.city} onChange={(v) => f("city", v)} placeholder="Douala" /></FField>
+          <FField label={en ? "Neighborhood" : "Quartier"}><TInput value={form.neighborhood} onChange={(v) => f("neighborhood", v)} placeholder="Bonapriso" /></FField>
         </div>
       </StaffDossierSection>
 
-      <StaffDossierSection icon={CreditCard} title="Pièce d'identité" description="Document officiel.">
+      <StaffDossierSection icon={CreditCard} title={en ? "Identity document" : "Pièce d'identité"} description={en ? "Official document." : "Document officiel."}>
         <div className="grid grid-cols-2 gap-3">
-          <FField label="Type de document">
+          <FField label={en ? "Document type" : "Type de document"}>
             <select value={form.id_type} onChange={(e) => f("id_type", e.target.value)} className={selectCls}>
-              <option value="">Sélectionner...</option>
-              {Object.entries(ID_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              <option value="">{en ? "Select..." : "Sélectionner..."}</option>
+              {Object.entries(ID_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{idTypeDisplayLabel(k, en) || v}</option>)}
             </select>
           </FField>
-          <FField label="Numéro">
-            <TInput value={form.id_number} onChange={(v) => f("id_number", v)} placeholder="Numéro du document" />
+          <FField label={en ? "Number" : "Numéro"}>
+            <TInput value={form.id_number} onChange={(v) => f("id_number", v)} placeholder={en ? "Document number" : "Numéro du document"} />
           </FField>
         </div>
       </StaffDossierSection>
@@ -1704,13 +1752,15 @@ function PermissionsChecklist({
   isTCF: boolean;
   compact?: boolean;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   return (
     <div className={`space-y-4 ${compact ? "mt-1" : "mt-1"}`}>
       {PERMISSION_GROUPS.map((group) => {
         const opts = PERMISSION_OPTIONS.filter((o) => group.keys.includes(o.key));
         return (
           <div key={group.id}>
-            <p className="text-[9px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">{group.label}</p>
+            <p className="text-[9px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">{permissionGroupLabel(group.id, group.label, en)}</p>
             <div className={compact ? "grid grid-cols-1 sm:grid-cols-2 gap-1.5" : "space-y-1.5"}>
               {opts.map((opt) => {
                 const Icon = opt.icon;
@@ -1722,7 +1772,7 @@ function PermissionsChecklist({
                     type="button"
                     onClick={() => onToggle(opt.key)}
                     disabled={locked}
-                    title={opt.hint}
+                    title={en && opt.key === "planning" ? "Also includes live sessions depending on the center type" : opt.hint}
                     className={`w-full flex items-center gap-2 px-3 ${compact ? "h-9" : "h-10"} rounded-lg border text-xs font-semibold transition-colors text-left ${
                       checked
                         ? "border-[#eb670e]/40 bg-[#FFF5EE] text-[#c95508]"
@@ -1731,7 +1781,7 @@ function PermissionsChecklist({
                   >
                     <Icon size={14} className="shrink-0" />
                     <span className="min-w-0">
-                      {opt.label}{opt.key === "lives" ? " (par défaut)" : locked ? " (inclus TCF)" : ""}
+                      {permissionLabel(opt.key, opt.label, en)}{opt.key === "lives" ? (en ? " (default)" : " (par défaut)") : locked ? " (inclus TCF)" : ""}
                     </span>
                   </button>
                 );
@@ -1759,6 +1809,8 @@ function StaffAccessTab({
   onUpdate: () => void;
   onAccessSaved: (staffId: string, next: { permissions: string[]; campusIds: string[]; campusNames: string[] }) => void;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const isManager = staff.role === "campus_manager";
   const [editing,     setEditing]     = useState(false);
   const [selCampuses, setSelCampuses] = useState<string[]>(staff.campusIds);
@@ -1786,7 +1838,7 @@ function StaffAccessTab({
     setSaveError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(en ? "Session expired." : "Session expirée.");
 
       const res = await fetch("/api/staff", {
         method: "PATCH",
@@ -1801,7 +1853,7 @@ function StaffAccessTab({
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Enregistrement impossible.");
+      if (!res.ok) throw new Error(en ? "Unable to save." : (json.error || "Enregistrement impossible."));
 
       const nextPerms = Array.isArray(json.permissions)
         ? filterModulePermissions(json.permissions.map(String))
@@ -1822,7 +1874,7 @@ function StaffAccessTab({
       setEditing(false);
       onUpdate();
     } catch (e: any) {
-      setSaveError(e.message || "Erreur lors de la sauvegarde.");
+      setSaveError(e.message || (en ? "Error while saving." : "Erreur lors de la sauvegarde."));
     } finally {
       setSaving(false);
     }
@@ -1842,8 +1894,8 @@ function StaffAccessTab({
     <div className="w-full">
       <StaffDossierSection
         icon={ShieldCheck}
-        title="Accès plateforme"
-        description="Campus assignés et modules autorisés dans le menu."
+        title={en ? "Platform access" : "Accès plateforme"}
+        description={en ? "Assigned campuses and modules available in the menu." : "Campus assignés et modules autorisés dans le menu."}
         actions={
           !editing ? (
             <button
@@ -1851,7 +1903,7 @@ function StaffAccessTab({
               onClick={() => setEditing(true)}
               className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:bg-black/[0.03]"
             >
-              <Edit3 size={12} /> Modifier
+              <Edit3 size={12} /> {en ? "Edit" : "Modifier"}
             </button>
           ) : (
             <>
@@ -1860,7 +1912,7 @@ function StaffAccessTab({
                 onClick={handleCancel}
                 className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 hover:bg-black/[0.03]"
               >
-                Annuler
+                {en ? "Cancel" : "Annuler"}
               </button>
               <button
                 type="button"
@@ -1869,7 +1921,7 @@ function StaffAccessTab({
                 className="h-9 px-3 rounded-lg text-xs font-semibold text-white inline-flex items-center gap-1.5 disabled:opacity-50"
                 style={{ backgroundColor: BLUE }}
               >
-                {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Enregistrer
+                {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} {en ? "Save" : "Enregistrer"}
               </button>
             </>
           )
@@ -1883,14 +1935,14 @@ function StaffAccessTab({
           <div className="rounded-xl border border-blue-100 bg-blue-50 p-4 flex items-start gap-3">
             <ShieldCheck className="text-blue-700 shrink-0 mt-0.5" size={18} />
             <div>
-              <p className="font-extrabold text-sm text-blue-900">Directeur de campus — Accès complet</p>
-              <p className="text-sm text-blue-700 font-medium mt-0.5">Droits d&apos;administration sur les campus assignés.</p>
+              <p className="font-extrabold text-sm text-blue-900">{en ? "Campus manager. Full access" : "Directeur de campus. Accès complet"}</p>
+              <p className="text-sm text-blue-700 font-medium mt-0.5">{en ? "Administrative rights for assigned campuses." : "Droits d'administration sur les campus assignés."}</p>
             </div>
           </div>
         )}
 
         <div>
-          <p className="text-sm font-semibold text-neutral-600 mb-2">Campus assignés</p>
+          <p className="text-sm font-semibold text-neutral-600 mb-2">{en ? "Assigned campuses" : "Campus assignés"}</p>
           {!editing ? (
             <div className="flex flex-wrap gap-2">
               {campusNames.length > 0 ? campusNames.map((name) => (
@@ -1898,7 +1950,7 @@ function StaffAccessTab({
                   <MapPin size={12} /> {name}
                 </span>
               )) : (
-                <p className="text-sm text-neutral-400 italic font-medium">Aucun campus assigné.</p>
+                <p className="text-sm text-neutral-400 italic font-medium">{en ? "No campus assigned." : "Aucun campus assigné."}</p>
               )}
             </div>
           ) : (
@@ -1917,16 +1969,16 @@ function StaffAccessTab({
                   <MapPin size={12} /> {c.name}
                 </button>
               ))}
-              {campuses.length === 0 && <p className="text-sm text-neutral-400 italic font-medium">Aucun campus créé.</p>}
+              {campuses.length === 0 && <p className="text-sm text-neutral-400 italic font-medium">{en ? "No campus created." : "Aucun campus créé."}</p>}
             </div>
           )}
         </div>
 
         {!isManager && (
           <div>
-            <p className="text-sm font-semibold text-neutral-600 mb-1">Modules autorisés</p>
+            <p className="text-sm font-semibold text-neutral-600 mb-1">{en ? "Allowed modules" : "Modules autorisés"}</p>
             <p className="text-xs text-neutral-400 font-medium mb-3">
-              Droits d&apos;écran (menu) — distincts des matières Académique.
+              {en ? "Menu access rights, separate from academic subjects." : "Droits d'écran (menu), distincts des matières académiques."}
             </p>
             {!editing ? (
               <div className="space-y-3">
@@ -1936,13 +1988,13 @@ function StaffAccessTab({
                     if (items.length === 0) return null;
                     return (
                       <div key={group.id}>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">{group.label}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">{permissionGroupLabel(group.id, group.label, en)}</p>
                         <div className="flex flex-wrap gap-1.5">
                           {items.map((opt) => {
                             const Icon = opt.icon;
                             return (
                               <span key={opt.key} className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-semibold border border-black/[0.08] bg-white text-neutral-700">
-                                <Icon size={13} /> {opt.label}
+                                <Icon size={13} /> {permissionLabel(opt.key, opt.label, en)}
                               </span>
                             );
                           })}
@@ -1951,7 +2003,7 @@ function StaffAccessTab({
                     );
                   })
                 ) : (
-                  <p className="text-sm text-neutral-400 italic font-medium">Aucun module attribué.</p>
+                  <p className="text-sm text-neutral-400 italic font-medium">{en ? "No module assigned." : "Aucun module attribué."}</p>
                 )}
               </div>
             ) : (
@@ -1993,14 +2045,14 @@ function niveauLabelFromPrintRow(m: {
     semaines?: number | null;
     jours?: number | null;
   } | null;
-}): string {
+}, en = false): string {
   if (m.niveaux?.nom?.trim()) return m.niveaux.nom.trim();
-  if (m.niveaux?.annee != null) return `Niveau ${m.niveaux.annee}`;
-  if (m.annee != null && m.annee > 0) return `Niveau ${m.annee}`;
-  if (m.niveaux?.mois) return `${m.niveaux.mois} mois`;
-  if (m.niveaux?.semaines) return `${m.niveaux.semaines} sem.`;
-  if (m.niveaux?.jours) return `${m.niveaux.jours} j`;
-  return "Programme (sans niveau)";
+  if (m.niveaux?.annee != null) return `${en ? "Level" : "Niveau"} ${m.niveaux.annee}`;
+  if (m.annee != null && m.annee > 0) return `${en ? "Level" : "Niveau"} ${m.annee}`;
+  if (m.niveaux?.mois) return `${m.niveaux.mois} ${en ? "months" : "mois"}`;
+  if (m.niveaux?.semaines) return `${m.niveaux.semaines} ${en ? "weeks" : "sem."}`;
+  if (m.niveaux?.jours) return `${m.niveaux.jours} ${en ? "days" : "j"}`;
+  return en ? "Program (no level)" : "Programme (sans niveau)";
 }
 
 function StaffPrintModal({
@@ -2016,6 +2068,8 @@ function StaffPrintModal({
   weeklyHours: number;
   onClose: () => void;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const [mounted, setMounted] = useState(false);
   const [loadingAcademic, setLoadingAcademic] = useState(staff.role === "trainer");
   const [programmes, setProgrammes] = useState<PrintProgrammeBlock[]>([]);
@@ -2126,10 +2180,10 @@ function StaffPrintModal({
 
         for (const m of rows) {
           const filiereId = m.filieres?.id as string;
-          const filiereName = (m.filieres?.name as string) || "Programme";
+          const filiereName = (m.filieres?.name as string) || (en ? "Program" : "Programme");
           const niveauId = (m.niveau_id || m.niveaux?.id || null) as string | null;
-          const nivLabel = niveauLabelFromPrintRow(m);
-          const matiereName = m.exam_disciplines?.name || "Matière";
+          const nivLabel = niveauLabelFromPrintRow(m, en);
+          const matiereName = m.exam_disciplines?.name || (en ? "Subject" : "Matière");
 
           let prog = byProg.get(filiereId);
           if (!prog) {
@@ -2172,7 +2226,7 @@ function StaffPrintModal({
     })();
 
     return () => { cancelled = true; };
-  }, [staff.id, staff.role, staff.tcfSubjects, centerId, isTCF]);
+  }, [staff.id, staff.role, staff.tcfSubjects, centerId, isTCF, en]);
 
   if (!mounted) return null;
 
@@ -2188,10 +2242,10 @@ function StaffPrintModal({
           onClick={onClose}
           className="flex items-center gap-2 h-9 px-3 rounded-xl border border-neutral-200 text-[11px] font-bold text-neutral-700 hover:bg-neutral-50 transition-colors"
         >
-          <ArrowLeft size={15} /> Retour
+          <ArrowLeft size={15} /> {en ? "Back" : "Retour"}
         </button>
         <p className="text-[11px] font-black uppercase tracking-wider text-neutral-400 hidden sm:block">
-          Aperçu — Dossier
+          {en ? "Record preview" : "Aperçu du dossier"}
         </p>
         <button
           type="button"
@@ -2201,7 +2255,7 @@ function StaffPrintModal({
           style={{ backgroundColor: ORANGE }}
         >
           {loadingAcademic ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-          Télécharger
+          {en ? "Download" : "Télécharger"}
         </button>
       </div>
 
@@ -2209,9 +2263,9 @@ function StaffPrintModal({
         <div className="bg-white max-w-[680px] w-full mx-auto p-4 sm:p-6 md:p-8 rounded-2xl shadow-2xl print:shadow-none print:rounded-none print:max-w-none" id="staff-print-content">
           <DocumentOfficialHeader
             config={docConfig}
-            fallbackTitle="Fiche de Personnel — Ressources Humaines"
+            fallbackTitle={en ? "Staff Record. Human Resources" : "Fiche de Personnel. Ressources Humaines"}
             rightExtra={
-              <p>Date d&apos;édition : {new Date().toLocaleDateString("fr-FR")}</p>
+              <p>{en ? "Issue date" : "Date d'édition"} : {new Date().toLocaleDateString(en ? "en-GB" : "fr-FR")}</p>
             }
           />
 
@@ -2221,12 +2275,12 @@ function StaffPrintModal({
               {staff.prenom} {staff.nom}
             </h2>
             <p className="text-xs font-bold mt-1" style={{ color: docConfig?.accentColor || ORANGE }}>
-              {staff.job_title || ROLE_LABELS[staff.role]}
+              {staff.job_title || roleDisplayLabel(staff.role, en)}
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-neutral-500">
               <span>{staff.email}</span>
               <span className={`font-bold ${staff.center_status === "active" ? "text-emerald-600" : "text-red-500"}`}>
-                {staff.center_status === "active" ? "Actif" : "Suspendu"}
+                {staff.center_status === "active" ? (en ? "Active" : "Actif") : (en ? "Suspended" : "Suspendu")}
               </span>
             </div>
           </div>
@@ -2244,13 +2298,13 @@ function StaffPrintModal({
               )}
             </div>
             <div className="flex-1">
-              <PSection title="Informations personnelles">
+              <PSection title={en ? "Personal information" : "Informations personnelles"}>
                 <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
-                  <PField label="Téléphone"  value={staff.phone       || "—"} />
-                  <PField label="Pays"       value={staff.country      ? `${staff.country_code ? `(${staff.country_code}) ` : ""}${staff.country}` : "—"} />
-                  <PField label="Région"     value={staff.region        || "—"} />
-                  <PField label="Ville"      value={staff.city          || "—"} />
-                  <PField label="Quartier"   value={staff.neighborhood  || "—"} />
+                  <PField label={en ? "Phone" : "Téléphone"} value={staff.phone || "—"} />
+                  <PField label={en ? "Country" : "Pays"} value={staff.country ? `${staff.country_code ? `(${staff.country_code}) ` : ""}${staff.country}` : "—"} />
+                  <PField label={en ? "Region" : "Région"} value={staff.region || "—"} />
+                  <PField label={en ? "City" : "Ville"} value={staff.city || "—"} />
+                  <PField label={en ? "Neighborhood" : "Quartier"} value={staff.neighborhood || "—"} />
                 </div>
               </PSection>
             </div>
@@ -2258,14 +2312,14 @@ function StaffPrintModal({
 
           {/* Contrat */}
           <div className="mb-5">
-            <PSection title="Contrat & Rémunération">
+            <PSection title={en ? "Contract and compensation" : "Contrat & Rémunération"}>
               <div className="grid grid-cols-2 gap-x-8 gap-y-1.5">
-                <PField label="Rôle"            value={ROLE_LABELS[staff.role] || staff.role} />
-                <PField label="Intitulé"        value={staff.job_title           || "—"} />
-                <PField label="Ancienneté"      value={`${staff.seniority_years} an(s)`} />
-                <PField label="Volume horaire"  value={`${weeklyHours} h/semaine`} />
-                <PField label="Salaire de base" value={staff.base_salary ? `${staff.base_salary.toLocaleString("fr-FR")} XAF` : "—"} />
-                <PField label="Prime / Bonus"   value={staff.prime       ? `${staff.prime.toLocaleString("fr-FR")} XAF`       : "—"} />
+                <PField label={en ? "Role" : "Rôle"} value={roleDisplayLabel(staff.role, en)} />
+                <PField label={en ? "Job title" : "Intitulé"} value={staff.job_title || "—"} />
+                <PField label={en ? "Seniority" : "Ancienneté"} value={`${staff.seniority_years} ${en ? "year(s)" : "an(s)"}`} />
+                <PField label={en ? "Weekly hours" : "Volume horaire"} value={`${weeklyHours} ${en ? "hours/week" : "h/semaine"}`} />
+                <PField label={en ? "Base salary" : "Salaire de base"} value={staff.base_salary ? `${staff.base_salary.toLocaleString(en ? "en-US" : "fr-FR")} XAF` : "—"} />
+                <PField label={en ? "Bonus" : "Prime / Bonus"} value={staff.prime ? `${staff.prime.toLocaleString(en ? "en-US" : "fr-FR")} XAF` : "—"} />
               </div>
             </PSection>
           </div>
@@ -2273,10 +2327,10 @@ function StaffPrintModal({
           {/* ID doc */}
           {staff.id_type && (
             <div className="mb-5">
-              <PSection title="Pièce d'identité">
+              <PSection title={en ? "Identity document" : "Pièce d'identité"}>
                 <div className="grid grid-cols-2 gap-x-8">
-                  <PField label="Type"   value={ID_TYPE_LABELS[staff.id_type] ?? staff.id_type} />
-                  <PField label="Numéro" value={staff.id_number || "—"} />
+                  <PField label="Type" value={idTypeDisplayLabel(staff.id_type, en)} />
+                  <PField label={en ? "Number" : "Numéro"} value={staff.id_number || "—"} />
                 </div>
               </PSection>
             </div>
@@ -2284,26 +2338,26 @@ function StaffPrintModal({
 
           {/* Accès */}
           <div className="mb-5">
-            <PSection title="Accès plateforme">
+            <PSection title={en ? "Platform access" : "Accès plateforme"}>
               <div className="space-y-3">
                 <div>
-                  <p className="text-[8px] font-bold uppercase text-neutral-400 tracking-wider mb-1">Campus assignés</p>
+                  <p className="text-[8px] font-bold uppercase text-neutral-400 tracking-wider mb-1">{en ? "Assigned campuses" : "Campus assignés"}</p>
                   <p className="text-xs font-semibold" style={{ color: BLUE }}>
-                    {staff.campuses.length > 0 ? staff.campuses.join(" · ") : "Aucun campus assigné"}
+                    {staff.campuses.length > 0 ? staff.campuses.join(" · ") : (en ? "No campus assigned" : "Aucun campus assigné")}
                   </p>
                 </div>
                 {isManager ? (
                   <div className="rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2">
                     <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: BLUE }}>
-                      Directeur de campus — Accès complet
+                      {en ? "Campus manager. Full access" : "Directeur de campus. Accès complet"}
                     </p>
                     <p className="text-[10px] text-neutral-500 mt-0.5">
-                      Droits d&apos;administration sur les campus assignés.
+                      {en ? "Administrative rights for assigned campuses." : "Droits d'administration sur les campus assignés."}
                     </p>
                   </div>
                 ) : (
                   <div>
-                    <p className="text-[8px] font-bold uppercase text-neutral-400 tracking-wider mb-1.5">Modules autorisés</p>
+                    <p className="text-[8px] font-bold uppercase text-neutral-400 tracking-wider mb-1.5">{en ? "Allowed modules" : "Modules autorisés"}</p>
                     {permLabels.length > 0 ? (
                       <div className="space-y-2">
                         {PERMISSION_GROUPS.map((group) => {
@@ -2311,16 +2365,16 @@ function StaffPrintModal({
                           if (items.length === 0) return null;
                           return (
                             <div key={group.id}>
-                              <p className="text-[8px] font-black uppercase tracking-widest text-neutral-400 mb-0.5">{group.label}</p>
+                              <p className="text-[8px] font-black uppercase tracking-widest text-neutral-400 mb-0.5">{permissionGroupLabel(group.id, group.label, en)}</p>
                               <p className="text-xs font-semibold" style={{ color: BLUE }}>
-                                {items.map((o) => o.label).join(" · ")}
+                                {items.map((o) => permissionLabel(o.key, o.label, en)).join(" · ")}
                               </p>
                             </div>
                           );
                         })}
                       </div>
                     ) : (
-                      <p className="text-xs text-neutral-400 italic">Aucun module attribué.</p>
+                      <p className="text-xs text-neutral-400 italic">{en ? "No module assigned." : "Aucun module attribué."}</p>
                     )}
                   </div>
                 )}
@@ -2331,13 +2385,13 @@ function StaffPrintModal({
           {/* Académique — formateurs uniquement */}
           {isTrainer && (
             <div className="mb-5">
-              <PSection title="Affectation académique">
+              <PSection title={en ? "Academic assignment" : "Affectation académique"}>
                 {loadingAcademic ? (
                   <p className="text-xs text-neutral-400 flex items-center gap-2">
-                    <Loader2 size={12} className="animate-spin" /> Chargement des affectations…
+                    <Loader2 size={12} className="animate-spin" /> {en ? "Loading assignments..." : "Chargement des affectations…"}
                   </p>
                 ) : programmes.length === 0 ? (
-                  <p className="text-xs text-neutral-400 italic">Aucune affectation académique.</p>
+                  <p className="text-xs text-neutral-400 italic">{en ? "No academic assignment." : "Aucune affectation académique."}</p>
                 ) : (
                   <div className="space-y-3">
                     {programmes.map((prog) => (
@@ -2364,7 +2418,7 @@ function StaffPrintModal({
                                 )}
                                 <div className={niv.classes.length > 0 ? "" : "sm:col-span-2"}>
                                   <p className="text-[8px] font-bold uppercase text-neutral-400">
-                                    {isTCF ? "Compétences" : "Matières"}
+                                    {isTCF ? "Compétences" : (en ? "Subjects" : "Matières")}
                                   </p>
                                   <p className="text-[11px] font-semibold" style={{ color: BLUE }}>
                                     {niv.matieres.length > 0 ? niv.matieres.join(" · ") : "—"}
@@ -2385,18 +2439,18 @@ function StaffPrintModal({
           {/* Signatures */}
           <div className="flex justify-between items-end mt-12">
             <div className="w-48 text-center">
-              <p className="text-[9px] font-black uppercase mb-1" style={{ color: BLUE }}>Le Salarié</p>
+              <p className="text-[9px] font-black uppercase mb-1" style={{ color: BLUE }}>{en ? "Staff member" : "Le Salarié"}</p>
               <div className="h-14 border-b border-dashed border-neutral-300" />
               <p className="text-[9px] text-neutral-400 mt-1">Signature</p>
             </div>
             <div className="w-48 text-center">
-              <p className="text-[9px] font-black uppercase mb-1" style={{ color: BLUE }}>La Direction</p>
+              <p className="text-[9px] font-black uppercase mb-1" style={{ color: BLUE }}>{en ? "Management" : "La Direction"}</p>
               <div className="h-14 border-b border-dashed border-neutral-300" />
-              <p className="text-[9px] text-neutral-400 mt-1">Cachet & Signature</p>
+              <p className="text-[9px] text-neutral-400 mt-1">{en ? "Stamp and signature" : "Cachet & Signature"}</p>
             </div>
           </div>
           <div className="mt-6 text-right text-[10px] text-neutral-400">
-            Fait à __________________, le {new Date().toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
+            {en ? "Issued at" : "Fait à"} __________________, {en ? "on" : "le"} {new Date().toLocaleDateString(en ? "en-GB" : "fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
           </div>
         </div>
       </div>
@@ -2463,6 +2517,8 @@ function TcfSubjectsPicker({ selected, onChange }: { selected: string[]; onChang
 function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCreated }: {
   centerId: string; isTCF: boolean; campuses: Campus[]; staffList: StaffRow[]; onClose: () => void; onCreated: () => void;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const [step,     setStep]     = useState(1);
   const [prenom,   setPrenom]   = useState("");
   const [nom,      setNom]      = useState("");
@@ -2526,7 +2582,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
     setSaving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(en ? "Session expired." : "Session expirée.");
       const res = await fetch("/api/staff", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
@@ -2546,7 +2602,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Erreur lors de la création.");
+      if (!res.ok) throw new Error(en ? "Error while creating the profile." : (data.error || "Erreur lors de la création."));
       // Afficher le popup immédiatement, même si l'email part en arrière-plan
       setResult({
         emailSent: Boolean(data.emailSent),
@@ -2554,7 +2610,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
         temporaryPassword: data.temporaryPassword,
       });
     } catch (e: any) {
-      setError(e.message || "Erreur lors de la création.");
+      setError(e.message || (en ? "Error while creating the profile." : "Erreur lors de la création."));
     } finally {
       setSaving(false);
     }
@@ -2562,19 +2618,19 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
 
   if (result) {
     const fullName = `${prenom.trim()} ${nom.trim()}`.trim();
-    const roleLabel = ROLE_LABELS[role] || jobTitle.trim() || "Collaborateur";
+    const roleLabel = jobTitle.trim() || roleDisplayLabel(role, en) || (en ? "Staff member" : "Collaborateur");
     const loginUrl = typeof window !== "undefined" ? `${window.location.origin}/login` : "/login";
     const accessLines = [
-      `Bonjour ${prenom.trim()},`,
+      `${en ? "Hello" : "Bonjour"} ${prenom.trim()},`,
       "",
-      `Votre compte ${roleLabel.toLowerCase()} a été créé.`,
+      en ? `Your ${roleLabel.toLowerCase()} account has been created.` : `Votre compte ${roleLabel.toLowerCase()} a été créé.`,
       "",
-      `Nom : ${fullName}`,
+      `${en ? "Name" : "Nom"} : ${fullName}`,
       `Email : ${email.trim()}`,
-      result.temporaryPassword ? `Mot de passe temporaire : ${result.temporaryPassword}` : null,
-      `Lien de connexion : ${loginUrl}`,
+      result.temporaryPassword ? `${en ? "Temporary password" : "Mot de passe temporaire"} : ${result.temporaryPassword}` : null,
+      `${en ? "Sign-in link" : "Lien de connexion"} : ${loginUrl}`,
       "",
-      "Conservez ces identifiants et ne les partagez pas.",
+      en ? "Keep these credentials private." : "Conservez ces identifiants et ne les partagez pas.",
     ].filter((line): line is string => line !== null);
     const accessText = accessLines.join("\n");
 
@@ -2597,12 +2653,12 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
       <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl text-center border border-black/[0.06]">
           <CheckCircle2 size={44} className="text-emerald-500 mx-auto mb-3" />
-          <h3 className="text-xl font-extrabold tracking-tight" style={{ color: BLUE }}>Profil créé</h3>
+          <h3 className="text-xl font-extrabold tracking-tight" style={{ color: BLUE }}>{en ? "Profile created" : "Profil créé"}</h3>
           <p className="text-sm text-neutral-500 mt-1 font-medium">{roleLabel}</p>
 
           <div className="mt-4 space-y-2 text-left">
             <div className="rounded-xl border border-black/[0.06] bg-[#F7F7F6] px-3 py-2.5">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Nom</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{en ? "Name" : "Nom"}</p>
               <p className="text-sm font-extrabold mt-0.5" style={{ color: BLUE }}>{fullName}</p>
             </div>
             <div className="rounded-xl border border-black/[0.06] bg-[#F7F7F6] px-3 py-2.5">
@@ -2612,20 +2668,20 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
           </div>
 
           {result.emailSent ? (
-            <p className="text-sm text-emerald-700 font-bold mt-4">Un email a aussi été envoyé à {email.trim()}.</p>
+            <p className="text-sm text-emerald-700 font-bold mt-4">{en ? `An email was also sent to ${email.trim()}.` : `Un email a aussi été envoyé à ${email.trim()}.`}</p>
           ) : result.emailQueued ? (
             <p className="text-sm text-blue-700 font-bold mt-4">
-              Email en cours d&apos;envoi — conservez aussi le mot de passe ci-dessous.
+              {en ? "The email is being sent. Keep the password below as well." : "Email en cours d'envoi. Conservez aussi le mot de passe ci-dessous."}
             </p>
           ) : (
             <p className="text-sm text-amber-700 font-bold mt-4 flex items-center justify-center gap-1.5">
-              <AlertTriangle size={13} /> Email non envoyé — communiquez ces accès manuellement.
+              <AlertTriangle size={13} /> {en ? "Email not sent. Share these credentials manually." : "Email non envoyé. Communiquez ces accès manuellement."}
             </p>
           )}
 
           {result.temporaryPassword ? (
             <div className="mt-3 bg-amber-50 border border-amber-200 rounded-xl p-4 text-left">
-              <p className="text-xs font-bold text-amber-700">Mot de passe temporaire</p>
+              <p className="text-xs font-bold text-amber-700">{en ? "Temporary password" : "Mot de passe temporaire"}</p>
               <div className="mt-2 flex items-center gap-2">
                 <p className="flex-1 font-mono font-black text-sm bg-white border rounded-lg p-2 select-all break-all">
                   {result.temporaryPassword}
@@ -2639,7 +2695,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
                 </button>
               </div>
               <p className="mt-2 text-[10px] text-amber-700/80 font-medium">
-                Collez uniquement le mot de passe dans le champ connexion — pas tout le message.
+                {en ? "Paste only the password in the sign-in field, not the full message." : "Collez uniquement le mot de passe dans le champ connexion, pas tout le message."}
               </p>
             </div>
           ) : null}
@@ -2651,7 +2707,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
             style={{ borderColor: BLUE, color: BLUE }}
           >
             {copiedKind === "all" ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
-            {copiedKind === "all" ? "Copié !" : "Tout copier (message)"}
+            {copiedKind === "all" ? (en ? "Copied!" : "Copié !") : (en ? "Copy full message" : "Tout copier (message)")}
           </button>
 
           <button
@@ -2660,7 +2716,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
             className="w-full mt-3 h-11 rounded-xl text-xs font-black uppercase text-white"
             style={{ backgroundColor: BLUE }}
           >
-            Terminé
+            {en ? "Done" : "Terminé"}
           </button>
         </div>
       </div>
@@ -2675,14 +2731,14 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
           onClick={onClose}
           disabled={saving}
           className="absolute top-5 right-5 p-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-500 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          aria-label="Fermer"
+          aria-label={en ? "Close" : "Fermer"}
         >
           <X size={18} />
         </button>
-        <h3 className="text-xl font-extrabold tracking-tight mb-1.5" style={{ color: BLUE }}>Créer un membre</h3>
+        <h3 className="text-xl font-extrabold tracking-tight mb-1.5" style={{ color: BLUE }}>{en ? "Create a staff member" : "Créer un membre"}</h3>
         {saving && (
           <p className="mb-3 text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-100 rounded-xl px-3 py-2">
-            Création en cours… ne fermez pas cette fenêtre.
+            {en ? "Creating profile... Do not close this window." : "Création en cours… ne fermez pas cette fenêtre."}
           </p>
         )}
 
@@ -2697,23 +2753,23 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
         {step === 1 && (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2.5">
-              <TInput value={prenom} onChange={setPrenom} placeholder="Prénom" />
-              <TInput value={nom}    onChange={setNom}    placeholder="Nom" />
+              <TInput value={prenom} onChange={setPrenom} placeholder={en ? "First name" : "Prénom"} />
+              <TInput value={nom} onChange={setNom} placeholder={en ? "Last name" : "Nom"} />
             </div>
-            <TInput type="email" value={email} onChange={setEmail} placeholder="Adresse email" />
+            <TInput type="email" value={email} onChange={setEmail} placeholder={en ? "Email address" : "Adresse email"} />
 
             <div className="grid grid-cols-2 gap-2.5">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Genre *</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">{en ? "Gender" : "Genre"} *</p>
                 <select value={genre} onChange={(e) => setGenre(e.target.value)} className={selectCls}>
-                  <option value="">Choisir…</option>
-                  <option value="Homme">Garçon / Homme</option>
-                  <option value="Femme">Fille / Femme</option>
-                  <option value="Autre">Autre</option>
+                  <option value="">{en ? "Choose..." : "Choisir…"}</option>
+                  <option value="Homme">{en ? "Male" : "Garçon / Homme"}</option>
+                  <option value="Femme">{en ? "Female" : "Fille / Femme"}</option>
+                  <option value="Autre">{en ? "Other" : "Autre"}</option>
                 </select>
               </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">Date de naissance *</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">{en ? "Date of birth" : "Date de naissance"} *</p>
                 <input
                   type="date"
                   value={birthDate}
@@ -2725,32 +2781,32 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
             </div>
 
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 flex items-center gap-1"><Globe size={11} /> Pays</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5 flex items-center gap-1"><Globe size={11} /> {en ? "Country" : "Pays"}</p>
               <select value={selCountry} onChange={(e) => handleCountrySelect(e.target.value)} className={selectCls}>
-                <option value="">Sélectionner un pays...</option>
+                <option value="">{en ? "Select a country..." : "Sélectionner un pays..."}</option>
                 {AFRICA_54.map((c) => <option key={c.code} value={c.code}>{c.flag} {c.name} ({c.dial})</option>)}
               </select>
             </div>
 
             {regions.length > 0 && (
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5"><MapPin size={11} className="inline mr-1" />Région</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5"><MapPin size={11} className="inline mr-1" />{en ? "Region" : "Région"}</p>
                 <select value={region} onChange={(e) => setRegion(e.target.value)} className={selectCls}>
-                  <option value="">Sélectionner...</option>
+                  <option value="">{en ? "Select..." : "Sélectionner..."}</option>
                   {regions.map((r) => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
             )}
 
-            <TInput value={city} onChange={setCity} placeholder="Ville (ex: Douala, Dakar...)" />
+            <TInput value={city} onChange={setCity} placeholder={en ? "City (example: Douala, Dakar...)" : "Ville (ex: Douala, Dakar...)"} />
 
             <div className="flex gap-2">
               <input value={phonePrefix} readOnly placeholder="+237" className="w-24 h-10 px-3 bg-neutral-100 rounded-xl border text-xs font-bold text-neutral-500 outline-none" />
-              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Numéro de téléphone" className={`flex-1 ${inputCls}`} />
+              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder={en ? "Phone number" : "Numéro de téléphone"} className={`flex-1 ${inputCls}`} />
             </div>
 
             <button onClick={() => setStep(2)} disabled={!canStep2} className="w-full h-11 mt-1 rounded-xl text-xs font-semibold text-white disabled:opacity-40" style={{ backgroundColor: BLUE }}>
-              Suivant
+              {en ? "Next" : "Suivant"}
             </button>
           </div>
         )}
@@ -2761,7 +2817,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
             <div className="grid grid-cols-2 gap-3">
               {(Object.entries(STAFF_CATEGORIES) as [string, typeof STAFF_CATEGORIES.administratif][]).map(([key, cat]) => (
                 <button key={key} onClick={() => { setCategory(key as "administratif" | "academique"); setRole(""); }} className={`p-4 rounded-2xl border-2 text-left transition-colors ${category === key ? "border-orange-400 bg-orange-50" : "border-neutral-200 hover:border-neutral-300"}`}>
-                  <p className="font-black text-sm" style={{ color: BLUE }}>{cat.label}</p>
+                  <p className="font-black text-sm" style={{ color: BLUE }}>{en ? (key === "administratif" ? "Administrative staff" : "Academic staff") : cat.label}</p>
                 </button>
               ))}
             </div>
@@ -2770,8 +2826,8 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
               <div className="space-y-2">
                 {STAFF_CATEGORIES[category].roles.map((r) => (
                   <button key={r.value} onClick={() => { setRole(r.value); if (r.value !== "trainer") setSelTcfSubjects([]); }} className={`w-full p-3.5 rounded-xl border-2 text-left transition-colors ${role === r.value ? "border-orange-400 bg-orange-50" : "border-neutral-200 hover:border-neutral-300"}`}>
-                    <p className="font-black text-sm" style={{ color: BLUE }}>{r.label}</p>
-                    <p className="text-[11px] text-neutral-500 mt-0.5">{r.description}</p>
+                    <p className="font-black text-sm" style={{ color: BLUE }}>{en ? (r.value === "campus_manager" ? "Campus manager" : r.value === "staff" ? "Administrative officer" : r.value === "trainer" ? "Trainer" : "Academic coordinator") : r.label}</p>
+                    <p className="text-[11px] text-neutral-500 mt-0.5">{en ? (r.value === "campus_manager" ? "Full rights for the assigned campus." : r.value === "staff" ? "Access restricted by module." : r.value === "trainer" ? "Teaching and academic assignments." : "Academic coordination and supervision.") : r.description}</p>
                   </button>
                 ))}
               </div>
@@ -2779,8 +2835,8 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
 
             {role && (
               <div className="pt-3 border-t border-neutral-100 space-y-3">
-                <p className="text-[10px] font-black uppercase text-neutral-400 mb-1.5">Intitulé exact du poste</p>
-                <TInput value={jobTitle} onChange={setJobTitle} placeholder="Ex: Responsable Pédagogique, Prof. d'Anglais..." />
+                <p className="text-[10px] font-black uppercase text-neutral-400 mb-1.5">{en ? "Exact job title" : "Intitulé exact du poste"}</p>
+                <TInput value={jobTitle} onChange={setJobTitle} placeholder={en ? "Example: Academic Manager, English Teacher..." : "Ex: Responsable Pédagogique, Prof. d'Anglais..."} />
 
                 {needsTcfSubjects && (
                   <TcfSubjectsPicker
@@ -2792,8 +2848,8 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
             )}
 
             <div className="flex gap-2">
-              <button onClick={() => setStep(1)} className="h-11 px-4 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-600">Retour</button>
-              <button onClick={() => setStep(3)} disabled={!canStep3} className="flex-1 h-11 rounded-xl text-xs font-black uppercase text-white disabled:opacity-40" style={{ backgroundColor: BLUE }}>Suivant</button>
+              <button onClick={() => setStep(1)} className="h-11 px-4 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-600">{en ? "Back" : "Retour"}</button>
+              <button onClick={() => setStep(3)} disabled={!canStep3} className="flex-1 h-11 rounded-xl text-xs font-black uppercase text-white disabled:opacity-40" style={{ backgroundColor: BLUE }}>{en ? "Next" : "Suivant"}</button>
             </div>
           </div>
         )}
@@ -2803,8 +2859,8 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
           <div className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Campus assignés</p>
-                <span className="text-[9px] bg-neutral-100 text-neutral-500 px-2 py-0.5 rounded font-black uppercase">Optionnel</span>
+                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{en ? "Assigned campuses" : "Campus assignés"}</p>
+                <span className="text-[9px] bg-neutral-100 text-neutral-500 px-2 py-0.5 rounded font-black uppercase">{en ? "Optional" : "Optionnel"}</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 {campuses.map((c) => (
@@ -2812,14 +2868,14 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
                     <MapPin size={11} /> {c.name}
                   </button>
                 ))}
-                {campuses.length === 0 && <p className="text-xs text-neutral-400 italic">Aucun campus créé.</p>}
+                {campuses.length === 0 && <p className="text-xs text-neutral-400 italic">{en ? "No campus created." : "Aucun campus créé."}</p>}
               </div>
             </div>
 
             {needsPermissions && (
               <div className="border-t border-neutral-100 pt-4">
-                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Modules autorisés <span className="text-orange-500">*</span></p>
-                <p className="text-[10px] text-neutral-400 mb-2">Droits d&apos;écran — pas les matières (onglet Académique).</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">{en ? "Allowed modules" : "Modules autorisés"} <span className="text-orange-500">*</span></p>
+                <p className="text-[10px] text-neutral-400 mb-2">{en ? "Menu access rights, not academic subjects." : "Droits d'écran, pas les matières (onglet Académique)."}</p>
                 <PermissionsChecklist
                   selected={selPerms}
                   onToggle={(key) => {
@@ -2836,9 +2892,9 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
             {error && <p className="text-xs font-bold text-red-500 bg-red-50 p-3 rounded-xl border border-red-100">{error}</p>}
 
             <div className="flex gap-2">
-              <button onClick={() => setStep(2)} className="h-11 px-4 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-600">Retour</button>
+              <button onClick={() => setStep(2)} className="h-11 px-4 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-600">{en ? "Back" : "Retour"}</button>
               <button onClick={handleSubmit} disabled={!canSubmit || saving} className="flex-1 h-11 rounded-xl text-xs font-black uppercase text-white flex items-center justify-center gap-2 disabled:opacity-40" style={{ backgroundColor: ORANGE }}>
-                {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} Créer le profil
+                {saving ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} />} {en ? "Create profile" : "Créer le profil"}
               </button>
             </div>
           </div>
@@ -2852,11 +2908,9 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
             <div className="flex items-start gap-3 mb-4">
               <AlertTriangle size={20} className="text-amber-500 shrink-0 mt-0.5" />
               <div>
-                <p className="font-black text-sm" style={{ color: BLUE }}>Directeur déjà présent</p>
+                <p className="font-black text-sm" style={{ color: BLUE }}>{en ? "Manager already assigned" : "Directeur déjà présent"}</p>
                 <p className="text-xs text-neutral-500 mt-1">
-                  <strong>{duplicateWarning.campusName}</strong> a déjà un directeur :{" "}
-                  <strong>{duplicateWarning.managerName}</strong>.<br />
-                  Que souhaitez-vous faire ?
+                  {en ? <><strong>{duplicateWarning.campusName}</strong> already has a manager: <strong>{duplicateWarning.managerName}</strong>.<br />What would you like to do?</> : <><strong>{duplicateWarning.campusName}</strong> a déjà un directeur : <strong>{duplicateWarning.managerName}</strong>.<br />Que souhaitez-vous faire ?</>}
                 </p>
               </div>
             </div>
@@ -2865,10 +2919,10 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
                 onClick={() => { setSelCampuses((p) => [...p, duplicateWarning.campusId]); setDuplicateWarning(null); }}
                 className="h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-xs font-black uppercase hover:bg-amber-100 transition-colors"
               >
-                Ajouter quand même
+                {en ? "Add anyway" : "Ajouter quand même"}
               </button>
               <button onClick={() => setDuplicateWarning(null)} className="h-10 rounded-xl bg-neutral-100 text-neutral-600 text-xs font-bold hover:bg-neutral-200 transition-colors">
-                Annuler
+                {en ? "Cancel" : "Annuler"}
               </button>
             </div>
           </div>

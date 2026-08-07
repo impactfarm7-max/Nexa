@@ -65,32 +65,6 @@ function currentYm() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Brouillon",
-  validated: "Validé",
-  paid: "Payé",
-};
-
-const LINE_TITLE: Record<LineType, string> = {
-  prime: "Prime",
-  retenue: "Retenue",
-  ajustement: "Ajustement",
-};
-
-const LINE_HINT: Record<LineType, string> = {
-  prime: "Augmente le net à payer",
-  retenue: "Diminue le net à payer",
-  ajustement: "Complément positif sur le brut",
-};
-
-const METHOD_LABELS: Record<string, string> = {
-  especes: "Espèces",
-  mobile_money: "Mobile money",
-  virement: "Virement",
-  cheque: "Chèque",
-  autre: "Autre",
-};
-
 function PayrollSection({
   icon: Icon,
   title,
@@ -210,7 +184,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         setTotals(null);
         return;
       }
-      if (!res.ok) throw new Error(json.error || t("centre", "staffPayrollLoadError"));
+      if (!res.ok) throw new Error(locale === "en" ? t("centre", "staffPayrollLoadError") : (json.error || t("centre", "staffPayrollLoadError")));
       setContract(json.contract || { base_salary: staff.base_salary, prime: staff.prime });
       applyBundle(json);
       setHistory(json.history || []);
@@ -242,9 +216,9 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
       const json = await res.json().catch(() => ({}));
       if (res.status === 503 || json.code === "MISSING_TABLE") {
         setMissingTable(true);
-        throw new Error(json.error || t("centre", "staffPayrollTablesMissing"));
+        throw new Error(locale === "en" ? t("centre", "staffPayrollTablesMissing") : (json.error || t("centre", "staffPayrollTablesMissing")));
       }
-      if (!res.ok) throw new Error(json.error || t("centre", "staffPayrollActionError"));
+      if (!res.ok) throw new Error(locale === "en" ? t("centre", "staffPayrollActionError") : (json.error || t("centre", "staffPayrollActionError")));
       applyBundle(json);
       const histRes = await fetch(
         `/api/center/staff-payroll?staff_id=${encodeURIComponent(staff.id)}&period=${encodeURIComponent(periodYm)}`,
@@ -361,6 +335,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
     try {
       const config = await fetchDocumentExportConfig(supabase, centerId).catch(() => undefined);
       await downloadPayslipPdf({
+        locale,
         staffName: `${staff.prenom} ${staff.nom}`,
         jobTitle: staff.job_title,
         periodYm,
@@ -450,8 +425,8 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             <table className="w-full text-left min-w-[28rem]">
               <thead>
                 <tr className="border-b border-black/[0.06] bg-black/[0.015]">
-                  <th className="px-3.5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-400">Période</th>
-                  <th className="px-3.5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-400">Statut</th>
+                  <th className="px-3.5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Period" : "Période"}</th>
+                  <th className="px-3.5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Status" : "Statut"}</th>
                   <th className="px-3.5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-400 w-[1%] whitespace-nowrap">Action</th>
                 </tr>
               </thead>
@@ -480,7 +455,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                           }`}
                           style={active ? { backgroundColor: BLUE } : undefined}
                         >
-                          {active ? "Ouvert" : "Ouvrir"}
+                          {active ? (locale === "en" ? "Open" : "Ouvert") : (locale === "en" ? "Open" : "Ouvrir")}
                         </button>
                       </td>
                     </tr>
@@ -494,8 +469,8 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
 
       <PayrollSection
         icon={ClipboardList}
-        title="Enregistrer"
-        description={`Saisie du mois sélectionné — primes, retenues, versements et validation.`}
+        title={locale === "en" ? "Payroll entry" : "Enregistrer"}
+        description={locale === "en" ? "Enter bonuses, deductions, payments, and approval for the selected month." : "Saisie du mois sélectionné : primes, retenues, versements et validation."}
         actions={
           <>
             <input
@@ -534,7 +509,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                 style={{ backgroundColor: BLUE }}
                 onClick={() => void post({ action: "set_status", period_id: period.id, status: "validated" })}
               >
-                Valider
+                {locale === "en" ? "Approve" : "Valider"}
               </button>
             )}
             {period && period.status !== "draft" && (
@@ -543,7 +518,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                 className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 inline-flex items-center gap-1.5"
                 onClick={() => void post({ action: "reopen", period_id: period.id })}
               >
-                <RotateCcw size={12} /> Rouvrir
+                <RotateCcw size={12} /> {locale === "en" ? "Reopen" : "Rouvrir"}
               </button>
             )}
           </div>
@@ -553,16 +528,16 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
           <div className="rounded-lg border border-black/[0.06] bg-white p-4">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Net à payer</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Net payable" : "Net à payer"}</p>
                 <p className="text-2xl font-extrabold tracking-tight tabular-nums mt-1" style={{ color: BLUE }}>
                   {fmt(totals.net, locale)}
                   <span className="text-sm text-neutral-400 ml-1.5 font-semibold">XAF</span>
                 </p>
               </div>
               <div className="text-right text-sm text-neutral-500 font-medium space-y-0.5">
-                <p>Versé <span className="text-neutral-800 tabular-nums font-semibold">{fmt(totals.paid, locale)}</span></p>
+                <p>{locale === "en" ? "Paid" : "Versé"} <span className="text-neutral-800 tabular-nums font-semibold">{fmt(totals.paid, locale)}</span></p>
                 <p>
-                  Reste{" "}
+                  {locale === "en" ? "Balance" : "Reste"}{" "}
                   <span className={`tabular-nums font-semibold ${totals.reste > 0 ? "text-neutral-900" : "text-neutral-500"}`}>
                     {totals.reste > 0 ? fmt(totals.reste, locale) : t("centre", "financeAccountSettled")}
                   </span>
@@ -575,11 +550,11 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                 <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>{fmt(totals.base, locale)}</p>
               </div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Primes</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Bonuses" : "Primes"}</p>
                 <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>+{fmt(totals.primes, locale)}</p>
               </div>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Retenues</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Deductions" : "Retenues"}</p>
                 <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>−{fmt(totals.retenues, locale)}</p>
               </div>
             </div>
@@ -592,21 +567,21 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             onClick={() => openNewLine("prime")}
             className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 inline-flex items-center gap-1.5 hover:bg-black/[0.03]"
           >
-            <Plus size={14} /> Prime
+            <Plus size={14} /> {locale === "en" ? "Bonus" : "Prime"}
           </button>
           <button
             type="button"
             onClick={() => openNewLine("retenue")}
             className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 inline-flex items-center gap-1.5 hover:bg-black/[0.03]"
           >
-            <Plus size={14} /> Retenue
+            <Plus size={14} /> {locale === "en" ? "Deduction" : "Retenue"}
           </button>
           <button
             type="button"
             onClick={() => openNewLine("ajustement")}
             className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 inline-flex items-center gap-1.5 hover:bg-black/[0.03]"
           >
-            <Plus size={14} /> Ajustement
+            <Plus size={14} /> {locale === "en" ? "Adjustment" : "Ajustement"}
           </button>
           <button
             type="button"
@@ -614,7 +589,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             className="h-9 px-3 rounded-lg text-xs font-semibold text-white inline-flex items-center gap-1.5"
             style={{ backgroundColor: BLUE }}
           >
-            <Plus size={14} /> Versement
+            <Plus size={14} /> {locale === "en" ? "Payment" : "Versement"}
           </button>
         </div>
 
@@ -624,13 +599,13 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Mouvements du mois</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Monthly entries" : "Mouvements du mois"}</p>
             <span className="text-xs text-neutral-400 font-medium">{lines.length}</span>
           </div>
           <div className="rounded-lg border border-black/[0.06] bg-white overflow-hidden">
             {lines.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-neutral-400 font-medium">
-                Aucun mouvement ce mois.
+                {locale === "en" ? "No entries this month." : "Aucun mouvement ce mois."}
               </p>
             ) : (
               <ul className="divide-y divide-black/[0.04]">
@@ -640,7 +615,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                       <div className="flex items-center gap-2 text-xs text-neutral-400 font-medium">
                         <span>{lineTitle(l.type)}</span>
                         <span>·</span>
-                        <span>{new Date(l.created_at).toLocaleDateString("fr-FR")}</span>
+                        <span>{new Date(l.created_at).toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR")}</span>
                       </div>
                       <p className="text-sm font-semibold mt-0.5 truncate" style={{ color: BLUE }}>{l.reason}</p>
                     </div>
@@ -648,10 +623,10 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                       <span className="text-sm tabular-nums font-semibold mr-1" style={{ color: BLUE }}>
                         {l.type === "retenue" ? "−" : "+"}{fmt(Number(l.amount), locale)}
                       </span>
-                      <button type="button" onClick={() => openEditLine(l)} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]" title="Modifier">
+                      <button type="button" onClick={() => openEditLine(l)} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]" title={locale === "en" ? "Edit" : "Modifier"}>
                         <Pencil size={14} />
                       </button>
-                      <button type="button" disabled={saving} onClick={() => post({ action: "delete_line", line_id: l.id })} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]" title="Supprimer">
+                      <button type="button" disabled={saving} onClick={() => post({ action: "delete_line", line_id: l.id })} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]" title={locale === "en" ? "Delete" : "Supprimer"}>
                         <Trash2 size={14} />
                       </button>
                     </div>
@@ -664,21 +639,21 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Versements</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Payments" : "Versements"}</p>
             <button type="button" onClick={openNewPay} className="text-xs font-semibold" style={{ color: BLUE }}>
-              Ajouter
+              {locale === "en" ? "Add" : "Ajouter"}
             </button>
           </div>
           <div className="rounded-lg border border-black/[0.06] bg-white overflow-hidden">
             {payments.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-neutral-400 font-medium">Aucun versement.</p>
+              <p className="px-4 py-8 text-center text-sm text-neutral-400 font-medium">{locale === "en" ? "No payments." : "Aucun versement."}</p>
             ) : (
               <ul className="divide-y divide-black/[0.04]">
                 {payments.map((p) => (
                   <li key={p.id} className="px-4 py-3 flex items-center justify-between gap-3 group">
                     <div className="min-w-0">
                       <p className="text-sm font-semibold" style={{ color: BLUE }}>
-                        {new Date(p.payment_date).toLocaleDateString("fr-FR")}
+                        {new Date(p.payment_date).toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR")}
                       </p>
                       <p className="text-xs text-neutral-400 font-medium mt-0.5">
                         {methodLabel(p.payment_method)}
@@ -694,7 +669,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                         type="button"
                         disabled={saving}
                         onClick={() => {
-                          if (window.confirm("Supprimer ce versement ?")) {
+                          if (window.confirm(locale === "en" ? "Delete this payment?" : "Supprimer ce versement ?")) {
                             void post({ action: "delete_payment", payment_id: p.id });
                           }
                         }}
@@ -711,10 +686,10 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         </div>
 
         <div className="rounded-lg border border-black/[0.06] bg-white p-4 space-y-3">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Contrat & base du mois</p>
+          <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Contract and monthly base" : "Contrat & base du mois"}</p>
           <div className="flex flex-wrap gap-4 text-sm text-neutral-600 font-medium">
-            <span>Salaire contrat <strong className="font-semibold" style={{ color: BLUE }}>{fmt(contract.base_salary, locale)}</strong></span>
-            <span>Prime contrat <strong className="font-semibold" style={{ color: BLUE }}>{contract.prime > 0 ? fmt(contract.prime, locale) : "—"}</strong></span>
+            <span>{locale === "en" ? "Contract salary" : "Salaire contrat"} <strong className="font-semibold" style={{ color: BLUE }}>{fmt(contract.base_salary, locale)}</strong></span>
+            <span>{locale === "en" ? "Contract bonus" : "Prime contrat"} <strong className="font-semibold" style={{ color: BLUE }}>{contract.prime > 0 ? fmt(contract.prime, locale) : "—"}</strong></span>
           </div>
           {contract.prime > 0 && period ? (
             <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
@@ -744,13 +719,13 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                   }
                 }}
               />
-              Inclure la prime contrat ({fmt(contract.prime, locale)})
+              {locale === "en" ? "Include contract bonus" : "Inclure la prime contrat"} ({fmt(contract.prime, locale)})
             </label>
           ) : null}
           {period && (
             <div className="flex flex-wrap items-end gap-2">
               <div className="flex-1 min-w-[140px]">
-                <label className="text-xs font-semibold text-neutral-500 block mb-1">Base figée ce mois</label>
+                <label className="text-xs font-semibold text-neutral-500 block mb-1">{locale === "en" ? "Fixed base for this month" : "Base figée ce mois"}</label>
                 <input
                   type="number"
                   value={baseEdit}
@@ -772,12 +747,12 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                 }
                 className="h-10 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 hover:bg-black/[0.03]"
               >
-                Appliquer
+                {locale === "en" ? "Apply" : "Appliquer"}
               </button>
             </div>
           )}
           <p className="text-xs text-neutral-400 font-medium">
-            Le dossier n&apos;est pas modifié. Les primes et retenues sont enregistrées dans le journal du mois.
+            {locale === "en" ? "The staff record is unchanged. Bonuses and deductions are saved in the monthly journal." : "Le dossier n'est pas modifié. Les primes et retenues sont enregistrées dans le journal du mois."}
           </p>
         </div>
       </PayrollSection>
@@ -792,7 +767,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>
-                  {editingLineId ? `Modifier · ${lineTitle(lineType)}` : lineTitle(lineType)}
+                  {editingLineId ? `${locale === "en" ? "Edit" : "Modifier"} · ${lineTitle(lineType)}` : lineTitle(lineType)}
                 </h3>
                 <p className="text-sm text-neutral-500 mt-0.5 font-medium">{lineHint(lineType)}</p>
               </div>
@@ -801,7 +776,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
               </button>
             </div>
             <div>
-              <label className="text-sm font-semibold text-neutral-600 block mb-1.5">Montant (XAF)</label>
+              <label className="text-sm font-semibold text-neutral-600 block mb-1.5">{locale === "en" ? "Amount (XAF)" : "Montant (XAF)"}</label>
               <input
                 type="number"
                 autoFocus
@@ -813,17 +788,17 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
               <AmountInWords amount={lineAmount} />
             </div>
             <div>
-              <label className="text-sm font-semibold text-neutral-600 block mb-1.5">Motif</label>
+              <label className="text-sm font-semibold text-neutral-600 block mb-1.5">{locale === "en" ? "Reason" : "Motif"}</label>
               <textarea
                 rows={3}
                 value={lineReason}
                 onChange={(e) => setLineReason(e.target.value)}
                 placeholder={
                   lineType === "retenue"
-                    ? "Ex. avance, absence…"
+                    ? (locale === "en" ? "Example: advance, absence..." : "Ex. avance, absence…")
                     : lineType === "prime"
-                      ? "Ex. assiduité, résultats…"
-                      : "Ex. rappel, correction…"
+                      ? (locale === "en" ? "Example: attendance, results..." : "Ex. assiduité, résultats…")
+                      : (locale === "en" ? "Example: adjustment, correction..." : "Ex. rappel, correction…")
                 }
                 className="w-full p-3 rounded-lg border border-black/[0.08] text-sm font-medium outline-none resize-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
               />
@@ -834,7 +809,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                 onClick={() => setLineOpen(false)}
                 className="h-10 px-4 rounded-lg text-sm font-semibold text-neutral-600 bg-neutral-100"
               >
-                Annuler
+                {locale === "en" ? "Cancel" : "Annuler"}
               </button>
               <button
                 type="button"
@@ -844,7 +819,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                 style={{ backgroundColor: BLUE }}
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-                Enregistrer
+                {locale === "en" ? "Save" : "Enregistrer"}
               </button>
             </div>
           </div>
@@ -861,10 +836,10 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>
-                  {editingPayId ? "Corriger le versement" : "Versement"}
+                  {editingPayId ? (locale === "en" ? "Edit payment" : "Corriger le versement") : (locale === "en" ? "Payment" : "Versement")}
                 </h3>
                 {totals && !editingPayId && (
-                  <p className="text-sm text-neutral-500 mt-0.5 font-medium">Reste {fmt(totals.reste, locale)} XAF</p>
+                  <p className="text-sm text-neutral-500 mt-0.5 font-medium">{locale === "en" ? "Balance" : "Reste"} {fmt(totals.reste, locale)} XAF</p>
                 )}
               </div>
               <button type="button" onClick={() => setPayOpen(false)} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500">
@@ -872,7 +847,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
               </button>
             </div>
             <div>
-              <label className="text-sm font-semibold text-neutral-600 block mb-1.5">Montant</label>
+              <label className="text-sm font-semibold text-neutral-600 block mb-1.5">{locale === "en" ? "Amount" : "Montant"}</label>
               <input
                 type="number"
                 autoFocus
@@ -884,7 +859,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-sm font-semibold text-neutral-600 block mb-1.5">Mode</label>
+                <label className="text-sm font-semibold text-neutral-600 block mb-1.5">{locale === "en" ? "Method" : "Mode"}</label>
                 <select
                   value={payMethod}
                   onChange={(e) => setPayMethod(e.target.value)}
@@ -906,13 +881,13 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
               </div>
             </div>
             <div>
-              <label className="text-sm font-semibold text-neutral-600 block mb-1.5">Note</label>
+              <label className="text-sm font-semibold text-neutral-600 block mb-1.5">{locale === "en" ? "Note" : "Note"}</label>
               <input
                 type="text"
                 value={payNotes}
                 onChange={(e) => setPayNotes(e.target.value)}
                 className="w-full h-11 px-3 rounded-lg border border-black/[0.08] text-sm font-semibold outline-none"
-                placeholder="Optionnel"
+                placeholder={locale === "en" ? "Optional" : "Optionnel"}
               />
             </div>
             <div className="flex justify-end gap-2 pt-1">
@@ -921,7 +896,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                 onClick={() => setPayOpen(false)}
                 className="h-10 px-4 rounded-lg text-sm font-semibold text-neutral-600 bg-neutral-100"
               >
-                Annuler
+                {locale === "en" ? "Cancel" : "Annuler"}
               </button>
               <button
                 type="button"
@@ -931,7 +906,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                 style={{ backgroundColor: BLUE }}
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-                {editingPayId ? "Enregistrer" : "Confirmer"}
+                {editingPayId ? (locale === "en" ? "Save" : "Enregistrer") : (locale === "en" ? "Confirm" : "Confirmer")}
               </button>
             </div>
           </div>

@@ -403,8 +403,8 @@ export async function shareStatementPdf(params: StatementPdfParams): Promise<"sh
     if (!canShareFiles) return "unsupported";
 
     await navigator.share({
-      title: "Relevé de compte",
-      text: `Relevé de compte — ${params.studentName}`,
+      title: params.locale === "en" ? "Account statement" : "Relevé de compte",
+      text: `${params.locale === "en" ? "Account statement" : "Relevé de compte"} — ${params.studentName}`,
       files: [file],
     });
     return "shared";
@@ -606,9 +606,11 @@ export type ProgrammePdfData = {
 
 export async function downloadProgrammePdf(
   data: ProgrammePdfData,
-  config?: Partial<DocumentExportConfig>
+  config?: Partial<DocumentExportConfig>,
+  locale: "fr" | "en" = "fr",
 ) {
-  const { doc, autoTable, startY, cfg } = await createDoc("Fiche programme", config);
+  const en = locale === "en";
+  const { doc, autoTable, startY, cfg } = await createDoc(en ? "Program sheet" : "Fiche programme", config);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
   let y = startY;
@@ -646,9 +648,9 @@ export async function downloadProgrammePdf(
   };
 
   // Identité
-  sectionTitle("1. Informations générales");
-  kv("Nom", data.name);
-  if (data.programId) kv("ID programme", data.programId);
+  sectionTitle(en ? "1. General information" : "1. Informations générales");
+  kv(en ? "Name" : "Nom", data.name);
+  if (data.programId) kv(en ? "Program ID" : "ID programme", data.programId);
   kv("Type", data.typeLabel);
   kv("Structure", data.structureLabel);
   kv("Mode", data.modeLabel);
@@ -667,13 +669,13 @@ export async function downloadProgrammePdf(
     y += descLines.length * 4.5 + 4;
   }
 
-  sectionTitle("2. Campus et direction");
+  sectionTitle(en ? "2. Campus and management" : "2. Campus et direction");
   kv("Campus", data.campuses.length ? data.campuses.join(", ") : "—");
-  kv("Directeur", data.directeur || "Non assigné");
+  kv(en ? "Director" : "Directeur", data.directeur || (en ? "Not assigned" : "Non assigné"));
 
-  sectionTitle("3. Tarification");
+  sectionTitle(en ? "3. Pricing" : "3. Tarification");
   if (data.isCursus) {
-    kv("Prix de référence (indicatif)", `${fmtFCFA(data.globalTuition)} FCFA`);
+    kv(en ? "Reference price (indicative)" : "Prix de référence (indicatif)", `${fmtFCFA(data.globalTuition)} FCFA`);
     for (const niv of data.niveaux) {
       ensureSpace(28);
       doc.setFont("helvetica", "bold");
@@ -681,11 +683,11 @@ export async function downloadProgrammePdf(
       doc.setTextColor(...cfg.accentRgb);
       doc.text(niv.label, 14, y);
       y += 6;
-      kv("Prix formation", `${fmtFCFA(niv.tuition)} FCFA`);
+      kv(en ? "Training price" : "Prix formation", `${fmtFCFA(niv.tuition)} FCFA`);
       if (niv.fees.length) {
         autoTable(doc, {
           startY: y,
-          head: [["Frais", "Montant"]],
+          head: [[en ? "Fees" : "Frais", en ? "Amount" : "Montant"]],
           body: niv.fees.map((f) => [f.label, `${fmtFCFA(f.montant)} FCFA`]),
           styles: { fontSize: 8, cellPadding: 2 },
           headStyles: { fillColor: cfg.blueRgb, textColor: 255 },
@@ -703,15 +705,17 @@ export async function downloadProgrammePdf(
       doc.setFont("helvetica", "italic");
       doc.setFontSize(8);
       doc.setTextColor(70, 70, 70);
-      const words = doc.splitTextToSize(`En lettres : ${niv.totalWords}`, pageWidth - 28);
-      doc.text(words, 14, y);
-      y += words.length * 4 + 2;
+      if (!en) {
+        const words = doc.splitTextToSize(`En lettres : ${niv.totalWords}`, pageWidth - 28);
+        doc.text(words, 14, y);
+        y += words.length * 4 + 2;
+      }
       if (niv.installments.length) {
         autoTable(doc, {
           startY: y,
-          head: [["Échéance", "Montant", "Jours"]],
+          head: [[en ? "Installment" : "Échéance", en ? "Amount" : "Montant", en ? "Days" : "Jours"]],
           body: niv.installments.map((inst, i) => [
-            `Échéance ${i + 1}`,
+            `${en ? "Installment" : "Échéance"} ${i + 1}`,
             `${fmtFCFA(inst.montant)} FCFA`,
             `J + ${inst.jours}`,
           ]),
@@ -725,11 +729,11 @@ export async function downloadProgrammePdf(
       }
     }
   } else {
-    kv("Prix formation", `${fmtFCFA(data.globalTuition)} FCFA`);
+    kv(en ? "Training price" : "Prix formation", `${fmtFCFA(data.globalTuition)} FCFA`);
     if (data.globalFees.length) {
       autoTable(doc, {
         startY: y,
-        head: [["Frais supplémentaires", "Montant"]],
+        head: [[en ? "Additional fees" : "Frais supplémentaires", en ? "Amount" : "Montant"]],
         body: data.globalFees.map((f) => [f.label, `${fmtFCFA(f.montant)} FCFA`]),
         styles: { fontSize: 8, cellPadding: 2 },
         headStyles: { fillColor: cfg.blueRgb, textColor: 255 },
@@ -742,20 +746,22 @@ export async function downloadProgrammePdf(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
     doc.setTextColor(...cfg.blueRgb);
-    doc.text(`Total à payer : ${fmtFCFA(data.globalTotal)} FCFA`, 14, y);
+    doc.text(`${en ? "Total due" : "Total à payer"} : ${fmtFCFA(data.globalTotal)} FCFA`, 14, y);
     y += 6;
     doc.setFont("helvetica", "italic");
     doc.setFontSize(9);
     doc.setTextColor(60, 60, 60);
-    const gWords = doc.splitTextToSize(`En lettres : ${data.globalTotalWords}`, pageWidth - 28);
-    doc.text(gWords, 14, y);
-    y += gWords.length * 4.5 + 4;
+    if (!en) {
+      const gWords = doc.splitTextToSize(`En lettres : ${data.globalTotalWords}`, pageWidth - 28);
+      doc.text(gWords, 14, y);
+      y += gWords.length * 4.5 + 4;
+    }
     if (data.globalInstallments.length) {
       autoTable(doc, {
         startY: y,
-        head: [["Échéance", "Montant", "Jours"]],
+        head: [[en ? "Installment" : "Échéance", en ? "Amount" : "Montant", en ? "Days" : "Jours"]],
         body: data.globalInstallments.map((inst, i) => [
-          `Échéance ${i + 1}`,
+          `${en ? "Installment" : "Échéance"} ${i + 1}`,
           `${fmtFCFA(inst.montant)} FCFA`,
           `J + ${inst.jours}`,
         ]),
@@ -767,7 +773,7 @@ export async function downloadProgrammePdf(
     }
   }
 
-  sectionTitle("4. Salles de classe");
+  sectionTitle(en ? "4. Classrooms" : "4. Salles de classe");
   if (data.isCursus) {
     for (const niv of data.niveaux) {
       ensureSpace(10);
@@ -778,24 +784,24 @@ export async function downloadProgrammePdf(
       y += 5;
       doc.setFont("helvetica", "normal");
       doc.setTextColor(50, 50, 50);
-      const rooms = niv.classes.length ? niv.classes.join(" · ") : "Aucune salle";
+      const rooms = niv.classes.length ? niv.classes.join(" · ") : (en ? "No classrooms" : "Aucune salle");
       const roomLines = doc.splitTextToSize(rooms, pageWidth - 28);
       doc.text(roomLines, 14, y);
       y += roomLines.length * 4.5 + 4;
     }
   } else {
     const rooms = data.niveaux[0]?.classes || [];
-    kv("Salles", rooms.length ? rooms.join(" · ") : "Aucune salle");
+    kv(en ? "Classrooms" : "Salles", rooms.length ? rooms.join(" · ") : (en ? "No classrooms" : "Aucune salle"));
   }
 
-  sectionTitle("5. Matières et formateurs");
+  sectionTitle(en ? "5. Subjects and trainers" : "5. Matières et formateurs");
   if (data.matieres.length === 0) {
-    kv("Matières", "Aucune matière renseignée");
+    kv(en ? "Subjects" : "Matières", en ? "No subjects provided" : "Aucune matière renseignée");
   } else {
     autoTable(doc, {
       startY: y,
-      head: [["Matière", "Niveaux", "Formateurs"]],
-      body: data.matieres.map((m) => [m.name, m.niveaux || "—", m.formateurs || "Optionnel / non assigné"]),
+      head: [[en ? "Subject" : "Matière", en ? "Levels" : "Niveaux", en ? "Trainers" : "Formateurs"]],
+      body: data.matieres.map((m) => [m.name, m.niveaux || "—", m.formateurs || (en ? "Optional / not assigned" : "Optionnel / non assigné")]),
       styles: { fontSize: 8, cellPadding: 2.5, overflow: "linebreak" },
       headStyles: { fillColor: cfg.blueRgb, textColor: 255, fontStyle: "bold" },
       margin: { left: 14, right: 14 },
@@ -814,7 +820,7 @@ export async function downloadProgrammePdf(
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
   doc.text(
-    "Document généré depuis Nexa Academy — les montants en lettres sont indicatifs et correspondent au total affiché.",
+    en ? "Document generated by Nexa Academy." : "Document généré depuis Nexa Academy. Les montants en lettres sont indicatifs et correspondent au total affiché.",
     14,
     y,
     { maxWidth: pageWidth - 28 }
@@ -835,6 +841,7 @@ export async function downloadProgrammePdf(
 }
 
 export type PayslipPdfParams = {
+  locale?: "fr" | "en";
   staffName: string;
   jobTitle?: string | null;
   periodYm: string;
@@ -853,9 +860,11 @@ export type PayslipPdfParams = {
 };
 
 export async function downloadPayslipPdf(params: PayslipPdfParams) {
-  const { doc, autoTable, startY, cfg } = await createDoc("Bulletin de paie", {
+  const isEn = params.locale === "en";
+  const payslipTitle = isEn ? "Payslip" : "Bulletin de paie";
+  const { doc, autoTable, startY, cfg } = await createDoc(payslipTitle, {
     ...params.config,
-    title: params.config?.title || "Bulletin de paie",
+    title: params.config?.title || payslipTitle,
   });
 
   let y = startY;
@@ -871,22 +880,22 @@ export async function downloadPayslipPdf(params: PayslipPdfParams) {
     doc.text(params.jobTitle, 14, y);
     y += 5;
   }
-  doc.text(`Période : ${params.periodLabel} (${params.periodYm})`, 14, y);
+  doc.text(`${isEn ? "Period" : "Période"} : ${params.periodLabel} (${params.periodYm})`, 14, y);
   y += 5;
-  doc.text(`Statut : ${params.statusLabel}`, 14, y);
+  doc.text(`${isEn ? "Status" : "Statut"} : ${params.statusLabel}`, 14, y);
   y += 8;
 
   autoTable(doc, {
     startY: y,
-    head: [["Libellé", "Montant"]],
+    head: [[isEn ? "Description" : "Libellé", isEn ? "Amount" : "Montant"]],
     body: [
-      ["Salaire de base", `${fmtFCFA(params.base)} XAF`],
-      ["Primes / ajustements", `+${fmtFCFA(params.primes)} XAF`],
-      ["Retenues", `−${fmtFCFA(params.retenues)} XAF`],
-      ["Brut", `${fmtFCFA(params.brut)} XAF`],
-      ["Net à payer", `${fmtFCFA(params.net)} XAF`],
-      ["Versé", `${fmtFCFA(params.paid)} XAF`],
-      ["Reste", `${fmtFCFA(params.reste)} XAF`],
+      [isEn ? "Base salary" : "Salaire de base", `${fmtFCFA(params.base)} XAF`],
+      [isEn ? "Bonuses / adjustments" : "Primes / ajustements", `+${fmtFCFA(params.primes)} XAF`],
+      [isEn ? "Deductions" : "Retenues", `−${fmtFCFA(params.retenues)} XAF`],
+      [isEn ? "Gross pay" : "Brut", `${fmtFCFA(params.brut)} XAF`],
+      [isEn ? "Net payable" : "Net à payer", `${fmtFCFA(params.net)} XAF`],
+      [isEn ? "Paid" : "Versé", `${fmtFCFA(params.paid)} XAF`],
+      [isEn ? "Balance" : "Reste", `${fmtFCFA(params.reste)} XAF`],
     ],
     styles: { fontSize: 9, cellPadding: 2.5 },
     headStyles: { fillColor: cfg.blueRgb, textColor: 255 },
@@ -897,11 +906,11 @@ export async function downloadPayslipPdf(params: PayslipPdfParams) {
   if (params.lines.length > 0) {
     autoTable(doc, {
       startY: y,
-      head: [["Type", "Motif", "Date", "Montant"]],
+      head: [["Type", isEn ? "Reason" : "Motif", "Date", isEn ? "Amount" : "Montant"]],
       body: params.lines.map((l) => [
-        l.type === "prime" ? "Prime" : l.type === "retenue" ? "Retenue" : "Ajustement",
+        l.type === "prime" ? (isEn ? "Bonus" : "Prime") : l.type === "retenue" ? (isEn ? "Deduction" : "Retenue") : (isEn ? "Adjustment" : "Ajustement"),
         l.reason,
-        fmtDate(l.created_at),
+        fmtDate(l.created_at, isEn ? "en" : "fr"),
         `${l.type === "retenue" ? "−" : "+"}${fmtFCFA(l.amount)} XAF`,
       ]),
       styles: { fontSize: 8, cellPadding: 2 },
@@ -914,9 +923,9 @@ export async function downloadPayslipPdf(params: PayslipPdfParams) {
   if (params.payments.length > 0) {
     autoTable(doc, {
       startY: y,
-      head: [["Date", "Mode", "Note", "Montant"]],
+      head: [["Date", isEn ? "Method" : "Mode", "Note", isEn ? "Amount" : "Montant"]],
       body: params.payments.map((p) => [
-        fmtDate(p.payment_date),
+        fmtDate(p.payment_date, isEn ? "en" : "fr"),
         p.payment_method,
         p.notes || "—",
         `+${fmtFCFA(p.amount)} XAF`,
@@ -928,8 +937,8 @@ export async function downloadPayslipPdf(params: PayslipPdfParams) {
   }
 
   addPdfFooter(doc, cfg);
-  const safe = params.staffName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || "collaborateur";
-  doc.save(`bulletin_paie_${safe}_${params.periodYm}.pdf`);
+  const safe = params.staffName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || (isEn ? "staff_member" : "collaborateur");
+  doc.save(`${isEn ? "payslip" : "bulletin_paie"}_${safe}_${params.periodYm}.pdf`);
 }
 
 // ── Bulletin / relevé de notes (modèle Paramètres → Documents) ───────────────
@@ -1090,6 +1099,7 @@ export async function downloadClassGradeSheetPdf(params: ClassGradeSheetPdfParam
 // ── Attestation de réussite ─────────────────────────────────────────────────
 
 export type AttestationReussitePdfParams = {
+  locale?: "fr" | "en";
   studentName: string;
   programName?: string | null;
   niveauLabel?: string | null;
@@ -1103,7 +1113,8 @@ export type AttestationReussitePdfParams = {
 };
 
 export async function downloadAttestationReussitePdf(params: AttestationReussitePdfParams) {
-  const title = params.config?.title?.trim() || "Attestation de réussite";
+  const isEn = params.locale === "en";
+  const title = params.config?.title?.trim() || (isEn ? "Certificate of achievement" : "Attestation de réussite");
   const { doc, startY, cfg } = await createDoc(title, {
     ...params.config,
     title,
@@ -1116,13 +1127,13 @@ export async function downloadAttestationReussitePdf(params: AttestationReussite
   doc.setFontSize(11);
   doc.setTextColor(40, 40, 40);
 
-  const legal = cfg.legalName || "l'établissement";
+  const legal = cfg.legalName || (isEn ? "the institution" : "l'établissement");
   const body = [
-    `Je soussigné(e), représentant(e) de ${legal}, atteste que :`,
+    isEn ? `I, the undersigned representative of ${legal}, certify that:` : `Je soussigné(e), représentant(e) de ${legal}, atteste que :`,
     "",
     `${params.studentName}`,
     "",
-    "a suivi avec succès le programme ci-dessous et obtient la présente attestation de réussite.",
+    isEn ? "has successfully completed the program below and is awarded this certificate of achievement." : "a suivi avec succès le programme ci-dessous et obtient la présente attestation de réussite.",
   ];
 
   for (const line of body) {
@@ -1148,12 +1159,12 @@ export async function downloadAttestationReussitePdf(params: AttestationReussite
 
   y += 6;
   const details: string[] = [];
-  if (params.programName) details.push(`Programme : ${params.programName}`);
-  if (params.niveauLabel) details.push(`Niveau : ${params.niveauLabel}`);
-  if (params.classeLabel) details.push(`Classe : ${params.classeLabel}`);
-  if (params.academicYear) details.push(`Année académique : ${params.academicYear}`);
-  if (params.mention) details.push(`Mention : ${params.mention}`);
-  details.push(`Date d'émission : ${params.issuedAt || new Date().toLocaleDateString("fr-FR")}`);
+  if (params.programName) details.push(`${isEn ? "Program" : "Programme"} : ${params.programName}`);
+  if (params.niveauLabel) details.push(`${isEn ? "Level" : "Niveau"} : ${params.niveauLabel}`);
+  if (params.classeLabel) details.push(`${isEn ? "Class" : "Classe"} : ${params.classeLabel}`);
+  if (params.academicYear) details.push(`${isEn ? "Academic year" : "Année académique"} : ${params.academicYear}`);
+  if (params.mention) details.push(`${isEn ? "Distinction" : "Mention"} : ${params.mention}`);
+  details.push(`${isEn ? "Issue date" : "Date d'émission"} : ${params.issuedAt || new Date().toLocaleDateString(isEn ? "en-GB" : "fr-FR")}`);
 
   doc.setFontSize(10);
   doc.setTextColor(60, 60, 60);
@@ -1167,7 +1178,7 @@ export async function downloadAttestationReussitePdf(params: AttestationReussite
   doc.setFontSize(9);
   doc.setTextColor(100, 100, 100);
   doc.text(
-    "Document officiel généré par le centre. Valable sur présentation d'une pièce d'identité.",
+    isEn ? "Official document issued by the center. Valid when presented with an identity document." : "Document officiel généré par le centre. Valable sur présentation d'une pièce d'identité.",
     pageWidth / 2,
     y,
     { align: "center", maxWidth: pageWidth - 40 },
@@ -1175,7 +1186,7 @@ export async function downloadAttestationReussitePdf(params: AttestationReussite
 
   await addPdfSignatures(doc, cfg, params.signatures, params.stampUrl);
   addPdfFooter(doc, cfg);
-  const safe = params.studentName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || "apprenant";
-  doc.save(`attestation_reussite_${safe}.pdf`);
+  const safe = params.studentName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || (isEn ? "learner" : "apprenant");
+  doc.save(`${isEn ? "certificate_of_achievement" : "attestation_reussite"}_${safe}.pdf`);
 }
 

@@ -273,7 +273,7 @@ function SyntheseContent() {
               </Panel>
             )}
 
-            <Panel title={isTcf ? "Examens TCF" : t("centre", "summaryExamsPeriod")} href={reportHref("/centre/rapports/examens")}>
+            <Panel title={isTcf ? t("centre", "reportsExamTitleTcf") : t("centre", "summaryExamsPeriod")} href={reportHref("/centre/rapports/examens")}>
               <div className="divide-y divide-neutral-100">
                 <PanelRow icon={<ClipboardCheck size={12} className="text-indigo-600" />} iconBg="bg-indigo-50" label={t("centre", "summaryScheduled")} value={report.sections.examens.programmes} />
                 <PanelRow icon={<ClipboardCheck size={12} className="text-emerald-600" />} iconBg="bg-emerald-50" label={t("centre", "summaryCompleted")} value={report.sections.examens.realises} />

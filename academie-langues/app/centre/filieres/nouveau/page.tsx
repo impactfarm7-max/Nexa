@@ -12,6 +12,7 @@ import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { filterDisciplinesForCenterProgram } from "@/app/data/tcf-teaching-subjects";
 import { amountInWordsFr } from "@/app/utils/amountInWordsFr";
 import { AmountInWords } from "@/app/components/AmountInWords";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import { fetchDocumentExportConfig } from "@/app/utils/documentConfig";
 import { downloadProgrammePdf, type ProgrammePdfData } from "@/app/utils/centerPdfExport";
 import {
@@ -239,6 +240,8 @@ function PriceBlock({ value, onChange, locked, onLock, onUnlock, placeholder, la
   placeholder?: string;
   label: string;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   return (
     <div>
       <label className={FIELD_LABEL_INLINE}>
@@ -255,7 +258,7 @@ function PriceBlock({ value, onChange, locked, onLock, onUnlock, placeholder, la
             onClick={onUnlock}
             className="flex items-center gap-1.5 px-3 h-10 rounded-lg border border-black/[0.08] text-sm font-semibold text-neutral-600 hover:bg-black/[0.03] transition-colors"
           >
-            <Pencil size={14} /> Modifier
+            <Pencil size={14} /> {en ? "Edit" : "Modifier"}
           </button>
         </div>
       ) : (
@@ -278,7 +281,7 @@ function PriceBlock({ value, onChange, locked, onLock, onUnlock, placeholder, la
               className="px-4 h-12 rounded-lg text-sm font-semibold text-white transition-all hover:opacity-90"
               style={{ backgroundColor: ORANGE }}
             >
-              Valider
+              {en ? "Confirm" : "Valider"}
             </button>
           )}
         </div>
@@ -309,6 +312,8 @@ function InstallmentsBlock({
   onRemove: (id: string) => void;
   label: string;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const total = parseAmount(totalPrice);
   const allocated = sumInstallments(installments);
   const remaining = Math.max(0, total - allocated);
@@ -335,26 +340,26 @@ function InstallmentsBlock({
       <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-4 mt-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
           <h4 className="text-[10px] font-black uppercase text-neutral-500 flex items-center gap-1.5">
-            <Lock size={13} /> {label} — validé
+            <Lock size={13} /> {label}. {en ? "Confirmed" : "Validé"}
           </h4>
           <button
             type="button"
             onClick={onUnlock}
             className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-neutral-200 text-[10px] font-black uppercase tracking-wider text-neutral-500 hover:bg-white transition-colors"
           >
-            <Pencil size={12} /> Modifier
+            <Pencil size={12} /> {en ? "Edit" : "Modifier"}
           </button>
         </div>
         <div className="space-y-2">
           {installments.map((inst, idx) => (
             <div key={inst.id} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-white border border-neutral-200">
-              <span className="text-[11px] font-bold text-neutral-500">Échéance {idx + 1}</span>
+              <span className="text-[11px] font-bold text-neutral-500">{en ? "Installment" : "Échéance"} {idx + 1}</span>
               <span className="text-xs font-black" style={{ color: BLUE }}>{formatFCFA(inst.montant)} FCFA</span>
               <span className="text-[10px] font-bold text-neutral-400">J + {inst.jours || "0"}</span>
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-neutral-400 mt-3">Total : <span className="font-black text-neutral-700">{formatFCFA(allocated)} FCFA</span></p>
+        <p className="text-[11px] text-neutral-400 mt-3">{en ? "Total" : "Total"} : <span className="font-black text-neutral-700">{formatFCFA(allocated)} FCFA</span></p>
         <AmountInWords amount={allocated} />
       </div>
     );
@@ -366,19 +371,19 @@ function InstallmentsBlock({
         <CalendarDays size={13} /> {label}
       </h4>
       <p className="text-[11px] text-neutral-400 mb-3">
-        Chaque montant est plafonné au reste du total à payer. La prochaine échéance propose automatiquement le solde.
+        {en ? "Each amount is limited to the remaining balance. The next installment automatically suggests the outstanding amount." : "Chaque montant est plafonné au reste du total à payer. La prochaine échéance propose automatiquement le solde."}
       </p>
 
       {total <= 0 ? (
         <p className="text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
-          Définissez d&apos;abord le prix de la formation / du niveau.
+          {en ? "Define the program or level price first." : "Définissez d’abord le prix de la formation / du niveau."}
         </p>
       ) : (
         <div className="flex flex-wrap gap-3 mb-3 text-[11px] font-bold">
-          <span className="text-neutral-500">Pension : <span style={{ color: BLUE }}>{formatFCFA(total)} FCFA</span></span>
-          <span className="text-neutral-500">Réparti : <span style={{ color: BLUE }}>{formatFCFA(allocated)} FCFA</span></span>
+          <span className="text-neutral-500">{en ? "Tuition" : "Pension"} : <span style={{ color: BLUE }}>{formatFCFA(total)} FCFA</span></span>
+          <span className="text-neutral-500">{en ? "Allocated" : "Réparti"} : <span style={{ color: BLUE }}>{formatFCFA(allocated)} FCFA</span></span>
           <span className={remaining === 0 ? "text-emerald-600" : "text-orange-600"}>
-            Reste : {formatFCFA(remaining)} FCFA
+            {en ? "Remaining" : "Reste"} : {formatFCFA(remaining)} FCFA
           </span>
         </div>
       )}
@@ -431,7 +436,7 @@ function InstallmentsBlock({
           disabled={total <= 0 || remaining <= 0}
           className="h-9 px-3 rounded-lg bg-white border border-dashed border-neutral-200 text-neutral-500 text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 hover:bg-neutral-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <Plus size={12} /> Ajouter une échéance
+          <Plus size={12} /> {en ? "Add an installment" : "Ajouter une échéance"}
           {remaining > 0 && total > 0 ? ` (${formatFCFA(remaining)})` : ""}
         </button>
         {canLock && (
@@ -441,12 +446,12 @@ function InstallmentsBlock({
             className="h-9 px-4 rounded-lg text-[10px] font-black uppercase tracking-wider text-white transition-all hover:opacity-90"
             style={{ backgroundColor: ORANGE }}
           >
-            Valider l&apos;échéancier
+            {en ? "Confirm payment schedule" : "Valider l’échéancier"}
           </button>
         )}
         {total > 0 && installments.length > 0 && remaining > 0 && (
           <span className="text-[10px] font-bold text-neutral-400">
-            Répartissez les {formatFCFA(remaining)} FCFA restants pour valider.
+            {en ? `Allocate the remaining ${formatFCFA(remaining)} FCFA to confirm.` : `Répartissez les ${formatFCFA(remaining)} FCFA restants pour valider.`}
           </span>
         )}
       </div>
@@ -473,6 +478,8 @@ function FeesBlock({
   onUnlock: () => void;
   label?: string;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const complete = fees.filter((f) => f.label.trim() && parseAmount(f.montant) > 0);
   const incomplete = fees.some((f) => f.label.trim() || parseAmount(f.montant) > 0) && fees.some((f) => !f.label.trim() || parseAmount(f.montant) <= 0);
   const canLock = !incomplete;
@@ -482,18 +489,18 @@ function FeesBlock({
       <div className="mt-4 bg-neutral-50 border border-neutral-200 rounded-xl p-4">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
           <p className="text-[10px] font-black uppercase text-neutral-500 tracking-wider flex items-center gap-1.5">
-            <Lock size={12} /> {label || "Frais supplémentaires"} — validés
+            <Lock size={12} /> {label || (en ? "Additional fees" : "Frais supplémentaires")}. {en ? "Confirmed" : "Validés"}
           </p>
           <button
             type="button"
             onClick={onUnlock}
             className="flex items-center gap-1.5 px-3 h-8 rounded-lg border border-neutral-200 text-[10px] font-black uppercase tracking-wider text-neutral-500 hover:bg-white transition-colors"
           >
-            <Pencil size={12} /> Modifier
+            <Pencil size={12} /> {en ? "Edit" : "Modifier"}
           </button>
         </div>
         {complete.length === 0 ? (
-          <p className="text-xs font-bold text-neutral-400">Aucun frais supplémentaire.</p>
+          <p className="text-xs font-bold text-neutral-400">{en ? "No additional fees." : "Aucun frais supplémentaire."}</p>
         ) : (
           <ul className="space-y-1.5">
             {complete.map((f) => (
@@ -511,16 +518,16 @@ function FeesBlock({
   return (
     <div className="mt-4">
       <p className="text-[10px] font-black uppercase text-neutral-400 tracking-wider mb-2">
-        {label || "Frais supplémentaires"}
+        {label || (en ? "Additional fees" : "Frais supplémentaires")}
       </p>
-      <p className="text-[11px] text-neutral-400 mb-3">Intitulé + montant, puis validez pour figer la liste.</p>
+      <p className="text-[11px] text-neutral-400 mb-3">{en ? "Enter a label and amount, then confirm to lock the list." : "Intitulé + montant, puis validez pour figer la liste."}</p>
       <div className="space-y-2">
         {fees.map((f) => (
           <div key={f.id} className="flex flex-wrap gap-2 items-center">
             <input
               value={f.label}
               onChange={(e) => onUpdate(f.id, "label", e.target.value)}
-              placeholder="Intitulé"
+              placeholder={en ? "Label" : "Intitulé"}
               className="flex-1 min-w-[8rem] h-10 px-3 rounded-xl border bg-neutral-50 text-xs font-bold outline-none"
             />
             <div className="relative w-32">
@@ -546,7 +553,7 @@ function FeesBlock({
           className="px-3 h-9 rounded-xl border border-dashed border-orange-200 text-[10px] font-black uppercase tracking-wider hover:bg-orange-50"
           style={{ color: ORANGE }}
         >
-          <Plus size={12} className="inline mr-1" /> Ajouter un frais
+          <Plus size={12} className="inline mr-1" /> {en ? "Add a fee" : "Ajouter un frais"}
         </button>
         <button
           type="button"
@@ -555,22 +562,23 @@ function FeesBlock({
           className="px-3 h-9 rounded-xl text-[10px] font-black uppercase tracking-wider text-white disabled:opacity-40"
           style={{ backgroundColor: BLUE }}
         >
-          <CheckCircle2 size={12} className="inline mr-1" /> Valider les frais
+          <CheckCircle2 size={12} className="inline mr-1" /> {en ? "Confirm fees" : "Valider les frais"}
         </button>
       </div>
       {incomplete && (
-        <p className="text-[10px] text-amber-600 font-bold mt-2">Complétez intitulé et montant de chaque ligne, ou retirez les lignes vides.</p>
+        <p className="text-[10px] text-amber-600 font-bold mt-2">{en ? "Complete the label and amount for each row, or remove empty rows." : "Complétez intitulé et montant de chaque ligne, ou retirez les lignes vides."}</p>
       )}
     </div>
   );
 }
 
 function TotalDisplay({ total, label }: { total: string; label?: string }) {
+  const { locale } = useI18n();
   const n = parseAmount(total);
   return (
     <div className="rounded-xl bg-neutral-50 border border-neutral-200 px-4 py-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-black uppercase text-neutral-400">{label || "Total à payer"}</span>
+        <span className="text-[10px] font-black uppercase text-neutral-400">{label || (locale === "en" ? "Total due" : "Total à payer")}</span>
         <span className="text-sm font-black" style={{ color: BLUE }}>{formatFCFA(total)} FCFA</span>
       </div>
       <AmountInWords amount={n} />
@@ -591,17 +599,19 @@ function ClassroomsBlock({
   editLocked?: boolean;
   niveauLabel?: string;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const minCount = editLocked ? classes.filter((c) => c.id).length : 0;
   return (
     <div>
       <p className="text-sm font-semibold text-neutral-600 tracking-normal mb-1">
-        Salles de classe{niveauLabel ? ` — ${niveauLabel}` : ""}
+        {en ? "Classrooms" : "Salles de classe"}{niveauLabel ? `: ${niveauLabel}` : ""}
       </p>
       <p className="text-sm text-neutral-400 mb-3 font-medium">
-        Indiquez le nombre de salles, puis nommez-les (ex. Cours du jour, Cours du soir).
+        {en ? "Enter the number of classrooms, then name them (e.g. Day class, Evening class)." : "Indiquez le nombre de salles, puis nommez-les (ex. Cours du jour, Cours du soir)."}
       </p>
       <div className="flex items-center gap-3 mb-3">
-        <label className="text-sm font-semibold text-neutral-600">Nombre</label>
+        <label className="text-sm font-semibold text-neutral-600">{en ? "Number" : "Nombre"}</label>
         <input
           type="text"
           inputMode="numeric"
@@ -618,11 +628,11 @@ function ClassroomsBlock({
           className="w-20 h-12 px-3 rounded-lg border border-black/[0.08] bg-white font-semibold text-base text-center outline-none focus:border-[#11224E]/40"
         />
         {editLocked && minCount > 0 && (
-          <span className="text-sm text-amber-600 font-semibold">Min. {minCount} (déjà liées)</span>
+          <span className="text-sm text-amber-600 font-semibold">Min. {minCount} ({en ? "already linked" : "déjà liées"})</span>
         )}
       </div>
       {classes.length === 0 ? (
-        <p className="text-sm font-medium text-neutral-400">Aucune salle — saisissez un nombre ci-dessus.</p>
+        <p className="text-sm font-medium text-neutral-400">{en ? "No classrooms. Enter a number above." : "Aucune salle. Saisissez un nombre ci-dessus."}</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {classes.map((c, idx) => (
@@ -646,12 +656,14 @@ function FormateursBlock({ trainers, matiereData, onToggle, onOpenQuickCreate }:
   onToggle: (id: string) => void;
   onOpenQuickCreate: () => void;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   return (
     <div className="bg-white p-3 rounded-xl border border-neutral-200">
       <p className="text-[9px] font-black uppercase text-neutral-400 mb-2 tracking-wider flex items-center gap-1">
-        <UserCheck size={12} /> Formateurs <span className="font-medium normal-case tracking-normal text-neutral-300">— optionnel</span>
+        <UserCheck size={12} /> {en ? "Trainers" : "Formateurs"} <span className="font-medium normal-case tracking-normal text-neutral-300">({en ? "optional" : "optionnel"})</span>
       </p>
-      <p className="text-[10px] text-neutral-400 mb-2">Complétez le profil dans Staff après création rapide.</p>
+      <p className="text-[10px] text-neutral-400 mb-2">{en ? "Complete the profile under Staff after quick creation." : "Complétez le profil dans Staff après création rapide."}</p>
       <div className="flex gap-1.5 flex-wrap mb-2">
         {trainers.map((t) => (
           <button
@@ -675,7 +687,7 @@ function FormateursBlock({ trainers, matiereData, onToggle, onOpenQuickCreate }:
         className="flex items-center gap-1.5 text-[10px] font-bold hover:opacity-80 transition-opacity mt-1"
         style={{ color: ORANGE }}
       >
-        <UserPlus size={13} /> Créer un formateur
+        <UserPlus size={13} /> {en ? "Create a trainer" : "Créer un formateur"}
       </button>
     </div>
   );
@@ -690,6 +702,8 @@ export default function NouveauProgrammePage() {
 }
 
 function NouveauProgrammeForm() {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const router = useRouter();
   const searchParams = useSearchParams();
   const editFiliereId = searchParams.get("edit");
@@ -794,7 +808,7 @@ function NouveauProgrammeForm() {
       .eq("id", filiereId)
       .eq("center_id", cId)
       .single();
-    if (fErr || !f) throw new Error("Programme introuvable.");
+      if (fErr || !f) throw new Error(en ? "Program not found." : "Programme introuvable.");
 
     setName(f.name || "");
     setDescription(f.description || "");
@@ -1019,7 +1033,7 @@ function NouveauProgrammeForm() {
       try {
         await hydrateProgramForEdit(editFiliereId, cId);
       } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Impossible de charger le programme.";
+      const msg = e instanceof Error ? e.message : (en ? "Unable to load the program." : "Impossible de charger le programme.");
         setErrorMsg(msg);
       }
     }
@@ -1047,7 +1061,7 @@ function NouveauProgrammeForm() {
     const n = niveaux.find((x) => x.numero === numero);
     if (!n) return;
     const nextNum = n.classes.length + 1;
-    updateNiveau(numero, { classes: [...n.classes, { id: null, nom: `Salle ${nextNum}` }] });
+    updateNiveau(numero, { classes: [...n.classes, { id: null, nom: `${en ? "Classroom" : "Salle"} ${nextNum}` }] });
   };
   const setClassesCountNiveau = (numero: number, count: number) => {
     const n = niveaux.find((x) => x.numero === numero);
@@ -1055,7 +1069,7 @@ function NouveauProgrammeForm() {
     const min = editLocked ? n.classes.filter((c) => c.id).length : 0;
     const target = Math.max(min, count);
     let next = [...n.classes];
-    while (next.length < target) next.push({ id: null, nom: `Salle ${next.length + 1}` });
+    while (next.length < target) next.push({ id: null, nom: `${en ? "Classroom" : "Salle"} ${next.length + 1}` });
     if (next.length > target) next = next.slice(0, target);
     updateNiveau(numero, { classes: next });
   };
@@ -1117,13 +1131,13 @@ function NouveauProgrammeForm() {
     const target = Math.max(min, count);
     setClassesCourtes((prev) => {
       let next = [...prev];
-      while (next.length < target) next.push({ id: null, nom: `Salle ${next.length + 1}` });
+      while (next.length < target) next.push({ id: null, nom: `${en ? "Classroom" : "Salle"} ${next.length + 1}` });
       if (next.length > target) next = next.slice(0, target);
       return next;
     });
   };
   const addClasseCourte = () =>
-    setClassesCourtes((p) => [...p, { id: null, nom: `Salle ${p.length + 1}` }]);
+    setClassesCourtes((p) => [...p, { id: null, nom: `${en ? "Classroom" : "Salle"} ${p.length + 1}` }]);
   const renameClasseCourte = (idx: number, val: string) =>
     setClassesCourtes((p) => p.map((c, i) => (i === idx ? { ...c, nom: val } : c)));
   const removeClasseCourte = (idx: number) => {
@@ -1196,13 +1210,13 @@ function NouveauProgrammeForm() {
   };
 
   const matiereDisplayName = (m: MatiereDraft) => {
-    if (m.discipline_id) return disciplines.find((d) => d.id === m.discipline_id)?.name || "Matière";
-    return m.newDisciplineName.trim() || "Nouvelle matière";
+    if (m.discipline_id) return disciplines.find((d) => d.id === m.discipline_id)?.name || (en ? "Subject" : "Matière");
+    return m.newDisciplineName.trim() || (en ? "New subject" : "Nouvelle matière");
   };
 
   const validateDraftMatiere = (m: MatiereDraft, forCursus: boolean): string | null => {
     const rawName = m.newDisciplineName.trim();
-    if (!m.discipline_id && !rawName) return "Choisissez ou saisissez une matière.";
+    if (!m.discipline_id && !rawName) return en ? "Choose or enter a subject." : "Choisissez ou saisissez une matière.";
 
     const existingDisc = !m.discipline_id && rawName
       ? disciplines.find((d) => d.name.trim().toLowerCase() === rawName.toLowerCase())
@@ -1224,10 +1238,10 @@ function NouveauProgrammeForm() {
       const discName = m.discipline_id
         ? disciplines.find((d) => d.id === m.discipline_id)?.name
         : existingDisc?.name || rawName;
-      return `La matière « ${discName} » est déjà présente dans ce programme.`;
+      return en ? `The subject “${discName}” is already included in this program.` : `La matière « ${discName} » est déjà présente dans ce programme.`;
     }
 
-    if (forCursus && !(m.niveauNumeros || []).length) return "Sélectionnez au moins un niveau.";
+    if (forCursus && !(m.niveauNumeros || []).length) return en ? "Select at least one level." : "Sélectionnez au moins un niveau.";
     return null;
   };
 
@@ -1380,14 +1394,14 @@ function NouveauProgrammeForm() {
   };
 
   const submitQuickTrainer = async () => {
-    if (!qtPrenom.trim()) { setQtError("Le prénom est requis."); return; }
-    if (!qtNom.trim()) { setQtError("Le nom est requis."); return; }
+    if (!qtPrenom.trim()) { setQtError(en ? "First name is required." : "Le prénom est requis."); return; }
+    if (!qtNom.trim()) { setQtError(en ? "Last name is required." : "Le nom est requis."); return; }
     if (!qtEmail.trim()) { setQtError("L'email est requis."); return; }
     if (!centerId) return;
     setQtSaving(true); setQtError(""); setQtResult(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(en ? "Session expired." : "Session expirée.");
       const res = await fetch("/api/staff", {
         method: "POST",
         headers: {
@@ -1400,7 +1414,7 @@ function NouveauProgrammeForm() {
           email: qtEmail.trim(),
           phone: qtPhone.trim() || null,
           role: "trainer",
-          job_title: "Formateur",
+        job_title: en ? "Trainer" : "Formateur",
           genre: "Autre",
           birth_date: "2000-01-01",
           campus_ids: [],
@@ -1408,7 +1422,7 @@ function NouveauProgrammeForm() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Création échouée.");
+      if (!res.ok) throw new Error(en ? "Creation failed." : (data.error || "Création échouée."));
       const newId = data.id as string;
       if (!newId) throw new Error("Identifiant formateur manquant.");
       const newTrainer: Trainer = { id: newId, prenom: qtPrenom.trim(), nom: qtNom.trim() };
@@ -1427,7 +1441,7 @@ function NouveauProgrammeForm() {
         temporaryPassword: data.temporaryPassword as string | undefined,
       });
     } catch (e: any) {
-      setQtError(e.message || "Erreur lors de la création.");
+      setQtError(e.message || (en ? "An error occurred while creating the trainer." : "Erreur lors de la création."));
     } finally {
       setQtSaving(false);
     }
@@ -1437,18 +1451,18 @@ function NouveauProgrammeForm() {
   function validate(): string | null {
     if (!name.trim()) return "Le nom du programme est requis.";
     if (isDuplicateProgramName) {
-      return `Un programme nommé « ${name.trim()} » existe déjà dans votre centre. Veuillez choisir un autre nom.`;
+      return en ? `A program named “${name.trim()}” already exists in your center. Please choose another name.` : `Un programme nommé « ${name.trim()} » existe déjà dans votre centre. Veuillez choisir un autre nom.`;
     }
-    if (campuses.length > 0 && selectedCampusIds.length === 0) return "Sélectionnez au moins un campus pour ce programme.";
+    if (campuses.length > 0 && selectedCampusIds.length === 0) return en ? "Select at least one campus for this program." : "Sélectionnez au moins un campus pour ce programme.";
     if (type === "cursus") {
-      if (!nbNiveaux || nbNiveaux < 1) return "Indique le nombre de niveaux.";
+      if (!nbNiveaux || nbNiveaux < 1) return en ? "Enter the number of levels." : "Indique le nombre de niveaux.";
       for (const n of niveaux) {
-        if (n.classes.length === 0) return `Le niveau ${n.numero} n'a aucune salle de classe. Créez-en au moins une.`;
+        if (n.classes.length === 0) return en ? `Level ${n.numero} has no classroom. Create at least one.` : `Le niveau ${n.numero} n'a aucune salle de classe. Créez-en au moins une.`;
         if (n.classes.some((c) => !c.nom.trim())) return `Le niveau ${n.numero} a une salle sans nom.`;
       }
     } else {
       if (pricingMode === "forfaitaire" && (!dureeValeur || dureeValeur < 1)) {
-        return "Indique la durée de la formation (tarif forfaitaire).";
+        return en ? "Enter the course duration for flat-rate pricing." : "Indique la durée de la formation (tarif forfaitaire).";
       }
       if (classesCourtes.length === 0) return "Ajoutez au moins une salle de classe.";
       if (classesCourtes.some((c) => !c.nom.trim())) return "Une salle de classe n'a pas de nom.";
@@ -1480,7 +1494,7 @@ function NouveauProgrammeForm() {
       .insert({ filiere_id: filiereId, annee: null, ...dur })
       .select("id")
       .single();
-    if (error || !created) throw new Error(`Niveau programme : ${error?.message || "échec"}`);
+    if (error || !created) throw new Error(en ? `Program level: ${error?.message || "failed"}` : `Niveau programme : ${error?.message || "échec"}`);
     return created.id as string;
   }
 
@@ -1504,13 +1518,13 @@ function NouveauProgrammeForm() {
       payment_plan: filierePaymentPlan,
       head_trainer_id: headTrainerId || null,
     }).eq("id", filiereId);
-    if (e1) throw new Error(`Programme : ${e1.message}`);
+    if (e1) throw new Error(`${en ? "Program" : "Programme"} : ${e1.message}`);
 
     const campusIds = selectedCampusIds.length > 0 ? selectedCampusIds : campuses.length === 1 ? [campuses[0].id] : [];
     await supabase.from("filiere_campus").delete().eq("filiere_id", filiereId);
     for (const campusId of campusIds) {
       const { error: fcErr } = await supabase.from("filiere_campus").insert({ filiere_id: filiereId, campus_id: campusId });
-      if (fcErr) throw new Error(`Liaison campus : ${fcErr.message}`);
+      if (fcErr) throw new Error(en ? `Campus assignment: ${fcErr.message}` : `Liaison campus : ${fcErr.message}`);
     }
 
     const createdDisciplines: Record<string, string> = {};
@@ -1539,7 +1553,7 @@ function NouveauProgrammeForm() {
         .from("exam_disciplines")
         .insert({ name: m.newDisciplineName.trim(), code, is_builtin: false, center_id: centerId })
         .select("id").single();
-      if (discErr || !disc) throw new Error(`Matière « ${m.newDisciplineName.trim()} » : ${discErr?.message || "refus"}`);
+      if (discErr || !disc) throw new Error(en ? `Subject “${m.newDisciplineName.trim()}”: ${discErr?.message || "rejected"}` : `Matière « ${m.newDisciplineName.trim()} » : ${discErr?.message || "refus"}`);
       createdDisciplines[key] = disc.id;
       return disc.id;
     }
@@ -1559,17 +1573,17 @@ function NouveauProgrammeForm() {
           .from("filiere_matieres")
           .update({ coefficient: coeff, max_score: maxScore })
           .eq("id", fmId);
-        if (metaErr) throw new Error(`Barème / coeff. : ${metaErr.message}`);
+        if (metaErr) throw new Error(en ? `Maximum score / coefficient: ${metaErr.message}` : `Barème / coeff. : ${metaErr.message}`);
         const initial = initialFormateurIds || [];
         const toAdd = m.formateurIds.filter((f) => !initial.includes(f));
         const toRemove = initial.filter((f) => !m.formateurIds.includes(f));
         for (const f of toAdd) {
           const { error } = await supabase.from("matiere_formateurs").insert({ filiere_matiere_id: fmId, formateur_id: f });
-          if (error) throw new Error(`Habilitation : ${error.message}`);
+          if (error) throw new Error(en ? `Trainer assignment: ${error.message}` : `Habilitation : ${error.message}`);
         }
         for (const f of toRemove) {
           const { error } = await supabase.from("matiere_formateurs").delete().eq("filiere_matiere_id", fmId).eq("formateur_id", f);
-          if (error) throw new Error(`Retrait formateur : ${error.message}`);
+          if (error) throw new Error(en ? `Trainer removal: ${error.message}` : `Retrait formateur : ${error.message}`);
         }
         return fmId;
       }
@@ -1587,10 +1601,10 @@ function NouveauProgrammeForm() {
           max_score: maxScore,
         })
         .select("id").single();
-      if (fe || !fm) throw new Error(`Matière non enregistrée : ${fe?.message || "refus"}`);
+      if (fe || !fm) throw new Error(en ? `Subject not saved: ${fe?.message || "rejected"}` : `Matière non enregistrée : ${fe?.message || "refus"}`);
       for (const f of m.formateurIds) {
         const { error } = await supabase.from("matiere_formateurs").insert({ filiere_matiere_id: fm.id, formateur_id: f });
-        if (error) throw new Error(`Habilitation : ${error.message}`);
+        if (error) throw new Error(en ? `Trainer assignment: ${error.message}` : `Habilitation : ${error.message}`);
       }
       return fm.id as string;
     }
@@ -1609,7 +1623,7 @@ function NouveauProgrammeForm() {
             patch.niveau_id = null;
           }
           const { error } = await supabase.from("groupes").update(patch).eq("id", c.id);
-          if (error) throw new Error(`Classe : ${error.message}`);
+      if (error) throw new Error(`${en ? "Classroom" : "Classe"} : ${error.message}`);
         } else {
           const payload: Record<string, unknown> = niveauId
             ? {
@@ -1623,7 +1637,7 @@ function NouveauProgrammeForm() {
                 created_by: userId,
               };
           const { data: newGroupe, error } = await supabase.from("groupes").insert(payload).select("id").single();
-          if (error || !newGroupe) throw new Error(`Classe « ${c.nom.trim()} » : ${error?.message || "refus"}`);
+          if (error || !newGroupe) throw new Error(en ? `Classroom “${c.nom.trim()}”: ${error?.message || "rejected"}` : `Classe « ${c.nom.trim()} » : ${error?.message || "refus"}`);
           await supabase.rpc("ensure_groupe_room", { p_groupe_id: newGroupe.id, p_center_id: centerId });
         }
       }
@@ -1639,7 +1653,7 @@ function NouveauProgrammeForm() {
         let niveauId = n.id ?? null;
         if (!niveauId) {
           const { data: nid, error } = await supabase.rpc("ensure_niveau", { p_filiere_id: filiereId, p_annee: n.numero });
-          if (error || !nid) throw new Error(`Niveau ${n.numero} : ${error?.message || "échec"}`);
+          if (error || !nid) throw new Error(en ? `Level ${n.numero}: ${error?.message || "failed"}` : `Niveau ${n.numero} : ${error?.message || "échec"}`);
           niveauId = nid as string;
         }
         keptNiveauIds.push(niveauId);
@@ -1651,7 +1665,7 @@ function NouveauProgrammeForm() {
           payment_plan: formatPaymentPlan(n.fees, n.installments),
           seuil_passage: n.seuil_passage.trim() ? Number(n.seuil_passage) : null,
         }).eq("id", niveauId);
-        if (ne) throw new Error(`Niveau ${n.numero} : ${ne.message}`);
+        if (ne) throw new Error(en ? `Level ${n.numero}: ${ne.message}` : `Niveau ${n.numero} : ${ne.message}`);
 
         await saveClasses(n.classes, niveauId);
         n.classes.forEach((c) => c.id && keptClasseIds.push(c.id));
@@ -1743,16 +1757,16 @@ function NouveauProgrammeForm() {
         .select("id, name").single();
 
       if (filErr?.message?.includes("QUOTA_FILIERES_ATTEINT")) {
-        throw new Error(`Limite de ton plan atteinte (${includedProgrammes} programme${includedProgrammes! > 1 ? "s" : ""} max).`);
+        throw new Error(en ? `Your plan limit has been reached (${includedProgrammes} program${includedProgrammes! > 1 ? "s" : ""} maximum).` : `Limite de ton plan atteinte (${includedProgrammes} programme${includedProgrammes! > 1 ? "s" : ""} max).`);
       }
-      if (filErr || !filiere) throw new Error(filErr?.message || "Création du programme échouée.");
+      if (filErr || !filiere) throw new Error(filErr?.message || (en ? "Program creation failed." : "Création du programme échouée."));
       const filiereId = filiere.id;
 
       // Lier le programme aux campus sélectionnés
       const campusIds = selectedCampusIds.length > 0 ? selectedCampusIds : campuses.length === 1 ? [campuses[0].id] : [];
       for (const campusId of campusIds) {
         const { error: fcErr } = await supabase.from("filiere_campus").insert({ filiere_id: filiereId, campus_id: campusId });
-        if (fcErr) throw new Error(`Liaison campus échouée : ${fcErr.message}`);
+        if (fcErr) throw new Error(en ? `Unable to link the campus: ${fcErr.message}` : `Liaison campus échouée : ${fcErr.message}`);
       }
 
       // Créer le forum du programme
@@ -1784,7 +1798,7 @@ function NouveauProgrammeForm() {
           .from("exam_disciplines")
           .insert({ name: m.newDisciplineName.trim(), code, is_builtin: false, center_id: centerId })
           .select("id").single();
-        if (discErr || !disc) throw new Error(`Matière « ${m.newDisciplineName.trim()} » : ${discErr?.message || "création refusée"}`);
+        if (discErr || !disc) throw new Error(en ? `Subject “${m.newDisciplineName.trim()}”: ${discErr?.message || "creation rejected"}` : `Matière « ${m.newDisciplineName.trim()} » : ${discErr?.message || "création refusée"}`);
         createdDisciplines[key] = disc.id;
         return disc.id;
       }
@@ -1811,10 +1825,10 @@ function NouveauProgrammeForm() {
             max_score: maxScore,
           })
           .select("id").single();
-        if (fmErr || !fm) throw new Error(`Matière non enregistrée : ${fmErr?.message || "insertion refusée"}`);
+        if (fmErr || !fm) throw new Error(en ? `Subject not saved: ${fmErr?.message || "insertion rejected"}` : `Matière non enregistrée : ${fmErr?.message || "insertion refusée"}`);
         for (const formateurId of formateurIds) {
           const { error: mfErr } = await supabase.from("matiere_formateurs").insert({ filiere_matiere_id: fm.id, formateur_id: formateurId });
-          if (mfErr) throw new Error(`Habilitation formateur échouée : ${mfErr.message}`);
+          if (mfErr) throw new Error(en ? `Unable to assign the trainer: ${mfErr.message}` : `Habilitation formateur échouée : ${mfErr.message}`);
         }
       }
 
@@ -1822,7 +1836,7 @@ function NouveauProgrammeForm() {
         const niveauIdByAnnee: Record<number, string> = {};
         for (const n of niveaux) {
           const { data: niveauId, error: nivErr } = await supabase.rpc("ensure_niveau", { p_filiere_id: filiereId, p_annee: n.numero });
-          if (nivErr || !niveauId) throw new Error(`Niveau ${n.numero} non créé : ${nivErr?.message || "échec"}`);
+          if (nivErr || !niveauId) throw new Error(en ? `Level ${n.numero} was not created: ${nivErr?.message || "failed"}` : `Niveau ${n.numero} non créé : ${nivErr?.message || "échec"}`);
           niveauIdByAnnee[n.numero] = niveauId as string;
 
           const { error: updateErr } = await supabase.from("niveaux").update({
@@ -1830,12 +1844,12 @@ function NouveauProgrammeForm() {
             payment_plan: formatPaymentPlan(n.fees, n.installments),
             seuil_passage: n.seuil_passage.trim() ? Number(n.seuil_passage) : null,
           }).eq("id", niveauId);
-          if (updateErr) throw new Error(`Paramètres du niveau ${n.numero} non enregistrés : ${updateErr.message}`);
+          if (updateErr) throw new Error(en ? `Settings for level ${n.numero} were not saved: ${updateErr.message}` : `Paramètres du niveau ${n.numero} non enregistrés : ${updateErr.message}`);
 
           for (const classe of n.classes) {
             const classeNom = classe.nom.trim();
             const { data: newGroupe, error: gErr } = await supabase.from("groupes").insert({ niveau_id: niveauId, nom: classeNom, created_by: userId }).select("id").single();
-            if (gErr || !newGroupe) throw new Error(`Salle « ${classeNom} » non créée : ${gErr?.message}`);
+            if (gErr || !newGroupe) throw new Error(en ? `Classroom “${classeNom}” was not created: ${gErr?.message}` : `Salle « ${classeNom} » non créée : ${gErr?.message}`);
             await supabase.rpc("ensure_groupe_room", { p_groupe_id: newGroupe.id, p_center_id: centerId });
           }
         }
@@ -1867,7 +1881,7 @@ function NouveauProgrammeForm() {
             nom: classeNom,
             created_by: userId,
           }).select("id").single();
-          if (gErr || !newGroupe) throw new Error(`Salle « ${classeNom} » non créée : ${gErr?.message}`);
+          if (gErr || !newGroupe) throw new Error(en ? `Classroom “${classeNom}” was not created: ${gErr?.message}` : `Salle « ${classeNom} » non créée : ${gErr?.message}`);
           await supabase.rpc("ensure_groupe_room", { p_groupe_id: newGroupe.id, p_center_id: centerId });
         }
         for (const m of matieresCourtes) {
@@ -1887,7 +1901,7 @@ function NouveauProgrammeForm() {
       setCreated({ id: filiereId, name: name.trim() });
       }
     } catch (e: any) {
-      setErrorMsg(e.message || "Erreur lors de l'enregistrement.");
+      setErrorMsg(e.message || (en ? "An error occurred while saving." : "Erreur lors de l'enregistrement."));
     } finally {
       setSaving(false);
     }
@@ -1896,9 +1910,9 @@ function NouveauProgrammeForm() {
   // ===================== PDF =====================
   const buildProgrammePdfData = useCallback((): ProgrammePdfData => {
     const modeLabels: Record<ModeEnseignement, string> = {
-      presentiel: "Présentiel",
-      en_ligne: "En ligne",
-      hybride: "Hybride",
+      presentiel: en ? "In person" : "Présentiel",
+      en_ligne: en ? "Online" : "En ligne",
+      hybride: en ? "Hybrid" : "Hybride",
     };
     const campusNames = campuses
       .filter((c) => selectedCampusIds.includes(c.id))
@@ -1938,7 +1952,7 @@ function NouveauProgrammeForm() {
       ? (isUniforme
           ? [
               {
-                label: "Programme (tarif uniforme)",
+                label: en ? "Program (uniform rate)" : "Programme (tarif uniforme)",
                 tuition: globalTuition,
                 fees: globalFees,
                 total: globalTotal,
@@ -1952,7 +1966,7 @@ function NouveauProgrammeForm() {
               const fees = feeRows(n.fees);
               const total = tuition + fees.reduce((a, f) => a + f.montant, 0);
               return {
-                label: `Niveau ${n.numero}${n.nom ? ` — ${n.nom}` : ""}`,
+                label: `${en ? "Level" : "Niveau"} ${n.numero}${n.nom ? `: ${n.nom}` : ""}`,
                 tuition,
                 fees,
                 total,
@@ -1963,7 +1977,7 @@ function NouveauProgrammeForm() {
             }))
       : [
           {
-            label: "Programme",
+            label: en ? "Program" : "Programme",
             tuition: globalTuition,
             fees: globalFees,
             total: globalTotal,
@@ -1977,19 +1991,19 @@ function NouveauProgrammeForm() {
     const matieres = matieresSrc.map((m) => ({
       name: matiereDisplayName(m),
       niveaux: isCursus
-        ? (m.niveauNumeros || []).map((num) => `Niv. ${num}`).join(", ")
-        : "Formation courte",
+        ? (m.niveauNumeros || []).map((num) => `${en ? "Level" : "Niv."} ${num}`).join(", ")
+        : (en ? "Short course" : "Formation courte"),
       formateurs: trainerLabel(m.formateurIds),
     }));
 
     return {
-      name: (name.trim() || "Programme").toLocaleUpperCase("fr-FR"),
+      name: (name.trim() || (en ? "Program" : "Programme")).toLocaleUpperCase(en ? "en-US" : "fr-FR"),
       description: description.trim(),
-      typeLabel: isCursus ? "Cursus pluriannuel" : "Formation courte",
+      typeLabel: isCursus ? (en ? "Multi-year program" : "Cursus pluriannuel") : (en ? "Short course" : "Formation courte"),
       modeLabel: modeLabels[mode],
       structureLabel: isCursus
-        ? `${nbNiveaux} niveau${nbNiveaux > 1 ? "x" : ""}`
-        : `${dureeValeur} ${dureeUnite}`,
+        ? en ? `${nbNiveaux} level${nbNiveaux > 1 ? "s" : ""}` : `${nbNiveaux} niveau${nbNiveaux > 1 ? "x" : ""}`
+        : `${dureeValeur} ${en ? ({ jours: "days", semaines: "weeks", mois: "months" } as const)[dureeUnite] : dureeUnite}`,
       programId: editFiliereId || created?.id || null,
       campuses: campusNames,
       directeur: directeurLabel,
@@ -2005,7 +2019,7 @@ function NouveauProgrammeForm() {
   }, [
     campuses, selectedCampusIds, staffMembers, headTrainerId, type, cursusFeeMode, tuitionFee, shortFees,
     shortInstallments, niveaux, classesCourtes, matieresProgram, matieresCourtes, trainers,
-    disciplines, name, description, mode, nbNiveaux, dureeValeur, dureeUnite, editFiliereId, created,
+    disciplines, name, description, mode, nbNiveaux, dureeValeur, dureeUnite, editFiliereId, created, en,
   ]);
 
   const handleDownloadPdf = async () => {
@@ -2013,9 +2027,9 @@ function NouveauProgrammeForm() {
     setPdfBusy(true);
     try {
       const cfg = await fetchDocumentExportConfig(supabase, centerId);
-      await downloadProgrammePdf(buildProgrammePdfData(), cfg);
+      await downloadProgrammePdf(buildProgrammePdfData(), cfg, locale);
     } catch (e: any) {
-      const msg = e.message || "Export PDF impossible.";
+      const msg = e.message || (en ? "Unable to export PDF." : "Export PDF impossible.");
       setErrorMsg(msg);
       if (created) window.alert(msg);
     } finally {
@@ -2034,13 +2048,13 @@ function NouveauProgrammeForm() {
             <div className="flex justify-center mb-6"><CheckCircle2 size={52} className="text-emerald-500" /></div>
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight mb-2 uppercase" style={{ color: BLUE }}>
               {created.updated
-                ? `"${(created.name || "").toLocaleUpperCase("fr-FR")}" a été mis à jour`
-                : `"${(created.name || "").toLocaleUpperCase("fr-FR")}" a été créé`}
+                ? en ? `"${(created.name || "").toLocaleUpperCase("en-US")}" has been updated` : `"${(created.name || "").toLocaleUpperCase("fr-FR")}" a été mis à jour`
+                : en ? `"${(created.name || "").toLocaleUpperCase("en-US")}" has been created` : `"${(created.name || "").toLocaleUpperCase("fr-FR")}" a été créé`}
             </h2>
             <p className="text-sm font-medium text-neutral-500 mb-8 leading-relaxed">
               {created.updated
-                ? "Les modifications sont enregistrées. Publiez le programme s'il est encore en brouillon pour accueillir des inscriptions."
-                : <>Le programme est en <span className="font-bold text-red-600">brouillon</span>. Ouvrez-le pour fixer les derniers détails et le <span className="font-bold" style={{ color: BLUE }}>publier</span> — il doit être publié pour accueillir des inscriptions.</>}
+                ? en ? "Your changes have been saved. Publish the program if it is still a draft so it can accept enrolments." : "Les modifications sont enregistrées. Publiez le programme s'il est encore en brouillon pour accueillir des inscriptions."
+                : en ? <>The program is a <span className="font-bold text-red-600">draft</span>. Open it to finalize the details and <span className="font-bold" style={{ color: BLUE }}>publish it</span>. It must be published to accept enrolments.</> : <>Le programme est en <span className="font-bold text-red-600">brouillon</span>. Ouvrez-le pour fixer les derniers détails et le <span className="font-bold" style={{ color: BLUE }}>publier</span>. Il doit être publié pour accueillir des inscriptions.</>}
             </p>
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <button
@@ -2049,10 +2063,10 @@ function NouveauProgrammeForm() {
                 disabled={pdfBusy}
                 className="px-5 h-11 rounded-lg text-sm font-semibold border border-black/[0.08] text-neutral-700 hover:bg-black/[0.03] disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Télécharger le PDF
+                {pdfBusy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} {en ? "Download PDF" : "Télécharger le PDF"}
               </button>
               <OutlineHeaderButton onClick={() => router.push("/centre/filieres")}>
-                Voir mes programmes
+                {en ? "View my programs" : "Voir mes programmes"}
               </OutlineHeaderButton>
             </div>
           </div>
@@ -2075,36 +2089,36 @@ function NouveauProgrammeForm() {
             type="button"
             onClick={() => router.push("/centre/filieres")}
             className="h-9 w-9 rounded-lg border border-black/[0.08] text-neutral-600 hover:bg-black/[0.03] inline-flex items-center justify-center shrink-0"
-            aria-label="Retour"
+            aria-label={en ? "Back" : "Retour"}
           >
             <ArrowLeft size={16} />
           </button>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight truncate" style={{ color: BLUE }}>
-            Nouveau programme
+            {en ? "New program" : "Nouveau programme"}
           </h1>
         </header>
 
         <div className="nexa-center-shell pt-8 sm:pt-12 pb-16 max-w-3xl">
-          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-400 mb-2">Étape 1 sur 2</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-400 mb-2">{en ? "Step 1 of 2" : "Étape 1 sur 2"}</p>
           <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight mb-2" style={{ color: BLUE }}>
-            Quel parcours proposez-vous ?
+            {en ? "What type of program do you offer?" : "Quel parcours proposez-vous ?"}
           </h2>
           <p className="text-base text-neutral-500 font-medium mb-8 max-w-xl leading-relaxed">
-            Choisissez la structure du programme. Vous pourrez ensuite renseigner les informations générales, les tarifs et les matières.
+            {en ? "Choose the program structure. You can then enter general information, pricing, and subjects." : "Choisissez la structure du programme. Vous pourrez ensuite renseigner les informations générales, les tarifs et les matières."}
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
             {([
               {
                 value: "cursus" as const,
-                title: "Cursus pluriannuel",
-                desc: "Plusieurs niveaux ou années, progression et passage de niveau.",
+                title: en ? "Multi-year program" : "Cursus pluriannuel",
+                desc: en ? "Multiple levels or years, progression, and level advancement." : "Plusieurs niveaux ou années, progression et passage de niveau.",
                 icon: Layers,
               },
               {
                 value: "formation_courte" as const,
-                title: "Formation courte",
-                desc: "Parcours court, durée catalogue, tarif forfaitaire ou mensuel.",
+                title: en ? "Short course" : "Formation courte",
+                desc: en ? "Short program with a catalog duration and fixed or monthly pricing." : "Parcours court, durée catalogue, tarif forfaitaire ou mensuel.",
                 icon: Clock,
               },
             ]).map(({ value, title, desc, icon: Icon }) => {
@@ -2145,13 +2159,13 @@ function NouveauProgrammeForm() {
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <OutlineHeaderButton onClick={() => setUiStep("form")} className="h-11 px-5 text-sm">
-              Continuer
+              {en ? "Continue" : "Continuer"}
               <span aria-hidden>→</span>
             </OutlineHeaderButton>
             <p className="text-sm text-neutral-400 font-medium">
-              Sélection actuelle :{" "}
+              {en ? "Current selection" : "Sélection actuelle"} :{" "}
               <span className="font-semibold" style={{ color: BLUE }}>
-                {type === "cursus" ? "Cursus pluriannuel" : "Formation courte"}
+                {type === "cursus" ? (en ? "Multi-year program" : "Cursus pluriannuel") : (en ? "Short course" : "Formation courte")}
               </span>
             </p>
           </div>
@@ -2170,18 +2184,18 @@ function NouveauProgrammeForm() {
             else router.push("/centre/filieres");
           }}
           className="h-9 w-9 rounded-lg border border-black/[0.08] text-neutral-600 hover:bg-black/[0.03] inline-flex items-center justify-center shrink-0"
-          aria-label="Retour"
+          aria-label={en ? "Back" : "Retour"}
         >
           <ArrowLeft size={16} />
         </button>
         <div className="min-w-0">
           {!isEditMode && (
             <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-neutral-400 leading-none mb-1">
-              Étape 2 sur 2 · {type === "cursus" ? "Cursus" : "Formation courte"}
+              {en ? "Step 2 of 2" : "Étape 2 sur 2"} · {type === "cursus" ? (en ? "Program" : "Cursus") : (en ? "Short course" : "Formation courte")}
             </p>
           )}
           <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight leading-tight truncate" style={{ color: BLUE }}>
-            {isEditMode ? "Modifier le programme" : "Informations générales"}
+            {isEditMode ? (en ? "Edit program" : "Modifier le programme") : (en ? "General information" : "Informations générales")}
           </h1>
         </div>
       </header>
@@ -2192,61 +2206,61 @@ function NouveauProgrammeForm() {
           <div className="flex items-start gap-2.5 rounded-xl border border-amber-200/80 p-3.5 mb-6" style={{ backgroundColor: SURFACE }}>
             <Lock size={16} className="text-amber-500 shrink-0 mt-0.5" />
             <p className="text-sm text-amber-800 font-medium leading-relaxed">
-              Des étudiants sont inscrits. Vous pouvez <b>ajouter et renommer</b>, mais pas <b>supprimer</b> de niveaux, salles ou matières déjà liées.
+              {en ? <>Students are enrolled. You can <b>add and rename</b>, but you cannot <b>delete</b> levels, classrooms, or subjects that are already linked.</> : <>Des étudiants sont inscrits. Vous pouvez <b>ajouter et renommer</b>, mais pas <b>supprimer</b> de niveaux, salles ou matières déjà liées.</>}
             </p>
           </div>
         )}
         {isQuotaReached && (
           <div className="rounded-xl border border-red-200 p-4 mb-6" style={{ backgroundColor: SURFACE }}>
-            <p className="text-sm font-bold text-red-600">Limite de votre plan atteinte ({includedProgrammes} programme{includedProgrammes! > 1 ? "s" : ""} maximum).</p>
+            <p className="text-sm font-bold text-red-600">{en ? `Your plan limit has been reached (${includedProgrammes} program${includedProgrammes! > 1 ? "s" : ""} maximum).` : `Limite de votre plan atteinte (${includedProgrammes} programme${includedProgrammes! > 1 ? "s" : ""} maximum).`}</p>
           </div>
         )}
 
-        <ProgramSection icon={BookOpen} title="Informations générales" description="Nom, description, structure et mode d'enseignement.">
+        <ProgramSection icon={BookOpen} title={en ? "General information" : "Informations générales"} description={en ? "Name, description, structure, and teaching mode." : "Nom, description, structure et mode d'enseignement."}>
           <div>
-            <label className={FIELD_LABEL}>Nom du programme *</label>
+            <label className={FIELD_LABEL}>{en ? "Program name *" : "Nom du programme *"}</label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex : Baccalauréat Scientifique"
+              placeholder={en ? "E.g. Bachelor of Science" : "Ex : Baccalauréat Scientifique"}
               className={`${FIELD_INPUT} ${isDuplicateProgramName ? "border-red-400 focus:border-red-500 ring-2 ring-red-100" : ""}`}
             />
             {isDuplicateProgramName && (
               <p className="text-xs font-bold text-red-500 mt-1.5 flex items-center gap-1">
-                ⚠️ Un programme nommé « {name.trim()} » existe déjà dans votre centre. Veuillez choisir un autre nom.
+                {en ? `⚠️ A program named “${name.trim()}” already exists in your center. Please choose another name.` : `⚠️ Un programme nommé « ${name.trim()} » existe déjà dans votre centre. Veuillez choisir un autre nom.`}
               </p>
             )}
           </div>
           <div>
-            <label className={FIELD_LABEL}>ID programme</label>
+            <label className={FIELD_LABEL}>{en ? "Program ID" : "ID programme"}</label>
             <input
-              value={isEditMode && editFiliereId ? editFiliereId : "Généré à l'enregistrement"}
+              value={isEditMode && editFiliereId ? editFiliereId : (en ? "Generated when saved" : "Généré à l'enregistrement")}
               disabled
               className="w-full h-12 px-4 rounded-lg border border-black/[0.06] bg-white/60 text-base font-mono text-neutral-500"
             />
           </div>
           <div>
-            <label className={FIELD_LABEL}>Description</label>
+            <label className={FIELD_LABEL}>{en ? "Description" : "Description"}</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
-              placeholder="Détails du programme..."
+              placeholder={en ? "Program details..." : "Détails du programme..."}
               className="w-full p-3.5 rounded-lg border border-black/[0.08] bg-white text-base font-semibold outline-none resize-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
             />
           </div>
           <div>
             <label className={FIELD_LABEL_INLINE}>
-              <Clock size={15} /> Structure
+              <Clock size={15} /> {en ? "Structure" : "Structure"}
               {isEditMode && (
                 <span className="ml-1 text-sm font-medium text-neutral-400">
-                  ({type === "cursus" ? "Cursus pluriannuel" : "Formation courte"} — non modifiable)
+                  ({type === "cursus" ? (en ? "Multi-year program" : "Cursus pluriannuel") : (en ? "Short course" : "Formation courte")}, {en ? "cannot be changed" : "non modifiable"})
                 </span>
               )}
             </label>
             {type === "cursus" ? (
               <div>
-                <label className={FIELD_LABEL}>Nombre de niveaux / années</label>
+                <label className={FIELD_LABEL}>{en ? "Number of levels / years" : "Nombre de niveaux / années"}</label>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -2259,7 +2273,7 @@ function NouveauProgrammeForm() {
               <div className="space-y-3">
                 <div>
                   <label className={FIELD_LABEL}>
-                    Durée catalogue{pricingMode === "mensuel" ? " (indicative)" : " *"}
+                    {en ? "Catalog duration" : "Durée catalogue"}{pricingMode === "mensuel" ? (en ? " (indicative)" : " (indicative)") : " *"}
                   </label>
                   <div className="flex gap-3 items-end flex-wrap">
                     <input
@@ -2281,14 +2295,14 @@ function NouveauProgrammeForm() {
                               : "border-black/[0.08] text-neutral-500 bg-white/70"
                           }`}
                         >
-                          {u}
+                          {en ? ({ jours: "days", semaines: "weeks", mois: "months" } as const)[u] : u}
                         </button>
                       ))}
                     </div>
                   </div>
                   {pricingMode === "mensuel" && (
                     <p className={FIELD_HINT}>
-                      En tarif mensuel, la durée facturée se choisit à chaque inscription (en mois).
+                      {en ? "With monthly pricing, the billed duration is selected for each enrolment in months." : "En tarif mensuel, la durée facturée se choisit à chaque inscription (en mois)."}
                     </p>
                   )}
                 </div>
@@ -2297,13 +2311,13 @@ function NouveauProgrammeForm() {
           </div>
           <div>
             <h3 className={FIELD_LABEL_INLINE}>
-              <Monitor size={15} /> Mode d&apos;enseignement
+              <Monitor size={15} /> {en ? "Teaching mode" : "Mode d’enseignement"}
             </h3>
             <div className="flex gap-2 flex-wrap">
               {([
-                { value: "presentiel" as const, label: "Présentiel", icon: Users },
-                { value: "en_ligne" as const, label: "En ligne", icon: Monitor },
-                { value: "hybride" as const, label: "Hybride", icon: GitBranch },
+                { value: "presentiel" as const, label: en ? "In person" : "Présentiel", icon: Users },
+                { value: "en_ligne" as const, label: en ? "Online" : "En ligne", icon: Monitor },
+                { value: "hybride" as const, label: en ? "Hybrid" : "Hybride", icon: GitBranch },
               ]).map(({ value, label, icon: Icon }) => (
                 <button
                   key={value}
@@ -2322,7 +2336,7 @@ function NouveauProgrammeForm() {
           </div>
         </ProgramSection>
 
-        <ProgramSection icon={MapPin} title="Campus et directeur" description="Où le programme est enseigné, et qui le pilote (optionnel).">
+        <ProgramSection icon={MapPin} title={en ? "Campus and director" : "Campus et directeur"} description={en ? "Where the program is taught and who leads it (optional)." : "Où le programme est enseigné, et qui le pilote (optionnel)."}>
           {campuses.length > 0 ? (
             <div className="flex flex-wrap gap-2.5">
               {campuses.map((c) => {
@@ -2341,24 +2355,24 @@ function NouveauProgrammeForm() {
                     </div>
                     <div>
                       <p className="text-base font-semibold" style={{ color: BLUE }}>{c.name}</p>
-                      {c.city && <p className="text-sm font-medium text-neutral-400">{c.city}{c.is_main ? " · Principal" : ""}</p>}
+                      {c.city && <p className="text-sm font-medium text-neutral-400">{c.city}{c.is_main ? ` · ${en ? "Main" : "Principal"}` : ""}</p>}
                     </div>
                   </button>
                 );
               })}
             </div>
           ) : (
-            <p className="text-sm text-neutral-400 font-medium">Aucun campus actif — configurez-en un dans Paramètres.</p>
+            <p className="text-sm text-neutral-400 font-medium">{en ? "No active campus. Configure one under Settings." : "Aucun campus actif. Configurez-en un dans Paramètres."}</p>
           )}
           <div>
             <label className={FIELD_LABEL_INLINE}>
-              <Shield size={15} /> Directeur de programme
-              <span className="font-medium text-neutral-400">— optionnel</span>
+              <Shield size={15} /> {en ? "Program director" : "Directeur de programme"}
+              <span className="font-medium text-neutral-400">({en ? "optional" : "optionnel"})</span>
             </label>
             <select value={headTrainerId} onChange={(e) => setHeadTrainerId(e.target.value)} className={FIELD_SELECT}>
-              <option value="">Aucun directeur assigné</option>
+              <option value="">{en ? "No director assigned" : "Aucun directeur assigné"}</option>
               {staffMembers.map((s) => (
-                <option key={s.id} value={s.id}>{s.prenom}{s.nom ? ` ${s.nom}` : ""} — {s.role === "center_manager" ? "Responsable" : s.role === "trainer" ? "Formateur" : "Staff"}</option>
+                <option key={s.id} value={s.id}>{s.prenom}{s.nom ? ` ${s.nom}` : ""}. {s.role === "center_manager" ? (en ? "Manager" : "Responsable") : s.role === "trainer" ? (en ? "Trainer" : "Formateur") : "Staff"}</option>
               ))}
             </select>
           </div>
@@ -2367,8 +2381,8 @@ function NouveauProgrammeForm() {
         {type === "cursus" && (
           <ProgramSection
             icon={Gauge}
-            title="Seuil de passage"
-            description="Moyenne minimale (/20) pour passer au niveau suivant. Configurable par niveau."
+            title={en ? "Pass threshold" : "Seuil de passage"}
+            description={en ? "Minimum average out of 20 required to advance to the next level. Configurable for each level." : "Moyenne minimale (/20) pour passer au niveau suivant. Configurable par niveau."}
           >
             <div className="flex gap-1.5 flex-wrap mb-4">
               {niveaux.map((n) => (
@@ -2381,14 +2395,14 @@ function NouveauProgrammeForm() {
                   }`}
                   style={expandedNiveau === n.numero ? { backgroundColor: BLUE } : undefined}
                 >
-                  Niveau {n.numero}
+                  {en ? "Level" : "Niveau"} {n.numero}
                 </button>
               ))}
             </div>
             {niveauActuel && (
               <div>
                 <label className={FIELD_LABEL}>
-                  Seuil de passage — Niveau {niveauActuel.numero} (/20)
+                  {en ? "Advancement threshold for level" : "Seuil de passage niveau"} {niveauActuel.numero} (/20)
                 </label>
                 <input
                   type="text"
@@ -2398,37 +2412,37 @@ function NouveauProgrammeForm() {
                   placeholder="Ex. 10"
                   className={`${FIELD_INPUT_SM} w-40`}
                 />
-                <p className={FIELD_HINT}>Vide = décision 100 % manuelle à la fin d&apos;année.</p>
+                <p className={FIELD_HINT}>{en ? "Leave empty for a fully manual decision at the end of the year." : "Vide = décision 100 % manuelle à la fin d’année."}</p>
               </div>
             )}
           </ProgramSection>
         )}
 
-        <ProgramSection icon={Tag} title="Tarification" description="Prix de formation, frais supplémentaires intitulés, total et échéancier.">
+        <ProgramSection icon={Tag} title={en ? "Pricing" : "Tarification"} description={en ? "Training price, additional fees, total, and payment schedule." : "Prix de formation, frais supplémentaires intitulés, total et échéancier."}>
           {type === "formation_courte" ? (
             <>
               <div>
-                <label className={FIELD_LABEL}>Mode de tarification</label>
+                <label className={FIELD_LABEL}>{en ? "Pricing mode" : "Mode de tarification"}</label>
                 <div className="flex p-1 rounded-lg bg-white border border-black/[0.08] mb-1 gap-1 max-w-md">
                   <button
                     type="button"
                     onClick={() => setPricingMode("forfaitaire")}
                     className={`flex-1 py-2.5 px-3 rounded-md text-sm font-semibold ${pricingMode === "forfaitaire" ? "bg-[#11224E] text-white" : "text-neutral-500"}`}
                   >
-                    Forfaitaire
+                    {en ? "Flat rate" : "Forfaitaire"}
                   </button>
                   <button
                     type="button"
                     onClick={() => setPricingMode("mensuel")}
                     className={`flex-1 py-2.5 px-3 rounded-md text-sm font-semibold ${pricingMode === "mensuel" ? "bg-[#11224E] text-white" : "text-neutral-500"}`}
                   >
-                    Mensuelle
+                    {en ? "Monthly" : "Mensuelle"}
                   </button>
                 </div>
                 <p className={FIELD_HINT}>
                   {pricingMode === "mensuel"
-                    ? "Prix par mois × durée choisie à l'inscription (mois entiers)."
-                    : "Montant unique pour tout le programme, durée fixe."}
+                    ? en ? "Monthly price multiplied by the duration selected at enrolment in whole months." : "Prix par mois × durée choisie à l'inscription (mois entiers)."
+                    : en ? "One fixed amount for the entire program." : "Montant unique pour tout le programme, durée fixe."}
                 </p>
               </div>
               <PriceBlock
@@ -2442,7 +2456,7 @@ function NouveauProgrammeForm() {
                 locked={priceLocked}
                 onLock={() => setPriceLocked(true)}
                 onUnlock={() => setPriceLocked(false)}
-                label={pricingMode === "mensuel" ? "Prix par mois" : "Prix total du programme"}
+                label={pricingMode === "mensuel" ? (en ? "Price per month" : "Prix par mois") : (en ? "Total program price" : "Prix total du programme")}
               />
               <FeesBlock
                 fees={shortFees}
@@ -2455,11 +2469,11 @@ function NouveauProgrammeForm() {
               />
               <TotalDisplay
                 total={shortTotal}
-                label={pricingMode === "mensuel" ? "Total catalogue (1 mois + frais)" : undefined}
+                label={pricingMode === "mensuel" ? (en ? "Catalog total (1 month + fees)" : "Total catalogue (1 mois + frais)") : undefined}
               />
               {pricingMode === "mensuel" && (
                 <p className="text-sm text-neutral-400 font-medium -mt-2">
-                  À l&apos;inscription : total = prix/mois × nombre de mois (+ frais).
+                  {en ? "At enrolment, the total is the monthly price multiplied by the number of months, plus fees." : "À l’inscription : total = prix/mois × nombre de mois (+ frais)."}
                 </p>
               )}
               <InstallmentsBlock
@@ -2471,33 +2485,33 @@ function NouveauProgrammeForm() {
                 onAdd={addShortInstallment}
                 onUpdate={updateShortInstallment}
                 onRemove={removeShortInstallment}
-                label="Plan de paiement"
+                label={en ? "Payment schedule" : "Plan de paiement"}
               />
             </>
           ) : (
             <>
               <div>
-                <label className={FIELD_LABEL}>Mode de tarification cursus</label>
+                <label className={FIELD_LABEL}>{en ? "Program pricing mode" : "Mode de tarification cursus"}</label>
                 <div className="flex p-1 rounded-lg bg-white border border-black/[0.08] mb-1 gap-1 max-w-md">
                   <button
                     type="button"
                     onClick={() => setCursusFeeMode("par_niveau")}
                     className={`flex-1 py-2.5 px-3 rounded-md text-sm font-semibold ${cursusFeeMode === "par_niveau" ? "bg-[#11224E] text-white" : "text-neutral-500"}`}
                   >
-                    Par niveau
+                    {en ? "By level" : "Par niveau"}
                   </button>
                   <button
                     type="button"
                     onClick={() => setCursusFeeMode("uniforme")}
                     className={`flex-1 py-2.5 px-3 rounded-md text-sm font-semibold ${cursusFeeMode === "uniforme" ? "bg-[#11224E] text-white" : "text-neutral-500"}`}
                   >
-                    Uniforme
+                    {en ? "Uniform" : "Uniforme"}
                   </button>
                 </div>
                 <p className={FIELD_HINT}>
                   {cursusFeeMode === "uniforme"
-                    ? "Le prix global s'applique à chaque inscription, quel que soit le niveau."
-                    : "Le prix du niveau est prioritaire ; sinon héritage du prix global."}
+                    ? en ? "The global price applies to every enrolment regardless of level." : "Le prix global s'applique à chaque inscription, quel que soit le niveau."
+                    : en ? "The level price takes priority. Otherwise, the global price is inherited." : "Le prix du niveau est prioritaire ; sinon héritage du prix global."}
                 </p>
               </div>
               <PriceBlock
@@ -2511,7 +2525,7 @@ function NouveauProgrammeForm() {
                 locked={priceLocked}
                 onLock={() => setPriceLocked(true)}
                 onUnlock={() => setPriceLocked(false)}
-                label={cursusFeeMode === "uniforme" ? "Prix uniforme du programme" : "Prix de référence global (indicatif)"}
+                label={cursusFeeMode === "uniforme" ? (en ? "Uniform program price" : "Prix uniforme du programme") : (en ? "Global reference price (indicative)" : "Prix de référence global (indicatif)")}
               />
               {cursusFeeMode === "uniforme" && (
                 <>
@@ -2523,9 +2537,9 @@ function NouveauProgrammeForm() {
                     locked={shortFeesLocked}
                     onLock={lockShortFees}
                     onUnlock={() => setShortFeesLocked(false)}
-                    label="Frais supplémentaires du programme"
+                    label={en ? "Additional program fees" : "Frais supplémentaires du programme"}
                   />
-                  <TotalDisplay total={shortTotal} label="Total par inscription" />
+              <TotalDisplay total={shortTotal} label={en ? "Total per enrollment" : "Total par inscription"} />
                   <InstallmentsBlock
                     installments={shortInstallments}
                     totalPrice={shortTotal}
@@ -2535,12 +2549,12 @@ function NouveauProgrammeForm() {
                     onAdd={addShortInstallment}
                     onUpdate={updateShortInstallment}
                     onRemove={removeShortInstallment}
-                    label="Échéancier du programme"
+                    label={en ? "Program payment schedule" : "Échéancier du programme"}
                   />
                 </>
               )}
               {cursusFeeMode === "par_niveau" && (
-                <p className="text-sm text-neutral-400 -mt-2">Fixez le vrai prix, les frais et l&apos;échéancier dans chaque niveau ci-dessous.</p>
+                <p className="text-sm text-neutral-400 -mt-2">{en ? "Set the actual price, fees, and payment schedule for each level below." : "Fixez le vrai prix, les frais et l’échéancier dans chaque niveau ci-dessous."}</p>
               )}
               {cursusFeeMode === "par_niveau" && (
               <div className="flex gap-1.5 flex-wrap">
@@ -2552,14 +2566,14 @@ function NouveauProgrammeForm() {
                     className={`px-4 h-11 rounded-lg text-sm font-semibold ${expandedNiveau === n.numero ? "text-white" : "bg-white text-neutral-600 border border-black/[0.08]"}`}
                     style={expandedNiveau === n.numero ? { backgroundColor: BLUE } : undefined}
                   >
-                    Niveau {n.numero}
+                    {en ? "Level" : "Niveau"} {n.numero}
                   </button>
                 ))}
               </div>
               )}
               {cursusFeeMode === "par_niveau" && niveauActuel && (
                 <div className="space-y-4 pt-2 border-t border-black/[0.06]">
-                  <p className="text-sm font-semibold text-neutral-600">Tarification — Niveau {niveauActuel.numero}</p>
+                  <p className="text-sm font-semibold text-neutral-600">{en ? "Pricing for level" : "Tarification niveau"} {niveauActuel.numero}</p>
                   <PriceBlock
                     value={niveauActuel.tuition_fee}
                     onChange={(v) => {
@@ -2572,8 +2586,8 @@ function NouveauProgrammeForm() {
                     locked={niveauActuel.priceLocked}
                     onLock={() => updateNiveau(niveauActuel.numero, { priceLocked: true })}
                     onUnlock={() => updateNiveau(niveauActuel.numero, { priceLocked: false })}
-                    placeholder={tuitionFee || "Hérite du prix global"}
-                    label={`Prix formation — niveau ${niveauActuel.numero}`}
+                    placeholder={tuitionFee || (en ? "Inherits the global price" : "Hérite du prix global")}
+                    label={en ? `Training price for level ${niveauActuel.numero}` : `Prix formation niveau ${niveauActuel.numero}`}
                   />
                   <FeesBlock
                     fees={niveauActuel.fees}
@@ -2583,7 +2597,7 @@ function NouveauProgrammeForm() {
                     locked={niveauActuel.feesLocked}
                     onLock={() => lockNiveauFees(niveauActuel.numero)}
                     onUnlock={() => updateNiveau(niveauActuel.numero, { feesLocked: false })}
-                    label={`Frais supplémentaires — niveau ${niveauActuel.numero}`}
+                    label={en ? `Additional fees for level ${niveauActuel.numero}` : `Frais supplémentaires niveau ${niveauActuel.numero}`}
                   />
                   <TotalDisplay total={niveauTotal} label={`Total niveau ${niveauActuel.numero}`} />
                   <InstallmentsBlock
@@ -2595,7 +2609,7 @@ function NouveauProgrammeForm() {
                     onAdd={(prefill) => addNiveauInstallment(niveauActuel.numero, prefill)}
                     onUpdate={(id, key, val) => updateNiveauInstallment(niveauActuel.numero, id, key, val)}
                     onRemove={(id) => removeNiveauInstallment(niveauActuel.numero, id)}
-                    label={`Échéancier — niveau ${niveauActuel.numero}`}
+                    label={en ? `Payment schedule for level ${niveauActuel.numero}` : `Échéancier niveau ${niveauActuel.numero}`}
                   />
                 </div>
               )}
@@ -2603,13 +2617,13 @@ function NouveauProgrammeForm() {
           )}
         </ProgramSection>
 
-        <ProgramSection icon={Layers} title="Salles de classe" description="Indiquez le nombre de salles, puis donnez-leur un nom.">
+        <ProgramSection icon={Layers} title={en ? "Classrooms" : "Salles de classe"} description={en ? "Enter the number of classrooms, then give each one a name." : "Indiquez le nombre de salles, puis donnez-leur un nom."}>
           {type === "cursus" ? (
             <>
               <div className="flex gap-1.5 flex-wrap mb-2">
                 {niveaux.map((n) => (
                   <button key={n.numero} type="button" onClick={() => setExpandedNiveau(n.numero)} className={`px-4 py-2 rounded-lg text-xs font-black uppercase ${expandedNiveau === n.numero ? "text-white" : "bg-neutral-100 text-neutral-500"}`} style={expandedNiveau === n.numero ? { backgroundColor: BLUE } : {}}>
-                    Niveau {n.numero}
+                    {en ? "Level" : "Niveau"} {n.numero}
                     {n.classes.length === 0 && <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-amber-400 align-middle" />}
                   </button>
                 ))}
@@ -2620,7 +2634,7 @@ function NouveauProgrammeForm() {
                   onSetCount={(n) => setClassesCountNiveau(niveauActuel.numero, n)}
                   onRename={(idx, val) => renameClasse(niveauActuel.numero, idx, val)}
                   editLocked={editLocked}
-                  niveauLabel={`Niveau ${niveauActuel.numero}`}
+                  niveauLabel={`${en ? "Level" : "Niveau"} ${niveauActuel.numero}`}
                 />
               )}
             </>
@@ -2634,7 +2648,7 @@ function NouveauProgrammeForm() {
           )}
         </ProgramSection>
 
-        <ProgramSection icon={BookOpen} title="Matières du programme" description="Validez une matière à la fois pour alléger l'écran. Formateurs optionnels — complétez dans Staff.">
+        <ProgramSection icon={BookOpen} title={en ? "Program subjects" : "Matières du programme"} description={en ? "Confirm one subject at a time to keep the screen simple. Trainers are optional and profiles can be completed under Staff." : "Validez une matière à la fois pour alléger l'écran. Formateurs optionnels, complétez dans Staff."}>
           {type === "cursus" ? (
             <>
               {matieresProgram.length > 0 && (
@@ -2644,13 +2658,13 @@ function NouveauProgrammeForm() {
                       <div className="min-w-0">
                         <p className="text-xs font-black truncate" style={{ color: BLUE }}>{matiereDisplayName(m)}</p>
                         <p className="text-[10px] text-neutral-400 font-medium mt-0.5">
-                          Niv. {(m.niveauNumeros || []).join(", ") || "—"}
+                          {en ? "Levels" : "Niv."} {(m.niveauNumeros || []).join(", ") || "—"}
                           {` · /${m.max_score || 20} · ×${m.coefficient || 1}`}
                           {m.formateurIds.length > 0 ? ` · ${m.formateurIds.length} formateur${m.formateurIds.length > 1 ? "s" : ""}` : " · formateur optionnel"}
                         </p>
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        <button type="button" onClick={() => editMatiereProgram(m.key!)} disabled={!!draftMatiereProgram} className="h-9 px-2.5 rounded-lg border border-neutral-200 text-[10px] font-black uppercase text-neutral-500 disabled:opacity-40">Modifier</button>
+                        <button type="button" onClick={() => editMatiereProgram(m.key!)} disabled={!!draftMatiereProgram} className="h-9 px-2.5 rounded-lg border border-neutral-200 text-[10px] font-black uppercase text-neutral-500 disabled:opacity-40">{en ? "Edit" : "Modifier"}</button>
                         <button type="button" onClick={() => removeMatiereProgram(m.key!)} className="w-9 h-9 flex items-center justify-center text-red-500 bg-red-50 rounded-lg border border-red-100"><Trash2 size={14} /></button>
                       </div>
                     </li>
@@ -2659,7 +2673,7 @@ function NouveauProgrammeForm() {
               )}
               {draftMatiereProgram ? (
                 <div className="bg-white border-2 border-orange-200/80 rounded-xl p-4 space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: ORANGE }}>Nouvelle matière</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: ORANGE }}>{en ? "New subject" : "Nouvelle matière"}</p>
                   <select
                     value={draftMatiereProgram.discipline_id}
                     onChange={(e) => {
@@ -2668,7 +2682,7 @@ function NouveauProgrammeForm() {
                     }}
                     className={FIELD_INPUT}
                   >
-                    <option value="" disabled>Choisir une matière existante…</option>
+                    <option value="" disabled>{en ? "Choose an existing subject…" : "Choisir une matière existante…"}</option>
                     {disciplines.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   <button
@@ -2681,14 +2695,14 @@ function NouveauProgrammeForm() {
                     }`}
                     style={{ color: ORANGE }}
                   >
-                    <Plus size={14} /> Créer une nouvelle matière
+                    <Plus size={14} /> {en ? "Create a new subject" : "Créer une nouvelle matière"}
                   </button>
                   {!draftMatiereProgram.discipline_id && (
                     <div>
                       <input
                         value={draftMatiereProgram.newDisciplineName}
                         onChange={(e) => updateMatiereProgram(draftMatiereProgram.key!, { newDisciplineName: e.target.value })}
-                        placeholder="Intitulé de la matière..."
+                        placeholder={en ? "Subject name..." : "Intitulé de la matière..."}
                         className={FIELD_INPUT}
                       />
                       {(() => {
@@ -2702,8 +2716,8 @@ function NouveauProgrammeForm() {
                               onClick={() => updateMatiereProgram(draftMatiereProgram.key!, { discipline_id: match.id, newDisciplineName: "" })}
                               className="mt-1.5 w-full text-left text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 p-2.5 rounded-lg border border-blue-200 flex items-center justify-between transition-colors"
                             >
-                              <span>💡 La matière « <b>{match.name}</b> » existe déjà.</span>
-                              <span className="underline shrink-0">Sélectionner</span>
+                              <span>💡 {en ? <>The subject “<b>{match.name}</b>” already exists.</> : <>La matière « <b>{match.name}</b> » existe déjà.</>}</span>
+                              <span className="underline shrink-0">{en ? "Select" : "Sélectionner"}</span>
                             </button>
                           );
                         }
@@ -2712,7 +2726,7 @@ function NouveauProgrammeForm() {
                     </div>
                   )}
                   <div>
-                    <p className="text-[9px] font-black uppercase text-neutral-400 mb-2">Niveaux concernés</p>
+                    <p className="text-[9px] font-black uppercase text-neutral-400 mb-2">{en ? "Applicable levels" : "Niveaux concernés"}</p>
                     <div className="flex flex-wrap gap-2">
                       {niveaux.map((n) => {
                         const checked = (draftMatiereProgram.niveauNumeros || []).includes(n.numero);
@@ -2724,7 +2738,7 @@ function NouveauProgrammeForm() {
                             className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${checked ? "text-white border-transparent" : "bg-white border-neutral-200 text-neutral-500"}`}
                             style={checked ? { backgroundColor: BLUE } : {}}
                           >
-                            Niv. {n.numero}
+                            {en ? "Level" : "Niv."} {n.numero}
                           </button>
                         );
                       })}
@@ -2732,7 +2746,7 @@ function NouveauProgrammeForm() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className={FIELD_LABEL}>Barème (sur)</p>
+                      <p className={FIELD_LABEL}>{en ? "Maximum score" : "Barème (sur)"}</p>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -2746,7 +2760,7 @@ function NouveauProgrammeForm() {
                       />
                     </div>
                     <div>
-                      <p className={FIELD_LABEL}>Coefficient</p>
+                      <p className={FIELD_LABEL}>{en ? "Weight" : "Coefficient"}</p>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -2768,15 +2782,15 @@ function NouveauProgrammeForm() {
                   />
                   {matiereDraftError && <p className="text-[11px] font-bold text-red-500">{matiereDraftError}</p>}
                   <div className="flex gap-2">
-                    <button type="button" onClick={cancelDraftMatiereProgram} className="flex-1 h-11 rounded-xl border border-neutral-200 text-[10px] font-black uppercase text-neutral-500">Annuler</button>
+                    <button type="button" onClick={cancelDraftMatiereProgram} className="flex-1 h-11 rounded-xl border border-neutral-200 text-[10px] font-black uppercase text-neutral-500">{en ? "Cancel" : "Annuler"}</button>
                     <button type="button" onClick={confirmDraftMatiereProgram} className="flex-1 h-11 rounded-xl text-[10px] font-black uppercase text-white" style={{ backgroundColor: BLUE }}>
-                      <CheckCircle2 size={14} className="inline mr-1" /> Valider la matière
+                      <CheckCircle2 size={14} className="inline mr-1" /> {en ? "Confirm subject" : "Valider la matière"}
                     </button>
                   </div>
                 </div>
               ) : (
                 <button type="button" onClick={() => { setDraftMatiereProgram(defaultMatiere()); setDraftProgramIsEdit(false); setMatiereDraftError(""); }} className="w-full h-11 rounded-xl border border-dashed border-orange-200 hover:bg-orange-50 flex items-center justify-center gap-1.5 text-[10px] font-black uppercase" style={{ color: ORANGE }}>
-                  <Plus size={14} /> Ajouter une matière
+                  <Plus size={14} /> {en ? "Add a subject" : "Ajouter une matière"}
                 </button>
               )}
             </>
@@ -2790,11 +2804,13 @@ function NouveauProgrammeForm() {
                         <p className="text-xs font-black truncate" style={{ color: BLUE }}>{matiereDisplayName(m)}</p>
                         <p className="text-[10px] text-neutral-400 font-medium mt-0.5">
                           {`/${m.max_score || 20} · ×${m.coefficient || 1}`}
-                          {m.formateurIds.length > 0 ? ` · ${m.formateurIds.length} formateur${m.formateurIds.length > 1 ? "s" : ""}` : " · Formateur optionnel"}
+                    {m.formateurIds.length > 0
+                      ? ` · ${m.formateurIds.length} ${en ? `trainer${m.formateurIds.length > 1 ? "s" : ""}` : `formateur${m.formateurIds.length > 1 ? "s" : ""}`}`
+                      : (en ? " · Optional trainer" : " · Formateur optionnel")}
                         </p>
                       </div>
                       <div className="flex gap-1 shrink-0">
-                        <button type="button" onClick={() => editMatiereCourteRow(m.key!)} disabled={!!draftMatiereCourte} className="h-9 px-2.5 rounded-lg border border-neutral-200 text-[10px] font-black uppercase text-neutral-500 disabled:opacity-40">Modifier</button>
+                        <button type="button" onClick={() => editMatiereCourteRow(m.key!)} disabled={!!draftMatiereCourte} className="h-9 px-2.5 rounded-lg border border-neutral-200 text-[10px] font-black uppercase text-neutral-500 disabled:opacity-40">{en ? "Edit" : "Modifier"}</button>
                         <button type="button" onClick={() => removeMatiereCourteByKey(m.key!)} className="w-9 h-9 flex items-center justify-center text-red-500 bg-red-50 rounded-lg border border-red-100"><Trash2 size={14} /></button>
                       </div>
                     </li>
@@ -2803,7 +2819,7 @@ function NouveauProgrammeForm() {
               )}
               {draftMatiereCourte ? (
                 <div className="bg-white border-2 border-orange-200/80 rounded-xl p-4 space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: ORANGE }}>Nouvelle matière</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: ORANGE }}>{en ? "New subject" : "Nouvelle matière"}</p>
                   <select
                     value={draftMatiereCourte.discipline_id}
                     onChange={(e) => {
@@ -2812,7 +2828,7 @@ function NouveauProgrammeForm() {
                     }}
                     className={FIELD_INPUT}
                   >
-                    <option value="" disabled>Choisir une matière existante…</option>
+                    <option value="" disabled>{en ? "Choose an existing subject…" : "Choisir une matière existante…"}</option>
                     {disciplines.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   <button
@@ -2825,14 +2841,14 @@ function NouveauProgrammeForm() {
                     }`}
                     style={{ color: ORANGE }}
                   >
-                    <Plus size={14} /> Créer une nouvelle matière
+                    <Plus size={14} /> {en ? "Create a new subject" : "Créer une nouvelle matière"}
                   </button>
                   {!draftMatiereCourte.discipline_id && (
                     <div>
                       <input
                         value={draftMatiereCourte.newDisciplineName}
                         onChange={(e) => updateMatiereCourteDraft({ newDisciplineName: e.target.value })}
-                        placeholder="Intitulé de la matière..."
+                        placeholder={en ? "Subject name..." : "Intitulé de la matière..."}
                         className={FIELD_INPUT}
                       />
                       {(() => {
@@ -2846,8 +2862,8 @@ function NouveauProgrammeForm() {
                               onClick={() => updateMatiereCourteDraft({ discipline_id: match.id, newDisciplineName: "" })}
                               className="mt-1.5 w-full text-left text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 p-2.5 rounded-lg border border-blue-200 flex items-center justify-between transition-colors"
                             >
-                              <span>💡 La matière « <b>{match.name}</b> » existe déjà.</span>
-                              <span className="underline shrink-0">Sélectionner</span>
+                              <span>💡 {en ? <>The subject “<b>{match.name}</b>” already exists.</> : <>La matière « <b>{match.name}</b> » existe déjà.</>}</span>
+                              <span className="underline shrink-0">{en ? "Select" : "Sélectionner"}</span>
                             </button>
                           );
                         }
@@ -2857,7 +2873,7 @@ function NouveauProgrammeForm() {
                   )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <p className={FIELD_LABEL}>Barème (sur)</p>
+                      <p className={FIELD_LABEL}>{en ? "Maximum score" : "Barème (sur)"}</p>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -2871,7 +2887,7 @@ function NouveauProgrammeForm() {
                       />
                     </div>
                     <div>
-                      <p className={FIELD_LABEL}>Coefficient</p>
+                      <p className={FIELD_LABEL}>{en ? "Weight" : "Coefficient"}</p>
                       <input
                         type="text"
                         inputMode="decimal"
@@ -2893,15 +2909,15 @@ function NouveauProgrammeForm() {
                   />
                   {matiereDraftError && <p className="text-[11px] font-bold text-red-500">{matiereDraftError}</p>}
                   <div className="flex gap-2">
-                    <button type="button" onClick={cancelDraftMatiereCourte} className="flex-1 h-11 rounded-xl border border-neutral-200 text-[10px] font-black uppercase text-neutral-500">Annuler</button>
+                    <button type="button" onClick={cancelDraftMatiereCourte} className="flex-1 h-11 rounded-xl border border-neutral-200 text-[10px] font-black uppercase text-neutral-500">{en ? "Cancel" : "Annuler"}</button>
                     <button type="button" onClick={confirmDraftMatiereCourte} className="flex-1 h-11 rounded-xl text-[10px] font-black uppercase text-white" style={{ backgroundColor: BLUE }}>
-                      <CheckCircle2 size={14} className="inline mr-1" /> Valider la matière
+                      <CheckCircle2 size={14} className="inline mr-1" /> {en ? "Confirm subject" : "Valider la matière"}
                     </button>
                   </div>
                 </div>
               ) : (
                 <button type="button" onClick={() => { setDraftMatiereCourte(defaultMatiere()); setDraftCourteIsEdit(false); setMatiereDraftError(""); }} className="w-full h-11 rounded-xl border border-dashed border-orange-200 hover:bg-orange-50 flex items-center justify-center gap-1.5 text-[10px] font-black uppercase" style={{ color: ORANGE }}>
-                  <Plus size={14} /> Ajouter une matière
+                  <Plus size={14} /> {en ? "Add a subject" : "Ajouter une matière"}
                 </button>
               )}
             </>
@@ -2917,11 +2933,11 @@ function NouveauProgrammeForm() {
             disabled={pdfBusy || !name.trim()}
             className="sm:w-auto h-14 px-5 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest border border-neutral-200 bg-white text-neutral-700 disabled:opacity-50"
           >
-            {pdfBusy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Aperçu PDF
+            {pdfBusy ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} {en ? "PDF preview" : "Aperçu PDF"}
           </button>
           <button type="button" onClick={handleSubmit} disabled={saving || isQuotaReached} className="flex-1 h-14 flex items-center justify-center gap-2 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-md disabled:opacity-50" style={{ backgroundColor: BLUE }}>
             {saving ? <Loader2 size={16} className="animate-spin" /> : isEditMode ? <CheckCircle2 size={16} /> : <Plus size={16} />}{" "}
-            {isEditMode ? "Enregistrer les modifications" : "Enregistrer et créer le programme"}
+            {isEditMode ? (en ? "Save changes" : "Enregistrer les modifications") : (en ? "Save and create program" : "Enregistrer et créer le programme")}
           </button>
         </div>
       </div>
@@ -2934,15 +2950,15 @@ function NouveauProgrammeForm() {
             {qtResult ? (
               <div className="text-center py-2">
                 <CheckCircle2 size={44} className="text-emerald-500 mx-auto mb-3" />
-                <h3 className="text-sm font-black mb-2" style={{ color: BLUE }}>Formateur créé</h3>
+                <h3 className="text-sm font-black mb-2" style={{ color: BLUE }}>{en ? "Trainer created" : "Formateur créé"}</h3>
                 <p className="text-[11px] text-neutral-500 font-medium mb-3">
-                  Il est sélectionné sur la matière. Complétez son profil dans <b>Staff</b>.
+                  {en ? <>The trainer is selected for this subject. Complete the profile under <b>Staff</b>.</> : <>Il est sélectionné sur la matière. Complétez son profil dans <b>Staff</b>.</>}
                 </p>
                 {qtResult.emailSent ? (
-                  <p className="text-[11px] text-emerald-700 font-bold mb-4">Accès envoyés par email.</p>
+                  <p className="text-[11px] text-emerald-700 font-bold mb-4">{en ? "Access details sent by email." : "Accès envoyés par email."}</p>
                 ) : qtResult.temporaryPassword ? (
                   <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-left mb-4">
-                    <p className="text-[10px] font-bold text-amber-700 mb-1">Mot de passe temporaire :</p>
+                    <p className="text-[10px] font-bold text-amber-700 mb-1">{en ? "Temporary password" : "Mot de passe temporaire"} :</p>
                     <p className="font-mono font-black text-xs bg-white border rounded-lg p-2">{qtResult.temporaryPassword}</p>
                   </div>
                 ) : null}
@@ -2952,39 +2968,39 @@ function NouveauProgrammeForm() {
                   className="w-full h-11 rounded-xl text-xs font-black uppercase text-white"
                   style={{ backgroundColor: BLUE }}
                 >
-                  Continuer
+                  {en ? "Continue" : "Continuer"}
                 </button>
               </div>
             ) : (
               <>
                 <div className="flex items-center justify-between mb-5">
-                  <h3 className="text-sm font-black flex items-center gap-2" style={{ color: BLUE }}><UserPlus size={18} style={{ color: ORANGE }} /> Créer un formateur</h3>
+                  <h3 className="text-sm font-black flex items-center gap-2" style={{ color: BLUE }}><UserPlus size={18} style={{ color: ORANGE }} /> {en ? "Create a trainer" : "Créer un formateur"}</h3>
                   <button type="button" onClick={() => setQuickTrainerCtx(null)} className="p-1.5 rounded-lg hover:bg-neutral-100 transition-colors"><X size={16} /></button>
                 </div>
-                <p className="text-[11px] text-neutral-400 mb-4 font-medium">Création sommaire — complétez le profil ensuite dans Staff.</p>
+                <p className="text-[11px] text-neutral-400 mb-4 font-medium">{en ? "Quick creation. Complete the profile later under Staff." : "Création sommaire. Complétez le profil ensuite dans Staff."}</p>
                 <div className="space-y-3">
                   <div>
-                    <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1">Prénom *</label>
-                    <input value={qtPrenom} onChange={(e) => setQtPrenom(e.target.value)} placeholder="Prénom" className="w-full h-11 px-3 rounded-xl border bg-neutral-50 text-xs font-bold outline-none focus:border-blue-500" />
+                    <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1">{en ? "First name *" : "Prénom *"}</label>
+                    <input value={qtPrenom} onChange={(e) => setQtPrenom(e.target.value)} placeholder={en ? "First name" : "Prénom"} className="w-full h-11 px-3 rounded-xl border bg-neutral-50 text-xs font-bold outline-none focus:border-blue-500" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1">Nom *</label>
-                    <input value={qtNom} onChange={(e) => setQtNom(e.target.value)} placeholder="Nom de famille" className="w-full h-11 px-3 rounded-xl border bg-neutral-50 text-xs font-bold outline-none focus:border-blue-500" />
+                    <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1">{en ? "Last name *" : "Nom *"}</label>
+                    <input value={qtNom} onChange={(e) => setQtNom(e.target.value)} placeholder={en ? "Last name" : "Nom de famille"} className="w-full h-11 px-3 rounded-xl border bg-neutral-50 text-xs font-bold outline-none focus:border-blue-500" />
                   </div>
                   <div>
                     <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1 flex items-center gap-1"><Mail size={10} /> Email *</label>
-                    <input type="email" value={qtEmail} onChange={(e) => setQtEmail(e.target.value)} placeholder="email@exemple.com" className="w-full h-11 px-3 rounded-xl border bg-neutral-50 text-xs font-bold outline-none focus:border-blue-500" />
+                    <input type="email" value={qtEmail} onChange={(e) => setQtEmail(e.target.value)} placeholder={en ? "email@example.com" : "email@exemple.com"} className="w-full h-11 px-3 rounded-xl border bg-neutral-50 text-xs font-bold outline-none focus:border-blue-500" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1 flex items-center gap-1"><Phone size={10} /> Téléphone</label>
+                    <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1 flex items-center gap-1"><Phone size={10} /> {en ? "Phone" : "Téléphone"}</label>
                     <input type="tel" value={qtPhone} onChange={(e) => setQtPhone(e.target.value)} placeholder="+237..." className="w-full h-11 px-3 rounded-xl border bg-neutral-50 text-xs font-bold outline-none focus:border-blue-500" />
                   </div>
                 </div>
                 {qtError && <p className="text-[11px] font-bold text-red-500 mt-3">{qtError}</p>}
                 <div className="flex gap-2 mt-5">
-                  <button type="button" onClick={() => setQuickTrainerCtx(null)} className="flex-1 h-11 rounded-xl border border-neutral-200 text-xs font-black uppercase tracking-wider text-neutral-500 hover:bg-neutral-50 transition-colors">Annuler</button>
+                  <button type="button" onClick={() => setQuickTrainerCtx(null)} className="flex-1 h-11 rounded-xl border border-neutral-200 text-xs font-black uppercase tracking-wider text-neutral-500 hover:bg-neutral-50 transition-colors">{en ? "Cancel" : "Annuler"}</button>
                   <button type="button" onClick={submitQuickTrainer} disabled={qtSaving} className="flex-1 h-11 rounded-xl text-xs font-black uppercase tracking-wider text-white transition-all hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2" style={{ backgroundColor: ORANGE }}>
-                    {qtSaving ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />} Créer
+                    {qtSaving ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />} {en ? "Create" : "Créer"}
                   </button>
                 </div>
               </>

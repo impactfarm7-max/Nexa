@@ -13,6 +13,7 @@ import ReportTrendChart from "../components/ReportTrendChart";
 import { useReportPage } from "../hooks/useReportPage";
 import { useReportPdfExport } from "../hooks/useReportPdfExport";
 import { downloadCsv, fmtNum } from "@/app/utils/reports-export";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type ExamensReport = {
   period: { label: string };
@@ -40,6 +41,7 @@ type ExamensReport = {
 };
 
 function ExamensContent() {
+  const { t } = useI18n();
   const {
     loading, error, report, campuses, filieres, centerType, centerId,
     from, to, campusId, filiereId, setFilter, setPeriodRange,
@@ -49,8 +51,22 @@ function ExamensContent() {
   const exportCsv = useCallback(() => {
     if (!report) return;
     const headers = report.source === "tcf"
-      ? ["Titre", "Examen n°", "Date", "Heure", "Type", "Statut"]
-      : ["Apprenant", "Examen n°", "Date", "Heure", "Type", "Statut"];
+      ? [
+          t("centre", "reportsExamColumnTitle"),
+          t("centre", "reportsExamNumber"),
+          t("centre", "reportsDate"),
+          t("centre", "reportsExamTime"),
+          t("centre", "reportsExamType"),
+          t("centre", "reportsExamStatus"),
+        ]
+      : [
+          t("centre", "reportsExamLearner"),
+          t("centre", "reportsExamNumber"),
+          t("centre", "reportsDate"),
+          t("centre", "reportsExamTime"),
+          t("centre", "reportsExamType"),
+          t("centre", "reportsExamStatus"),
+        ];
     downloadCsv(
       `examens-${report.period.label.replace(/\s+/g, "-")}.csv`,
       headers,
@@ -60,28 +76,28 @@ function ExamensContent() {
           : [r.student || "—", r.examenId, r.date, r.heure, r.type, r.status],
       ),
     );
-  }, [report]);
+  }, [report, t]);
 
   const exportPdfReport = useCallback(async () => {
     if (!report) return;
     await exportPdf({
-      title: isTcfCanadaCenter(centerType) ? "Examens TCF" : "Examens",
+      title: isTcfCanadaCenter(centerType) ? t("centre", "reportsExamTitleTcf") : t("centre", "reportsExamTitleGeneric"),
       periodLabel: report.period.label,
       kpis: [
-        { label: "Séances", value: fmtNum(report.kpis.totalSessions) },
-        { label: "Réalisés", value: fmtNum(report.kpis.realises) },
-        { label: "Annulés", value: fmtNum(report.kpis.annules) },
+        { label: t("centre", "reportsExamSessionsPeriod"), value: fmtNum(report.kpis.totalSessions) },
+        { label: t("centre", "reportsExamCompleted"), value: fmtNum(report.kpis.realises) },
+        { label: t("centre", "reportsExamCancelledAbandoned"), value: fmtNum(report.kpis.annules) },
       ],
       sections: [
         {
-          title: "Par statut",
-          columns: ["Statut", "Nombre"],
+          title: t("centre", "reportsExamByStatus"),
+          columns: [t("centre", "reportsExamStatus"), t("centre", "reportsExamCount")],
           rows: report.byStatus.map((x) => [x.label, x.count]),
         },
       ],
       filename: `examens-${report.period.label.replace(/\s+/g, "-")}.pdf`,
     });
-  }, [report, exportPdf, centerType]);
+  }, [report, exportPdf, centerType, t]);
 
   const examTrend = useMemo(() => {
     if (!report) return [];
@@ -105,7 +121,7 @@ function ExamensContent() {
     <ReportsShell
       activeSlug="examens"
       centerType={centerType}
-      title={isTcf ? "Examens TCF" : "Examens"}
+      title={isTcf ? t("centre", "reportsExamTitleTcf") : t("centre", "reportsExamTitleGeneric")}
       periodLabel={report?.period?.label}
       dateFrom={from}
       dateTo={to}
@@ -122,59 +138,59 @@ function ExamensContent() {
       )}
       {loading && (
         <div className="flex items-center gap-2 text-neutral-400 text-sm">
-          <Loader2 size={16} className="animate-spin" /> Actualisation…
+          <Loader2 size={16} className="animate-spin" /> {t("centre", "summaryRefreshing")}
         </div>
       )}
       {report && (
         <>
           <p className="text-xs text-neutral-500">
-            Source : {report.source === "tcf" ? "Sessions TCF planifiées (tcf_exam_sessions)" : "Simulateurs complétés par les apprenants (exam_sessions)"}
+            {t("centre", "reportsExamSourceLabel")} {report.source === "tcf" ? t("centre", "reportsExamSourceTcf") : t("centre", "reportsExamSourceGeneric")}
           </p>
           <ReportKpiGrid
             items={[
-              { label: "Séances (période)", value: fmtNum(report.kpis.totalSessions), sub: report.period.label },
-              { label: isTcf ? "Programmés" : "En cours", value: fmtNum(report.kpis.programmes) },
-              { label: "En cours", value: fmtNum(report.kpis.enCours) },
-              { label: "Réalisés", value: fmtNum(report.kpis.realises) },
-              { label: "Annulés / abandonnés", value: fmtNum(report.kpis.annules), alert: report.kpis.annules > 0 },
+              { label: t("centre", "reportsExamSessionsPeriod"), value: fmtNum(report.kpis.totalSessions), sub: report.period.label },
+              { label: isTcf ? t("centre", "reportsExamScheduled") : t("centre", "reportsExamInProgress"), value: fmtNum(report.kpis.programmes) },
+              { label: t("centre", "reportsExamInProgress"), value: fmtNum(report.kpis.enCours) },
+              { label: t("centre", "reportsExamCompleted"), value: fmtNum(report.kpis.realises) },
+              { label: t("centre", "reportsExamCancelledAbandoned"), value: fmtNum(report.kpis.annules), alert: report.kpis.annules > 0 },
               {
-                label: isTcf ? "Participations" : "Complétions",
+                label: isTcf ? t("centre", "reportsExamParticipations") : t("centre", "reportsExamCompletions"),
                 value: fmtNum(report.kpis.participations),
-                sub: isTcf ? "Convocations terminées" : "Sessions terminées",
+                sub: isTcf ? t("centre", "reportsExamCompletedInvitations") : t("centre", "reportsExamCompletedSessions"),
               },
             ]}
           />
           <div className="grid md:grid-cols-2 gap-4">
-            <ReportTrendChart title="Évolution des séances" points={examTrend} />
+            <ReportTrendChart title={t("centre", "reportsExamTrend")} points={examTrend} />
             <ReportBarChart
-              title="Répartition par statut"
+              title={t("centre", "reportsExamBreakdownByStatus")}
               items={report.byStatus.map((x) => ({ label: x.label, value: x.count }))}
             />
           </div>
           <ReportBreakdownTable
-            title="Par statut"
+            title={t("centre", "reportsExamByStatus")}
             columns={[
-              { key: "label", label: "Statut" },
-              { key: "count", label: "Nombre", align: "right" },
+              { key: "label", label: t("centre", "reportsExamStatus") },
+              { key: "count", label: t("centre", "reportsExamCount"), align: "right" },
             ]}
             rows={report.byStatus}
           />
           <ReportBreakdownTable
-            title={isTcf ? "Séances d'examen TCF" : "Sessions simulateur"}
+            title={isTcf ? t("centre", "reportsExamTcfSessions") : t("centre", "reportsExamSimulationSessions")}
             columns={
               isTcf
                 ? [
-                    { key: "title", label: "Titre" },
-                    { key: "date", label: "Date" },
-                    { key: "heure", label: "Heure" },
-                    { key: "type", label: "Type" },
-                    { key: "status", label: "Statut" },
+                    { key: "title", label: t("centre", "reportsExamColumnTitle") },
+                    { key: "date", label: t("centre", "reportsDate") },
+                    { key: "heure", label: t("centre", "reportsExamTime") },
+                    { key: "type", label: t("centre", "reportsExamType") },
+                    { key: "status", label: t("centre", "reportsExamStatus") },
                   ]
                 : [
-                    { key: "student", label: "Apprenant" },
-                    { key: "title", label: "Examen" },
-                    { key: "date", label: "Date" },
-                    { key: "status", label: "Statut" },
+                    { key: "student", label: t("centre", "reportsExamLearner") },
+                    { key: "title", label: t("centre", "reportsExamExam") },
+                    { key: "date", label: t("centre", "reportsDate") },
+                    { key: "status", label: t("centre", "reportsExamStatus") },
                   ]
             }
             rows={report.rows.map((r) => ({

@@ -405,7 +405,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || t("centre", "createStudentCreateError"));
+      if (!res.ok) throw new Error(locale === "en" ? t("centre", "createStudentCreateError") : (data.error || t("centre", "createStudentCreateError")));
 
       // Créer les détails complémentaires (pays, indicatif, responsable)
       if (data.studentId) {

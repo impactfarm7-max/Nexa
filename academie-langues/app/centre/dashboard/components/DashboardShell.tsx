@@ -164,7 +164,7 @@ export default function DashboardShell({
                 <span className="capitalize">{todayLabel(locale)}</span>
               </p>
               <h1 className={CENTER_TYPE.h0} style={{ color: BLUE }}>
-                {greeting(locale)}, {staffPrenom}
+                {greeting(locale)}, {locale === "en" && staffPrenom === "Directeur" ? "Manager" : (staffPrenom || (locale === "en" ? "Manager" : "Directeur"))}
               </h1>
             </div>
           </div>

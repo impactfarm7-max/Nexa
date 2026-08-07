@@ -6,6 +6,7 @@ import { MessageCircle, CheckCircle, Clock, AlertCircle, RefreshCcw, ChevronDown
 import { supabase } from "../utils/supabase";
 import { useOnlineStatus } from "@/app/hooks/useOnlineStatus";
 import { useOfflineQueue } from "@/app/hooks/useOfflineQueue";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type UserFeedback = {
   id: string;
@@ -26,6 +27,8 @@ interface AdminFeedbackSectionProps {
 }
 
 export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedbackSectionProps) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const { isOnline } = useOnlineStatus();
   const { addToQueue, pendingCount: queuedActionsCount } = useOfflineQueue();
 
@@ -51,7 +54,7 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error("Vous devez être connecté");
+        throw new Error(en ? "You must be signed in" : "Vous devez être connecté");
       }
 
       const res = await fetch("/api/admin/feedback", {
@@ -66,7 +69,7 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
       setFeedbacks(data.feedbacks || []);
     } catch (error) {
       console.error("Erreur fetch feedbacks:", error);
-      setError(error instanceof Error ? error.message : "Erreur lors du chargement");
+      setError(error instanceof Error ? error.message : (en ? "Error while loading" : "Erreur lors du chargement"));
     } finally {
       setLoading(false);
     }
@@ -76,7 +79,7 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error("Vous devez être connecté");
+        throw new Error(en ? "You must be signed in" : "Vous devez être connecté");
       }
 
       if (!isOnline) {
@@ -151,9 +154,9 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
 
   const typeLabel: Record<string, string> = {
     bug: "Bug",
-    "feature-request": "Fonctionnalité",
-    complaint: "Réclamation",
-    general: "Général",
+    "feature-request": en ? "Feature" : "Fonctionnalité",
+    complaint: en ? "Complaint" : "Réclamation",
+    general: en ? "General" : "Général",
   };
 
   const FeedbackCard = ({ feedback, isTreated }: { feedback: UserFeedback; isTreated: boolean }) => (
@@ -174,10 +177,10 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
             <span className="text-lg">{typeIcon[feedback.type] || "💬"}</span>
             <div className="flex-1">
               <p className={`font-bold text-sm ${isTreated ? "text-slate-500" : "text-white"}`}>
-                {feedback.profiles?.prenom || "Anonyme"}
+                {feedback.profiles?.prenom || (en ? "Anonymous" : "Anonyme")}
               </p>
               <p className={`text-xs ${isTreated ? "text-slate-600" : "text-slate-500"}`}>
-                {feedback.profiles?.email || "email non disponible"}
+                {feedback.profiles?.email || (en ? "email unavailable" : "email non disponible")}
               </p>
             </div>
           </div>
@@ -190,7 +193,7 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
               {typeLabel[feedback.type] || feedback.type}
             </span>
             <span className={`text-[10px] ${isTreated ? "text-slate-700" : "text-slate-600"}`}>
-              {new Date(feedback.created_at).toLocaleDateString("fr-FR", {
+              {new Date(feedback.created_at).toLocaleDateString(en ? "en-US" : "fr-FR", {
                 day: "numeric",
                 month: "short",
                 hour: "2-digit",
@@ -216,19 +219,19 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
           <button
             onClick={() => updateStatus(feedback.id, "treated")}
             disabled={!isOnline}
-            title={!isOnline ? "Connexion requise" : ""}
+            title={!isOnline ? (en ? "Connection required" : "Connexion requise") : ""}
             className="px-4 py-2 text-xs font-black uppercase tracking-widest bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Marquer traité
+            {en ? "Mark as resolved" : "Marquer traité"}
           </button>
         ) : (
           <button
             onClick={() => updateStatus(feedback.id, "pending")}
             disabled={!isOnline}
-            title={!isOnline ? "Connexion requise" : ""}
+            title={!isOnline ? (en ? "Connection required" : "Connexion requise") : ""}
             className="px-4 py-2 text-xs font-black uppercase tracking-widest bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Remettre en attente
+            {en ? "Move back to pending" : "Remettre en attente"}
           </button>
         )}
       </div>
@@ -245,7 +248,7 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
           className="px-4 py-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-300 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2 disabled:opacity-50"
         >
           <RefreshCcw size={14} className={loading ? "animate-spin" : ""} />
-          Actualiser
+          {en ? "Refresh" : "Actualiser"}
         </button>
       </div>
 
@@ -270,7 +273,9 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
         >
           <WifiOff size={18} />
           <span className="text-sm font-medium">
-            Mode hors ligne — {queuedActionsCount} action{queuedActionsCount !== 1 ? "s" : ""} en attente
+            {en
+              ? `Offline mode — ${queuedActionsCount} action${queuedActionsCount !== 1 ? "s" : ""} pending`
+              : `Mode hors ligne — ${queuedActionsCount} action${queuedActionsCount !== 1 ? "s" : ""} en attente`}
           </span>
         </motion.div>
       )}
@@ -290,9 +295,11 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
             <div className="flex items-center gap-4">
               <div className="w-1 h-8 bg-gradient-to-b from-amber-500 to-amber-600 rounded-full" />
               <div>
-                <h3 className="text-xl font-black text-white">Feedbacks en attente</h3>
+                <h3 className="text-xl font-black text-white">{en ? "Pending feedback" : "Feedbacks en attente"}</h3>
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
-                  {pendingFeedbacks.length} retour{pendingFeedbacks.length > 1 ? "s" : ""} à traiter
+                  {en
+                    ? `${pendingFeedbacks.length} item${pendingFeedbacks.length !== 1 ? "s" : ""} to review`
+                    : `${pendingFeedbacks.length} retour${pendingFeedbacks.length > 1 ? "s" : ""} à traiter`}
                 </p>
               </div>
               <div className="ml-auto">
@@ -314,7 +321,7 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
                     <MessageCircle size={24} className="text-slate-700" />
                   </div>
                   <p className="text-slate-400 text-sm font-medium">
-                    Tous les feedbacks ont été traités! 🎉
+                    {en ? "All feedback has been resolved! 🎉" : "Tous les feedbacks ont été traités! 🎉"}
                   </p>
                 </motion.div>
               )}
@@ -345,9 +352,11 @@ export default function AdminFeedbackSection({ searchQuery = "" }: AdminFeedback
               >
                 <div className="w-1 h-8 bg-gradient-to-b from-slate-600 to-slate-700 rounded-full" />
                 <div className="flex-1 text-left">
-                  <h3 className="text-xl font-black text-slate-500">Feedbacks traités</h3>
+                  <h3 className="text-xl font-black text-slate-500">{en ? "Resolved feedback" : "Feedbacks traités"}</h3>
                   <p className="text-xs text-slate-600 font-bold uppercase tracking-widest">
-                    {treatedFeedbacks.length} retour{treatedFeedbacks.length > 1 ? "s" : ""} archivé{treatedFeedbacks.length > 1 ? "s" : ""}
+                    {en
+                      ? `${treatedFeedbacks.length} archived item${treatedFeedbacks.length !== 1 ? "s" : ""}`
+                      : `${treatedFeedbacks.length} retour${treatedFeedbacks.length > 1 ? "s" : ""} archivé${treatedFeedbacks.length > 1 ? "s" : ""}`}
                   </p>
                 </div>
                 <div className="ml-auto">

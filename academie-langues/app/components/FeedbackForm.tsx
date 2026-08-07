@@ -6,6 +6,7 @@ import { Send, X, AlertCircle, CheckCircle, Bug, Lightbulb, AlertTriangle, Messa
 import { supabase } from "../utils/supabase";
 import { useOnlineStatus } from "@/app/hooks/useOnlineStatus";
 import { useOfflineQueue } from "@/app/hooks/useOfflineQueue";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type FeedbackType = "bug" | "feature-request" | "complaint" | "general";
 
@@ -15,6 +16,8 @@ interface FeedbackFormProps {
 }
 
 export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormProps) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const { isOnline } = useOnlineStatus();
   const { addToQueue, pendingCount } = useOfflineQueue();
 
@@ -29,7 +32,7 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
 
     if (!message.trim()) {
       setStatus("error");
-      setErrorMsg("Le message est requis.");
+      setErrorMsg(en ? "Message is required." : "Le message est requis.");
       return;
     }
 
@@ -39,7 +42,7 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        throw new Error("Vous devez être connecté pour envoyer un retour");
+        throw new Error(en ? "You must be signed in to send feedback" : "Vous devez être connecté pour envoyer un retour");
       }
 
       // Mode offline: mettre en queue
@@ -78,7 +81,7 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
 
       if (!res.ok) {
         const error = await res.json();
-        throw new Error(error.error || "Erreur lors de la soumission");
+        throw new Error(error.error || (en ? "An error occurred while submitting" : "Erreur lors de la soumission"));
       }
 
       setStatus("success");
@@ -91,7 +94,7 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
     } catch (error) {
       setStatus("error");
       setErrorMsg(
-        error instanceof Error ? error.message : "Erreur serveur"
+        error instanceof Error ? error.message : (en ? "Server error" : "Erreur serveur")
       );
     } finally {
       setLoading(false);
@@ -99,10 +102,10 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
   };
 
   const feedbackTypes: Array<{ value: FeedbackType; label: string; icon: React.ReactNode; color: string }> = [
-    { value: "bug", label: "Signaler un bug", icon: <Bug size={20} />, color: "from-red-600 to-red-700" },
-    { value: "feature-request", label: "Demander une fonctionnalité", icon: <Lightbulb size={20} />, color: "from-yellow-600 to-yellow-700" },
-    { value: "complaint", label: "Réclamation", icon: <AlertTriangle size={20} />, color: "from-orange-600 to-orange-700" },
-    { value: "general", label: "Feedback général", icon: <MessageCircle size={20} />, color: "from-blue-600 to-blue-700" },
+    { value: "bug", label: en ? "Report a bug" : "Signaler un bug", icon: <Bug size={20} />, color: "from-red-600 to-red-700" },
+    { value: "feature-request", label: en ? "Request a feature" : "Demander une fonctionnalité", icon: <Lightbulb size={20} />, color: "from-yellow-600 to-yellow-700" },
+    { value: "complaint", label: en ? "Complaint" : "Réclamation", icon: <AlertTriangle size={20} />, color: "from-orange-600 to-orange-700" },
+    { value: "general", label: en ? "General feedback" : "Feedback général", icon: <MessageCircle size={20} />, color: "from-blue-600 to-blue-700" },
   ];
 
   const content = (
@@ -110,7 +113,7 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
       {/* Type Selection */}
       <div>
         <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-4">
-          Type de retour
+          {en ? "Feedback type" : "Type de retour"}
         </label>
         <div className="grid grid-cols-2 gap-3">
           {feedbackTypes.map((option) => {
@@ -150,12 +153,12 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
       {/* Message Input */}
       <div>
         <label className="block text-xs font-black uppercase tracking-widest text-slate-400 mb-3">
-          Votre message
+          {en ? "Your message" : "Votre message"}
         </label>
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
-          placeholder="Décrivez votre retour..."
+          placeholder={en ? "Describe your feedback..." : "Décrivez votre retour..."}
           className="w-full px-4 py-3 bg-slate-950/50 border border-slate-800 rounded-xl focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/20 focus:outline-none resize-none text-slate-200 placeholder:text-slate-600 transition-all text-sm font-medium"
           rows={5}
         />
@@ -186,7 +189,7 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
             className="flex items-center gap-3 p-4 bg-amber-950/30 border border-amber-800/50 rounded-xl text-amber-400"
           >
             <Clock size={18} className="shrink-0" />
-            <span className="text-sm font-medium">Retour sauvegardé, envoi automatique à la reconnexion</span>
+            <span className="text-sm font-medium">{en ? "Feedback saved and will be sent automatically when reconnected" : "Retour sauvegardé, envoi automatique à la reconnexion"}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -201,7 +204,7 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
             className="flex items-center gap-3 p-4 bg-emerald-950/30 border border-emerald-800/50 rounded-xl text-emerald-400"
           >
             <CheckCircle size={18} className="shrink-0" />
-            <span className="text-sm font-medium">Merci pour votre retour! 🎉</span>
+            <span className="text-sm font-medium">{en ? "Thank you for your feedback! 🎉" : "Merci pour votre retour! 🎉"}</span>
           </motion.div>
         )}
       </AnimatePresence>
@@ -217,17 +220,17 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
         {loading ? (
           <>
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            <span>Envoi en cours...</span>
+            <span>{en ? "Sending..." : "Envoi en cours..."}</span>
           </>
         ) : status === "success" ? (
           <>
             <CheckCircle size={18} />
-            <span>Envoyé!</span>
+            <span>{en ? "Sent!" : "Envoyé!"}</span>
           </>
         ) : (
           <>
             <Send size={18} />
-            <span>Envoyer mon retour</span>
+            <span>{en ? "Send my feedback" : "Envoyer mon retour"}</span>
           </>
         )}
       </motion.button>
@@ -235,7 +238,9 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
       {/* Pending Count Badge */}
       {pendingCount > 0 && (
         <p className="text-center text-xs text-amber-500 font-medium mt-1">
-          {pendingCount} retour{pendingCount > 1 ? "s" : ""} en attente d'envoi
+          {en
+            ? `${pendingCount} feedback item${pendingCount > 1 ? "s" : ""} waiting to be sent`
+            : `${pendingCount} retour${pendingCount > 1 ? "s" : ""} en attente d'envoi`}
         </p>
       )}
     </form>
@@ -268,10 +273,10 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-black text-white uppercase tracking-tight">
-                  Nous donner votre avis
+                  {en ? "Give us your feedback" : "Nous donner votre avis"}
                 </h2>
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">
-                  Aidez-nous à améliorer l'app
+                  {en ? "Help us improve the app" : "Aidez-nous à améliorer l'app"}
                 </p>
               </div>
               {onClose && (
@@ -298,10 +303,10 @@ export default function FeedbackForm({ onClose, isModal = false }: FeedbackFormP
     <div className="bg-gradient-to-br from-slate-900 to-slate-950 rounded-2xl shadow-lg p-8 max-w-lg mx-auto border border-slate-800/50">
       <div className="mb-6">
         <h2 className="text-2xl font-black text-white uppercase tracking-tight">
-          Nous donner votre avis
+          {en ? "Give us your feedback" : "Nous donner votre avis"}
         </h2>
         <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">
-          Aidez-nous à améliorer l'app
+          {en ? "Help us improve the app" : "Aidez-nous à améliorer l'app"}
         </p>
       </div>
       {content}

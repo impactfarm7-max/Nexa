@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
 import { CENTER_TYPE } from "@/app/centre/center-page-ui";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const B = "#11224E";
 const O = "#eb670e";
@@ -140,12 +141,13 @@ export function Panel({
   children: React.ReactNode;
   accentColor?: string;
 }) {
+  const { locale } = useI18n();
   return (
     <div className="rounded-2xl border border-neutral-200 bg-white p-5 min-w-0 hover:shadow-sm transition-shadow">
       <div className="flex items-center justify-between gap-2 mb-4">
         <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400">{title}</span>
         <Link href={href} className="text-[10px] font-bold flex items-center gap-0.5 px-2 py-1 rounded-lg hover:bg-orange-50 transition-colors shrink-0" style={{ color: accentColor }}>
-          Voir <ArrowUpRight size={11} />
+          {locale === "en" ? "View" : "Voir"} <ArrowUpRight size={11} />
         </Link>
       </div>
       <div>{children}</div>

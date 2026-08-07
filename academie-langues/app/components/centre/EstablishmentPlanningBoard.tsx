@@ -6,10 +6,14 @@ import {
   Printer, User, Sparkles, X,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
-const DAYS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+const DAYS = {
+  fr: ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"],
+  en: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+};
 const WEEKS_VISIBLE = 3;
 
 type TrainerOption = { id: string; prenom: string; nom: string | null };
@@ -100,6 +104,8 @@ type Props = {
 };
 
 export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: Props) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const [anchorMonday, setAnchorMonday] = useState(() => getMonday(new Date()));
   const [weeks, setWeeks] = useState<WeekBundle[]>([]);
   const [pending, setPending] = useState<PendingReport[]>([]);
@@ -125,7 +131,7 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(en ? "Session expired." : "Session expirée.");
 
       const results = await Promise.all(
         mondayList.map(async (ws) => {
@@ -134,7 +140,7 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
             { headers: { Authorization: `Bearer ${session.access_token}` } },
           );
           const json = await res.json().catch(() => ({}));
-          if (!res.ok) throw new Error(json.error || "Chargement impossible.");
+          if (!res.ok) throw new Error(json.error || (en ? "Unable to load." : "Chargement impossible."));
           return {
             weekStart: ws,
             slots: (json.slots || []) as EstSlot[],
@@ -158,10 +164,10 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
       }
       setKnownRooms(Array.from(rooms).sort((a, b) => a.localeCompare(b, "fr")));
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur.");
+      setError(e instanceof Error ? e.message : (en ? "Error." : "Erreur."));
       setWeeks(mondayList.map((weekStart) => ({ weekStart, slots: [], loading: false })));
     }
-  }, [anchorMonday]);
+  }, [anchorMonday, en]);
 
   useEffect(() => {
     void load();
@@ -227,7 +233,7 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
     setError("");
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Session expirée.");
+      if (!session) throw new Error(en ? "Session expired." : "Session expirée.");
       const res = await fetch("/api/center/planning-slots", {
         method: "POST",
         headers: {
@@ -246,13 +252,13 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || "Placement impossible.");
+      if (!res.ok) throw new Error(json.error || (en ? "Unable to place the session." : "Placement impossible."));
       setPlacingId(null);
       setPlaceRoom("");
       setPlaceFormateurId("");
       await load();
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur.");
+      setError(e instanceof Error ? e.message : (en ? "Error." : "Erreur."));
     } finally {
       setSaving(false);
     }
@@ -293,9 +299,9 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div>
-          <h2 className="text-base sm:text-lg font-extrabold text-[#11224E]">Calendrier établissement</h2>
+          <h2 className="text-base sm:text-lg font-extrabold text-[#11224E]">{en ? "Establishment calendar" : "Calendrier établissement"}</h2>
           <p className="text-xs text-neutral-500 mt-0.5">
-            {WEEKS_VISIBLE} semaines · plages libres · reports · filtres intelligents
+            {en ? `${WEEKS_VISIBLE} weeks · free slots · rescheduling · smart filters` : `${WEEKS_VISIBLE} semaines · plages libres · reports · filtres intelligents`}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -305,14 +311,14 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
             className="h-9 inline-flex items-center gap-1.5 rounded-lg px-3 text-xs font-semibold"
             style={{ color: BLUE, border: `1.5px solid ${BLUE}` }}
           >
-            <Printer size={14} /> Imprimer
+            <Printer size={14} /> {en ? "Print" : "Imprimer"}
           </button>
           <div className="flex items-center gap-0.5 bg-black/[0.04] rounded-lg p-0.5 border border-black/[0.06]">
             <button
               type="button"
               onClick={() => navigate("prev")}
               className="p-1.5 rounded-md hover:bg-white text-neutral-500"
-              aria-label="Semaines précédentes"
+              aria-label={en ? "Previous weeks" : "Semaines précédentes"}
             >
               <ChevronLeft size={14} />
             </button>
@@ -321,13 +327,13 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
               onClick={() => setAnchorMonday(getMonday(new Date()))}
               className="text-[10px] font-bold uppercase px-2 tracking-wider hover:text-[#eb670e]"
             >
-              Cette semaine
+              {en ? "This week" : "Cette semaine"}
             </button>
             <button
               type="button"
               onClick={() => navigate("next")}
               className="p-1.5 rounded-md hover:bg-white text-neutral-500"
-              aria-label="Semaines suivantes"
+              aria-label={en ? "Next weeks" : "Semaines suivantes"}
             >
               <ChevronRight size={14} />
             </button>
@@ -338,15 +344,15 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
       {/* Smart filters */}
       <div className="flex flex-wrap items-center gap-2 print:hidden">
         <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-          <Sparkles size={11} style={{ color: ORANGE }} /> Filtres
+          <Sparkles size={11} style={{ color: ORANGE }} /> {en ? "Filters" : "Filtres"}
         </span>
         {(
           [
-            { id: "all", label: "Tout" },
-            { id: "free_rooms", label: `Salles libres (${freeRoomsThisWeek.length})` },
-            { id: "busy_rooms", label: "Salles occupées" },
-            { id: "no_formateur", label: "Sans formateur" },
-            { id: "cancelled", label: "Annulés" },
+            { id: "all", label: en ? "All" : "Tout" },
+            { id: "free_rooms", label: en ? `Free rooms (${freeRoomsThisWeek.length})` : `Salles libres (${freeRoomsThisWeek.length})` },
+            { id: "busy_rooms", label: en ? "Occupied rooms" : "Salles occupées" },
+            { id: "no_formateur", label: en ? "Without trainer" : "Sans formateur" },
+            { id: "cancelled", label: en ? "Cancelled" : "Annulés" },
           ] as { id: SmartFilter; label: string }[]
         ).map((f) => (
           <button
@@ -364,7 +370,7 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
         ))}
         {smartFilter === "free_rooms" && freeRoomsThisWeek.length > 0 && (
           <p className="text-[11px] text-neutral-500 w-full sm:w-auto">
-            Cette semaine sans cours :{" "}
+            {en ? "No classes this week" : "Cette semaine sans cours"} :{" "}
             <span className="font-semibold text-[#11224E]">{freeRoomsThisWeek.join(" · ")}</span>
           </p>
         )}
@@ -385,10 +391,10 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-xs font-semibold text-[#11224E]">
-                Placement · {placing.schedule_slots?.title || "Cours"}
+                {en ? "Placement" : "Placement"} · {placing.schedule_slots?.title || (en ? "Class" : "Cours")}
               </p>
               <p className="text-[11px] text-neutral-500 mt-0.5">
-                Choisissez formateur / salle puis cliquez une case « Libre »
+                {en ? "Choose a trainer and room, then click a Free slot" : "Choisissez formateur / salle puis cliquez une case « Libre »"}
               </p>
             </div>
             <button type="button" onClick={() => selectPending(placing)} className="p-1 text-neutral-400 hover:text-neutral-700">
@@ -398,14 +404,14 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <label className="block">
               <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1">
-                <User size={10} /> Formateur
+                <User size={10} /> {en ? "Trainer" : "Formateur"}
               </span>
               <select
                 value={placeFormateurId}
                 onChange={(e) => setPlaceFormateurId(e.target.value)}
                 className="mt-1 w-full h-9 rounded-lg border border-black/[0.08] bg-white px-2 text-sm"
               >
-                <option value="">Conserver / aucun</option>
+                <option value="">{en ? "Keep / none" : "Conserver / aucun"}</option>
                 {trainers.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.prenom}{t.nom ? ` ${t.nom}` : ""}
@@ -415,7 +421,7 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
             </label>
             <label className="block">
               <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 flex items-center gap-1">
-                <MapPin size={10} /> Salle
+                <MapPin size={10} /> {en ? "Room" : "Salle"}
               </span>
               <input
                 list="est-room-suggestions"
@@ -447,6 +453,7 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
               onPlace={placeReport}
               smartFilter={smartFilter}
               freeRoomsHint={smartFilter === "free_rooms" ? freeRoomsThisWeek : []}
+              locale={locale}
             />
           ))}
         </div>
@@ -454,13 +461,13 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
         <div className="bg-white/80 rounded-xl border border-black/[0.06] overflow-hidden flex flex-col max-h-[560px] print:hidden">
           <div className="px-3 py-2.5 border-b border-black/[0.06] flex items-center gap-2">
             <RefreshCw size={13} style={{ color: BLUE }} />
-            <p className="text-xs font-semibold text-[#11224E]">À replanifier</p>
+            <p className="text-xs font-semibold text-[#11224E]">{en ? "To reschedule" : "À replanifier"}</p>
             <span className="ml-auto text-[10px] text-neutral-400">{pending.length}</span>
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-2">
             {pending.length === 0 ? (
               <p className="text-xs text-neutral-400 text-center py-8 px-2">
-                Aucun report en attente de placement.
+                {en ? "No rescheduled sessions waiting for placement." : "Aucun report en attente de placement."}
               </p>
             ) : (
               pending.map((p) => {
@@ -482,11 +489,11 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
                       <Ban size={12} className="text-amber-600 mt-0.5 shrink-0" />
                       <div className="min-w-0">
                         <p className="text-xs font-semibold text-neutral-900 truncate">
-                          {slot?.title || "Cours"}
+                          {slot?.title || (en ? "Class" : "Cours")}
                         </p>
                         <p className="text-[10px] text-neutral-500 mt-0.5">
-                          Annulé le {p.exception_date}
-                          {slot ? ` · était ${fmt5(slot.start_time)}–${fmt5(slot.end_time)}` : ""}
+                          {en ? "Cancelled on" : "Annulé le"} {p.exception_date}
+                          {slot ? ` · ${en ? "was" : "était"} ${fmt5(slot.start_time)}–${fmt5(slot.end_time)}` : ""}
                         </p>
                         <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
                           {formateur && (
@@ -501,11 +508,11 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
                           )}
                         </div>
                         {p.reason && (
-                          <p className="text-[10px] text-neutral-400 mt-1 line-clamp-2">Motif : {p.reason}</p>
+                          <p className="text-[10px] text-neutral-400 mt-1 line-clamp-2">{en ? "Reason" : "Motif"} : {p.reason}</p>
                         )}
                         {selected && (
                           <p className="text-[10px] font-medium mt-2" style={{ color: BLUE }}>
-                            Ajustez formateur/salle puis cliquez « Libre »
+                            {en ? "Adjust the trainer/room, then click Free" : "Ajustez formateur/salle puis cliquez « Libre »"}
                           </p>
                         )}
                       </div>
@@ -516,7 +523,9 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
             )}
           </div>
           <div className="px-3 py-2 border-t border-black/[0.06] text-[10px] text-neutral-400">
-            {freeCellsCount} plage(s) libre(s) sur {WEEKS_VISIBLE} semaine(s) · {allSlots.length} créneau(x)
+            {en
+              ? `${freeCellsCount} free slot(s) across ${WEEKS_VISIBLE} week(s) · ${allSlots.length} scheduled slot(s)`
+              : `${freeCellsCount} plage(s) libre(s) sur ${WEEKS_VISIBLE} semaine(s) · ${allSlots.length} créneau(x)`}
           </div>
         </div>
       </div>
@@ -525,6 +534,7 @@ export default function EstablishmentPlanningBoard({ centerId, trainers = [] }: 
         <EstablishmentPrintModal
           weeks={weeks}
           onClose={() => setShowPrint(false)}
+          locale={locale}
         />
       )}
     </div>
@@ -540,6 +550,7 @@ function WeekGrid({
   onPlace,
   smartFilter,
   freeRoomsHint,
+  locale,
 }: {
   weekStart: Date;
   slots: EstSlot[];
@@ -549,7 +560,9 @@ function WeekGrid({
   onPlace: (exceptionId: string, cell: { date: string; start: string; end: string }) => void;
   smartFilter: SmartFilter;
   freeRoomsHint: string[];
+  locale: "fr" | "en";
 }) {
+  const en = locale === "en";
   const byDay = useMemo(() => {
     const map: Record<number, EstSlot[]> = { 1: [], 2: [], 3: [], 4: [], 5: [], 6: [] };
     for (const s of slots) {
@@ -559,7 +572,7 @@ function WeekGrid({
     return map;
   }, [slots]);
 
-  const label = `Semaine du ${weekStart.toLocaleDateString("fr-FR", {
+  const label = `${en ? "Week of" : "Semaine du"} ${weekStart.toLocaleDateString(en ? "en-US" : "fr-FR", {
     day: "2-digit",
     month: "long",
     year: "numeric",
@@ -571,17 +584,17 @@ function WeekGrid({
         <p className="text-xs font-semibold text-[#11224E]">{label}</p>
         {smartFilter === "free_rooms" && freeRoomsHint.length > 0 && (
           <p className="text-[10px] text-neutral-400 truncate max-w-[50%]">
-            Libres : {freeRoomsHint.join(", ")}
+            {en ? "Free" : "Libres"} : {freeRoomsHint.join(", ")}
           </p>
         )}
       </div>
       {loading ? (
         <div className="flex items-center justify-center py-12 text-neutral-400 gap-2 text-sm">
-          <Loader2 size={16} className="animate-spin" /> Chargement…
+          <Loader2 size={16} className="animate-spin" /> {en ? "Loading…" : "Chargement…"}
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 divide-x divide-black/[0.04] min-h-[200px]">
-          {DAYS.map((day, idx) => {
+          {DAYS[locale].map((day, idx) => {
             const dayNum = idx + 1;
             const daySlots = byDay[dayNum] || [];
             const dayDate = addDays(weekStart, idx);
@@ -598,7 +611,7 @@ function WeekGrid({
                     {day}
                   </p>
                   <p className={`text-xs ${isPast ? "text-neutral-300" : isToday ? "text-orange-600 font-bold" : "text-neutral-400"}`}>
-                    {dayDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+                    {dayDate.toLocaleDateString(en ? "en-US" : "fr-FR", { day: "2-digit", month: "short" })}
                   </p>
                 </div>
                 <div className={`p-1.5 space-y-1.5 ${isPast ? "bg-neutral-50/80" : ""}`}>
@@ -614,7 +627,7 @@ function WeekGrid({
                       } ${isPast ? "grayscale-[0.35]" : ""}`}
                     >
                       <p className="font-semibold truncate">{fmt5(s.start_time)}–{fmt5(s.end_time)}</p>
-                      <p className="truncate opacity-80">{s.title || "Cours"}</p>
+                      <p className="truncate opacity-80">{s.title || (en ? "Class" : "Cours")}</p>
                       {s.filiere_name && <p className="truncate text-neutral-400">{s.filiere_name}</p>}
                       {s.formateur_prenom && (
                         <p className="truncate text-neutral-400 flex items-center gap-0.5">
@@ -652,17 +665,17 @@ function WeekGrid({
                               : "border-neutral-200 text-neutral-300"
                           }`}
                         >
-                          Libre {b.start}–{b.end}
+                          {en ? "Free" : "Libre"} {b.start}–{b.end}
                         </button>
                       );
                     })}
                   {isPast && daySlots.length === 0 && (
                     <p className="text-[9px] font-bold uppercase tracking-wider text-neutral-300 text-center py-3">
-                      Passé
+                      {en ? "Past" : "Passé"}
                     </p>
                   )}
                   {!isPast && daySlots.length === 0 && smartFilter !== "all" && (
-                    <p className="text-[9px] text-neutral-300 text-center py-2">Aucun</p>
+                    <p className="text-[9px] text-neutral-300 text-center py-2">{en ? "None" : "Aucun"}</p>
                   )}
                 </div>
               </div>
@@ -677,10 +690,13 @@ function WeekGrid({
 function EstablishmentPrintModal({
   weeks,
   onClose,
+  locale,
 }: {
   weeks: WeekBundle[];
   onClose: () => void;
+  locale: "fr" | "en";
 }) {
+  const en = locale === "en";
   return (
     <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 overflow-y-auto print:bg-white print:p-0">
       <div className="bg-white max-w-5xl w-full p-6 sm:p-8 rounded-2xl shadow-2xl my-8 print:shadow-none print:rounded-none print:max-w-none print:my-0">
@@ -691,7 +707,7 @@ function EstablishmentPrintModal({
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black uppercase text-white"
             style={{ backgroundColor: ORANGE }}
           >
-            <Printer size={15} /> Imprimer / PDF
+            <Printer size={15} /> {en ? "Print / PDF" : "Imprimer / PDF"}
           </button>
           <button type="button" onClick={onClose} className="p-2.5 bg-neutral-100 rounded-xl hover:bg-neutral-200">
             <X size={17} />
@@ -700,11 +716,11 @@ function EstablishmentPrintModal({
 
         <div className="flex justify-between items-start border-b-2 pb-5 mb-6" style={{ borderColor: BLUE }}>
           <div>
-            <p className="text-[9px] font-black uppercase tracking-widest text-neutral-400">Emploi du temps</p>
-            <h1 className="text-2xl font-black uppercase mt-1" style={{ color: BLUE }}>Établissement</h1>
+            <p className="text-[9px] font-black uppercase tracking-widest text-neutral-400">{en ? "Schedule" : "Emploi du temps"}</p>
+            <h1 className="text-2xl font-black uppercase mt-1" style={{ color: BLUE }}>{en ? "Establishment" : "Établissement"}</h1>
             <p className="text-xs font-bold mt-1" style={{ color: ORANGE }}>
-              {WEEKS_VISIBLE} semaines à partir du{" "}
-              {weeks[0]?.weekStart.toLocaleDateString("fr-FR", {
+              {en ? `${WEEKS_VISIBLE} weeks starting` : `${WEEKS_VISIBLE} semaines à partir du`}{" "}
+              {weeks[0]?.weekStart.toLocaleDateString(en ? "en-US" : "fr-FR", {
                 day: "2-digit",
                 month: "long",
                 year: "numeric",
@@ -723,15 +739,15 @@ function EstablishmentPrintModal({
             return (
               <div key={weekIso(w.weekStart)} className="break-inside-avoid">
                 <p className="text-sm font-bold mb-3" style={{ color: BLUE }}>
-                  Semaine du{" "}
-                  {w.weekStart.toLocaleDateString("fr-FR", {
+                  {en ? "Week of" : "Semaine du"}{" "}
+                  {w.weekStart.toLocaleDateString(en ? "en-US" : "fr-FR", {
                     day: "2-digit",
                     month: "long",
                     year: "numeric",
                   })}
                 </p>
                 <div className="grid grid-cols-6 gap-2">
-                  {DAYS.map((day, i) => {
+                  {DAYS[locale].map((day, i) => {
                     const dayDate = addDays(w.weekStart, i);
                     const daySlots = (byDay[i + 1] ?? []).sort((a, b) =>
                       a.start_time.localeCompare(b.start_time),

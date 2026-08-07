@@ -276,14 +276,27 @@ export default function CenterStudentsPage() {
         session.access_token,
         options?.force ? { force: true } : undefined,
       );
-      setStudents(data.students || []);
+      const localizedStudents = (data.students || []).map((student) => ({
+        ...student,
+        enrollments: student.enrollments.map((enrollment) => ({
+          ...enrollment,
+          filiere_name: locale === "en"
+            ? enrollment.filiere_name
+                .replace(/\bAnnée\s+(\d+)/gi, "Year $1")
+                .replace(/\b(\d+)\s+mois\b/gi, "$1 months")
+                .replace(/\b(\d+)\s+semaines?\b/gi, "$1 weeks")
+                .replace(/\b(\d+)\s+jours?\b/gi, "$1 days")
+            : enrollment.filiere_name,
+        })),
+      }));
+      setStudents(localizedStudents);
     } catch (err) {
       console.error("loadStudents:", err);
       setStudents([]);
     } finally {
       if (!options?.silent) setDataLoading(false);
     }
-  }, []);
+  }, [locale]);
 
   useLayoutEffect(() => {
     const bootstrap = peekCenterBootstrap();
@@ -533,7 +546,10 @@ export default function CenterStudentsPage() {
                     className="inline-flex flex-wrap items-center rounded-lg border border-black/[0.06] px-3 py-1.5"
                     style={{ backgroundColor: SURFACE }}
                   >
-                    <span className="font-bold">{rosterStats.total}</span> {t("centre", "studentsRegisteredCount", { count: rosterStats.total })}
+                    <span className="inline-flex items-center gap-1">
+                      <span className="font-bold">{rosterStats.total}</span>
+                      <span>{t("centre", "studentsRegisteredCount", { count: rosterStats.total })}</span>
+                    </span>
                     <StatSep />
                     <span className="font-semibold">{rosterStats.active} {t("centre", "studentsActiveCount", { count: rosterStats.active })}</span>
                     <StatSep />
@@ -625,8 +641,8 @@ export default function CenterStudentsPage() {
                         </td>
                         <TableActions>
                           <span className="print:hidden inline-flex items-center gap-1">
-                            <TableBtnPreview onClick={() => setViewingStudent(s)} />
-                            <TableBtnModify onClick={() => selectStudent(s)} />
+                            <TableBtnPreview onClick={() => setViewingStudent(s)} label={locale === "en" ? "Preview" : "Aperçu"} />
+                            <TableBtnModify onClick={() => selectStudent(s)} label={locale === "en" ? "Edit" : "Modifier"} />
                           </span>
                         </TableActions>
                       </CenterTableRow>

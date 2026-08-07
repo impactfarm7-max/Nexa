@@ -11,6 +11,7 @@ import { logClientActivity } from "@/app/utils/client-activity";
 import { useRooms, type CommunityRoom } from "./useRooms";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import ProfileAvatar from "@/app/components/ProfileAvatar";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 import RoomSettingsDrawer from "./RoomSettingsDrawer";
 const EDIT_WINDOW_MS = 2 * 60 * 1000;
@@ -42,21 +43,23 @@ function messagesSignature(rows: any[]) {
   return rows.map((m) => `${m.id}:${m.edited ? 1 : 0}:${isMessagePinned(m) ? 1 : 0}`).join("|");
 }
 
-function formatTime(dateStr: string) {
-  return new Date(dateStr).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+function formatTime(dateStr: string, locale = "fr") {
+  return new Date(dateStr).toLocaleTimeString(locale === "en" ? "en-US" : "fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatDateSeparator(dateStr: string) {
+function formatDateSeparator(dateStr: string, locale = "fr") {
   const d = new Date(dateStr);
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
-  if (d.toDateString() === today.toDateString()) return "Aujourd'hui";
-  if (d.toDateString() === yesterday.toDateString()) return "Hier";
-  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  if (d.toDateString() === today.toDateString()) return locale === "en" ? "Today" : "Aujourd'hui";
+  if (d.toDateString() === yesterday.toDateString()) return locale === "en" ? "Yesterday" : "Hier";
+  return d.toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { weekday: "long", day: "numeric", month: "long" });
 }
 
 function CommunauteContent() {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -328,7 +331,7 @@ function CommunauteContent() {
           center_id: activeRoom.center_id,
           replied_to_id: repliedToMessage?.id || null,
         }]);
-        if (error) alert(`Erreur d'envoi : ${error.message}`);
+    if (error) alert(`${en ? "Send error" : "Erreur d'envoi"} : ${error.message}`);
         else logClientActivity("Message communaute envoye");
       }
       setNewMessage("");
@@ -349,7 +352,7 @@ function CommunauteContent() {
 
   const deleteMessage = async (messageId: string) => {
     setOpenMenuId(null);
-    if (!window.confirm("Voulez-vous vraiment supprimer ce message ?")) return;
+    if (!window.confirm(en ? "Are you sure you want to delete this message?" : "Voulez-vous vraiment supprimer ce message ?")) return;
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
     const { error } = await supabase.from("community_messages").delete().eq("id", messageId);
     if (error) { alert("Erreur lors de la suppression."); if (activeRoom) fetchMessages(activeRoom.id); }
@@ -422,7 +425,7 @@ function CommunauteContent() {
             className={`${STUDENT_TEXT.sidebarMeta} truncate mt-0.5`}
             style={{ color: isActive ? BRAND.orange : "#a3a3a3" }}
           >
-            {room.type === "announcement" ? "Annonces du centre" : "Salle de classe"}
+            {room.type === "announcement" ? (en ? "Center announcements" : "Annonces du centre") : (en ? "Classroom" : "Salle de classe")}
           </p>
         </div>
       </button>
@@ -442,9 +445,9 @@ function CommunauteContent() {
       <div className="min-h-[100dvh] bg-[#FFFBF7] flex items-center justify-center p-6 font-sans">
         <div className="bg-white border border-orange-200 rounded-xl p-8 max-w-md text-center">
           <Users size={36} className="mx-auto text-orange-300 mb-4" />
-          <h2 className={`${STUDENT_TEXT.cardTitle} mb-2`} style={{ color: BRAND.blue }}>Communauté centre</h2>
+          <h2 className={`${STUDENT_TEXT.cardTitle} mb-2`} style={{ color: BRAND.blue }}>{en ? "Center community" : "Communauté centre"}</h2>
           <p className="text-sm text-neutral-500 leading-relaxed">
-            L&apos;espace communautaire est réservé aux étudiants inscrits dans un centre partenaire.
+            {en ? "The community space is reserved for students enrolled at a partner center." : "L’espace communautaire est réservé aux étudiants inscrits dans un centre partenaire."}
           </p>
         </div>
       </div>
@@ -473,8 +476,8 @@ function CommunauteContent() {
                 <Pin size={18} className="text-orange-600" />
               </div>
               <div className="flex-1">
-                <p className={`${STUDENT_TEXT.cardTitle} truncate`} style={{ color: BRAND.blue }}>Messages épinglés</p>
-                <p className="text-xs text-neutral-400">{getPinnedMessages().length} message{getPinnedMessages().length > 1 ? "s" : ""}</p>
+                <p className={`${STUDENT_TEXT.cardTitle} truncate`} style={{ color: BRAND.blue }}>{en ? "Pinned messages" : "Messages épinglés"}</p>
+                <p className="text-xs text-neutral-400">{getPinnedMessages().length} {en ? `message${getPinnedMessages().length !== 1 ? "s" : ""}` : `message${getPinnedMessages().length > 1 ? "s" : ""}`}</p>
               </div>
               <button onClick={() => setPinnedModalOpen(false)} className="p-2 text-neutral-400 hover:text-neutral-700 rounded-lg hover:bg-orange-50">
                 <X size={18} />
@@ -484,7 +487,7 @@ function CommunauteContent() {
               {getPinnedMessages().length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3 text-neutral-400">
                   <Pin size={36} className="opacity-20" />
-                  <p className="text-sm font-semibold">Aucun message épinglé</p>
+                  <p className="text-sm font-semibold">{en ? "No pinned messages" : "Aucun message épinglé"}</p>
                 </div>
               ) : getPinnedMessages().map((msg) => (
                 <button key={msg.id} onClick={() => scrollToMessage(msg.id)} className="w-full text-left p-4 bg-orange-50 border border-orange-200 rounded-xl hover:bg-orange-100 transition-colors group">
@@ -498,7 +501,7 @@ function CommunauteContent() {
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-neutral-600">{msg.profiles?.prenom || "Étudiant"}</p>
-                      <p className="text-[10px] text-neutral-400">{formatTime(msg.created_at)}</p>
+                      <p className="text-[10px] text-neutral-400">{formatTime(msg.created_at, locale)}</p>
                     </div>
                   </div>
                   <p className="text-sm text-neutral-700 line-clamp-2 leading-relaxed group-hover:text-neutral-900">{msg.message}</p>
@@ -521,14 +524,14 @@ function CommunauteContent() {
                 <MessageCircle size={18} style={{ color: BRAND.orange }} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`${STUDENT_TEXT.pageTitle} truncate`} style={{ color: BRAND.blue }}>Salles · {centerName}</p>
+                <p className={`${STUDENT_TEXT.pageTitle} truncate`} style={{ color: BRAND.blue }}>{en ? "Rooms" : "Salles"} · {centerName}</p>
                 <p className={STUDENT_TEXT.sidebarMeta} style={{ color: BRAND.orange }}>
                   {visibleRooms.length} salle{visibleRooms.length > 1 ? "s" : ""}
                 </p>
               </div>
               <button
                 onClick={() => setMobileRoomsOpen(false)}
-                aria-label="Fermer la liste des salles"
+                aria-label={en ? "Close room list" : "Fermer la liste des salles"}
                 className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-orange-50 text-neutral-500"
               >
                 <X size={18} />
@@ -540,7 +543,7 @@ function CommunauteContent() {
                 <input
                   value={sidebarSearch}
                   onChange={(e) => setSidebarSearch(e.target.value)}
-                  placeholder="Rechercher une salle…"
+                  placeholder={en ? "Search for a room…" : "Rechercher une salle…"}
                   className="w-full h-11 pl-9 pr-3 rounded-lg bg-[#FFFBF7] border border-orange-100 text-sm font-medium outline-none focus:border-orange-300 transition-colors"
                 />
               </div>
@@ -552,7 +555,7 @@ function CommunauteContent() {
                     className={`${STUDENT_TEXT.cardLabel} px-3 pt-2 pb-1.5 flex items-center gap-2`}
                     style={{ color: BRAND.orange }}
                   >
-                    <Megaphone size={12} style={{ color: BRAND.orange }} /> Groupe du centre
+                    <Megaphone size={12} style={{ color: BRAND.orange }} /> {en ? "Center group" : "Groupe du centre"}
                   </p>
                   {centerForumRooms.map((r) => renderSidebarRoom(r, centerName))}
                 </div>
@@ -563,14 +566,14 @@ function CommunauteContent() {
                     className={`${STUDENT_TEXT.cardLabel} px-3 pt-2 pb-1.5 flex items-center gap-2`}
                     style={{ color: BRAND.blue }}
                   >
-                    <GraduationCap size={12} style={{ color: BRAND.blue }} /> Salle de classe
+                    <GraduationCap size={12} style={{ color: BRAND.blue }} /> {en ? "Classroom" : "Salle de classe"}
                   </p>
-                  {classroomRooms.map((r) => renderSidebarRoom(r, "Salle de classe"))}
+                  {classroomRooms.map((r) => renderSidebarRoom(r, en ? "Classroom" : "Salle de classe"))}
                 </div>
               )}
               {visibleRooms.length === 0 && (
                 <p className="text-sm text-neutral-400 text-center px-4 py-8 leading-relaxed">
-                  Aucune salle disponible pour le moment.
+                  {en ? "No rooms are available at the moment." : "Aucune salle disponible pour le moment."}
                 </p>
               )}
             </div>
@@ -586,7 +589,7 @@ function CommunauteContent() {
               <MessageCircle size={20} style={{ color: BRAND.orange }} />
             </div>
             <div className="min-w-0">
-              <p className={`${STUDENT_TEXT.cardLabel} leading-none mb-0.5`} style={{ color: BRAND.orange }}>Communauté</p>
+              <p className={`${STUDENT_TEXT.cardLabel} leading-none mb-0.5`} style={{ color: BRAND.orange }}>{en ? "Community" : "Communauté"}</p>
               <h2 className={`${STUDENT_TEXT.pageTitle} leading-tight truncate`} style={{ color: BRAND.blue }}>{centerName}</h2>
             </div>
           </div>
@@ -595,7 +598,7 @@ function CommunauteContent() {
             <input
               value={sidebarSearch}
               onChange={(e) => setSidebarSearch(e.target.value)}
-              placeholder="Rechercher…"
+              placeholder={en ? "Search…" : "Rechercher…"}
               className="w-full h-9 pl-8 pr-3 rounded-lg bg-[#FFFBF7] border border-orange-100 text-xs font-medium outline-none focus:border-orange-300 transition-colors"
             />
           </div>
@@ -608,7 +611,7 @@ function CommunauteContent() {
                 className={`${STUDENT_TEXT.cardLabel} px-3 pt-3 pb-1.5 flex items-center gap-2`}
                 style={{ color: BRAND.orange }}
               >
-                <Megaphone size={12} style={{ color: BRAND.orange }} /> Groupe du centre
+                <Megaphone size={12} style={{ color: BRAND.orange }} /> {en ? "Center group" : "Groupe du centre"}
               </p>
               {centerForumRooms.map((r) => renderSidebarRoom(r, centerName))}
             </div>
@@ -620,15 +623,15 @@ function CommunauteContent() {
                 className={`${STUDENT_TEXT.cardLabel} px-3 pt-2 pb-1.5 flex items-center gap-2`}
                 style={{ color: BRAND.blue }}
               >
-                <GraduationCap size={12} style={{ color: BRAND.blue }} /> Salle de classe
+                <GraduationCap size={12} style={{ color: BRAND.blue }} /> {en ? "Classroom" : "Salle de classe"}
               </p>
-              {classroomRooms.map((r) => renderSidebarRoom(r, "Salle de classe"))}
+              {classroomRooms.map((r) => renderSidebarRoom(r, en ? "Classroom" : "Salle de classe"))}
             </div>
           )}
 
           {visibleRooms.length === 0 && (
             <p className="text-[11px] text-neutral-400 text-center px-4 py-6 leading-relaxed">
-              Aucune salle disponible pour le moment. Contactez votre centre si besoin.
+              {en ? "No rooms are available at the moment. Contact your center if needed." : "Aucune salle disponible pour le moment. Contactez votre centre si besoin."}
             </p>
           )}
         </div>
@@ -636,14 +639,14 @@ function CommunauteContent() {
         <div className="px-3 py-3 border-t border-orange-100">
           <div
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border border-orange-100 bg-neutral-50 opacity-75 cursor-not-allowed"
-            title="Bientôt disponible"
+            title={en ? "Coming soon" : "Bientôt disponible"}
           >
             <div className="w-10 h-10 rounded-xl bg-white border border-orange-100 flex items-center justify-center shrink-0">
               <Lock size={16} className="text-neutral-400" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className={`${STUDENT_TEXT.sidebarItem} ${STUDENT_TEXT.sidebarItemActive} text-neutral-500`}>Messages privés</p>
-              <p className={`${STUDENT_TEXT.sidebarMeta} text-neutral-400`}>Bientôt disponible</p>
+              <p className={`${STUDENT_TEXT.sidebarItem} ${STUDENT_TEXT.sidebarItemActive} text-neutral-500`}>{en ? "Private messages" : "Messages privés"}</p>
+              <p className={`${STUDENT_TEXT.sidebarMeta} text-neutral-400`}>{en ? "Coming soon" : "Bientôt disponible"}</p>
             </div>
           </div>
         </div>
@@ -657,7 +660,7 @@ function CommunauteContent() {
             <button
               type="button"
               onClick={() => router.push("/dashboard")}
-              aria-label="Retour au tableau de bord"
+              aria-label={en ? "Back to dashboard" : "Retour au tableau de bord"}
               className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-orange-200 bg-white text-neutral-700 active:scale-95 transition-transform"
             >
               <ArrowLeft size={18} />
@@ -665,7 +668,7 @@ function CommunauteContent() {
             <button
               type="button"
               onClick={() => setMobileRoomsOpen(true)}
-              aria-label="Ouvrir la liste des salles"
+              aria-label={en ? "Open room list" : "Ouvrir la liste des salles"}
               className="shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl border border-orange-200 bg-orange-50 text-neutral-700 active:scale-95 transition-transform"
             >
               <PanelLeft size={18} />
@@ -696,11 +699,11 @@ function CommunauteContent() {
               <div className="w-16 h-16 rounded-2xl bg-orange-50 border border-orange-200 flex items-center justify-center mx-auto mb-4">
                 <MessageCircle size={28} style={{ color: BRAND.orange }} />
               </div>
-              <h3 className={`${STUDENT_TEXT.sectionTitle} mb-2`} style={{ color: BRAND.blue }}>Communauté {centerName}</h3>
+              <h3 className={`${STUDENT_TEXT.sectionTitle} mb-2`} style={{ color: BRAND.blue }}>{en ? "Community" : "Communauté"} {centerName}</h3>
               <p className="text-sm text-neutral-500 leading-relaxed">
                 {isTcfCenterStudent
-                  ? "Sélectionnez le groupe de votre centre ou votre classe pour participer aux discussions."
-                  : "Sélectionnez une salle dans le panneau de gauche."}
+                  ? en ? "Select your center group or class to join the discussions." : "Sélectionnez le groupe de votre centre ou votre classe pour participer aux discussions."
+                  : en ? "Select a room from the left panel." : "Sélectionnez une salle dans le panneau de gauche."}
               </p>
             </div>
           </main>
@@ -722,7 +725,7 @@ function CommunauteContent() {
                   className={STUDENT_TEXT.sidebarMeta}
                   style={{ color: activeRoom.type === "announcement" ? BRAND.orange : BRAND.blue }}
                 >
-                  {activeRoom.type === "announcement" ? `Groupe · ${centerName}` : "Salle de classe"}
+                  {activeRoom.type === "announcement" ? `${en ? "Group" : "Groupe"} · ${centerName}` : (en ? "Classroom" : "Salle de classe")}
                 </p>
               </div>
               {canModerateRoom && (
@@ -738,7 +741,9 @@ function CommunauteContent() {
               <Pin size={16} className="text-orange-700 shrink-0" />
               <div className="flex-1 text-left w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto">
                 <p className="text-xs font-black text-orange-700 uppercase tracking-wider">
-                  {getPinnedMessages().length} message{getPinnedMessages().length > 1 ? "s" : ""} épinglé{getPinnedMessages().length > 1 ? "s" : ""}
+                  {en
+                    ? `${getPinnedMessages().length} pinned message${getPinnedMessages().length !== 1 ? "s" : ""}`
+                    : `${getPinnedMessages().length} message${getPinnedMessages().length > 1 ? "s" : ""} épinglé${getPinnedMessages().length > 1 ? "s" : ""}`}
                 </p>
                 <p className="text-sm font-semibold text-orange-900 line-clamp-1">{getPinnedMessages()[getPinnedMessages().length - 1]?.message}</p>
               </div>
@@ -750,7 +755,7 @@ function CommunauteContent() {
             <div className="w-full max-w-5xl xl:max-w-6xl 2xl:max-w-7xl mx-auto flex flex-col space-y-3">
               <div className="text-center my-4">
                 <span className="px-4 py-2 bg-slate-200 text-slate-500 text-[9px] font-black uppercase tracking-[0.2em] rounded-full shadow-inner">
-                  Début de l'historique · {activeRoom.name}
+                  {en ? "Start of history" : "Début de l'historique"} · {activeRoom.name}
                 </span>
               </div>
 
@@ -761,8 +766,8 @@ function CommunauteContent() {
               ) : messages.length === 0 ? (
                 <div className="text-center py-20 bg-white rounded-[2rem] border border-dashed border-slate-300 max-w-md mx-auto w-full">
                   <Users size={32} className="mx-auto text-slate-300 mb-4" />
-                  <h3 className="text-lg font-black text-slate-900 mb-1">Silence absolu !</h3>
-                  <p className="text-slate-400 font-medium text-xs">Soyez le premier à lancer la discussion.</p>
+                  <h3 className="text-lg font-black text-slate-900 mb-1">{en ? "No messages yet!" : "Silence absolu !"}</h3>
+                  <p className="text-slate-400 font-medium text-xs">{en ? "Be the first to start the discussion." : "Soyez le premier à lancer la discussion."}</p>
                 </div>
               ) : (() => {
                 let lastDateStr = "";
@@ -800,34 +805,34 @@ function CommunauteContent() {
                       {showDateSep && (
                         <div className="flex items-center justify-center my-4">
                           <span className="px-4 py-1.5 bg-slate-200/80 text-slate-500 text-[9px] font-black uppercase tracking-[0.18em] rounded-full">
-                            {formatDateSeparator(msg.created_at)}
+                            {formatDateSeparator(msg.created_at, locale)}
                           </span>
                         </div>
                       )}
                       {msg.replied_to && (
                         <div className={`mb-2 ${isMe ? "mr-12" : "ml-12"}`}>
                           <div className="border-l-4 border-slate-300 bg-slate-50 rounded-r px-3 py-2">
-                            <p className="text-[10px] font-bold text-slate-500">{msg.replied_to.profiles?.prenom || "Étudiant"}</p>
+                            <p className="text-[10px] font-bold text-slate-500">{msg.replied_to.profiles?.prenom || (en ? "Student" : "Étudiant")}</p>
                             <p className="text-sm text-slate-600 line-clamp-2">{msg.replied_to.message}</p>
                           </div>
                         </div>
                       )}
                       <div className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}>
                         <div className={`flex items-center gap-2 mb-1 ${isMe ? "mr-2" : "ml-12"}`}>
-                          <span className="text-[10px] font-bold text-slate-400">{isMe ? "Vous" : msg.profiles?.prenom || "Étudiant"}</span>
+                          <span className="text-[10px] font-bold text-slate-400">{isMe ? (en ? "You" : "Vous") : msg.profiles?.prenom || (en ? "Student" : "Étudiant")}</span>
                           {isCoach && !isMe && (
                             <span className="text-[8px] px-2 py-0.5 rounded-md uppercase font-bold tracking-wider" style={{ backgroundColor: BRAND.blue, color: BRAND.orange }}>
-                              Équipe centre
+                              {en ? "Center team" : "Équipe centre"}
                             </span>
                           )}
                           {!isCoach && isRoomMod && !isMe && (
                             <span className="inline-flex items-center gap-1 text-[8px] px-2 py-0.5 bg-orange-100 text-orange-700 rounded-md uppercase font-black tracking-widest">
-                              <ShieldCheck size={9} /> Admin salle
+                              <ShieldCheck size={9} /> {en ? "Room admin" : "Admin salle"}
                             </span>
                           )}
                           {isPinned && (
                             <span className="inline-flex items-center gap-1 text-[8px] px-2 py-0.5 bg-orange-100 text-orange-700 rounded-md uppercase font-black tracking-widest">
-                              <Pin size={9} /> Épinglé
+                              <Pin size={9} /> {en ? "Pinned" : "Épinglé"}
                             </span>
                           )}
                         </div>
@@ -887,25 +892,25 @@ function CommunauteContent() {
                                       {canAct && (
                                         <>
                                           <button onMouseDown={(e) => { e.stopPropagation(); startEdit(msg); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
-                                            <Pencil size={15} className="text-slate-400 shrink-0" /> Modifier
+                                            <Pencil size={15} className="text-slate-400 shrink-0" /> {en ? "Edit" : "Modifier"}
                                           </button>
                                           <div className="h-px bg-slate-100 mx-3" />
                                         </>
                                       )}
                                       {canPin && (
                                         <button onMouseDown={(e) => { e.stopPropagation(); setOpenMenuId(null); setPinSubMenuMsgId(msg.id); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
-                                          <Pin size={15} className="text-orange-500 shrink-0" /> {isPinned ? "Désépingler" : "Épingler"}
+                                          <Pin size={15} className="text-orange-500 shrink-0" /> {isPinned ? (en ? "Unpin" : "Désépingler") : (en ? "Pin" : "Épingler")}
                                         </button>
                                       )}
                                       {canPin && <div className="h-px bg-slate-100 mx-3" />}
                                       <button onMouseDown={(e) => { e.stopPropagation(); setRepliedToMessage(msg); setOpenMenuId(null); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
-                                        <MessageCircle size={15} className="text-slate-400 shrink-0" /> Répondre
+                                        <MessageCircle size={15} className="text-slate-400 shrink-0" /> {en ? "Reply" : "Répondre"}
                                       </button>
                                       {canDelete && (
                                         <>
                                           <div className="h-px bg-slate-100 mx-3" />
                                           <button onMouseDown={(e) => { e.stopPropagation(); deleteMessage(msg.id); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-red-500 hover:bg-red-50 text-left">
-                                            <Trash2 size={15} className="shrink-0" /> Supprimer
+                                            <Trash2 size={15} className="shrink-0" /> {en ? "Delete" : "Supprimer"}
                                           </button>
                                         </>
                                       )}
@@ -918,16 +923,16 @@ function CommunauteContent() {
                                       style={{ boxShadow: "0 10px 40px rgba(0,0,0,0.15)", maxHeight: "400px" }}
                                     >
                                       <button onMouseDown={(e) => { e.stopPropagation(); setPinSubMenuMsgId(null); setOpenMenuId(msg.id); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
-                                        <X size={15} className="text-slate-400 shrink-0" /> Retour
+                                        <X size={15} className="text-slate-400 shrink-0" /> {en ? "Back" : "Retour"}
                                       </button>
                                       <div className="h-px bg-slate-100 mx-3" />
                                       {isPinned ? (
                                         <button onMouseDown={(e) => { e.stopPropagation(); updateMessagePin(msg, null); setPinSubMenuMsgId(null); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-red-500 hover:bg-red-50 text-left">
-                                          <Pin size={15} className="shrink-0" /> Désépingler
+                                          <Pin size={15} className="shrink-0" /> {en ? "Unpin" : "Désépingler"}
                                         </button>
                                       ) : PIN_DURATIONS.slice(1).map((d) => (
                                         <button key={d.days} onMouseDown={(e) => { e.stopPropagation(); updateMessagePin(msg, d.days); setPinSubMenuMsgId(null); }} className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50 text-left">
-                                          <Pin size={15} className="text-orange-500 shrink-0" /> Épingler {d.label}
+                                          <Pin size={15} className="text-orange-500 shrink-0" /> {en ? `Pin for ${d.days} days` : `Épingler ${d.label}`}
                                         </button>
                                       ))}
                                     </div>
@@ -936,8 +941,8 @@ function CommunauteContent() {
                               )}
                             </div>
                             <div className={`flex items-center gap-1 ${isMe ? "mr-1" : "ml-1"}`}>
-                              {msg.edited && <span className="text-[9px] text-slate-400 italic">modifié ·</span>}
-                              <span className="text-[10px] font-semibold text-slate-400">{formatTime(msg.created_at)}</span>
+                              {msg.edited && <span className="text-[9px] text-slate-400 italic">{en ? "edited" : "modifié"} ·</span>}
+                              <span className="text-[10px] font-semibold text-slate-400">{formatTime(msg.created_at, locale)}</span>
                             </div>
                           </div>
                         </div>
@@ -956,7 +961,7 @@ function CommunauteContent() {
                 <div className="flex items-center justify-between bg-orange-50 border-l-4 border-orange-400 rounded-r-2xl pl-4 pr-3 py-2.5">
                   <div className="flex items-center gap-2">
                     <Pencil size={12} className="text-orange-500 shrink-0" />
-                    <span className="text-xs font-bold text-orange-700">Modification du message</span>
+                    <span className="text-xs font-bold text-orange-700">{en ? "Editing message" : "Modification du message"}</span>
                   </div>
                   <button onClick={cancelEdit} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-orange-100 text-orange-500"><X size={13} /></button>
                 </div>
@@ -964,7 +969,7 @@ function CommunauteContent() {
               {repliedToMessage && (
                 <div className="flex items-start justify-between bg-slate-50 border-l-4 border-slate-400 rounded-r-2xl pl-4 pr-3 py-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-slate-600">Réponse à {repliedToMessage.profiles?.prenom || "Étudiant"}</p>
+                    <p className="text-xs font-bold text-slate-600">{en ? "Reply to" : "Réponse à"} {repliedToMessage.profiles?.prenom || (en ? "Student" : "Étudiant")}</p>
                     <p className="text-sm text-slate-700 line-clamp-2 leading-relaxed mt-1">{repliedToMessage.message}</p>
                   </div>
                   <button onClick={() => setRepliedToMessage(null)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 shrink-0 ml-3"><X size={13} /></button>
@@ -973,14 +978,14 @@ function CommunauteContent() {
               {isReadOnly ? (
                 <div className="flex items-center justify-center gap-3 h-14 bg-slate-100 rounded-full px-6 border-2 border-slate-200">
                   <Lock size={14} className="text-slate-400 shrink-0" />
-                  <p className="text-xs font-bold text-slate-500">Cette salle est réservée aux annonces.</p>
+                  <p className="text-xs font-bold text-slate-500">{en ? "This room is reserved for announcements." : "Cette salle est réservée aux annonces."}</p>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="flex items-end gap-3">
                   <textarea
                     ref={inputRef}
                     rows={1}
-                    placeholder={editingId ? "Modifier votre message..." : `Écrire dans ${activeRoom.name}...`}
+                    placeholder={editingId ? (en ? "Edit your message..." : "Modifier votre message...") : (en ? `Write in ${activeRoom.name}...` : `Écrire dans ${activeRoom.name}...`)}
                     className={`flex-1 border-2 focus:bg-white outline-none rounded-2xl px-5 py-3 text-sm font-medium text-neutral-900 placeholder:text-neutral-400 transition-all resize-none overflow-y-auto ${editingId ? "bg-orange-50 border-orange-300 focus:border-orange-500" : "bg-[#FFFBF7] border-orange-100 focus:border-orange-400"}`}
                     style={{ maxHeight: "200px", minHeight: "44px" }}
                     value={newMessage}

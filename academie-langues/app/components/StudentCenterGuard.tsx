@@ -8,6 +8,7 @@ import {
   resolveCenterGuardStatus,
   type CenterGuardStatus,
 } from "@/app/utils/student-access-cache";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -18,6 +19,8 @@ interface Props {
 }
 
 export default function StudentCenterGuard({ children, overlayMode = false }: Props) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const [status, setStatus] = useState<CenterGuardStatus>("none");
   const [centerName, setCenterName] = useState<string | null>(null);
   const [daysLeft, setDaysLeft] = useState<number | null>(null);
@@ -72,11 +75,16 @@ export default function StudentCenterGuard({ children, overlayMode = false }: Pr
         <div className="w-20 h-20 rounded-3xl mx-auto mb-6 flex items-center justify-center bg-red-50">
           <Ban size={32} className="text-red-500" />
         </div>
-        <h1 className="text-2xl font-black mb-3 text-red-600">Accès temporairement indisponible</h1>
+        <h1 className="text-2xl font-black mb-3 text-red-600">{en ? "Access temporarily unavailable" : "Accès temporairement indisponible"}</h1>
         <p className="text-sm text-neutral-500 font-medium leading-relaxed mb-6">
-          L&apos;espace de {centerName ? <strong>{centerName}</strong> : "votre centre"} est actuellement
-          indisponible (validation en attente ou suspension). Contactez votre centre ou l&apos;équipe NEXA pour
-          plus d&apos;informations.
+          {en ? <>
+            The space for {centerName ? <strong>{centerName}</strong> : "your center"} is currently unavailable
+            (pending approval or suspension). Contact your center or the NEXA team for more information.
+          </> : <>
+            L&apos;espace de {centerName ? <strong>{centerName}</strong> : "votre centre"} est actuellement
+            indisponible (validation en attente ou suspension). Contactez votre centre ou l&apos;équipe NEXA pour
+            plus d&apos;informations.
+          </>}
         </p>
       </div>
     );
@@ -115,12 +123,16 @@ export default function StudentCenterGuard({ children, overlayMode = false }: Pr
                 <Clock size={28} style={{ color: ORANGE }} />
               </div>
               <h2 className="text-lg font-black mb-2" style={{ color: BLUE }}>
-                Validation en attente
+                {en ? "Approval pending" : "Validation en attente"}
               </h2>
               <p className="text-sm text-neutral-500 font-medium leading-relaxed">
                 {centerName
-                  ? <>Votre accès à ce module sera activé dès que <strong>{centerName}</strong> valide votre inscription.</>
-                  : "Votre accès sera activé dès que votre centre valide votre inscription."}
+                  ? en
+                    ? <>Your access to this module will be activated as soon as <strong>{centerName}</strong> approves your registration.</>
+                    : <>Votre accès à ce module sera activé dès que <strong>{centerName}</strong> valide votre inscription.</>
+                  : en
+                    ? "Your access will be activated as soon as your center approves your registration."
+                    : "Votre accès sera activé dès que votre centre valide votre inscription."}
               </p>
             </div>
           </div>
@@ -138,12 +150,16 @@ export default function StudentCenterGuard({ children, overlayMode = false }: Pr
             <Clock size={32} style={{ color: ORANGE }} />
           </div>
           <h1 className="text-2xl font-black mb-3" style={{ color: BLUE }}>
-            Validation en attente
+            {en ? "Approval pending" : "Validation en attente"}
           </h1>
           <p className="text-sm text-neutral-500 font-medium leading-relaxed">
             {centerName
-              ? <>Votre inscription est en cours de validation par <strong>{centerName}</strong>.</>
-              : "Votre inscription est en cours de validation par votre centre."}
+              ? en
+                ? <>Your registration is being reviewed by <strong>{centerName}</strong>.</>
+                : <>Votre inscription est en cours de validation par <strong>{centerName}</strong>.</>
+              : en
+                ? "Your registration is being reviewed by your center."
+                : "Votre inscription est en cours de validation par votre centre."}
           </p>
         </div>
       </div>
@@ -163,11 +179,17 @@ export default function StudentCenterGuard({ children, overlayMode = false }: Pr
           <div className="w-20 h-20 rounded-3xl mx-auto mb-6 flex items-center justify-center bg-red-50">
             <Ban size={32} className="text-red-500" />
           </div>
-          <h1 className="text-2xl font-black mb-3 text-red-600">Accès révoqué</h1>
+          <h1 className="text-2xl font-black mb-3 text-red-600">{en ? "Access revoked" : "Accès révoqué"}</h1>
           <p className="text-sm text-neutral-500 font-medium leading-relaxed mb-6">
-            Votre accès à cette plateforme a été révoqué
-            {centerName ? <> par <strong>{centerName}</strong></> : ""}.
-            {" "}Contactez votre centre pour régulariser votre situation.
+            {en ? <>
+              Your access to this platform has been revoked
+              {centerName ? <> by <strong>{centerName}</strong></> : ""}.
+              {" "}Contact your center to resolve the situation.
+            </> : <>
+              Votre accès à cette plateforme a été révoqué
+              {centerName ? <> par <strong>{centerName}</strong></> : ""}.
+              {" "}Contactez votre centre pour régulariser votre situation.
+            </>}
           </p>
         </div>
       </div>
@@ -184,16 +206,24 @@ export default function StudentCenterGuard({ children, overlayMode = false }: Pr
           >
             <Shield size={32} style={{ color: ORANGE }} />
           </div>
-          <h1 className="text-2xl font-black mb-3" style={{ color: BLUE }}>Accès expiré</h1>
+          <h1 className="text-2xl font-black mb-3" style={{ color: BLUE }}>{en ? "Access expired" : "Accès expiré"}</h1>
           <p className="text-sm text-neutral-500 font-medium leading-relaxed mb-6">
-            Votre période d&apos;accès est terminée
-            {centerName ? <> à <strong>{centerName}</strong></> : ""}.
-            {" "}Contactez votre centre pour renouveler votre inscription.
+            {en ? <>
+              Your access period has ended
+              {centerName ? <> at <strong>{centerName}</strong></> : ""}.
+              {" "}Contact your center to renew your registration.
+            </> : <>
+              Votre période d&apos;accès est terminée
+              {centerName ? <> à <strong>{centerName}</strong></> : ""}.
+              {" "}Contactez votre centre pour renouveler votre inscription.
+            </>}
           </p>
           {daysLeft !== null && daysLeft > 0 && (
             <div className="bg-green-50 border border-green-100 rounded-2xl p-3 text-center">
               <p className="text-xs font-bold text-green-700">
-                {daysLeft} jour{daysLeft > 1 ? "s" : ""} restant{daysLeft > 1 ? "s" : ""}
+                {en
+                  ? `${daysLeft} day${daysLeft > 1 ? "s" : ""} remaining`
+                  : `${daysLeft} jour${daysLeft > 1 ? "s" : ""} restant${daysLeft > 1 ? "s" : ""}`}
               </p>
             </div>
           )}

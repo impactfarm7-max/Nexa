@@ -4,10 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Star, X, Send, CheckCircle } from "lucide-react";
 import { supabase } from "../utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const FEEDBACK_INTERVAL_DAYS = 10;
 
 export default function FeedbackPopup() {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const [visible, setVisible] = useState(false);
   const [rating, setRating] = useState(0);
   const [hovered, setHovered] = useState(0);
@@ -130,9 +133,9 @@ export default function FeedbackPopup() {
                       <div className="w-12 h-12 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
                         <Star size={22} className="text-orange-500 fill-orange-500" />
                       </div>
-                      <h3 className="text-lg font-black text-slate-900">Votre avis compte !</h3>
+                      <h3 className="text-lg font-black text-slate-900">{en ? "Your feedback matters!" : "Votre avis compte !"}</h3>
                       <p className="text-xs text-slate-500 font-medium mt-1">
-                        Comment évaluez-vous votre expérience sur NEXA ?
+                        {en ? "How would you rate your experience on NEXA?" : "Comment évaluez-vous votre expérience sur NEXA ?"}
                       </p>
                     </div>
 
@@ -162,7 +165,9 @@ export default function FeedbackPopup() {
                     <div className="h-5 mb-3 text-center">
                       {(hovered || rating) > 0 && (
                         <p className="text-xs font-bold text-orange-500">
-                          {["", "Très mauvais 😞", "Mauvais 😕", "Correct 😐", "Bien 😊", "Excellent ! 🔥"][hovered || rating]}
+                          {(en
+                            ? ["", "Very poor 😞", "Poor 😕", "Average 😐", "Good 😊", "Excellent! 🔥"]
+                            : ["", "Très mauvais 😞", "Mauvais 😕", "Correct 😐", "Bien 😊", "Excellent ! 🔥"])[hovered || rating]}
                         </p>
                       )}
                     </div>
@@ -171,7 +176,7 @@ export default function FeedbackPopup() {
                     <textarea
                       value={comment}
                       onChange={(e) => setComment(e.target.value)}
-                      placeholder="Partagez votre expérience (optionnel)..."
+                      placeholder={en ? "Share your experience (optional)..." : "Partagez votre expérience (optionnel)..."}
                       rows={3}
                       className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-orange-400 resize-none transition-colors font-medium mb-4"
                     />
@@ -183,9 +188,9 @@ export default function FeedbackPopup() {
                       className="w-full h-12 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 mb-3"
                     >
                       {loading ? (
-                        <span className="animate-pulse">Envoi en cours...</span>
+                        <span className="animate-pulse">{en ? "Sending..." : "Envoi en cours..."}</span>
                       ) : (
-                        <><Send size={15} /> Envoyer mon avis</>
+                        <><Send size={15} /> {en ? "Send my feedback" : "Envoyer mon avis"}</>
                       )}
                     </button>
 
@@ -194,7 +199,7 @@ export default function FeedbackPopup() {
                       onClick={handleClose}
                       className="w-full text-[11px] text-slate-400 font-medium hover:text-slate-600 transition-colors"
                     >
-                      Me le rappeler demain
+                      {en ? "Remind me tomorrow" : "Me le rappeler demain"}
                     </button>
                   </motion.div>
                 ) : (
@@ -207,9 +212,9 @@ export default function FeedbackPopup() {
                     <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
                       <CheckCircle size={32} className="text-emerald-500" />
                     </div>
-                    <h3 className="text-lg font-black text-slate-900">Merci Beaucoup !</h3>
+                    <h3 className="text-lg font-black text-slate-900">{en ? "Thank you very much!" : "Merci Beaucoup !"}</h3>
                     <p className="text-sm text-slate-500 font-medium">
-                      Votre avis nous aide à améliorer NEXA pour tous les apprenants. 🙏
+                      {en ? "Your feedback helps us improve NEXA for every learner. 🙏" : "Votre avis nous aide à améliorer NEXA pour tous les apprenants. 🙏"}
                     </p>
                     <div className="flex justify-center gap-1 mt-2">
                       {[1, 2, 3, 4, 5].map((star) => (

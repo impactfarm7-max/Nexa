@@ -55,18 +55,18 @@ const TEMPLATE_META: Record<TemplateKey, {
   defaults: TemplateConfig;
 }> = {
   trimestrial: {
-    label: "Trimestriel (Séquences)",
-    description: "Trimestres avec séquences — configurez le nombre avant de créer.",
+    label: "",
+    description: "",
     defaults: { groups: 3, childrenPerGroup: 2, includeRattrapage: false, evalCount: 2, coefficient: 1 },
   },
   semestrial: {
-    label: "Semestriel",
-    description: "Semestres avec sessions — idéal pour le système universitaire.",
+    label: "",
+    description: "",
     defaults: { groups: 2, childrenPerGroup: 1, includeRattrapage: true, evalCount: 2, coefficient: 1 },
   },
   simple: {
-    label: "Simple (évaluations libres)",
-    description: "Pas de groupement — idéal pour les formations courtes.",
+    label: "",
+    description: "",
     defaults: { groups: 0, childrenPerGroup: 0, includeRattrapage: false, evalCount: 2, coefficient: 1 },
   },
 };

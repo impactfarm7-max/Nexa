@@ -16,7 +16,7 @@ export default function ReportBreakdownTable({
   title,
   columns,
   rows,
-  emptyLabel = "Aucune donnée pour cette période.",
+  emptyLabel = "No data for this period.",
 }: Props) {
   return (
     <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden">
@@ -75,7 +75,7 @@ export default function ReportBreakdownTable({
       </div>
       {rows.length > 100 && (
         <p className="px-4 py-2.5 text-[10px] text-neutral-400 border-t border-neutral-100 bg-neutral-50/50">
-          Affichage limité à 100 lignes — exportez le CSV pour la liste complète.
+          Display limited to 100 rows — export the CSV for the full list.
         </p>
       )}
     </div>

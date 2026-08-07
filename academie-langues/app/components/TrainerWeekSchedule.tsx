@@ -12,10 +12,14 @@ import {
   Ban,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
-const DAYS = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+const DAYS = {
+  fr: ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"],
+  en: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+};
 
 type WeekSlot = {
   slot_id: string;
@@ -44,6 +48,8 @@ function formatTime(t: string) {
 }
 
 export default function TrainerWeekSchedule() {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const [centerId, setCenterId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
@@ -92,13 +98,13 @@ export default function TrainerWeekSchedule() {
     });
     if (rpcErr) {
       console.error("[TrainerWeekSchedule]", rpcErr);
-      setError("Planning indisponible pour le moment.");
+      setError(en ? "Schedule is currently unavailable." : "Planning indisponible pour le moment.");
       setWeekSlots([]);
     } else {
       setWeekSlots((data as WeekSlot[]) || []);
     }
     setWeekLoading(false);
-  }, [centerId, userId, weekStart]);
+  }, [centerId, userId, weekStart, en]);
 
   useEffect(() => {
     if (centerId && userId) void loadWeek();
@@ -121,7 +127,7 @@ export default function TrainerWeekSchedule() {
   if (loading) {
     return (
       <div className="rounded-2xl border border-black/[0.06] bg-white p-5 text-sm text-neutral-400">
-        Chargement du planning…
+        {en ? "Loading schedule…" : "Chargement du planning…"}
       </div>
     );
   }
@@ -132,9 +138,11 @@ export default function TrainerWeekSchedule() {
         <div className="flex items-center gap-2 min-w-0">
           <Calendar size={16} style={{ color: ORANGE }} />
           <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Mon planning</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{en ? "My schedule" : "Mon planning"}</p>
             <p className="text-sm font-extrabold truncate" style={{ color: BLUE }}>
-              {activeCount} session{activeCount !== 1 ? "s" : ""} cette semaine
+              {en
+                ? `${activeCount} session${activeCount !== 1 ? "s" : ""} this week`
+                : `${activeCount} session${activeCount !== 1 ? "s" : ""} cette semaine`}
             </p>
           </div>
         </div>
@@ -144,18 +152,18 @@ export default function TrainerWeekSchedule() {
               type="button"
               onClick={() => navigateWeek("prev")}
               className="p-1.5 rounded-md hover:bg-white text-neutral-500"
-              aria-label="Semaine précédente"
+              aria-label={en ? "Previous week" : "Semaine précédente"}
             >
               <ChevronLeft size={14} />
             </button>
             <span className="text-[10px] font-bold uppercase px-2 tracking-wider text-neutral-600">
-              {weekStart.toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}
+              {weekStart.toLocaleDateString(en ? "en-US" : "fr-FR", { day: "2-digit", month: "short" })}
             </span>
             <button
               type="button"
               onClick={() => navigateWeek("next")}
               className="p-1.5 rounded-md hover:bg-white text-neutral-500"
-              aria-label="Semaine suivante"
+              aria-label={en ? "Next week" : "Semaine suivante"}
             >
               <ChevronRight size={14} />
             </button>
@@ -164,21 +172,21 @@ export default function TrainerWeekSchedule() {
             href="/centre/mon-planning"
             className="text-[11px] font-bold uppercase tracking-wider text-orange-600 hover:underline"
           >
-            Voir tout
+            {en ? "View all" : "Voir tout"}
           </Link>
         </div>
       </div>
 
       <div className="p-3 max-h-[320px] overflow-y-auto">
         {weekLoading ? (
-          <p className="text-sm text-neutral-400 text-center py-8">Chargement…</p>
+          <p className="text-sm text-neutral-400 text-center py-8">{en ? "Loading…" : "Chargement…"}</p>
         ) : error ? (
           <p className="text-sm text-amber-700 text-center py-8">{error}</p>
         ) : weekSlots.length === 0 ? (
-          <p className="text-sm text-neutral-400 text-center py-8">Aucun cours cette semaine.</p>
+          <p className="text-sm text-neutral-400 text-center py-8">{en ? "No classes this week." : "Aucun cours cette semaine."}</p>
         ) : (
           <div className="space-y-3">
-            {DAYS.map((dayLabel, idx) => {
+            {DAYS[locale].map((dayLabel, idx) => {
               const dayNum = idx + 1;
               const daySlots = (slotsByDay[dayNum] || [])
                 .slice()
@@ -208,7 +216,7 @@ export default function TrainerWeekSchedule() {
                             </span>
                             {cancelled ? (
                               <span className="text-[10px] font-bold text-red-600 inline-flex items-center gap-0.5">
-                                <Ban size={10} /> Annulé
+                                <Ban size={10} /> {en ? "Cancelled" : "Annulé"}
                               </span>
                             ) : null}
                           </div>

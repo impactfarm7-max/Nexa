@@ -280,7 +280,7 @@ export default function EntrepriseSettingsPage() {
   ) => {
     setBusy(true);
     const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
-    if (error) { alert("Erreur lors de l'envoi : " + error.message); setBusy(false); return; }
+    if (error) { alert(t("centre", "companyUploadError", { message: error.message })); setBusy(false); return; }
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
     setUrl(data.publicUrl + "?t=" + Date.now());
     setBusy(false);
@@ -307,14 +307,14 @@ export default function EntrepriseSettingsPage() {
     }
 
     const { error } = await supabase.storage.from("center-documents").upload(path, file, { upsert: true });
-    if (error) { alert("Erreur lors de l'envoi : " + error.message); setUploadingAgrement(false); return; }
+    if (error) { alert(t("centre", "companyUploadError", { message: error.message })); setUploadingAgrement(false); return; }
     const { data } = supabase.storage.from("center-documents").getPublicUrl(path);
     // Persiste immediatement : sinon la valeur ne vit qu'en memoire locale et
     // disparait si l'utilisateur actualise avant de cliquer "Enregistrer".
     const { error: saveError } = await supabase
       .from("center_branding")
       .upsert({ center_id: centerId, agrement_file_url: data.publicUrl });
-    if (saveError) { alert("Document televerse mais non enregistre : " + saveError.message); setUploadingAgrement(false); return; }
+    if (saveError) { alert(t("centre", "companyUploadSaveError", { message: saveError.message })); setUploadingAgrement(false); return; }
     setAgrementFileUrl(data.publicUrl);
     setUploadingAgrement(false);
   };
@@ -324,7 +324,7 @@ export default function EntrepriseSettingsPage() {
     const { error } = await supabase
       .from("center_branding")
       .upsert({ center_id: centerId, agrement_file_url: null });
-    if (error) { alert("Erreur lors de la suppression : " + error.message); return; }
+    if (error) { alert(t("centre", "companyDeleteError", { message: error.message })); return; }
     setAgrementFileUrl(null);
   };
 
@@ -334,9 +334,9 @@ export default function EntrepriseSettingsPage() {
     if (!centerId) return;
     const { data: files, error: listError } = await supabase.storage.from("center-documents").list(centerId);
     const file = files?.find((f) => f.name.startsWith("agrement."));
-    if (listError || !file) { alert("Document introuvable."); return; }
+    if (listError || !file) { alert(t("centre", "companyDocumentNotFound")); return; }
     const { data, error } = await supabase.storage.from("center-documents").download(`${centerId}/${file.name}`);
-    if (error || !data) { alert("Impossible d'ouvrir le document."); return; }
+    if (error || !data) { alert(t("centre", "companyOpenDocumentError")); return; }
     const url = URL.createObjectURL(data);
     window.open(url, "_blank", "noopener,noreferrer");
     setTimeout(() => URL.revokeObjectURL(url), 60000);
@@ -367,7 +367,7 @@ export default function EntrepriseSettingsPage() {
     if (!centerId) return;
     const path = `${centerId}/signatures/${sigId}.${extOf(file)}`;
     const { error } = await supabase.storage.from("center-logos").upload(path, file, { upsert: true });
-    if (error) { alert("Erreur signature : " + error.message); return; }
+    if (error) { alert(t("centre", "companySignatureError", { message: error.message })); return; }
     const { data } = supabase.storage.from("center-logos").getPublicUrl(path);
     updateSignataire(sigId, { signature_url: data.publicUrl + "?t=" + Date.now() });
   };
@@ -385,7 +385,7 @@ export default function EntrepriseSettingsPage() {
     };
     if (nextErrors.displayName || nextErrors.raisonSociale) {
       setErrors(nextErrors);
-      alert("Merci de renseigner au moins le nom affiché et la raison sociale.");
+      alert(t("centre", "companyMissingRequiredFields"));
       return;
     }
     setErrors({});
@@ -395,7 +395,7 @@ export default function EntrepriseSettingsPage() {
 
     const { error: e1 } = await supabase
       .from("centers").update({ name: displayName.trim() }).eq("id", centerId);
-    if (e1) { alert("Erreur (nom affiché) : " + e1.message); setSaving(false); return; }
+    if (e1) { alert(t("centre", "companyDisplayNameError", { message: e1.message })); setSaving(false); return; }
 
     const { error: e2 } = await supabase.from("center_branding").upsert({
       center_id: centerId,
@@ -421,7 +421,7 @@ export default function EntrepriseSettingsPage() {
       date_format: dateFormat || null,
       stamp_url: stampUrl,
     });
-    if (e2) { alert("Erreur (branding) : " + e2.message); setSaving(false); return; }
+    if (e2) { alert(t("centre", "companyBrandingError", { message: e2.message })); setSaving(false); return; }
 
     const rows = signataires
       .filter((s) => s.name.trim())
@@ -431,11 +431,11 @@ export default function EntrepriseSettingsPage() {
       }));
     if (rows.length) {
       const { error: e3 } = await supabase.from("bulletin_signatures").upsert(rows);
-      if (e3) { alert("Erreur (signataires) : " + e3.message); setSaving(false); return; }
+      if (e3) { alert(t("centre", "companySignatoriesError", { message: e3.message })); setSaving(false); return; }
     }
     if (removedSigIds.length) {
       const { error: e4 } = await supabase.from("bulletin_signatures").delete().in("id", removedSigIds);
-      if (e4) { alert("Erreur (suppression signataire) : " + e4.message); setSaving(false); return; }
+      if (e4) { alert(t("centre", "companyRemoveSignatoryError", { message: e4.message })); setSaving(false); return; }
       setRemovedSigIds([]);
     }
 
@@ -470,19 +470,19 @@ export default function EntrepriseSettingsPage() {
         <div className="flex flex-wrap items-end gap-6 sm:gap-8">
           <LogoUpload label={t("centre", "documentsLogo")} url={logoUrl} busy={uploadingLogo} accent={BLUE}
             accept="image/png,image/jpeg" onPick={uploadLogo} fit="cover" disabled={isLocked} />
-          <LogoUpload label="Favicon" url={faviconUrl} busy={uploadingFavicon} accent={ORANGE}
+          <LogoUpload label={t("centre", "companyFavicon")} url={faviconUrl} busy={uploadingFavicon} accent={ORANGE}
             accept="image/png,image/x-icon,image/svg+xml" onPick={uploadFavicon} fit="contain" disabled={isLocked} />
         </div>
 
         <div className="grid sm:grid-cols-2 gap-4">
           <Field label={t("centre", "companyDisplayName")} value={displayName} required error={errors.displayName} errorMessage={t("centre", "companyRequiredField")} disabled={isLocked}
             onChange={(v) => { setDisplayName(v); errors.displayName && setErrors((e) => ({ ...e, displayName: false })); }}
-            placeholder="Ex: CSIC" />
-          <Field label={t("centre", "companyShortName")} hint="SMS & mobile" value={shortName} onChange={setShortName} placeholder="Ex: CSIC" disabled={isLocked} />
+            placeholder={t("centre", "companyDisplayNamePlaceholder")} />
+          <Field label={t("centre", "companyShortName")} hint="SMS & mobile" value={shortName} onChange={setShortName} placeholder={t("centre", "companyShortNamePlaceholder")} disabled={isLocked} />
         </div>
         <Field label={t("centre", "companyLegalName")} value={raisonSociale} required error={errors.raisonSociale} errorMessage={t("centre", "companyRequiredField")} disabled={isLocked}
           onChange={(v) => { setRaisonSociale(v); errors.raisonSociale && setErrors((e) => ({ ...e, raisonSociale: false })); }}
-          placeholder="Ex: Complexe Scolaire International Les Champions" />
+          placeholder={t("centre", "companyLegalNamePlaceholder")} />
         <Field label={t("centre", "companySlogan")} value={slogan} onChange={setSlogan} placeholder={t("centre", "companySloganPlaceholder")} disabled={isLocked} />
 
         <div className="grid sm:grid-cols-2 gap-4">
@@ -535,8 +535,8 @@ export default function EntrepriseSettingsPage() {
           placeholder={t("centre", "companyMinistryIdPlaceholder")} disabled={isLocked} />
 
         <div className="grid sm:grid-cols-2 gap-4">
-          <Field label="N° RCCM" hint="Registre du Commerce" value={rccm} onChange={setRccm} disabled={isLocked} />
-          <Field label="NIU" hint="N° contribuable" value={niu} onChange={setNiu} disabled={isLocked} />
+          <Field label={t("centre", "companyRccm")} hint={t("centre", "companyRccmHint")} value={rccm} onChange={setRccm} disabled={isLocked} />
+          <Field label={t("centre", "companyNiu")} hint={t("centre", "companyNiuHint")} value={niu} onChange={setNiu} disabled={isLocked} />
         </div>
         <SelectField label={t("centre", "companyTaxRegime")} value={taxRegime} onChange={setTaxRegime} options={taxRegimeOptions} disabled={isLocked} />
       </Section>
@@ -562,7 +562,7 @@ export default function EntrepriseSettingsPage() {
               <span className="flex items-center gap-1.5 px-3 bg-neutral-50 border-r border-neutral-200 text-sm font-bold text-neutral-600 shrink-0">
                 {countryOf(country)?.flag} {dialOf(country)}
               </span>
-              <input value={phoneLocal} onChange={(e) => setPhoneLocal(e.target.value)} placeholder="6 XX XX XX XX"
+              <input value={phoneLocal} onChange={(e) => setPhoneLocal(e.target.value)} placeholder={t("centre", "companyPhonePlaceholder")}
                 disabled={isLocked}
                 className="flex-1 h-11 px-3 text-sm font-medium outline-none bg-transparent disabled:text-neutral-500 disabled:cursor-default" />
             </div>
@@ -570,7 +570,7 @@ export default function EntrepriseSettingsPage() {
         </div>
 
         <Field label={t("centre", "companyHeadOfficeAddress")} value={siegeAddress} onChange={setSiegeAddress} placeholder={t("centre", "companyAddressPlaceholder")} disabled={isLocked} />
-        <Field label={t("centre", "companyInstitutionalEmail")} type="email" value={institutionalEmail} onChange={setInstitutionalEmail} placeholder="info@ecole.cm" disabled={isLocked} />
+        <Field label={t("centre", "companyInstitutionalEmail")} type="email" value={institutionalEmail} onChange={setInstitutionalEmail} placeholder={t("centre", "companyInstitutionalEmailPlaceholder")} disabled={isLocked} />
 
         <div className="grid sm:grid-cols-2 gap-4">
           <SelectField label={t("centre", "companyDefaultCurrency")} value={currency} onChange={setCurrency} options={currencyOptions} disabled={isLocked} />
@@ -621,7 +621,7 @@ export default function EntrepriseSettingsPage() {
               <div className="flex items-center gap-3 sm:pl-9">
                 {s.signature_url ? (
                   <div className="flex items-center gap-2">
-                    <img src={s.signature_url} alt="signature" className="h-10 object-contain border rounded bg-white px-2" />
+                    <img src={s.signature_url} alt={t("centre", "companySignatureImageAlt")} className="h-10 object-contain border rounded bg-white px-2" />
                     {!isLocked && <button onClick={() => updateSignataire(s.id, { signature_url: null })} className="p-1 text-neutral-400 hover:text-red-500"><X size={13} /></button>}
                   </div>
                 ) : !isLocked ? (
@@ -645,7 +645,7 @@ export default function EntrepriseSettingsPage() {
           <FieldLabel label={t("centre", "companyOfficialStamp")} />
           {stampUrl ? (
             <div className="flex items-center gap-2">
-              <img src={stampUrl} alt="cachet" className="h-16 object-contain border rounded-xl bg-white p-2" />
+              <img src={stampUrl} alt={t("centre", "companyStampImageAlt")} className="h-16 object-contain border rounded-xl bg-white p-2" />
               {!isLocked && <button onClick={() => setStampUrl(null)} className="p-1 text-neutral-400 hover:text-red-500"><X size={14} /></button>}
             </div>
           ) : !isLocked ? (

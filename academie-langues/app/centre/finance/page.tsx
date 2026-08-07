@@ -587,7 +587,7 @@ export default function CenterFinancePage() {
       expires_at: couponForm.expires_at ? new Date(couponForm.expires_at).toISOString() : null,
       created_by: session?.user?.id || null,
     });
-    if (error) setCouponError(error.message);
+    if (error) setCouponError(t("centre", "financeCouponCreateError"));
     else { setCouponForm({ code: "", type: "fixed", value: "", max_uses: "", expires_at: "" }); await loadCoupons(); }
     setCouponSaving(false);
   };
@@ -645,7 +645,7 @@ export default function CenterFinancePage() {
       p_notes: payNotes.trim() || null,
     });
 
-    if (error) { setPayError(error.message); }
+    if (error) { setPayError(t("centre", "financePaymentRecordError")); }
     else {
       const paymentId = data as string;
       const { data: paymentRow } = await supabase
@@ -1169,7 +1169,10 @@ export default function CenterFinancePage() {
           {activeTab === "overdue" && (
             <div className="space-y-4">
               <p className="text-sm font-medium" style={{ color: BLUE }}>
-                <span className="font-bold">{fmtFCFA(agingAmounts.current)} F</span> {t("centre", "financeCurrent")}
+                <span className="inline-flex items-center gap-1">
+                  <span className="font-bold">{fmtFCFA(agingAmounts.current)} F</span>
+                  <span>{t("centre", "financeCurrent")}</span>
+                </span>
                 <StatSep />
                 <span className="font-semibold text-amber-700">{fmtFCFA(agingAmounts.d30)} F</span> 30j
                 <StatSep />
@@ -1370,7 +1373,7 @@ export default function CenterFinancePage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div>
                     <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">Code *</label>
-                    <input value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder="RENTRÉE25" className="w-full h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-black outline-none uppercase" />
+                    <input value={couponForm.code} onChange={e => setCouponForm(f => ({ ...f, code: e.target.value.toUpperCase() }))} placeholder={t("centre", "financeCouponCodePlaceholder")} className="w-full h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-black outline-none uppercase" />
                   </div>
                   <div>
                     <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "programType")}</label>
@@ -1381,7 +1384,7 @@ export default function CenterFinancePage() {
                   </div>
                   <div>
                     <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "summaryValue")} *</label>
-                    <input type="number" value={couponForm.value} onChange={e => setCouponForm(f => ({ ...f, value: e.target.value }))} placeholder={couponForm.type === "percentage" ? "Ex: 10" : "Ex: 50000"} className="w-full h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-bold outline-none" />
+                    <input type="number" value={couponForm.value} onChange={e => setCouponForm(f => ({ ...f, value: e.target.value }))} placeholder={`${locale === "en" ? "E.g." : "Ex."} ${couponForm.type === "percentage" ? "10" : "50000"}`} className="w-full h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-bold outline-none" />
                     {couponForm.type === "fixed" && <AmountInWords amount={couponForm.value} />}
                   </div>
                   <div>

@@ -412,7 +412,7 @@ export default function StudentIdentityTab({
         }),
       });
       const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json.error || t("centre", "identityUpdateError"));
+      if (!res.ok) throw new Error(locale === "en" ? t("centre", "identityUpdateError") : (json.error || t("centre", "identityUpdateError")));
       setEditingPlacement(false);
       onEnrollmentUpdated?.();
     } catch (e: unknown) {
@@ -439,6 +439,7 @@ export default function StudentIdentityTab({
         .maybeSingle();
       const signatures = filterSignatures(sigRows || [], config.signatureIds);
       await downloadAttestationReussitePdf({
+        locale,
         studentName: studentName,
         programName: enrollmentInfo?.filiere_name || null,
         niveauLabel: enrollmentInfo?.niveau_annee != null ? `${t("centre", "identityLevel")} ${enrollmentInfo.niveau_annee}` : null,

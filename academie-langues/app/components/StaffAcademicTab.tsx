@@ -5,6 +5,7 @@ import {
   GraduationCap, Loader2, CheckCircle2, Edit3, Save, Layers, ChevronRight, Lock, X, Users, Download,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import {
   TCF_TEACHING_SUBJECTS,
   TCF_SUBJECT_KEYS,
@@ -97,6 +98,16 @@ function niveauFromRow(m: {
   return { key: "tronc", label: "Programme (sans niveau)", niveau_id: m.niveaux?.id || null };
 }
 
+function levelDisplayLabel(label: string, en: boolean) {
+  if (!en) return label;
+  return label
+    .replace(/^Niveau\s+/i, "Level ")
+    .replace(/\s+mois$/i, " months")
+    .replace(/\s+sem\.$/i, " weeks")
+    .replace(/\s+j$/i, " days")
+    .replace(/^Programme \(sans niveau\)$/i, "Program (no level)");
+}
+
 export default function StaffAcademicTab({
   staff,
   centerId,
@@ -110,6 +121,8 @@ export default function StaffAcademicTab({
   tcfSubjects: string[];
   onUpdate?: () => void;
 }) {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const [allMatieresList, setAllMatieresList] = useState<MatiereItem[]>([]);
   const [allClassesList, setAllClassesList] = useState<ClasseItem[]>([]);
   const [savedAssignedIds, setSavedAssignedIds] = useState<string[]>([]);
@@ -171,9 +184,9 @@ export default function StaffAcademicTab({
           const niv = niveauFromRow(m);
           return {
             id: m.id,
-            name: m.exam_disciplines?.name || "Matière sans nom",
+            name: m.exam_disciplines?.name || (en ? "Unnamed subject" : "Matière sans nom"),
             filiere_id: m.filieres?.id || "",
-            filiere_name: m.filieres?.name || "Programme",
+            filiere_name: m.filieres?.name || (en ? "Program" : "Programme"),
             niveau_id: m.niveau_id || niv.niveau_id,
             niveau_key: niv.key,
             niveau_label: niv.label,
@@ -208,7 +221,7 @@ export default function StaffAcademicTab({
             const annee = nivById[g.niveau_id].annee;
             return {
               id: g.id,
-              nom: g.nom || "Classe",
+              nom: g.nom || (en ? "Class" : "Classe"),
               filiere_id,
               niveau_id: g.niveau_id as string,
               niveau_key: `annee:${annee}`,
@@ -217,7 +230,7 @@ export default function StaffAcademicTab({
           }
           return {
             id: g.id,
-            nom: g.nom || "Classe",
+            nom: g.nom || (en ? "Class" : "Classe"),
             filiere_id: g.filiere_id || filiere_id,
             niveau_id: null,
             niveau_key: "tronc",
@@ -249,7 +262,7 @@ export default function StaffAcademicTab({
     } finally {
       setLoading(false);
     }
-  }, [centerId, staff.id, isTCF, initialTcfSubjects]);
+  }, [centerId, staff.id, isTCF, initialTcfSubjects, en]);
 
   useEffect(() => {
     loadAcademicData();
@@ -311,7 +324,7 @@ export default function StaffAcademicTab({
     for (const c of allClassesList.filter((x) => savedGroupeIds.includes(x.id))) {
       let prog = byProg.get(c.filiere_id);
       if (!prog) {
-        const name = programmes.find((p) => p.id === c.filiere_id)?.name || "Programme";
+        const name = programmes.find((p) => p.id === c.filiere_id)?.name || (en ? "Program" : "Programme");
         prog = { name, niveaux: new Map() };
         byProg.set(c.filiere_id, prog);
       }
@@ -331,7 +344,7 @@ export default function StaffAcademicTab({
         .sort((a, b) => a.label.localeCompare(b.label, "fr")),
       count: assigned.filter((m) => m.filiere_id === id).length,
     }));
-  }, [allMatieresList, allClassesList, savedAssignedIds, savedGroupeIds, programmes]);
+  }, [allMatieresList, allClassesList, savedAssignedIds, savedGroupeIds, programmes, en]);
 
   const assignedProgrammeIds = useMemo(
     () => new Set(frozenByProgramme.map((p) => p.id)),
@@ -418,23 +431,24 @@ export default function StaffAcademicTab({
       doc.setTextColor(...blue);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(14);
-      doc.text(`Affectations — ${staff.prenom}`, 14, 18);
+      doc.text(`${en ? "Assignments" : "Affectations"}: ${staff.prenom}`, 14, 18);
       doc.setFont("helvetica", "normal");
       doc.setFontSize(9);
       doc.setTextColor(80, 80, 80);
-      const filtre =
-        filterNiveau === "all" ? "Tous niveaux" : `Niveau: ${filterNiveau}`;
+      const filtre = filterNiveau === "all"
+        ? (en ? "All levels" : "Tous niveaux")
+        : `${en ? "Level" : "Niveau"}: ${levelDisplayLabel(filterNiveau, en)}`;
       doc.text(filtre, 14, 25);
-      doc.text(`Genere le ${new Date().toLocaleString("fr-FR")}`, 14, 31);
+      doc.text(`${en ? "Generated on" : "Généré le"} ${new Date().toLocaleString(en ? "en-GB" : "fr-FR")}`, 14, 31);
       doc.setDrawColor(...blue);
       doc.setLineWidth(0.4);
       doc.line(14, 35, pageWidth - 14, 35);
       autoTable(doc, {
         startY: 40,
-        head: [["Programme", "Niveau", "Matiere assignee", "Classe"]],
+        head: [[en ? "Program" : "Programme", en ? "Level" : "Niveau", en ? "Assigned subject" : "Matière assignée", en ? "Class" : "Classe"]],
         body: displayAffectationRows.map((r) => [
           r.progName,
-          r.niveauLabel,
+          levelDisplayLabel(r.niveauLabel, en),
           r.matieresLabel,
           r.classesLabel,
         ]),
@@ -444,7 +458,7 @@ export default function StaffAcademicTab({
         margin: { left: 14, right: 14 },
       });
       const d = new Date().toISOString().slice(0, 10);
-      doc.save(`affectations-${staff.prenom.toLowerCase()}-${d}.pdf`);
+      doc.save(`${en ? "assignments" : "affectations"}-${staff.prenom.toLowerCase()}-${d}.pdf`);
     } finally {
       setDownloadingAffectations(false);
     }
@@ -543,7 +557,7 @@ export default function StaffAcademicTab({
         const picked = classesOnNiv.filter((c) => draftGroupeIds.includes(c.id));
         if (hasMatiereOnNiv && picked.length === 0) {
           const label = classesOnNiv[0]?.niveau_label || "ce niveau";
-          throw new Error(`Sélectionnez au moins une classe pour ${label}.`);
+          throw new Error(en ? `Select at least one class for ${label}.` : `Sélectionnez au moins une classe pour ${label}.`);
         }
       }
 
@@ -596,7 +610,7 @@ export default function StaffAcademicTab({
             .in("groupe_id", gRemove);
           if (error) {
             if (error.message?.includes("formateur_groupes") || error.code === "42P01") {
-              throw new Error("Table formateur_groupes absente — exécutez supabase-formateur-groupes.sql dans Supabase.");
+              throw new Error(en ? "The trainer_groups table is missing. Run supabase-formateur-groupes.sql in Supabase." : "Table formateur_groupes absente. Exécutez supabase-formateur-groupes.sql dans Supabase.");
             }
             throw error;
           }
@@ -607,7 +621,7 @@ export default function StaffAcademicTab({
           );
           if (error) {
             if (error.message?.includes("formateur_groupes") || error.code === "42P01") {
-              throw new Error("Table formateur_groupes absente — exécutez supabase-formateur-groupes.sql dans Supabase.");
+              throw new Error(en ? "The trainer_groups table is missing. Run supabase-formateur-groupes.sql in Supabase." : "Table formateur_groupes absente. Exécutez supabase-formateur-groupes.sql dans Supabase.");
             }
             throw error;
           }
@@ -625,7 +639,7 @@ export default function StaffAcademicTab({
       closeProgrammeCard();
       onUpdate?.();
     } catch (e: any) {
-      setCardError(e.message || "Enregistrement impossible.");
+      setCardError(e.message || (en ? "Unable to save." : "Enregistrement impossible."));
     } finally {
       setSavingCard(false);
     }
@@ -661,7 +675,7 @@ export default function StaffAcademicTab({
   if (loading) {
     return (
       <div className="p-8 text-neutral-400 text-sm font-medium animate-pulse">
-        Chargement des habilitations…
+        {en ? "Loading assignments..." : "Chargement des habilitations…"}
       </div>
     );
   }
@@ -786,8 +800,8 @@ export default function StaffAcademicTab({
         <>
           <AcademicSection
             icon={Lock}
-            title="Affectations"
-            description={`Ce qui est déjà validé pour ${staff.prenom} — programme, niveau, matières et classes.`}
+            title={en ? "Assignments" : "Affectations"}
+            description={en ? `Approved assignments for ${staff.prenom}: program, level, subjects, and classes.` : `Ce qui est déjà validé pour ${staff.prenom} : programme, niveau, matières et classes.`}
             actions={
               <>
                 {niveauFilterOptions.length > 0 && (
@@ -795,9 +809,9 @@ export default function StaffAcademicTab({
                     value={filterNiveau}
                     onChange={(e) => setFilterNiveau(e.target.value)}
                     className="h-8 px-2.5 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 outline-none"
-                    aria-label="Filtrer par niveau"
+                    aria-label={en ? "Filter by level" : "Filtrer par niveau"}
                   >
-                    <option value="all">Tous les niveaux</option>
+                    <option value="all">{en ? "All levels" : "Tous les niveaux"}</option>
                     {niveauFilterOptions.map((n) => (
                       <option key={n} value={n}>{n}</option>
                     ))}
@@ -810,18 +824,18 @@ export default function StaffAcademicTab({
                   className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 inline-flex items-center gap-1.5 disabled:opacity-40"
                 >
                   {downloadingAffectations ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                  Télécharger
+                  {en ? "Download" : "Télécharger"}
                 </button>
               </>
             }
           >
             {affectationRows.length === 0 ? (
               <p className="text-sm text-neutral-400 font-medium">
-                Aucune affectation pour l&apos;instant. Attribuez un programme ci-dessous.
+                {en ? "No assignment yet. Assign a program below." : "Aucune affectation pour l'instant. Attribuez un programme ci-dessous."}
               </p>
             ) : displayAffectationRows.length === 0 ? (
               <p className="text-sm text-neutral-400 font-medium">
-                Aucune affectation pour ce niveau. Changez le filtre.
+                {en ? "No assignment for this level. Change the filter." : "Aucune affectation pour ce niveau. Changez le filtre."}
               </p>
             ) : (
               <div className="overflow-x-auto rounded-lg border border-black/[0.06] bg-white">
@@ -829,19 +843,19 @@ export default function StaffAcademicTab({
                   <thead>
                     <tr className="border-b border-black/[0.06] bg-black/[0.015]">
                       <th className="px-3.5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-                        Programme
+                        {en ? "Program" : "Programme"}
                       </th>
                       <th className="px-3.5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-                        Niveaux
+                        {en ? "Levels" : "Niveaux"}
                       </th>
                       <th className="px-3.5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-                        Matière assignée
+                        {en ? "Assigned subject" : "Matière assignée"}
                       </th>
                       <th className="px-3.5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-400">
-                        Classe
+                        {en ? "Class" : "Classe"}
                       </th>
                       <th className="px-3.5 py-3 text-[11px] font-bold uppercase tracking-wider text-neutral-400 w-[1%] whitespace-nowrap">
-                        Action
+                        {en ? "Action" : "Action"}
                       </th>
                     </tr>
                   </thead>
@@ -862,7 +876,7 @@ export default function StaffAcademicTab({
                           </td>
                         ) : null}
                         <td className="px-3.5 py-3 text-sm font-medium text-neutral-700 whitespace-nowrap">
-                          {row.niveauLabel}
+                          {levelDisplayLabel(row.niveauLabel, en)}
                         </td>
                         <td className="px-3.5 py-3 text-sm font-medium text-neutral-700 leading-snug">
                           {row.matieresLabel}
@@ -884,7 +898,7 @@ export default function StaffAcademicTab({
                               onClick={() => openProgrammeCard(row.progId)}
                               className="h-8 px-2.5 rounded-lg border border-black/[0.08] text-xs font-semibold text-neutral-600 hover:bg-black/[0.03] inline-flex items-center gap-1 whitespace-nowrap"
                             >
-                              <Edit3 size={12} /> Modifier
+                              <Edit3 size={12} /> {en ? "Edit" : "Modifier"}
                             </button>
                           </td>
                         ) : null}
@@ -898,16 +912,16 @@ export default function StaffAcademicTab({
 
           <AcademicSection
             icon={GraduationCap}
-            title="Attribuer"
-            description="Programmes du centre pas encore affectés à ce formateur."
+            title={en ? "Assign" : "Attribuer"}
+            description={en ? "Center programs not yet assigned to this trainer." : "Programmes du centre pas encore affectés à ce formateur."}
           >
             {programmes.length === 0 ? (
               <p className="text-sm text-neutral-400 font-medium">
-                Aucun programme pédagogique créé dans ce centre.
+                {en ? "No academic program has been created in this center." : "Aucun programme pédagogique créé dans ce centre."}
               </p>
             ) : unassignedProgrammes.length === 0 ? (
               <p className="text-sm text-neutral-500 font-medium">
-                Tous les programmes ont déjà une affectation. Utilisez <span className="font-semibold">Modifier</span> dans le tableau ci-dessus pour ajuster.
+                {en ? <>All programs already have an assignment. Use <span className="font-semibold">Edit</span> in the table above to adjust them.</> : <>Tous les programmes ont déjà une affectation. Utilisez <span className="font-semibold">Modifier</span> dans le tableau ci-dessus pour ajuster.</>}
               </p>
             ) : (
               <div className="overflow-hidden rounded-lg border border-black/[0.06] bg-white divide-y divide-black/[0.04]">
@@ -924,13 +938,13 @@ export default function StaffAcademicTab({
                       <div className="min-w-0">
                         <p className="text-sm font-semibold truncate" style={{ color: BLUE }}>{p.name}</p>
                         <p className="text-xs text-neutral-400 font-medium mt-0.5">
-                          {niveauCount} {niveauCount > 1 ? "niveaux" : "niveau"}
-                          {matiereCount > 0 ? ` · ${matiereCount} matière${matiereCount > 1 ? "s" : ""} disponibles` : ""}
-                          {" · non affecté"}
+                          {niveauCount} {en ? `level${niveauCount > 1 ? "s" : ""}` : niveauCount > 1 ? "niveaux" : "niveau"}
+                          {matiereCount > 0 ? ` · ${matiereCount} ${en ? `subject${matiereCount > 1 ? "s" : ""} available` : `matière${matiereCount > 1 ? "s" : ""} disponibles`}` : ""}
+                          {en ? " · not assigned" : " · non affecté"}
                         </p>
                       </div>
                       <span className="flex items-center gap-1 text-xs font-semibold shrink-0" style={{ color: ORANGE }}>
-                        Attribuer <ChevronRight size={14} />
+                        {en ? "Assign" : "Attribuer"} <ChevronRight size={14} />
                       </span>
                     </button>
                   );
@@ -945,7 +959,7 @@ export default function StaffAcademicTab({
         <AcademicSection
           icon={Layers}
           title={activeProg.name}
-          description="1. Niveaux · 2. Matières · 3. Classes · 4. Valider"
+          description={en ? "1. Levels · 2. Subjects · 3. Classes · 4. Confirm" : "1. Niveaux · 2. Matières · 3. Classes · 4. Valider"}
           actions={
             <button
               type="button"
@@ -953,16 +967,16 @@ export default function StaffAcademicTab({
               disabled={savingCard}
               className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 inline-flex items-center gap-1.5 disabled:opacity-50"
             >
-              <X size={13} /> Fermer
+              <X size={13} /> {en ? "Close" : "Fermer"}
             </button>
           }
         >
           <div className="space-y-5">
             <div>
               <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">1. Niveaux</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{en ? "1. Levels" : "1. Niveaux"}</p>
                 <p className="text-xs text-neutral-400 font-medium">
-                  {selectedNiveaux.length} sélectionné{selectedNiveaux.length > 1 ? "s" : ""}
+                  {selectedNiveaux.length} {en ? "selected" : `sélectionné${selectedNiveaux.length > 1 ? "s" : ""}`}
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
@@ -978,7 +992,7 @@ export default function StaffAcademicTab({
                       }`}
                       style={on ? { backgroundColor: BLUE } : undefined}
                     >
-                      {n.label}
+                      {levelDisplayLabel(n.label, en)}
                       <span className="opacity-70 ml-1">({n.count})</span>
                     </button>
                   );
@@ -988,7 +1002,7 @@ export default function StaffAcademicTab({
 
             <div>
               <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">2. Matières</p>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{en ? "2. Subjects" : "2. Matières"}</p>
                 {selectedNiveaux.length > 0 && visibleMatieres.length > 0 && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-neutral-400 font-medium">
@@ -1000,18 +1014,18 @@ export default function StaffAcademicTab({
                       className="text-xs font-semibold"
                       style={{ color: ORANGE }}
                     >
-                      {allVisibleSelected ? "Tout décocher" : "Tout cocher"}
+                      {allVisibleSelected ? (en ? "Clear all" : "Tout décocher") : (en ? "Select all" : "Tout cocher")}
                     </button>
                   </div>
                 )}
               </div>
               {selectedNiveaux.length === 0 ? (
                 <p className="text-sm text-neutral-400 font-medium py-1">
-                  Sélectionnez au moins un niveau.
+                  {en ? "Select at least one level." : "Sélectionnez au moins un niveau."}
                 </p>
               ) : visibleMatieres.length === 0 ? (
                 <p className="text-sm text-neutral-400 font-medium py-1">
-                  Aucune matière sur ces niveaux.
+                  {en ? "No subjects for these levels." : "Aucune matière sur ces niveaux."}
                 </p>
               ) : (
                 <div className="max-h-64 overflow-y-auto rounded-lg border border-black/[0.06] bg-white divide-y divide-black/[0.04]">
@@ -1039,7 +1053,7 @@ export default function StaffAcademicTab({
                           </span>
                         </div>
                         <span className="text-[11px] font-medium text-neutral-400 shrink-0">
-                          {m.niveau_label}
+                          {levelDisplayLabel(m.niveau_label, en)}
                         </span>
                       </button>
                     );
@@ -1050,18 +1064,18 @@ export default function StaffAcademicTab({
 
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">
-                3. Classes
+                {en ? "3. Classes" : "3. Classes"}
               </p>
               {selectedNiveaux.length === 0 ? (
-                <p className="text-sm text-neutral-400 font-medium py-1">Choisissez d&apos;abord un niveau.</p>
+                <p className="text-sm text-neutral-400 font-medium py-1">{en ? "Choose a level first." : "Choisissez d'abord un niveau."}</p>
               ) : visibleClasses.length === 0 ? (
                 <p className="text-sm text-neutral-400 font-medium py-1">
-                  Aucune classe sur ces niveaux — rien à sélectionner.
+                  {en ? "No classes for these levels. There is nothing to select." : "Aucune classe sur ces niveaux. Rien à sélectionner."}
                 </p>
               ) : (
                 <div className="space-y-3">
                   <p className="text-xs text-neutral-500 font-medium">
-                    Si un niveau a plusieurs classes, cochez celles où le formateur intervient.
+                    {en ? "When a level has several classes, select the classes taught by this trainer." : "Si un niveau a plusieurs classes, cochez celles où le formateur intervient."}
                   </p>
                   {selectedNiveaux.map((nivKey) => {
                     const classesOnNiv = visibleClasses.filter((c) => c.niveau_key === nivKey);
@@ -1071,8 +1085,8 @@ export default function StaffAcademicTab({
                     return (
                       <div key={nivKey}>
                         <p className="text-[11px] font-semibold text-neutral-500 mb-1.5">
-                          {label}
-                          {multi ? " — plusieurs classes" : " — 1 classe"}
+                          {levelDisplayLabel(label, en)}
+                          {multi ? (en ? ". Several classes" : ". Plusieurs classes") : (en ? ". 1 class" : ". 1 classe")}
                         </p>
                         <div className="flex flex-wrap gap-2">
                           {classesOnNiv.map((c) => {
@@ -1114,7 +1128,7 @@ export default function StaffAcademicTab({
                 disabled={savingCard}
                 className="flex-1 h-11 rounded-lg border border-black/[0.08] bg-white text-sm font-semibold text-neutral-600 disabled:opacity-50"
               >
-                Annuler
+                {en ? "Cancel" : "Annuler"}
               </button>
               <button
                 type="button"
@@ -1124,7 +1138,7 @@ export default function StaffAcademicTab({
                 style={{ backgroundColor: BLUE }}
               >
                 {savingCard ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
-                Valider l&apos;affectation
+                {en ? "Confirm assignment" : "Valider l'affectation"}
               </button>
             </div>
           </div>

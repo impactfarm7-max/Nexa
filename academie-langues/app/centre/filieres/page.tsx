@@ -69,7 +69,10 @@ function structureLabel(p: ProgrammeCard, locale: "fr" | "en" = "fr", t?: (names
     const count = p.nb_niveaux || 1;
     return t ? t("centre", count > 1 ? "programsLevelMany" : "programsLevelOne", { count }) : `${count} niveau${count > 1 ? "x" : ""}`;
   }
-  return `${p.duree_valeur || 0} ${p.duree_unite || ""}`.trim();
+  const unit = locale === "en"
+    ? ({ jours: "days", semaines: "weeks", mois: "months", jour: "day", semaine: "week", month: "months" }[p.duree_unite || ""] || p.duree_unite || "")
+    : (p.duree_unite || "");
+  return `${p.duree_valeur || 0} ${unit}`.trim();
 }
 
 function priceLabel(p: ProgrammeCard, locale: "fr" | "en" = "fr", t?: (namespace: "centre", key: string, params?: Record<string, string | number>) => string) {
@@ -465,7 +468,7 @@ export default function CenterFilieresPage() {
               </span>
             }
           >
-            <ToolbarSearch value={query} onChange={setQuery} />
+            <ToolbarSearch value={query} onChange={setQuery} placeholder={locale === "en" ? "Search…" : "Rechercher…"} />
             <ProgrammesFilterMenu
               statusFilter={statusFilter}
               typeFilter={typeFilter}
@@ -499,8 +502,8 @@ export default function CenterFilieresPage() {
         ) : (
           <CenterDataTable
             columns={[t("centre", "programsName"), t("centre", "programsType"), t("centre", "programsStatus"), t("centre", "programsPrice"), t("centre", "programsActions")]}
-            columnWidths={[undefined, "15%", "14%", "16%", "15rem"]}
-            minWidth="750px"
+            columnWidths={[undefined, "14%", "13%", "15%", "18.5rem"]}
+            minWidth="900px"
           >
             {filtered.map((prog, i) => (
               <CenterTableRow key={prog.id} index={i}>
@@ -522,13 +525,13 @@ export default function CenterFilieresPage() {
                   {priceLabel(prog, locale, t)}
                 </td>
                 <TableActions>
-                  <span className="print:hidden inline-flex items-center justify-end gap-2 shrink-0">
+                  <span className="print:hidden flex w-full items-center justify-center gap-2 whitespace-nowrap">
                     <PublishToggleSwitch
                       published={prog.status === "published"}
                       onChange={() => togglePublish(prog)}
                     />
-                    <TableBtnPreview onClick={() => setViewing(prog)} />
-                    <TableBtnModify onClick={() => router.push(`/centre/filieres/nouveau?edit=${prog.id}`)} />
+                    <TableBtnPreview onClick={() => setViewing(prog)} label={locale === "en" ? "Preview" : "Aperçu"} />
+                    <TableBtnModify onClick={() => router.push(`/centre/filieres/nouveau?edit=${prog.id}`)} label={locale === "en" ? "Edit" : "Modifier"} />
                     <button
                       type="button"
                       onClick={() => setDeleting(prog)}

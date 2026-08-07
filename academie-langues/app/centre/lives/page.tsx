@@ -10,6 +10,7 @@ import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { loadCenterBootstrap } from "@/app/utils/center-me-cache";
 import { JOIN_BEFORE_MS, sessionStartMs, sessionEndMs } from "@/app/utils/collectiveLive";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import {
   BLUE,
   CenterPageLayout,
@@ -60,8 +61,8 @@ type LiveItem = {
   can_join?: boolean;
 };
 
-function fmtDate(dateKey: string) {
-  return new Date(`${dateKey}T12:00:00`).toLocaleDateString("fr-FR", {
+function fmtDate(dateKey: string, locale = "fr") {
+  return new Date(`${dateKey}T12:00:00`).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -73,10 +74,10 @@ function fmtTime(t?: string) {
   return t.slice(0, 5);
 }
 
-function roleLabel(role: string) {
-  if (role === "student") return "Étudiant";
-  if (role === "trainer") return "Formateur";
-  if (role === "center_manager") return "Directeur";
+function roleLabel(role: string, en = false) {
+  if (role === "student") return en ? "Student" : "Étudiant";
+  if (role === "trainer") return en ? "Trainer" : "Formateur";
+  if (role === "center_manager") return en ? "Director" : "Directeur";
   if (role === "campus_manager") return "Campus";
   if (role === "staff") return "Staff";
   if (role === "admin") return "Admin";
@@ -102,6 +103,8 @@ function sessionStatus(item: LiveItem): "join" | "upcoming" | "ended" | "cancell
 }
 
 export default function CentreLivesPage() {
+  const { locale } = useI18n();
+  const en = locale === "en";
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,17 +151,17 @@ export default function CentreLivesPage() {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Impossible de charger les sessions.");
+      if (!res.ok) throw new Error(json.error || (en ? "Unable to load sessions." : "Impossible de charger les sessions."));
 
       setSessions((json.items || []) as LiveItem[]);
       setPeople((json.people || []) as LivePerson[]);
       setAudiences((json.audiences || []) as AudienceProgramme[]);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Erreur de chargement.");
+      setError(e instanceof Error ? e.message : (en ? "Loading error." : "Erreur de chargement."));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [en]);
 
   useEffect(() => {
     void load();
@@ -248,7 +251,7 @@ export default function CentreLivesPage() {
   const applyAudiencePreview = () => {
     const n = mergeStudentIds(audiencePreview.people.map((p) => p.id));
     if (n === 0) {
-      setFormError("Aucun inscrit actif à ajouter pour cette audience.");
+      setFormError(en ? "There are no active enrollees to add for this audience." : "Aucun inscrit actif à ajouter pour cette audience.");
       return;
     }
     setFormError("");
@@ -317,7 +320,7 @@ export default function CentreLivesPage() {
     if (!token) return;
     if (!title.trim()) { setFormError("Titre requis."); return; }
     if (!date) { setFormError("Date requise."); return; }
-    if (selectedIds.length === 0) { setFormError("Sélectionnez au moins un participant."); return; }
+    if (selectedIds.length === 0) { setFormError(en ? "Select at least one participant." : "Sélectionnez au moins un participant."); return; }
     setSaving(true);
     setFormError("");
 
@@ -350,7 +353,7 @@ export default function CentreLivesPage() {
   };
 
   const handleCancel = async (item: LiveItem) => {
-    if (!token || !confirm("Annuler cette Session Live ?")) return;
+    if (!token || !confirm(en ? "Cancel this live session?" : "Annuler cette Session Live ?")) return;
     const res = await fetch("/api/centre/lives", {
       method: "PATCH",
       headers: {
@@ -363,7 +366,7 @@ export default function CentreLivesPage() {
   };
 
   const handleDelete = async (item: LiveItem) => {
-    if (!token || !confirm("Supprimer définitivement cette session ?")) return;
+    if (!token || !confirm(en ? "Permanently delete this session?" : "Supprimer définitivement cette session ?")) return;
     const res = await fetch(`/api/centre/lives?id=${item.slot_id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}` },
@@ -390,15 +393,15 @@ export default function CentreLivesPage() {
     <CenterPageLayout
       header={
         <CenterPageHeader
-          title="Sessions Live"
+          title={en ? "Live Sessions" : "Sessions Live"}
           actions={
             livesReady ? (
               <>
                 <OutlineHeaderButton onClick={openCreate}>
-                  <Plus size={15} /> Nouvelle session
+                  <Plus size={15} /> {en ? "New session" : "Nouvelle session"}
                 </OutlineHeaderButton>
                 <OutlineHeaderButton onClick={() => router.push("/centre/parametres/live")}>
-                  <Settings2 size={14} /> Rappels
+                  <Settings2 size={14} /> {en ? "Reminders" : "Rappels"}
                 </OutlineHeaderButton>
               </>
             ) : undefined
@@ -408,7 +411,7 @@ export default function CentreLivesPage() {
     >
       <CenterPageBody>
         <p className="text-sm text-neutral-500 font-medium -mt-1 mb-2 max-w-2xl">
-          Invitez des étudiants, formateurs ou staff à une visioconférence. Vous pouvez aussi convier un programme ou des classes (inscrits actifs).
+          {en ? "Invite students, trainers, or staff to a video conference. You can also invite a program or classes with active enrollees." : "Invitez des étudiants, formateurs ou staff à une visioconférence. Vous pouvez aussi convier un programme ou des classes (inscrits actifs)."}
         </p>
 
         {error && (
@@ -419,7 +422,7 @@ export default function CentreLivesPage() {
 
         {livesReady && joinable.length > 0 && (
           <section>
-            <SectionTitle icon={Radio} label="En direct — rejoindre" accent />
+            <SectionTitle icon={Radio} label={en ? "Live — join now" : "En direct — rejoindre"} accent />
             <div className="space-y-3">
               {joinable.map((s) => (
                 <SessionCard
@@ -429,6 +432,7 @@ export default function CentreLivesPage() {
                   onEdit={() => openEdit(s)}
                   onCancel={() => handleCancel(s)}
                   joinable
+                  locale={locale}
                 />
               ))}
             </div>
@@ -437,7 +441,7 @@ export default function CentreLivesPage() {
 
         {livesReady && upcoming.length > 0 && (
           <section>
-            <SectionTitle icon={Calendar} label="À venir" />
+            <SectionTitle icon={Calendar} label={en ? "Upcoming" : "À venir"} />
             <div className="space-y-3">
               {upcoming.map((s) => (
                 <SessionCard
@@ -446,6 +450,7 @@ export default function CentreLivesPage() {
                   onEdit={() => openEdit(s)}
                   onCancel={() => handleCancel(s)}
                   onDelete={() => handleDelete(s)}
+                  locale={locale}
                 />
               ))}
             </div>
@@ -454,11 +459,11 @@ export default function CentreLivesPage() {
 
         {livesReady && sessions.length === 0 && !error && (
           <EmptyState
-            title="Aucune Session Live"
-            hint="Créez une session et choisissez les participants (étudiants, formateurs, staff)."
+            title={en ? "No live sessions" : "Aucune Session Live"}
+            hint={en ? "Create a session and choose the participants (students, trainers, staff)." : "Créez une session et choisissez les participants (étudiants, formateurs, staff)."}
             action={
               <OutlineHeaderButton onClick={openCreate}>
-                <Plus size={16} /> Créer une session
+                <Plus size={16} /> {en ? "Create a session" : "Créer une session"}
               </OutlineHeaderButton>
             }
           />
@@ -466,10 +471,10 @@ export default function CentreLivesPage() {
 
         {livesReady && past.length > 0 && (
           <section>
-            <SectionTitle icon={Clock} label="Terminées ou annulées (21 jours)" muted />
+            <SectionTitle icon={Clock} label={en ? "Completed or cancelled (21 days)" : "Terminées ou annulées (21 jours)"} muted />
             <div className="space-y-2 opacity-70">
               {past.slice(0, 8).map((s) => (
-                <SessionCard key={s.id} item={s} compact />
+                <SessionCard key={s.id} item={s} compact locale={locale} />
               ))}
             </div>
           </section>
@@ -482,7 +487,7 @@ export default function CentreLivesPage() {
           <div className="relative w-full sm:w-[440px] h-full bg-white shadow-2xl flex flex-col">
             <div className="px-6 py-5 border-b flex items-center justify-between bg-neutral-50 shrink-0">
               <h3 className="text-base font-black" style={{ color: BLUE }}>
-                {editing ? "Modifier la session" : "Nouvelle Session Live"}
+                {editing ? (en ? "Edit session" : "Modifier la session") : (en ? "New Live Session" : "Nouvelle Session Live")}
               </h3>
               <button type="button" onClick={() => setPanelOpen(false)} className="p-2 text-neutral-400 hover:text-black rounded-xl hover:bg-neutral-200">
                 <X size={16} />
@@ -495,8 +500,8 @@ export default function CentreLivesPage() {
               )}
 
               <label className="block">
-                <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">Titre</span>
-                <input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1.5 w-full p-3 bg-neutral-50 border rounded-xl text-sm font-medium outline-none focus:border-blue-400" placeholder="Ex. Brief équipe, Q&A TCF…" />
+                <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">{en ? "Title" : "Titre"}</span>
+                <input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1.5 w-full p-3 bg-neutral-50 border rounded-xl text-sm font-medium outline-none focus:border-blue-400" placeholder={en ? "E.g. Team briefing, Q&A…" : "Ex. Brief équipe, Q&A TCF…"} />
               </label>
 
               <label className="block">
@@ -506,17 +511,17 @@ export default function CentreLivesPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">Début</span>
+                  <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">{en ? "Start" : "Début"}</span>
                   <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="mt-1.5 w-full p-3 bg-neutral-50 border rounded-xl text-sm font-medium outline-none focus:border-blue-400" />
                 </label>
                 <label className="block">
-                  <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">Fin</span>
+                  <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">{en ? "End" : "Fin"}</span>
                   <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="mt-1.5 w-full p-3 bg-neutral-50 border rounded-xl text-sm font-medium outline-none focus:border-blue-400" />
                 </label>
               </div>
 
               <label className="block">
-                <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">Animateur (optionnel)</span>
+                <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">{en ? "Host (optional)" : "Animateur (optionnel)"}</span>
                 <select value={formateurId} onChange={(e) => setFormateurId(e.target.value)} className="mt-1.5 w-full p-3 bg-neutral-50 border rounded-xl text-sm font-medium outline-none focus:border-blue-400">
                   <option value="">—</option>
                   {trainers.map((t) => (
@@ -529,15 +534,15 @@ export default function CentreLivesPage() {
                 <div className="rounded-xl border border-black/[0.08] bg-[#F7F7F6] p-3.5 space-y-3">
                   <div>
                     <p className="text-[11px] font-extrabold tracking-tight" style={{ color: BLUE }}>
-                      Convier une audience
+                      {en ? "Invite an audience" : "Convier une audience"}
                     </p>
                     <p className="text-[11px] text-neutral-500 mt-1 leading-relaxed">
-                      Choisissez un programme, éventuellement des classes, puis <span className="font-semibold text-neutral-700">vérifiez la liste</span> avant de l&apos;ajouter à la session.
+                      {en ? <>Choose a program and optionally some classes, then <span className="font-semibold text-neutral-700">review the list</span> before adding it to the session.</> : <>Choisissez un programme, éventuellement des classes, puis <span className="font-semibold text-neutral-700">vérifiez la liste</span> avant de l&apos;ajouter à la session.</>}
                     </p>
                   </div>
 
                   <label className="block">
-                    <span className="text-[10px] font-bold uppercase text-neutral-400 tracking-wider">1. Programme</span>
+                    <span className="text-[10px] font-bold uppercase text-neutral-400 tracking-wider">1. {en ? "Program" : "Programme"}</span>
                     <select
                       value={audienceProgrammeId}
                       onChange={(e) => {
@@ -546,10 +551,12 @@ export default function CentreLivesPage() {
                       }}
                       className="mt-1.5 w-full p-2.5 bg-white border border-black/[0.08] rounded-xl text-sm font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
                     >
-                      <option value="">— Choisir un programme —</option>
+                      <option value="">{en ? "— Choose a program —" : "— Choisir un programme —"}</option>
                       {audiences.map((a) => (
                         <option key={a.id} value={a.id}>
-                          {a.name} · {a.student_count} inscrit{a.student_count === 1 ? "" : "s"} actif{a.student_count === 1 ? "" : "s"}
+                          {en
+                            ? `${a.name} · ${a.student_count} active enrollee${a.student_count === 1 ? "" : "s"}`
+                            : `${a.name} · ${a.student_count} inscrit${a.student_count === 1 ? "" : "s"} actif${a.student_count === 1 ? "" : "s"}`}
                         </option>
                       ))}
                     </select>
@@ -561,7 +568,7 @@ export default function CentreLivesPage() {
                         <div>
                           <div className="flex items-center justify-between gap-2 mb-1.5">
                             <p className="text-[10px] font-bold uppercase text-neutral-400 tracking-wider">
-                              2. Classes (optionnel)
+                              2. {en ? "Classes (optional)" : "Classes (optionnel)"}
                             </p>
                             {audienceGroupeIds.length > 0 ? (
                               <button
@@ -569,10 +576,10 @@ export default function CentreLivesPage() {
                                 onClick={() => setAudienceGroupeIds([])}
                                 className="text-[10px] font-semibold text-neutral-500 hover:text-[#11224E]"
                               >
-                                Tout le programme
+                                {en ? "Entire program" : "Tout le programme"}
                               </button>
                             ) : (
-                              <span className="text-[10px] font-medium text-emerald-700">Tout le programme</span>
+                              <span className="text-[10px] font-medium text-emerald-700">{en ? "Entire program" : "Tout le programme"}</span>
                             )}
                           </div>
                           <div className="max-h-36 overflow-y-auto space-y-1 border border-black/[0.06] rounded-xl bg-white p-2">
@@ -601,7 +608,7 @@ export default function CentreLivesPage() {
                                     <span className="truncate">{g.name}</span>
                                   </span>
                                   <span className="text-[10px] text-neutral-400 shrink-0 tabular-nums">
-                                    {g.student_count} étud.
+                                    {g.student_count} {en ? "students" : "étud."}
                                   </span>
                                 </button>
                               );
@@ -609,8 +616,10 @@ export default function CentreLivesPage() {
                           </div>
                           <p className="text-[10px] text-neutral-400 mt-1.5 leading-snug">
                             {audienceGroupeIds.length === 0
-                              ? "Aucune classe cochée → aperçu = tous les inscrits du programme."
-                              : `${audienceGroupeIds.length} classe${audienceGroupeIds.length > 1 ? "s" : ""} cochée${audienceGroupeIds.length > 1 ? "s" : ""} → aperçu limité à ces classes.`}
+                              ? en ? "No classes selected → preview includes all program enrollees." : "Aucune classe cochée → aperçu = tous les inscrits du programme."
+                              : en
+                                ? `${audienceGroupeIds.length} class${audienceGroupeIds.length > 1 ? "es" : ""} selected → preview limited to these classes.`
+                                : `${audienceGroupeIds.length} classe${audienceGroupeIds.length > 1 ? "s" : ""} cochée${audienceGroupeIds.length > 1 ? "s" : ""} → aperçu limité à ces classes.`}
                           </p>
                         </div>
                       )}
@@ -619,7 +628,7 @@ export default function CentreLivesPage() {
                         <div className="px-3 py-2.5 border-b border-black/[0.06] flex items-start justify-between gap-2">
                           <div className="min-w-0">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                              3. Aperçu avant ajout
+                              3. {en ? "Preview before adding" : "Aperçu avant ajout"}
                             </p>
                             <p className="text-[11px] font-semibold text-[#11224E] mt-0.5 truncate" title={audiencePreview.scopeLabel}>
                               {audiencePreview.scopeLabel || "—"}
@@ -631,7 +640,7 @@ export default function CentreLivesPage() {
                         </div>
                         {audiencePreview.people.length === 0 ? (
                           <p className="px-3 py-4 text-xs text-neutral-400 text-center">
-                            Aucun inscrit actif dans cette audience.
+                            {en ? "No active enrollees in this audience." : "Aucun inscrit actif dans cette audience."}
                           </p>
                         ) : (
                           <ul className="max-h-40 overflow-y-auto divide-y divide-black/[0.04]">
@@ -642,11 +651,11 @@ export default function CentreLivesPage() {
                                   <span className="text-xs font-semibold text-neutral-800 truncate">{p.label}</span>
                                   {already ? (
                                     <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-600 shrink-0">
-                                      Déjà choisi
+                                      {en ? "Already selected" : "Déjà choisi"}
                                     </span>
                                   ) : (
                                     <span className="text-[9px] font-bold uppercase tracking-wider text-amber-600 shrink-0">
-                                      À ajouter
+                                      {en ? "To add" : "À ajouter"}
                                     </span>
                                   )}
                                 </li>
@@ -656,7 +665,7 @@ export default function CentreLivesPage() {
                         )}
                         {alreadyInvitedCount > 0 && audiencePreview.people.length > 0 && (
                           <p className="px-3 py-1.5 text-[10px] text-neutral-400 border-t border-black/[0.04]">
-                            {alreadyInvitedCount}/{audiencePreview.people.length} déjà dans les participants
+                            {alreadyInvitedCount}/{audiencePreview.people.length} {en ? "already in the participant list" : "déjà dans les participants"}
                           </p>
                         )}
                       </div>
@@ -669,8 +678,10 @@ export default function CentreLivesPage() {
                         style={{ backgroundColor: BLUE }}
                       >
                         {alreadyInvitedCount === audiencePreview.people.length && audiencePreview.people.length > 0
-                          ? "Déjà tous ajoutés"
-                          : `Ajouter ${audiencePreview.people.length - alreadyInvitedCount} personne${audiencePreview.people.length - alreadyInvitedCount > 1 ? "s" : ""} à la session`}
+                          ? (en ? "All already added" : "Déjà tous ajoutés")
+                          : en
+                            ? `Add ${audiencePreview.people.length - alreadyInvitedCount} person${audiencePreview.people.length - alreadyInvitedCount !== 1 ? "s" : ""} to the session`
+                            : `Ajouter ${audiencePreview.people.length - alreadyInvitedCount} personne${audiencePreview.people.length - alreadyInvitedCount > 1 ? "s" : ""} à la session`}
                       </button>
                     </>
                   )}
@@ -680,10 +691,10 @@ export default function CentreLivesPage() {
               <div>
                 <div className="flex items-center justify-between mb-1.5 gap-2">
                   <span className="text-[10px] font-black uppercase text-neutral-400 tracking-wider">
-                    Participants retenus ({selectedIds.length})
+                    {en ? "Selected participants" : "Participants retenus"} ({selectedIds.length})
                   </span>
                   <span className="text-[9px] font-bold text-neutral-400">
-                    {selectedStudentsCount} étud. · {selectedStaffCount} staff
+                    {selectedStudentsCount} {en ? "students" : "étud."} · {selectedStaffCount} staff
                   </span>
                 </div>
                 {selectedIds.length > 0 && (
@@ -696,7 +707,7 @@ export default function CentreLivesPage() {
                           key={id}
                           type="button"
                           onClick={() => toggleParticipant(id)}
-                          title="Retirer"
+                          title={en ? "Remove" : "Retirer"}
                           className="inline-flex items-center gap-1 max-w-full px-2 py-1 rounded-lg bg-white border border-black/[0.06] text-[11px] font-semibold text-[#11224E] hover:border-red-200 hover:text-red-600"
                         >
                           <span className="truncate">{p.label}</span>
@@ -716,7 +727,7 @@ export default function CentreLivesPage() {
                         : "text-neutral-500 hover:text-neutral-700"
                     }`}
                   >
-                    Étudiants
+                    {en ? "Students" : "Étudiants"}
                   </button>
                   <button
                     type="button"
@@ -727,13 +738,13 @@ export default function CentreLivesPage() {
                         : "text-neutral-500 hover:text-neutral-700"
                     }`}
                   >
-                    Formateurs / Staff
+                    {en ? "Trainers / Staff" : "Formateurs / Staff"}
                   </button>
                 </div>
                 <input
                   value={peopleFilter}
                   onChange={(e) => setPeopleFilter(e.target.value)}
-                  placeholder={peopleTab === "students" ? "Rechercher un étudiant…" : "Rechercher un formateur / staff…"}
+                  placeholder={peopleTab === "students" ? (en ? "Search for a student…" : "Rechercher un étudiant…") : (en ? "Search for a trainer / staff…" : "Rechercher un formateur / staff…")}
                   className="w-full mb-2 p-2.5 bg-neutral-50 border rounded-xl text-xs font-medium outline-none focus:border-blue-400"
                 />
                 <button
@@ -744,16 +755,16 @@ export default function CentreLivesPage() {
                 >
                   {allVisibleSelected
                     ? peopleTab === "staff"
-                      ? "Tout désélectionner (formateurs / staff)"
-                      : "Tout désélectionner (étudiants)"
+                      ? en ? "Deselect all (trainers / staff)" : "Tout désélectionner (formateurs / staff)"
+                      : en ? "Deselect all (students)" : "Tout désélectionner (étudiants)"
                     : peopleTab === "staff"
-                      ? "Tout sélectionner (formateurs / staff)"
-                      : "Tout sélectionner (étudiants)"}
+                      ? en ? "Select all (trainers / staff)" : "Tout sélectionner (formateurs / staff)"
+                      : en ? "Select all (students)" : "Tout sélectionner (étudiants)"}
                 </button>
                 <div className="max-h-56 overflow-y-auto border border-neutral-200 rounded-xl p-2 space-y-1">
                   {filteredPeople.length === 0 ? (
                     <p className="text-xs text-neutral-400 p-2">
-                      {peopleTab === "students" ? "Aucun étudiant." : "Aucun formateur / staff."}
+                      {peopleTab === "students" ? (en ? "No students." : "Aucun étudiant.") : (en ? "No trainers / staff." : "Aucun formateur / staff.")}
                     </p>
                   ) : (
                     filteredPeople.map((p) => (
@@ -767,7 +778,7 @@ export default function CentreLivesPage() {
                         <span className={`text-[9px] font-black uppercase tracking-wider shrink-0 ${
                           p.role === "student" ? "text-amber-600" : "text-blue-600"
                         }`}>
-                          {roleLabel(p.role)}
+                          {roleLabel(p.role, en)}
                         </span>
                       </label>
                     ))
@@ -782,7 +793,7 @@ export default function CentreLivesPage() {
                 onClick={() => setPanelOpen(false)}
                 className="flex-1 py-3 rounded-xl border text-xs font-black uppercase tracking-widest text-neutral-500"
               >
-                Annuler
+                {en ? "Cancel" : "Annuler"}
               </button>
               <button
                 type="button"
@@ -791,7 +802,7 @@ export default function CentreLivesPage() {
                 className="flex-1 py-3 rounded-xl text-xs font-black uppercase tracking-widest text-white disabled:opacity-60"
                 style={{ backgroundColor: BLUE }}
               >
-                {saving ? "…" : editing ? "Enregistrer" : "Créer"}
+                {saving ? "…" : editing ? (en ? "Save" : "Enregistrer") : (en ? "Create" : "Créer")}
               </button>
             </div>
           </div>
@@ -828,6 +839,7 @@ function SessionCard({
   onDelete,
   joinable,
   compact,
+  locale = "fr",
 }: {
   item: LiveItem;
   onJoin?: () => void;
@@ -836,7 +848,9 @@ function SessionCard({
   onDelete?: () => void;
   joinable?: boolean;
   compact?: boolean;
+  locale?: string;
 }) {
+  const en = locale === "en";
   const cancelled = item.kanban === "annule";
   const count = item.participants?.length ?? item.participant_ids?.length ?? 0;
 
@@ -854,19 +868,19 @@ function SessionCard({
         <p className="font-black text-sm truncate" style={{ color: BLUE }}>
           {item.title || "Session Live"}
         </p>
-        <p className="text-xs text-neutral-500 mt-0.5 capitalize">{fmtDate(item.date)}</p>
+        <p className="text-xs text-neutral-500 mt-0.5 capitalize">{fmtDate(item.date, locale)}</p>
         <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 text-[11px] text-neutral-500">
           <span className="flex items-center gap-1">
             <Clock size={11} /> {fmtTime(item.start_time)} – {fmtTime(item.end_time)}
           </span>
-          {item.formateur && <span>Animateur : {item.formateur}</span>}
+          {item.formateur && <span>{en ? "Host" : "Animateur"} : {item.formateur}</span>}
           <span className="flex items-center gap-1">
-            <Users size={11} /> {count} participant{count > 1 ? "s" : ""}
+            <Users size={11} /> {count} participant{count !== 1 ? "s" : ""}
           </span>
         </div>
         {cancelled && (
           <span className="inline-block mt-2 text-[9px] font-black uppercase tracking-wider text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
-            Annulée
+            {en ? "Cancelled" : "Annulée"}
           </span>
         )}
       </div>
@@ -878,26 +892,26 @@ function SessionCard({
             onClick={onJoin}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase text-white bg-emerald-600 hover:bg-emerald-700 transition-colors min-h-[44px]"
           >
-            <Radio size={14} /> Rejoindre
+            <Radio size={14} /> {en ? "Join" : "Rejoindre"}
           </button>
         )}
         {!joinable && !compact && sessionStatus(item) === "upcoming" && (
           <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold text-neutral-400 bg-neutral-50 border border-neutral-100">
-            <Lock size={11} /> Ouvre 15 min avant
+            <Lock size={11} /> {en ? "Opens 15 min before" : "Ouvre 15 min avant"}
           </span>
         )}
         {onEdit && !compact && (
           <button type="button" onClick={onEdit} className="px-3 py-2 rounded-xl text-[10px] font-bold border border-neutral-200 hover:border-orange-300">
-            Éditer
+            {en ? "Edit" : "Éditer"}
           </button>
         )}
         {onCancel && !compact && !cancelled && (
           <button type="button" onClick={onCancel} className="px-3 py-2 rounded-xl text-[10px] font-bold text-red-500 border border-red-100 hover:bg-red-50">
-            Annuler
+            {en ? "Cancel" : "Annuler"}
           </button>
         )}
         {onDelete && !compact && (
-          <button type="button" onClick={onDelete} className="p-2 rounded-xl text-neutral-400 hover:text-red-500 hover:bg-red-50" title="Supprimer">
+          <button type="button" onClick={onDelete} className="p-2 rounded-xl text-neutral-400 hover:text-red-500 hover:bg-red-50" title={en ? "Delete" : "Supprimer"}>
             <Trash2 size={14} />
           </button>
         )}

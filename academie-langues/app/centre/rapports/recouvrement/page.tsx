@@ -56,7 +56,7 @@ function RecouvrementContent() {
     if (!report) return;
     downloadCsv(
       `recouvrement-${report.period.label.replace(/\s+/g, "-")}.csv`,
-      [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "enrollmentLevel"), t("centre", "enrollmentClass"), "CA", t("centre", "recoveryCollected"), t("centre", "summaryBalance"), t("centre", "settingsStatus")],
+      [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "enrollmentLevel"), t("centre", "enrollmentClass"), t("centre", "recoveryRevenue"), t("centre", "recoveryCollected"), t("centre", "summaryBalance"), t("centre", "settingsStatus")],
       report.rows.map((r) => [
         r.student,
         r.filiere,
@@ -83,7 +83,7 @@ function RecouvrementContent() {
       sections: [
         {
           title: t("centre", "enrollmentByProgram"),
-          columns: [t("centre", "enrollmentProgram"), "CA", t("centre", "recoveryCollected"), t("centre", "summaryBalance"), t("centre", "recoveryRateShort")],
+          columns: [t("centre", "enrollmentProgram"), t("centre", "recoveryRevenue"), t("centre", "recoveryCollected"), t("centre", "summaryBalance"), t("centre", "recoveryRateShort")],
           rows: report.byFiliere.map((x) => [x.label, fmtFCFA(x.ca), fmtFCFA(x.encaisse), fmtFCFA(x.reste), `${x.taux} %`]),
         },
         {
@@ -153,7 +153,7 @@ function RecouvrementContent() {
             title={t("centre", "enrollmentByProgram")}
             columns={[
               { key: "label", label: t("centre", "enrollmentProgram") },
-              { key: "ca", label: "CA", align: "right" },
+              { key: "ca", label: t("centre", "recoveryRevenue"), align: "right" },
               { key: "encaisse", label: t("centre", "recoveryCollected"), align: "right" },
               { key: "reste", label: t("centre", "summaryBalance"), align: "right" },
               { key: "taux", label: t("centre", "recoveryRatePercent"), align: "right" },
