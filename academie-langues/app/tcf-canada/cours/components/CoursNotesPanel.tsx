@@ -6,6 +6,11 @@ import { supabase } from "@/app/utils/supabase";
 import type { CourseHighlight } from "./LessonReader";
 
 import type { HighlightColorKey } from "@/app/utils/highlightConstants";
+import {
+  DEFAULT_HIGHLIGHT_THEMES,
+  HIGHLIGHT_THEME_I18N_KEYS,
+  displayHighlightThemeLabel,
+} from "@/app/utils/highlightConstants";
 import { BRAND } from "@/app/utils/brand";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
@@ -109,14 +114,26 @@ export default function CoursNotesPanel({
     if (!headers) return;
     setSavingThemes(true);
     try {
+      const themesToSave = themeDrafts.map((theme) => {
+        const key = theme.color_key as HighlightColorKey;
+        const def = DEFAULT_HIGHLIGHT_THEMES.find((d) => d.color_key === key);
+        const i18nKey = HIGHLIGHT_THEME_I18N_KEYS[key];
+        const localized = i18nKey ? t("dashboard", i18nKey) : "";
+        const label = theme.label.trim();
+        const canonical =
+          !label || (def && (label === def.label || label === localized))
+            ? (def?.label || label)
+            : label;
+        return { ...theme, label: canonical };
+      });
       const res = await fetch("/api/student/highlight-themes", {
         method: "PATCH",
         headers,
-        body: JSON.stringify({ themes: themeDrafts }),
+        body: JSON.stringify({ themes: themesToSave }),
       });
       const json = await res.json();
       if (res.ok) {
-        onThemesChange(json.themes ?? themeDrafts);
+        onThemesChange(json.themes ?? themesToSave);
         setEditingThemes(false);
       }
     } finally {
@@ -179,7 +196,12 @@ export default function CoursNotesPanel({
           <button
             type="button"
             onClick={() => {
-              setThemeDrafts(themes);
+              setThemeDrafts(
+                themes.map((theme) => ({
+                  ...theme,
+                  label: displayHighlightThemeLabel(theme, t),
+                })),
+              );
               setEditingThemes((v) => !v);
             }}
             className="text-orange-600 hover:bg-orange-50 p-1.5 rounded-lg shrink-0"
@@ -235,22 +257,22 @@ export default function CoursNotesPanel({
           >
             {t("dashboard", "notesAll")}
           </button>
-          {themes.map((t) => {
-            const count = highlights.filter((h) => h.color_key === t.color_key).length;
+          {themes.map((theme) => {
+            const count = highlights.filter((h) => h.color_key === theme.color_key).length;
             if (count === 0) return null;
             return (
               <button
-                key={t.color_key}
+                key={theme.color_key}
                 type="button"
-                onClick={() => setColorFilter(t.color_key)}
+                onClick={() => setColorFilter(theme.color_key)}
                 className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-colors flex items-center gap-1.5 ${
-                  colorFilter === t.color_key
+                  colorFilter === theme.color_key
                     ? "bg-orange-500 text-white border-orange-500"
                     : "bg-white text-slate-600 border-orange-200 hover:border-orange-300"
                 }`}
               >
-                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.hex_color }} />
-                <span className="truncate max-w-[120px]">{t.label}</span>
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: theme.hex_color }} />
+                <span className="truncate max-w-[120px]">{displayHighlightThemeLabel(theme, t)}</span>
                 <span className="opacity-70">({count})</span>
               </button>
             );
@@ -293,7 +315,7 @@ export default function CoursNotesPanel({
               <div key={theme.color_key}>
                 <p className="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: theme.hex_color }} />
-                  {themeByKey[theme.color_key]?.label ?? theme.label}
+                  {displayHighlightThemeLabel(themeByKey[theme.color_key] ?? theme, t)}
                 </p>
                 <ul className="space-y-2">
                   {items.map((h) => (

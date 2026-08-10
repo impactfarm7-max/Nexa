@@ -43,13 +43,13 @@ function resolveMode(opts: NavOptions): StudentExperienceMode {
 function getTcfLikeNavItems(centerId: string | null): StudentNavItem[] {
   const navPaths = getStudentNavPaths(centerId);
   return [
-    { label: "Tableau de bord", shortLabel: "Accueil", icon: LayoutDashboard, path: navPaths.home },
-    { label: "Mon tuteur", shortLabel: "Tuteur", icon: MessageCircle, path: "/tuteur", tutorLockBadge: true },
-    { label: "Session Live", shortLabel: "Live", icon: Video, path: navPaths.coaching },
-    { label: "Cours et Quiz", shortLabel: "Cours", icon: BookOpen, path: "/tcf-canada/cours" },
-    { label: "Mes Devoirs", shortLabel: "Devoirs", icon: FileText, path: navPaths.missions },
-    { label: "Bibliothèque", shortLabel: "Bibliothèque", icon: Library, path: "/bibliotheque" },
-    { label: "Mode Examen", shortLabel: "Examen", icon: Timer, path: "/tcf-canada/simulateur/examen" },
+    { label: "Tableau de bord", shortLabel: "Accueil", labelKey: "navDashboard", shortLabelKey: "navHome", icon: LayoutDashboard, path: navPaths.home },
+    { label: "Mon tuteur", shortLabel: "Tuteur", labelKey: "navTutor", shortLabelKey: "navTutorShort", icon: MessageCircle, path: "/tuteur", tutorLockBadge: true },
+    { label: "Session Live", shortLabel: "Live", labelKey: "navLive", shortLabelKey: "navLive", icon: Video, path: navPaths.coaching },
+    { label: "Cours et Quiz", shortLabel: "Cours", labelKey: "navCoursesQuiz", shortLabelKey: "navCoursesShort", icon: BookOpen, path: "/tcf-canada/cours" },
+    { label: "Mes Devoirs", shortLabel: "Devoirs", labelKey: "navHomework", shortLabelKey: "navHomeworkShort", icon: FileText, path: navPaths.missions },
+    { label: "Bibliothèque", shortLabel: "Bibliothèque", labelKey: "navLibrary", shortLabelKey: "navLibrary", icon: Library, path: "/bibliotheque" },
+    { label: "Mode Examen", shortLabel: "Examen", labelKey: "navExamMode", shortLabelKey: "navExamShort", icon: Timer, path: "/tcf-canada/simulateur/examen" },
     { label: "Communauté", shortLabel: "Communauté", labelKey: "navCommunity", shortLabelKey: "navCommunity", icon: Users, path: navPaths.communaute },
   ];
 }
@@ -58,12 +58,12 @@ function getTcfLikeNavItems(centerId: string | null): StudentNavItem[] {
 function getPluriannualNavItems(centerId: string | null): StudentNavItem[] {
   const navPaths = getStudentNavPaths(centerId);
   return [
-    { label: "Tableau de bord", shortLabel: "Accueil", icon: LayoutDashboard, path: navPaths.home },
-    { label: "Mon tuteur", shortLabel: "Tuteur", icon: MessageCircle, path: "/tuteur", tutorLockBadge: true },
-    { label: "Session Live", shortLabel: "Live", icon: Video, path: navPaths.coaching },
-    { label: "Mes cours", shortLabel: "Cours", icon: BookOpen, path: "/tcf-canada/cours?tab=centre" },
-    { label: "Mes Devoirs", shortLabel: "Devoirs", icon: FileText, path: navPaths.missions },
-    { label: "Bibliothèque publique", shortLabel: "Bibliothèque", labelKey: "navPublicLibrary", icon: LibraryBig, path: "/bibliotheque-publique" },
+    { label: "Tableau de bord", shortLabel: "Accueil", labelKey: "navDashboard", shortLabelKey: "navHome", icon: LayoutDashboard, path: navPaths.home },
+    { label: "Mon tuteur", shortLabel: "Tuteur", labelKey: "navTutor", shortLabelKey: "navTutorShort", icon: MessageCircle, path: "/tuteur", tutorLockBadge: true },
+    { label: "Session Live", shortLabel: "Live", labelKey: "navLive", shortLabelKey: "navLive", icon: Video, path: navPaths.coaching },
+    { label: "Mes cours", shortLabel: "Cours", labelKey: "navCourses", shortLabelKey: "navCoursesShort", icon: BookOpen, path: "/tcf-canada/cours?tab=centre" },
+    { label: "Mes Devoirs", shortLabel: "Devoirs", labelKey: "navHomework", shortLabelKey: "navHomeworkShort", icon: FileText, path: navPaths.missions },
+    { label: "Bibliothèque publique", shortLabel: "Bibliothèque", labelKey: "navPublicLibrary", shortLabelKey: "navLibrary", icon: LibraryBig, path: "/bibliotheque-publique" },
     { label: "Communauté", shortLabel: "Communauté", labelKey: "navCommunity", shortLabelKey: "navCommunity", icon: Users, path: navPaths.communaute },
   ];
 }

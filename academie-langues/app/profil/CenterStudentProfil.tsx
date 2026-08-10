@@ -29,7 +29,6 @@ import {
   centerAccessStatusLabel,
   financeStatusLabel,
   formatDateFr,
-  formatDateTimeFr,
   formatEnrollmentDuration,
   packDisplayName,
 } from "@/app/utils/student-profile";
@@ -138,7 +137,8 @@ type StudentAccount = {
 };
 
 export default function CenterStudentProfil() {
-  const { locale } = useI18n();
+  const { t, locale } = useI18n();
+  const td = (key: string, values?: Record<string, string | number>) => t("dashboard", key, values);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -175,9 +175,8 @@ export default function CenterStudentProfil() {
   const financeDate = (value?: string | null) => value
     ? new Date(value).toLocaleString(financeLocale, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
     : "—";
-  const localizedFinanceStatus = (status?: string | null) => financeEn
-    ? ({ pending: "Awaiting payment", current: "In progress", paid: "Paid in full", late: "Overdue", exempt: "Exempt" } as Record<string, string>)[status || ""] || status || "—"
-    : financeStatusLabel(status);
+  const localizedFinanceStatus = (status?: string | null) =>
+    financeStatusLabel(status, financeEn ? "en" : "fr");
 
   const readJson = async (res: Response) => {
     const text = await res.text();
@@ -204,7 +203,7 @@ export default function CenterStudentProfil() {
     const res = await fetch("/api/student/account", { headers });
     const json = await readJson(res);
     if (!res.ok) {
-      setLoadError(json.error || "Impossible d'ouvrir votre profil.");
+      setLoadError(json.error || td("profilOpenError"));
       setLoading(false);
       return;
     }
@@ -244,12 +243,13 @@ export default function CenterStudentProfil() {
     if (prenom && nom) return `${prenom} ${nom}`;
     if (prenom) return prenom;
     if (nom) return nom;
-    return account?.profile?.email || account?.user.email || "Mon profil";
-  }, [account]);
+    return account?.profile?.email || account?.user.email || td("profilMyProfile");
+  }, [account, t]);
 
   const statusLabel = centerAccessStatusLabel(
     account?.profile?.center_status,
     account?.profile?.tag_status,
+    td,
   );
   const isPaused =
     account?.profile?.center_status === "paused" ||
@@ -267,6 +267,7 @@ export default function CenterStudentProfil() {
     account?.enrollment?.duration_value,
     account?.enrollment?.duration_unit,
     account?.enrollment?.duration_months,
+    td,
   );
 
   const subscriptionDaysLeft = useMemo(() => {
@@ -305,7 +306,7 @@ export default function CenterStudentProfil() {
         }),
       });
       const json = await readJson(res);
-      if (!res.ok) throw new Error(json.error || "Mise a jour impossible.");
+      if (!res.ok) throw new Error(json.error || td("profilUpdateError"));
 
       setAccount((current) =>
         current ? { ...current, profile: { ...current.profile, ...json.profile } } : current,
@@ -325,7 +326,7 @@ export default function CenterStudentProfil() {
       setForm(nextForm);
       setIsEditing(false);
     } catch (error: unknown) {
-      alert(error instanceof Error ? error.message : "Mise a jour impossible.");
+      alert(error instanceof Error ? error.message : td("profilUpdateError"));
     } finally {
       setSaving(false);
     }
@@ -336,11 +337,11 @@ export default function CenterStudentProfil() {
     if (!file || !account?.user.id) return;
 
     if (file.size > 2 * 1024 * 1024) {
-      alert("Image trop lourde. Maximum 2 Mo.");
+      alert(td("profilImageTooHeavy2Mb"));
       return;
     }
     if (!file.type.startsWith("image/")) {
-      alert("Fichier non supporte. Choisissez une image.");
+      alert(td("profilUnsupportedImage"));
       return;
     }
 
@@ -366,7 +367,7 @@ export default function CenterStudentProfil() {
         body: JSON.stringify({ avatar_url: urlData.publicUrl }),
       });
       const json = await readJson(res);
-      if (!res.ok) throw new Error(json.error || "Mise a jour impossible.");
+      if (!res.ok) throw new Error(json.error || td("profilUpdateError"));
 
       setAccount((current) =>
         current
@@ -377,7 +378,7 @@ export default function CenterStudentProfil() {
           : current,
       );
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Erreur lors de l'upload.");
+      alert(err instanceof Error ? err.message : td("profilUploadError"));
     } finally {
       setAvatarUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -394,7 +395,7 @@ export default function CenterStudentProfil() {
       return;
     }
     if (passwordForm.password !== passwordForm.confirm) {
-      setPasswordError("Les deux mots de passe ne correspondent pas.");
+      setPasswordError(td("profilPasswordsMismatch"));
       return;
     }
 
@@ -403,10 +404,10 @@ export default function CenterStudentProfil() {
       const { error } = await supabase.auth.updateUser({ password: passwordForm.password });
       if (error) throw error;
       setPasswordForm({ password: "", confirm: "" });
-      setPasswordMessage("Mot de passe mis a jour avec succes.");
+      setPasswordMessage(td("profilPasswordUpdated"));
       setPasswordOpen(false);
     } catch (err: unknown) {
-      setPasswordError(err instanceof Error ? err.message : "Impossible de modifier le mot de passe.");
+      setPasswordError(err instanceof Error ? err.message : td("profilPasswordUpdateError"));
     } finally {
       setPasswordSaving(false);
     }
@@ -426,14 +427,14 @@ export default function CenterStudentProfil() {
     return (
       <div className="min-h-[100dvh] bg-[#FFFBF7] flex items-center justify-center px-4">
         <div className="w-full max-w-md rounded-[2rem] border border-red-100 bg-white p-6 text-center shadow-sm">
-          <p className="text-xl font-black" style={{ color: BRAND.blue }}>Profil indisponible</p>
-          <p className="mt-2 text-sm font-bold text-slate-500">{loadError || "Compte introuvable."}</p>
+          <p className="text-xl font-black" style={{ color: BRAND.blue }}>{td("profilUnavailable")}</p>
+          <p className="mt-2 text-sm font-bold text-slate-500">{loadError || td("profilAccountNotFound")}</p>
           <Link
             href="/dashboard"
             className="mt-5 inline-flex h-12 items-center justify-center rounded-2xl px-5 text-xs font-black uppercase tracking-widest text-white hover:opacity-90"
             style={{ backgroundColor: BRAND.orange }}
           >
-            Retour dashboard
+            {td("profilBackDashboard")}
           </Link>
         </div>
       </div>
@@ -446,14 +447,14 @@ export default function CenterStudentProfil() {
         <div className="nexa-student-shell flex items-center gap-2 sm:gap-3 py-2.5 sm:py-3 md:py-4">
           <Link
             href="/dashboard"
-            aria-label="Retour au tableau de bord"
+            aria-label={td("profilBackAria")}
             className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-slate-600 shadow-sm hover:bg-neutral-50"
           >
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="min-w-0 flex-1">
             <span className="inline-flex rounded-full bg-orange-50 px-2.5 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-orange-600">
-              Mon profil
+              {td("profilMyProfile")}
             </span>
             <h1
               className={`mt-1 truncate text-base sm:text-lg md:text-xl font-black leading-tight ${STUDENT_TEXT.pageTitle}`}
@@ -470,7 +471,7 @@ export default function CenterStudentProfil() {
                 className="hidden h-11 items-center gap-2 rounded-full border border-orange-100 bg-orange-50 px-4 text-xs font-black uppercase tracking-widest text-orange-600 hover:bg-orange-100 lg:flex"
               >
                 <Edit2 className="h-4 w-4" />
-                Modifier
+                {td("profilEdit")}
               </button>
             ) : (
               <>
@@ -478,7 +479,7 @@ export default function CenterStudentProfil() {
                   onClick={cancelEditing}
                   className="hidden h-11 items-center rounded-full border border-neutral-200 bg-neutral-50 px-4 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-neutral-100 lg:flex"
                 >
-                  Annuler
+                  {td("profilCancel")}
                 </button>
                 <button
                   onClick={saveProfile}
@@ -487,17 +488,17 @@ export default function CenterStudentProfil() {
                   style={{ backgroundColor: BRAND.blue }}
                 >
                   <Save className="h-4 w-4" />
-                  {saving ? "..." : "Enregistrer"}
+                  {saving ? td("profilSaving") : td("profilSave")}
                 </button>
               </>
             )}
             <button
               onClick={signOut}
-              aria-label="Déconnexion"
+              aria-label={td("profilLogout")}
               className="flex h-10 w-10 sm:h-11 sm:w-auto sm:px-4 items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-100"
             >
               <LogOut className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">Déconnexion</span>
+              <span className="hidden sm:inline">{td("profilLogout")}</span>
             </button>
           </div>
         </div>
@@ -514,16 +515,20 @@ export default function CenterStudentProfil() {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-black" style={{ color: BRAND.blue }}>
-                Profil en pause
+                {td("profilPausedTitle")}
               </p>
               <p className="mt-0.5 text-xs font-medium text-blue-800/80 leading-relaxed">
-                Votre formation est temporairement suspendue
-                {account.center?.name ? <> par <strong>{account.center.name}</strong></> : ""}.
-                {" "}Contactez votre centre pour reprendre. Votre progression est conservée.
+                {td("profilPausedBodyPrefix")}
+                {account.center?.name ? (
+                  <> {td("profilPausedBy")} <strong>{account.center.name}</strong></>
+                ) : (
+                  <> {td("profilPausedByYourCenter")}</>
+                )}
+                . {td("profilPausedContact")} {td("profilPausedProgressKept")}
               </p>
               {account.profile?.access_pause_reason && (
                 <div className="mt-3 rounded-xl border border-blue-200/80 bg-white/70 px-3 py-2 text-left">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Motif</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">{td("profilPausedReasonLabel")}</p>
                   <p className="mt-0.5 text-xs font-bold text-blue-900 leading-relaxed">
                     {account.profile.access_pause_reason}
                   </p>
@@ -562,7 +567,7 @@ export default function CenterStudentProfil() {
                 onClick={() => fileInputRef.current?.click()}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-neutral-600 transition-colors hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600"
               >
-                <Camera size={11} /> Modifier la photo
+                <Camera size={11} /> {td("profilChangePhoto")}
               </button>
             )}
 
@@ -573,7 +578,11 @@ export default function CenterStudentProfil() {
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
                 <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-700">
-                  Étudiant TCF
+                  {account.isPluriannual
+                    ? td("profilStudentPluriannual")
+                    : isTcfCanadaCenter(account.center.center_type)
+                      ? td("profilStudentTcf")
+                      : td("profilStudentCenter")}
                 </span>
                 <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${statusBadgeClass}`}>
                   {statusLabel}
@@ -584,41 +593,41 @@ export default function CenterStudentProfil() {
             <div className="mt-5 sm:mt-6 border-t border-neutral-100 pt-4 sm:pt-5 text-left">
               <div className="mb-4 flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-black text-slate-900">Informations personnelles</p>
+                  <p className="text-sm font-black text-slate-900">{td("profilPersonalInfo")}</p>
                   <p className="mt-0.5 text-[10px] font-bold text-slate-400">
-                    {isEditing ? "Modifiez vos informations." : "Vos informations de profil."}
+                    {isEditing ? td("profilEditInfoHelp") : td("profilInfoHelp")}
                   </p>
                 </div>
                 {isEditing && (
                   <span className="shrink-0 rounded-full bg-orange-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-orange-600">
-                    Edition
+                    {td("profilEditingBadge")}
                   </span>
                 )}
               </div>
 
               {isEditing && (
                 <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                  <Field label="Prenom" value={form.prenom} onChange={(value) => setForm((c) => ({ ...c, prenom: value }))} />
-                  <Field label="Nom" value={form.nom} onChange={(value) => setForm((c) => ({ ...c, nom: value }))} />
+                  <Field label={td("profilFirstName")} value={form.prenom} onChange={(value) => setForm((c) => ({ ...c, prenom: value }))} />
+                  <Field label={td("profilLastName")} value={form.nom} onChange={(value) => setForm((c) => ({ ...c, nom: value }))} />
                 </div>
               )}
 
               <div className="grid grid-cols-1 gap-3 text-sm font-semibold text-slate-500 sm:grid-cols-2 lg:grid-cols-1">
-                <InfoLine icon={Mail} label="Email" value={account.profile.email || account.user.email || "—"} />
+                <InfoLine icon={Mail} label={td("profilEmail")} value={account.profile.email || account.user.email || "—"} />
                 {isEditing ? (
-                  <Field label="Telephone / WhatsApp" value={form.phone} onChange={(value) => setForm((c) => ({ ...c, phone: value }))} />
+                  <Field label={td("profilPhoneWhatsapp")} value={form.phone} onChange={(value) => setForm((c) => ({ ...c, phone: value }))} />
                 ) : (
-                  <InfoLine icon={Phone} label="Telephone / WhatsApp" value={savedForm.phone || "—"} />
+                  <InfoLine icon={Phone} label={td("profilPhoneWhatsapp")} value={savedForm.phone || "—"} />
                 )}
                 {isEditing ? (
                   <label className="block min-w-0">
-                    <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">Pays</span>
+                    <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilCountry")}</span>
                     <select
                       value={form.countryCode}
                       onChange={(e) => setForm((c) => ({ ...c, countryCode: e.target.value }))}
                       className="h-12 w-full max-w-full rounded-2xl border border-orange-200 bg-white px-3 sm:px-4 text-sm font-bold text-slate-900 outline-none transition-colors focus:border-orange-500"
                     >
-                      <option value="">Sélectionner un pays</option>
+                      <option value="">{td("profilSelectCountry")}</option>
                       {AFRICA_54.map((c) => (
                         <option key={c.code} value={c.code}>
                           {c.flag} {c.name}
@@ -627,25 +636,25 @@ export default function CenterStudentProfil() {
                     </select>
                   </label>
                 ) : (
-                  <InfoLine icon={Building2} label="Pays" value={displayCountry} />
+                  <InfoLine icon={Building2} label={td("profilCountry")} value={displayCountry} />
                 )}
                 {isEditing ? (
-                  <Field label="Ville" value={form.ville} onChange={(value) => setForm((c) => ({ ...c, ville: value }))} />
+                  <Field label={td("profilCity")} value={form.ville} onChange={(value) => setForm((c) => ({ ...c, ville: value }))} />
                 ) : (
-                  <InfoLine icon={MapPin} label="Ville" value={savedForm.ville || account.profile.city || "—"} />
+                  <InfoLine icon={MapPin} label={td("profilCity")} value={savedForm.ville || account.profile.city || "—"} />
                 )}
                 {isEditing ? (
                   <Field
-                    label="Date de naissance"
+                    label={td("profilBirthDate")}
                     value={form.birth_date}
                     onChange={(value) => setForm((c) => ({ ...c, birth_date: value }))}
                     type="date"
                   />
                 ) : (
-                  <InfoLine icon={Calendar} label="Date de naissance" value={formatDateFr(account.profile.birth_date)} />
+                  <InfoLine icon={Calendar} label={td("profilBirthDate")} value={formatDateFr(account.profile.birth_date, locale)} />
                 )}
-                {account.profile.genre ? <InfoLine icon={User} label="Genre" value={account.profile.genre} /> : null}
-                <InfoLine icon={Calendar} label="Membre depuis" value={formatDateFr(account.profile.created_at || account.user.created_at)} />
+                {account.profile.genre ? <InfoLine icon={User} label={td("profilGender")} value={account.profile.genre} /> : null}
+                <InfoLine icon={Calendar} label={td("profilMemberSince")} value={formatDateFr(account.profile.created_at || account.user.created_at, locale)} />
               </div>
 
               <div className="mt-5 flex flex-col gap-3 lg:hidden">
@@ -655,7 +664,7 @@ export default function CenterStudentProfil() {
                     className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-orange-100 bg-orange-50 text-sm font-black uppercase tracking-widest text-orange-600"
                   >
                     <Edit2 className="h-4 w-4" />
-                    Modifier
+                    {td("profilEdit")}
                   </button>
                 ) : (
                   <>
@@ -666,13 +675,13 @@ export default function CenterStudentProfil() {
                       style={{ backgroundColor: BRAND.blue }}
                     >
                       <Save className="h-4 w-4" />
-                      {saving ? "Enregistrement..." : "Enregistrer"}
+                      {saving ? td("profilSaving") : td("profilSave")}
                     </button>
                     <button
                       onClick={cancelEditing}
                       className="flex h-11 w-full items-center justify-center rounded-2xl bg-neutral-100 text-sm font-black uppercase tracking-widest text-slate-500"
                     >
-                      Annuler
+                      {td("profilCancel")}
                     </button>
                   </>
                 )}
@@ -685,7 +694,7 @@ export default function CenterStudentProfil() {
             className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-neutral-900 text-sm font-black uppercase tracking-widest text-white transition hover:bg-orange-600 lg:hidden"
           >
             <LogOut className="h-4 w-4" />
-            Se déconnecter
+            {td("profilSignOut")}
           </button>
         </aside>
 
@@ -696,9 +705,9 @@ export default function CenterStudentProfil() {
                 <KeyRound className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-base font-black">Mot de passe</p>
+                <p className="text-base font-black">{td("profilPassword")}</p>
                 <p className="truncate text-[11px] font-bold text-slate-400">
-                  Securisez votre compte de connexion.
+                  {td("profilPasswordHelp")}
                 </p>
               </div>
               {!passwordOpen && (
@@ -712,7 +721,7 @@ export default function CenterStudentProfil() {
                   className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-orange-100 bg-orange-50 px-2.5 sm:px-3 text-[10px] font-black uppercase tracking-wider text-orange-600 hover:bg-orange-100"
                 >
                   <Edit2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Modifier</span>
+                  <span className="hidden sm:inline">{td("profilEdit")}</span>
                 </button>
               )}
             </div>
@@ -726,7 +735,7 @@ export default function CenterStudentProfil() {
             {passwordOpen && (
               <div className="mt-5 border-t border-neutral-100 pt-5">
                 <div className="mb-4">
-                  <p className="text-sm font-black text-slate-900">Definir un nouveau mot de passe</p>
+                  <p className="text-sm font-black text-slate-900">{td("profilSetNewPassword")}</p>
                   <p className="mt-1 text-xs font-medium text-slate-400">
                     {PASSWORD_POLICY_HINT}
                   </p>
@@ -740,13 +749,13 @@ export default function CenterStudentProfil() {
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <Field
-                    label="Nouveau mot de passe"
+                    label={td("profilNewPassword")}
                     value={passwordForm.password}
                     onChange={(value) => setPasswordForm((c) => ({ ...c, password: value }))}
                     type="password"
                   />
                   <Field
-                    label="Confirmer le mot de passe"
+                    label={td("profilConfirmPassword")}
                     value={passwordForm.confirm}
                     onChange={(value) => setPasswordForm((c) => ({ ...c, confirm: value }))}
                     type="password"
@@ -764,7 +773,7 @@ export default function CenterStudentProfil() {
                     disabled={passwordSaving}
                     className="h-11 w-full rounded-xl bg-neutral-100 px-5 text-xs font-black uppercase tracking-wider text-slate-500 hover:bg-neutral-200 disabled:opacity-50 sm:w-auto"
                   >
-                    Annuler
+                    {td("profilCancel")}
                   </button>
                   <button
                     type="button"
@@ -774,7 +783,7 @@ export default function CenterStudentProfil() {
                     style={{ backgroundColor: BRAND.orange }}
                   >
                     <ShieldCheck className="h-4 w-4" />
-                    {passwordSaving ? "Mise a jour..." : "Confirmer"}
+                    {passwordSaving ? td("profilUpdating") : td("profilConfirm")}
                   </button>
                 </div>
               </div>
@@ -788,28 +797,26 @@ export default function CenterStudentProfil() {
               </div>
               <div className="min-w-0">
                 <p className="text-lg sm:text-xl font-black">
-                  {account.isPluriannual ? "Mon parcours" : "Mon offre / pack"}
+                  {account.isPluriannual ? td("profilMyPath") : td("profilMyOffer")}
                 </p>
                 <p className="text-[11px] sm:text-xs font-bold text-slate-400">
-                  {account.isPluriannual
-                    ? "Détails de votre formation pluri-annuelle."
-                    : "Details de votre formation TCF Canada."}
+                  {account.isPluriannual ? td("profilPathDetails") : td("profilOfferDetails")}
                 </p>
               </div>
             </div>
 
             <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4 sm:p-5">
               <p className="text-[10px] font-black uppercase tracking-widest text-orange-600">
-                {account.isPluriannual ? "Parcours actif" : "Pack actif"}
+                {account.isPluriannual ? td("profilActivePath") : td("profilActivePack")}
               </p>
               <p className="mt-1 break-words text-xl sm:text-2xl font-black" style={{ color: BRAND.blue }}>
-                {account.isPluriannual ? "Formation pluri-annuelle" : packLabel}
+                {account.isPluriannual ? td("pluriannualProgram") : packLabel}
               </p>
               <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-                <Stat label="Duree" value={durationLabel} />
-                <Stat label="Fin d'acces" value={formatDateFr(account.profile.subscription_ends_at)} />
-                <Stat label="Jours restants" value={subscriptionDaysLeft != null ? `${subscriptionDaysLeft} jours` : "—"} />
-                <Stat label="Valide le" value={formatDateFr(account.enrollment?.enrolled_at)} />
+                <Stat label={td("profilDuration")} value={durationLabel} />
+                <Stat label={td("profilAccessEnds")} value={formatDateFr(account.profile.subscription_ends_at, locale)} />
+                <Stat label={td("profilDaysLeft")} value={subscriptionDaysLeft != null ? td("profilDaysCount", { count: subscriptionDaysLeft }) : "—"} />
+                <Stat label={td("profilValidatedOn")} value={formatDateFr(account.enrollment?.enrolled_at, locale)} />
               </div>
               {account.enrollment?.price_note ? (
                 <p className="mt-4 text-xs font-bold text-slate-500 break-words">{account.enrollment.price_note}</p>
@@ -818,9 +825,9 @@ export default function CenterStudentProfil() {
 
             {!account.isPluriannual && account.nexaQuotas !== null && (
             <div className="mt-4 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-4 sm:p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Vos quantités NEXA</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilNexaQuotas")}</p>
               <p className="mt-1 text-[11px] font-bold text-slate-500">
-                Quotas inclus dans votre offre centre
+                {td("profilNexaQuotasHint")}
                 {account.nexaOffer ? ` (${String(account.nexaOffer).toUpperCase()})` : ""}.
               </p>
               <div className="mt-4 grid grid-cols-1 gap-2.5 min-[380px]:grid-cols-2">
@@ -843,7 +850,7 @@ export default function CenterStudentProfil() {
                   const value =
                     typeof allocated === "boolean"
                       ? allocated
-                        ? "Inclus"
+                        ? td("profilIncluded")
                         : "—"
                       : usage || String(allocated);
                   return <Stat key={key} label={label} value={value} />;
@@ -860,8 +867,8 @@ export default function CenterStudentProfil() {
                   <Wallet className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-lg sm:text-xl font-black">Finance</p>
-                  <p className="text-[11px] sm:text-xs font-bold text-slate-400">{financeEn ? "Payments, amounts and financial status." : "Paiements, montants et statut de votre dossier."}</p>
+                  <p className="text-lg sm:text-xl font-black">{td("profilFinance")}</p>
+                  <p className="text-[11px] sm:text-xs font-bold text-slate-400">{td("profilFinanceHint")}</p>
                 </div>
               </div>
               {account.finance ? (
@@ -882,14 +889,14 @@ export default function CenterStudentProfil() {
             {account.finance ? (
               <>
                 <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <FinanceCard label={financeEn ? "Program cost" : "Coût programme"} value={`${account.finance.tuition_fee.toLocaleString(financeLocale)} FCFA`} />
-                  <FinanceCard label={financeEn ? "Paid" : "Versé"} value={`${account.finance.tuition_paid.toLocaleString(financeLocale)} FCFA`} accent="emerald" />
-                  <FinanceCard label={financeEn ? "Balance due" : "Reste à payer"} value={`${account.finance.remaining.toLocaleString(financeLocale)} FCFA`} accent="red" />
+                  <FinanceCard label={td("profilProgramCost")} value={`${account.finance.tuition_fee.toLocaleString(financeLocale)} FCFA`} />
+                  <FinanceCard label={td("profilPaid")} value={`${account.finance.tuition_paid.toLocaleString(financeLocale)} FCFA`} accent="emerald" />
+                  <FinanceCard label={td("profilBalanceDue")} value={`${account.finance.remaining.toLocaleString(financeLocale)} FCFA`} accent="red" />
                 </div>
 
                 {(account.finance.discount_amount || 0) > 0 && (
                   <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">{financeEn ? "Discount" : "Réduction"}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">{td("profilDiscount")}</p>
                     <p className="mt-1 text-sm font-black text-amber-900">
                       −{(account.finance.discount_amount || 0).toLocaleString(financeLocale)} FCFA
                       {account.finance.discount_reason ? `${financeEn ? ": " : " — "}${account.finance.discount_reason}` : ""}
@@ -900,11 +907,11 @@ export default function CenterStudentProfil() {
                 <div className="mb-5 rounded-2xl border border-neutral-100 bg-neutral-50 px-3 sm:px-4 py-4">
                   <div className="flex flex-wrap items-end justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{financeEn ? "Financial status" : "Statut financier"}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilFinancialStatus")}</p>
                       <p className="mt-1 text-sm font-black text-slate-900">{localizedFinanceStatus(account.finance.financial_status)}</p>
                     </div>
                     <div className="text-left sm:text-right">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{financeEn ? "Progress" : "Progression"}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilProgress")}</p>
                       <p className="mt-1 text-sm font-black text-slate-900">
                         {account.finance.tuition_fee > 0
                           ? `${Math.min(100, Math.round((account.finance.tuition_paid / account.finance.tuition_fee) * 100))} %`
@@ -929,7 +936,7 @@ export default function CenterStudentProfil() {
 
                 {(account.installments?.length || 0) > 0 && (
                   <div className="mb-5">
-                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{financeEn ? "Payment schedule" : "Échéancier"}</p>
+                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilPaymentSchedule")}</p>
                     <div className="space-y-2">
                       {account.installments!.map((inst) => {
                         const deferred = !!inst.original_due_date && inst.original_due_date !== inst.due_date;
@@ -939,26 +946,26 @@ export default function CenterStudentProfil() {
                             <div className="flex flex-wrap items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <p className="text-sm font-black text-slate-900">{localizeInstallmentLabel(inst.label, financeEn ? "en" : "fr") || (financeEn ? "Installment" : "Échéance")}</p>
+                                  <p className="text-sm font-black text-slate-900">{localizeInstallmentLabel(inst.label, financeEn ? "en" : "fr") || td("profilInstallment")}</p>
                                   {deferred && (
                                     <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-blue-600">
-                                      {financeEn ? "Deferred" : "Reporté"}
+                                      {td("profilDeferred")}
                                     </span>
                                   )}
                                   {sold && (
                                     <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-700">
-                                      {financeEn ? "Paid" : "Soldé"}
+                                      {localizedFinanceStatus("paid")}
                                     </span>
                                   )}
                                 </div>
                                 <p className="mt-1 text-xs font-bold text-slate-500">
-                                  {financeEn ? "Due date" : "Échéance"} : {financeDate(inst.due_date)}
+                                  {td("profilInstallment")} : {financeDate(inst.due_date)}
                                   {deferred && inst.original_due_date
-                                    ? ` · ${financeEn ? "initially" : "initiale"} ${financeDate(inst.original_due_date)}`
+                                    ? ` · ${td("profilInitially")} ${financeDate(inst.original_due_date)}`
                                     : ""}
                                 </p>
                                 {inst.deferral_reason && (
-                                  <p className="mt-0.5 text-[11px] font-medium text-blue-600">{financeEn ? "Reason" : "Motif"} : {inst.deferral_reason}</p>
+                                  <p className="mt-0.5 text-[11px] font-medium text-blue-600">{td("profilPausedReasonLabel")} : {inst.deferral_reason}</p>
                                 )}
                               </div>
                               <p className="text-sm font-black whitespace-nowrap">{inst.amount.toLocaleString(financeLocale)} FCFA</p>
@@ -971,7 +978,7 @@ export default function CenterStudentProfil() {
                 )}
 
                 <div>
-                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{financeEn ? "Payment history" : "Historique des paiements"}</p>
+                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilPaymentHistory")}</p>
                   {account.payments.length > 0 ? (
                     <div className="space-y-3">
                       {account.payments.map((payment) => (
@@ -988,7 +995,7 @@ export default function CenterStudentProfil() {
                           </div>
                           <div className="text-left sm:text-right shrink-0">
                             <span className="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">
-                              {financeEn ? "Recorded" : "Enregistré"}
+                              {td("profilPaymentRecorded")}
                             </span>
                             {payment.receipt_number ? (
                               <p className="mt-1 text-[10px] font-bold text-slate-400 break-all">{payment.receipt_number}</p>
@@ -999,19 +1006,25 @@ export default function CenterStudentProfil() {
                     </div>
                   ) : (
                     <p className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-6 text-center text-sm font-bold text-slate-500">
-                      {financeEn ? "No payment has been recorded yet." : "Aucun paiement enregistré pour le moment."}
+                      {td("profilNoPaymentsYet")}
                     </p>
                   )}
                 </div>
 
                 {(account.financeEvents?.length || 0) > 0 && (
                   <div className="mt-5">
-                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{financeEn ? "Deferrals and discounts" : "Reports & réductions"}</p>
+                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilDeferralsDiscounts")}</p>
                     <div className="space-y-2">
                       {account.financeEvents!.map((ev) => (
                         <div key={ev.id} className="rounded-2xl border border-neutral-100 bg-white px-4 py-3">
                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {ev.type === "deferral" ? (financeEn ? "Deferral" : "Report") : ev.type === "discount" ? (financeEn ? "Discount" : "Réduction") : ev.type === "payment_note" ? (financeEn ? "Payment note" : "Note de paiement") : ev.type}
+                            {ev.type === "deferral"
+                              ? td("profilDeferral")
+                              : ev.type === "discount"
+                                ? td("profilDiscount")
+                                : ev.type === "payment_note"
+                                  ? td("profilPaymentNote")
+                                  : ev.type}
                             {" · "}{financeDate(ev.created_at)}
                           </p>
                           <p className="mt-1 text-sm font-bold text-slate-800">
@@ -1028,7 +1041,7 @@ export default function CenterStudentProfil() {
               </>
             ) : (
               <p className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-6 text-center text-sm font-bold text-slate-500">
-                {financeEn ? "Your financial record will be available after the center validates your enrollment." : "Votre dossier financier sera disponible après validation de votre inscription par le centre."}
+                {td("profilFinanceUnavailable")}
               </p>
             )}
           </section>

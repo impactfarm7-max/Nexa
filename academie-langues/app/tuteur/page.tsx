@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import { TUTOR_EXCHANGE_QUOTA } from "@/app/utils/tutor-quota";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Message = {
   id: string;
@@ -39,6 +40,7 @@ type TutorAccessState = {
 
 export default function TutorPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -90,9 +92,9 @@ export default function TutorPage() {
         setIsAdmin(profile.role === "admin");
         void supabase
           .from("profiles")
-          .update({ current_activity: "En session avec le Tuteur 🤖" })
+          .update({ current_activity: t("dashboard", "tutorActivity") })
           .eq("id", session.user.id);
-        logClientActivity("Ouverture Tuteur", "Page tuteur consultée");
+        logClientActivity(t("dashboard", "tutorOpenLog"), t("dashboard", "tutorOpenLogDetail"));
       }
 
       setLoading(false);
@@ -124,7 +126,7 @@ export default function TutorPage() {
     };
 
     void init();
-  }, [router]);
+  }, [router, t]);
 
   const handleNewConversation = async () => {
     if (!accessToken) return;
@@ -175,7 +177,7 @@ export default function TutorPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setSendError(json.error || "Le tuteur IA est momentanément indisponible. Réessayez.");
+        setSendError(json.error || t("dashboard", "tutorUnavailable"));
         setIsTyping(false);
         return;
       }
@@ -186,15 +188,15 @@ export default function TutorPage() {
       setIsTyping(false);
     } catch (error) {
       console.error("Erreur Tuteur:", error);
-      setSendError("Le tuteur IA est momentanément indisponible. Réessayez.");
+      setSendError(t("dashboard", "tutorUnavailable"));
       setIsTyping(false);
     }
   };
 
   const suggestions = [
-    { icon: BookOpen, text: "Explique-moi une règle de grammaire" },
-    { icon: PenTool, text: "Corrige cette phrase pour le TCF" },
-    { icon: MessageCircleQuestion, text: "Fais-moi passer un test rapide" },
+    { icon: BookOpen, text: t("dashboard", "tutorSuggestionGrammar") },
+    { icon: PenTool, text: t("dashboard", "tutorSuggestionCorrect") },
+    { icon: MessageCircleQuestion, text: t("dashboard", "tutorSuggestionQuiz") },
   ];
 
   if (loading) {
@@ -217,20 +219,20 @@ export default function TutorPage() {
           <div className="flex items-center gap-3 min-w-0">
             <button
               onClick={() => router.push("/dashboard")}
-              aria-label="Retour au tableau de bord"
+              aria-label={t("dashboard", "tutorBackAria")}
               className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition-colors shrink-0"
             >
               <ArrowLeft className="w-4 h-4 text-neutral-600" />
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className={STUDENT_TEXT.pageTitle} style={{ color: BRAND.blue }}>Coach NEXA</h1>
+                <h1 className={STUDENT_TEXT.pageTitle} style={{ color: BRAND.blue }}>{t("dashboard", "tutorTitle")}</h1>
                 <span className="bg-orange-50 border border-orange-200 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md flex items-center gap-1" style={{ color: BRAND.orange }}>
-                  <Sparkles className="w-3 h-3" /> Flash
+                  <Sparkles className="w-3 h-3" /> {t("dashboard", "tutorFlashBadge")}
                 </span>
               </div>
               <p className={`${STUDENT_TEXT.subtitle} mt-0.5`}>
-                {isTutorLocked ? "Fonctionnalité bientôt disponible" : "Votre tuteur privé disponible 24/7"}
+                {isTutorLocked ? t("dashboard", "tutorLockedSubtitle") : t("dashboard", "tutorAvailableSubtitle")}
               </p>
             </div>
           </div>
@@ -239,17 +241,17 @@ export default function TutorPage() {
             {!isTutorLocked && messages.length > 0 && (
               <button
                 onClick={handleNewConversation}
-                aria-label="Nouvelle conversation"
+                aria-label={t("dashboard", "tutorNewConversationAria")}
                 className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-lg border border-orange-200 bg-white text-[10px] font-black uppercase tracking-wider text-neutral-600 hover:bg-orange-50 hover:text-orange-600 transition-colors"
               >
-                <RotateCcw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Nouvelle conversation</span>
+                <RotateCcw className="w-3.5 h-3.5" /> <span className="hidden sm:inline">{t("dashboard", "tutorNewConversation")}</span>
               </button>
             )}
             <div className="flex flex-col items-end shrink-0">
               {isTutorLocked ? (
                 <>
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-orange-500 mb-1 inline-flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {tutorLock.unlockAt ? "Ouverture dans" : "Bientôt disponible"}
+                    <Clock className="w-3 h-3" /> {tutorLock.unlockAt ? t("dashboard", "tutorOpensIn") : t("dashboard", "tutorSoon")}
                   </span>
                   {tutorLock.unlockAt ? (
                     <div
@@ -258,10 +260,10 @@ export default function TutorPage() {
                       title={tutorLock.countdownLabel}
                     >
                       {[
-                        { value: tutorLock.daysRemaining, label: "J" },
-                        { value: tutorLock.hoursRemaining, label: "H" },
-                        { value: tutorLock.minutesRemaining, label: "M" },
-                        { value: tutorLock.secondsRemaining, label: "S" },
+                        { value: tutorLock.daysRemaining, label: t("dashboard", "tutorCountdownDay") },
+                        { value: tutorLock.hoursRemaining, label: t("dashboard", "tutorCountdownHour") },
+                        { value: tutorLock.minutesRemaining, label: t("dashboard", "tutorCountdownMinute") },
+                        { value: tutorLock.secondsRemaining, label: t("dashboard", "tutorCountdownSecond") },
                       ].map((unit) => (
                         <div key={unit.label} className="min-w-[2.25rem] rounded-md bg-white px-1.5 py-1 border border-orange-100 text-center">
                           <p className="text-sm font-bold tabular-nums leading-none" style={{ color: BRAND.blue }}>
@@ -275,18 +277,18 @@ export default function TutorPage() {
                     </div>
                   ) : (
                     <div className="rounded-lg border border-orange-100 bg-orange-50 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-orange-600">
-                      Fonctionnalité en préparation
+                      {t("dashboard", "tutorPreparing")}
                     </div>
                   )}
                 </>
               ) : quotaUnlimited ? (
                 <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-                  Messages illimités
+                  {t("dashboard", "tutorUnlimited")}
                 </span>
               ) : (
                 <>
                   <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 mb-1 hidden md:block">
-                    Échanges restants
+                    {t("dashboard", "tutorExchangesLeft")}
                   </span>
                   <div className="flex items-center gap-2">
                     <div className="w-16 md:w-24 h-1.5 bg-orange-100 rounded-full overflow-hidden">
@@ -320,10 +322,12 @@ export default function TutorPage() {
                     <Sparkles className="w-8 h-8" style={{ color: BRAND.orange }} />
                   </div>
                   <h2 className={`${STUDENT_TEXT.sectionTitle} mb-2`} style={{ color: BRAND.blue }}>
-                    {displayFirstName ? `Bonjour ${displayFirstName} !` : "Bonjour !"}
+                    {displayFirstName
+                      ? t("dashboard", "tutorHelloNamed", { name: displayFirstName })
+                      : t("dashboard", "tutorHello")}
                   </h2>
                   <p className="text-neutral-500 text-sm max-w-xl mx-auto leading-relaxed mb-6">
-                    Je suis votre tuteur privé, propulsé par NEXA. Je suis directement connecté à vos cours pour vous aider de manière précise et pédagogique. Que révisons-nous aujourd&apos;hui ?
+                    {t("dashboard", "tutorIntro")}
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full max-w-4xl mx-auto">
@@ -385,7 +389,7 @@ export default function TutorPage() {
               {isQuotaReached && (
                 <div className="flex items-center justify-center gap-2 p-3 mt-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-semibold text-center mx-auto w-fit">
                   <AlertCircle className="w-4 h-4" />
-                  Vous avez utilisé vos {TUTOR_EXCHANGE_QUOTA} échanges avec le tuteur IA.
+                  {t("dashboard", "tutorQuotaReached", { count: TUTOR_EXCHANGE_QUOTA })}
                 </div>
               )}
 
@@ -414,8 +418,8 @@ export default function TutorPage() {
                   }}
                   placeholder={
                     isQuotaReached
-                      ? `Quota de ${TUTOR_EXCHANGE_QUOTA} échanges atteint...`
-                      : "Posez votre question ici..."
+                      ? t("dashboard", "tutorQuotaPlaceholder", { count: TUTOR_EXCHANGE_QUOTA })
+                      : t("dashboard", "tutorInputPlaceholder")
                   }
                   disabled={isBlocked || isTyping}
                   aria-disabled={isBlocked || isTyping}
@@ -434,7 +438,7 @@ export default function TutorPage() {
                 </button>
               </div>
               <p className="text-center text-[10px] font-medium text-neutral-400 mt-2">
-                Le tuteur peut commettre des erreurs. Vérifiez toujours vos cours.
+                {t("dashboard", "tutorDisclaimer")}
               </p>
             </div>
         </>

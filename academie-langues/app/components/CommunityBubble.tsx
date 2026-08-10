@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Users } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const STORAGE_KEY = "nexa_community_bubble_pos";
 const SIZE = 56; // w-14
@@ -45,6 +46,7 @@ function readStoredPos(): Pos | null {
 }
 
 export default function CommunityBubble() {
+  const { t } = useI18n();
   const router = useRouter();
   const [unread, setUnread] = useState(0);
   const [pos, setPos] = useState<Pos | null>(null);
@@ -202,8 +204,8 @@ export default function CommunityBubble() {
       onPointerMove={onPointerMove}
       onPointerUp={endDrag}
       onPointerCancel={endDrag}
-      aria-label="Ouvrir la communauté (déplaçable)"
-      title="Glisser pour déplacer"
+      aria-label={t("dashboard", "communauteBubbleOpen")}
+      title={t("dashboard", "communauteBubbleDrag")}
       style={{
         left: `${pos.x}px`,
         top: `${pos.y}px`,

@@ -11,10 +11,10 @@ import {
   unwrapPendingMark,
   wrapRangeAsPending,
 } from "@/app/utils/highlightAnchor";
-import { DEFAULT_HIGHLIGHT_THEMES, themeMapByKey, type HighlightSourceType } from "@/app/utils/highlightConstants";
+import { DEFAULT_HIGHLIGHT_THEMES, themeMapByKey, type HighlightSourceType, displayHighlightThemeLabel } from "@/app/utils/highlightConstants";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import type { HighlightTheme } from "./CoursNotesPanel";
-import { downloadLessonAttachment, downloadLessonContentPdf } from "@/app/utils/downloadLessonPack";
+import { downloadLessonAttachment, downloadLessonContentPdf, lessonDownloadErrorMessage } from "@/app/utils/downloadLessonPack";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
 export type CourseHighlight = {
@@ -250,8 +250,19 @@ export default function LessonReader({
     if (!downloadable || downloading) return;
     setDownloading(true);
     setDownloadError("");
-    const result = await downloadLessonContentPdf({ title, subtitle, htmlContent, orgName });
-    if (!result.ok) setDownloadError(result.error || t("dashboard", "lessonDownloadError"));
+    const result = await downloadLessonContentPdf({
+      title,
+      subtitle,
+      htmlContent,
+      orgName,
+      labels: {
+        eyebrow: t("dashboard", "lessonPdfEyebrow"),
+        titleFallback: t("dashboard", "lessonPdfTitleFallback"),
+        emptyBody: t("dashboard", "lessonPdfEmptyBody"),
+        orgFallback: t("dashboard", "lessonPdfOrgFallback"),
+      },
+    });
+    if (!result.ok) setDownloadError(lessonDownloadErrorMessage(result, t));
     setDownloading(false);
   };
 
@@ -264,7 +275,7 @@ export default function LessonReader({
       label: m.label,
       type: m.type,
     });
-    if (!result.ok) setDownloadError(result.error || t("dashboard", "lessonDownloadError"));
+    if (!result.ok) setDownloadError(lessonDownloadErrorMessage(result, t));
     setDownloadingMediaId(null);
   };
 
@@ -393,21 +404,24 @@ export default function LessonReader({
             <p className="text-xs text-slate-500 line-clamp-3 mb-2 italic">&ldquo;{popover.text}&rdquo;</p>
             <p className="text-[10px] text-orange-600 mb-3">{t("dashboard", "lessonPickColor")}</p>
             <div className="grid grid-cols-4 gap-2 mb-3">
-              {themes.map((t) => (
+              {themes.map((theme) => {
+                const themeLabel = displayHighlightThemeLabel(theme, t);
+                return (
                 <button
-                  key={t.color_key}
+                  key={theme.color_key}
                   type="button"
-                  title={t.label}
-                  onClick={() => void createHighlight(t.color_key)}
+                  title={themeLabel}
+                  onClick={() => void createHighlight(theme.color_key)}
                   className="flex flex-col items-center gap-1 min-h-[44px]"
                 >
                   <span
                     className="w-9 h-9 rounded-lg border-2 border-white shadow-sm"
-                    style={{ backgroundColor: t.hex_color }}
+                    style={{ backgroundColor: theme.hex_color }}
                   />
-                  <span className="text-[8px] font-bold text-slate-500 truncate w-full text-center">{t.label}</span>
+                  <span className="text-[8px] font-bold text-slate-500 truncate w-full text-center">{themeLabel}</span>
                 </button>
-              ))}
+                );
+              })}
             </div>
             <input
               type="text"
@@ -430,23 +444,26 @@ export default function LessonReader({
               <p className="text-[10px] xl:text-xs text-slate-500 line-clamp-2 mb-2 italic">&ldquo;{popover.text}&rdquo;</p>
               <p className="text-[9px] text-orange-600 mb-2">{t("dashboard", "lessonPickColorDesktop")}</p>
               <div className="grid grid-cols-4 gap-2 mb-2">
-                {themes.map((t) => (
+                {themes.map((theme) => {
+                  const themeLabel = displayHighlightThemeLabel(theme, t);
+                  return (
                   <button
-                    key={t.color_key}
+                    key={theme.color_key}
                     type="button"
-                    title={t.label}
-                    onClick={() => void createHighlight(t.color_key)}
+                    title={themeLabel}
+                    onClick={() => void createHighlight(theme.color_key)}
                     className="flex flex-col items-center gap-1 group"
                   >
                     <span
                       className="w-8 h-8 rounded-lg border-2 border-white shadow-sm group-hover:scale-110 transition-transform"
-                      style={{ backgroundColor: t.hex_color }}
+                      style={{ backgroundColor: theme.hex_color }}
                     />
                     <span className="text-[8px] font-bold text-slate-500 truncate w-full text-center leading-tight">
-                      {t.label}
+                      {themeLabel}
                     </span>
                   </button>
-                ))}
+                  );
+                })}
               </div>
               <input
                 type="text"

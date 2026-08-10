@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  BarChart3, Bell, Building2, ChevronRight, Command, Inbox, LayoutDashboard,
+  BarChart3, Bell, Building2, ChevronRight, Command, Headphones, Inbox, LayoutDashboard,
   LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck,
   Star, Sun, ScrollText, Users, X, LibraryBig,
 } from "lucide-react";
@@ -22,6 +22,7 @@ const NAV_CONFIG = [
   { href: "/superadmin/centres", labelKey: "navCentersLabel", descKey: "navCentersDesc", icon: Building2, groupKey: "groupNetwork" },
   { href: "/superadmin/etudiants", labelKey: "navStudentsLabel", descKey: "navStudentsDesc", icon: Users, groupKey: "groupNetwork" },
   { href: "/superadmin/demandes", labelKey: "navRequestsLabel", descKey: "navRequestsDesc", icon: Inbox, groupKey: "groupOperations" },
+  { href: "/superadmin/support", labelKey: "navSupportLabel", descKey: "navSupportDesc", icon: Headphones, groupKey: "groupOperations" },
   { href: "/superadmin/bibliotheque", labelKey: "navLibraryLabel", descKey: "navLibraryDesc", icon: LibraryBig, groupKey: "groupOperations" },
   { href: "/superadmin/audit", labelKey: "navAuditLabel", descKey: "navAuditDesc", icon: ScrollText, groupKey: "groupSecurity" },
 ] as const;

@@ -5,10 +5,19 @@ const SYSTEM_NOTIFICATION_REPLACEMENTS: Array<[RegExp, string]> = [
   [/Session Live annulée/gi, "Live Session cancelled"],
   [/Session Live modifiée/gi, "Live Session updated"],
   [/Nouvelle Session Live/gi, "New Live Session"],
+  [/Session Live/gi, "Live Session"],
   [/nouvelle date/gi, "new date"],
   [/Présentiel/gi, "In person"],
   [/En ligne/gi, "Online"],
   [/Rejoindre\s*:/gi, "Join:"],
+  [/Bonne nouvelle\s*:/gi, "Good news:"],
+  [/votre examen complet TCF est débloqué\s*!/gi, "your full TCF exam is unlocked!"],
+  [/Vous pouvez le lancer dès maintenant depuis le simulateur\./gi, "You can start it now from the simulator."],
+  [/L'expression écrite est ouverte aujourd'hui\s*!/gi, "Written expression is open today!"],
+  [/Entraînez-vous en illimité,?\s*disponible chaque mercredi et samedi\./gi, "Practice without limits, available every Wednesday and Saturday."],
+  [/Entraînez-vous en illimité\s*[—\-–,]?\s*disponible chaque mercredi et samedi\./gi, "Practice without limits, available every Wednesday and Saturday."],
+  [/Votre examen complet TCF sera débloqué le/gi, "Your full TCF exam will unlock on"],
+  [/Plus que quelques jours, préparez-vous\s*!/gi, "Just a few days left, get ready!"],
 ];
 
 const FRENCH_DATE_WORDS: Record<string, string> = {

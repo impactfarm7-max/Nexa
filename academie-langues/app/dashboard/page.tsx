@@ -90,6 +90,7 @@ import { useSimulationLimit } from "@/app/hooks/useSimulationLimit";
 import { useStudentCenterContext } from "@/app/hooks/useStudentCenterContext";
 import { addCalendarMonths } from "@/app/utils/examCompletUnlock";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeNotificationMessage } from "@/app/utils/notificationI18n";
 
 // Message de la notif in-app envoyée le jour où l'examen complet se débloque
 const EXAM_COMPLET_UNLOCK_MSG =
@@ -98,7 +99,7 @@ const EXAM_COMPLET_UNLOCK_MSG =
 // Message de la notif in-app envoyée les jours d'ouverture de l'expression écrite
 // (étudiants de centre : chaque mercredi et samedi).
 const EE_OPEN_MSG =
-  "✍️ L'expression écrite est ouverte aujourd'hui ! Entraînez-vous en illimité — disponible chaque mercredi et samedi.";
+  "✍️ L'expression écrite est ouverte aujourd'hui ! Entraînez-vous en illimité, disponible chaque mercredi et samedi.";
 
 // Date locale au format AAAA-MM-JJ (sert de clé anti-doublon par jour).
 function localDateKey(d = new Date()) {
@@ -1233,7 +1234,7 @@ export default function Dashboard() {
                           ) : (
                             notifications.map((notif) => (
                               <div key={notif.id} className="p-4 rounded-2xl transition-colors border-b border-neutral-50 last:border-none hover:bg-neutral-50">
-                                <p className="text-xs font-medium text-neutral-800 leading-snug">{notif.message}</p>
+                                <p className="text-xs font-medium text-neutral-800 leading-snug">{localizeNotificationMessage(notif.message, locale)}</p>
                                 <p className="text-[10px] text-neutral-400 font-mono mt-1">{new Date(notif.created_at).toLocaleDateString(dateLocale, { hour: "2-digit", minute: "2-digit" })}</p>
                               </div>
                             ))
@@ -1622,7 +1623,7 @@ export default function Dashboard() {
                     <motion.div key={`fb-${activePromo}`} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} transition={{ duration: 0.5 }} className="absolute inset-0 bg-slate-900 p-6 md:p-8 flex flex-col justify-center text-white">
                       <div className="flex gap-0.5 mb-2">{[1, 2, 3, 4, 5].map((s) => <Star key={s} size={14} fill={s <= fb.rating ? BRAND.orange : "none"} className={s <= fb.rating ? "" : "text-slate-600"} style={s <= fb.rating ? { color: BRAND.orange } : {}} />)}</div>
                       {fb.comment && <p className="text-sm md:text-base font-semibold text-white/90 line-clamp-3 mb-2 italic">"{fb.comment}"</p>}
-                      <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: "#FDBA74" }}>— {fb.prenom || t("dashboard", "nexaStudentFallback")}</p>
+                      <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: "#FDBA74" }}>{fb.prenom || t("dashboard", "nexaStudentFallback")}</p>
                     </motion.div>
                   );
                 })()}

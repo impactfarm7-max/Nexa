@@ -30,7 +30,8 @@ const ICONS_MAP: Record<string, typeof LibraryBig> = {
 };
 
 export default function BibliothequePubliquePage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const router = useRouter();
   const { loading: centerLoading, isPluriannual } = useStudentCenterContext();
 
@@ -61,12 +62,13 @@ export default function BibliothequePubliquePage() {
       setLoading(false);
     };
 
-    load();
+    void load();
   }, [router]);
 
   const openDocument = async (storagePath: string, doc: any) => {
     if (doc.is_paid) {
-      alert(`Ce document est payant (${Number(doc.price || 0).toLocaleString("fr-FR")} FCFA). Contactez votre centre pour y accéder.`);
+      const price = Number(doc.price || 0).toLocaleString(dateLocale);
+      alert(t("dashboard", "bibliothequePublicPaidAlert", { price }));
       return;
     }
     setIsLoadingPdf(true);
@@ -80,13 +82,13 @@ export default function BibliothequePubliquePage() {
         .createSignedUrl(storagePath, 60);
 
       if (error || !data) {
-        alert("Impossible de charger le document.");
+        alert(t("dashboard", "bibliothequePublicLoadError"));
         return;
       }
 
       setViewingDoc(data.signedUrl);
     } catch {
-      alert("Une erreur de connexion est survenue.");
+      alert(t("dashboard", "bibliothequePublicNetworkError"));
     } finally {
       setIsLoadingPdf(false);
     }
@@ -119,7 +121,7 @@ export default function BibliothequePubliquePage() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.back()}
-              aria-label="Retour"
+              aria-label={t("dashboard", "bibliothequePublicBackAria")}
               className="p-2 rounded-lg bg-white border border-orange-200 hover:bg-orange-50 transition group"
             >
               <ArrowLeft className="w-4 h-4 text-neutral-600 group-hover:-translate-x-0.5 transition-transform" />
@@ -128,7 +130,9 @@ export default function BibliothequePubliquePage() {
               <h1 className="font-display font-black tracking-tight leading-none text-[clamp(1rem,0.9rem+0.55vw,1.5rem)]" style={{ color: BRAND.blue }}>
                 {t("dashboard", "navPublicLibrary")}
               </h1>
-              <p className={`${STUDENT_TEXT.badge} mt-0.5`} style={{ color: BRAND.orange }}>Accès libre à tous les documents</p>
+              <p className={`${STUDENT_TEXT.badge} mt-0.5`} style={{ color: BRAND.orange }}>
+                {t("dashboard", "bibliothequePublicSubtitle")}
+              </p>
             </div>
           </div>
 
@@ -136,7 +140,7 @@ export default function BibliothequePubliquePage() {
             <Search className="w-4 h-4 text-neutral-400 group-focus-within:text-orange-500 transition-colors" />
             <input
               type="text"
-              placeholder="Chercher (ex: grammaire, culture...)"
+              placeholder={t("dashboard", "bibliothequePublicSearchPlaceholder")}
               className="bg-transparent border-none outline-none ml-2 text-xs font-medium w-full text-neutral-700 placeholder:text-neutral-400"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -149,7 +153,7 @@ export default function BibliothequePubliquePage() {
             <Search className="w-4 h-4 text-neutral-400 group-focus-within:text-orange-500 transition-colors shrink-0" />
             <input
               type="text"
-              placeholder="Chercher (ex: grammaire, culture...)"
+              placeholder={t("dashboard", "bibliothequePublicSearchPlaceholder")}
               className="bg-transparent border-none outline-none ml-2 text-xs font-medium w-full text-neutral-700 placeholder:text-neutral-400"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -163,7 +167,7 @@ export default function BibliothequePubliquePage() {
         <section>
           <div className="flex items-center gap-3 mb-4 px-1">
             <h2 className={`${STUDENT_TEXT.cardTitle} flex items-center gap-2`} style={{ color: BRAND.blue }}>
-              <LibraryBig className="w-4 h-4" style={{ color: BRAND.orange }} /> Documents disponibles
+              <LibraryBig className="w-4 h-4" style={{ color: BRAND.orange }} /> {t("dashboard", "bibliothequePublicDocsTitle")}
             </h2>
             <div className="h-px flex-1 bg-orange-100" />
           </div>
@@ -171,6 +175,7 @@ export default function BibliothequePubliquePage() {
           <div className="grid gap-[clamp(0.75rem,0.5rem+0.8vw,1.35rem)] grid-cols-[repeat(auto-fill,minmax(clamp(9.5rem,28vw,14rem),1fr))]">
             {filteredDocs.map((doc: any) => {
               const IconComponent = ICONS_MAP[doc.icone] || LibraryBig;
+              const priceLabel = Number(doc.price || 0).toLocaleString(dateLocale);
 
               return (
                 <article key={doc.id}>
@@ -188,7 +193,9 @@ export default function BibliothequePubliquePage() {
                     {doc.is_paid && (
                       <div className="absolute top-2.5 right-2.5 z-10 flex items-center gap-1 bg-orange-50 border border-orange-200 rounded-full px-2 py-0.5">
                         <Lock className="w-2.5 h-2.5 text-orange-500" />
-                        <span className="text-[9px] font-black text-orange-600">{Number(doc.price || 0).toLocaleString("fr-FR")} F</span>
+                        <span className="text-[9px] font-black text-orange-600">
+                          {t("dashboard", "bibliothequePublicPriceBadge", { price: priceLabel })}
+                        </span>
                       </div>
                     )}
                     <div className="flex items-start gap-3 z-10 relative">
@@ -210,7 +217,7 @@ export default function BibliothequePubliquePage() {
 
             {filteredDocs.length === 0 && (
               <div className="col-span-full py-12 text-center text-neutral-400 text-sm bg-white rounded-xl border border-dashed border-orange-200">
-                Aucun document ne correspond à &ldquo;{searchQuery}&rdquo;.
+                {t("dashboard", "bibliothequePublicEmpty", { query: searchQuery })}
               </div>
             )}
           </div>
@@ -234,18 +241,22 @@ export default function BibliothequePubliquePage() {
                     <LibraryBig className="text-white w-4 h-4" strokeWidth={1.75} />
                   </div>
                   <div>
-                    <p className={`${STUDENT_TEXT.cardTitle} leading-tight`} style={{ color: BRAND.blue }}>Lecteur NEXA</p>
-                    <p className="text-[10px] font-medium" style={{ color: BRAND.orange }}>Anti-copie activé</p>
+                    <p className={`${STUDENT_TEXT.cardTitle} leading-tight`} style={{ color: BRAND.blue }}>
+                      {t("dashboard", "bibliothequeReaderTitle")}
+                    </p>
+                    <p className="text-[10px] font-medium" style={{ color: BRAND.orange }}>
+                      {t("dashboard", "bibliothequeReaderAntiCopy")}
+                    </p>
                   </div>
                 </div>
 
                 <button
                   onClick={() => setViewingDoc(null)}
-                  aria-label="Fermer le lecteur PDF"
+                  aria-label={t("dashboard", "bibliothequeReaderCloseAria")}
                   className="bg-white border border-orange-200 hover:border-orange-400 hover:bg-orange-50 font-semibold p-2 md:px-3 md:py-2 rounded-lg text-xs transition-colors flex items-center gap-2"
                   style={{ color: BRAND.blue }}
                 >
-                  <span className="hidden md:inline">Fermer</span> <X className="w-4 h-4" />
+                  <span className="hidden md:inline">{t("dashboard", "bibliothequeReaderClose")}</span> <X className="w-4 h-4" />
                 </button>
               </div>
 
@@ -267,7 +278,7 @@ export default function BibliothequePubliquePage() {
                 <button
                   disabled={pageNumber <= 1}
                   onClick={() => changePage(-1)}
-                  aria-label="Page précédente"
+                  aria-label={t("dashboard", "bibliothequeReaderPrevAria")}
                   className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   style={{ color: BRAND.blue }}
                 >
@@ -275,13 +286,16 @@ export default function BibliothequePubliquePage() {
                 </button>
 
                 <p className="text-xs md:text-sm xl:text-base font-semibold tabular-nums" style={{ color: BRAND.blue }}>
-                  Page <span style={{ color: BRAND.orange }}>{pageNumber}</span> / {numPages || "—"}
+                  {t("dashboard", "bibliothequeReaderPage", {
+                    current: pageNumber,
+                    total: numPages || "—",
+                  })}
                 </p>
 
                 <button
                   disabled={pageNumber >= (numPages || 1)}
                   onClick={() => changePage(1)}
-                  aria-label="Page suivante"
+                  aria-label={t("dashboard", "bibliothequeReaderNextAria")}
                   className="w-11 h-11 min-w-[44px] min-h-[44px] rounded-lg bg-orange-50 border border-orange-200 hover:bg-orange-100 flex items-center justify-center transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                   style={{ color: BRAND.blue }}
                 >
@@ -295,7 +309,7 @@ export default function BibliothequePubliquePage() {
       </AnimatePresence>
 
       <p className="text-center text-[10px] text-neutral-400 pt-8 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
-        NEXA Library Service • © 2026
+        {t("dashboard", "bibliothequePublicFooter")}
       </p>
     </div>
   );

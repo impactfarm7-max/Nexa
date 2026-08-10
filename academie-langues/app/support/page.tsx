@@ -68,7 +68,7 @@ export default function SupportPage() {
   const [botTyping, setBotTyping] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const fetchMessages = async (uid: string) => {
+  const fetchMessages = async (uid: string, centerUser = isCenterUser) => {
     const { data } = await supabase
       .from("support_messages")
       .select("*")
@@ -87,7 +87,8 @@ export default function SupportPage() {
         .from("profiles")
         .select("id, prenom")
         .in("id", adminIds);
-      setAdminNames(Object.fromEntries((profiles || []).map((p: any) => [p.id, p.prenom || t("dashboard", "supportDefaultAgent")])));
+      const fallback = centerUser ? t("dashboard", "supportCenterDefaultAgent") : t("dashboard", "supportDefaultAgent");
+      setAdminNames(Object.fromEntries((profiles || []).map((p: any) => [p.id, p.prenom || fallback])));
     } else {
       setAdminNames({});
     }
@@ -132,12 +133,21 @@ export default function SupportPage() {
 
       setIsCenterUser(Boolean(profile?.center_id));
 
+      if (profile?.role === "superadmin") {
+        router.push("/superadmin/support");
+        return;
+      }
+
       if (profile?.role === "admin") {
         router.push("/admin?tab=support");
         return;
       }
 
-      const res = await fetch("/api/messages/admin-id?scope=iag-support", {
+      const isCenter = Boolean(profile?.center_id);
+      const adminIdUrl = isCenter
+        ? "/api/messages/admin-id"
+        : "/api/messages/admin-id?scope=iag-support";
+      const res = await fetch(adminIdUrl, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       const json = await res.json();
@@ -145,10 +155,10 @@ export default function SupportPage() {
 
       await supabase
         .from("profiles")
-        .update({ current_activity: "Support client" })
+        .update({ current_activity: isCenter ? "Support centre" : "Support client" })
         .eq("id", session.user.id);
 
-      await fetchMessages(session.user.id);
+      await fetchMessages(session.user.id, isCenter);
       setLoading(false);
     };
 
@@ -245,20 +255,22 @@ export default function SupportPage() {
           throw new Error("Le message est parti mais l'image n'a pas ete enregistree. Verifiez la colonne image_url dans Supabase.");
         }
         await fetchMessages(user.id);
-        // Déclenche l'assistant IA (la réponse arrive via realtime)
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session) {
-            setBotTyping(true);
-            fetch("/api/support/bot", {
-              method: "POST",
-              headers: { Authorization: `Bearer ${session.access_token}` },
-            })
-              .then(() => fetchMessages(user.id))
-              .catch(() => {})
-              .finally(() => setBotTyping(false));
-          }
-        } catch { setBotTyping(false); }
+        // Bot B2C uniquement — le support centre part vers le suivi réseau, sans mélange.
+        if (!isCenterUser) {
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              setBotTyping(true);
+              fetch("/api/support/bot", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              })
+                .then(() => fetchMessages(user.id))
+                .catch(() => {})
+                .finally(() => setBotTyping(false));
+            }
+          } catch { setBotTyping(false); }
+        }
       } else if (guestToken) {
         setBotTyping(true);
         const res = await fetch("/api/support/guest", {
@@ -298,7 +310,11 @@ export default function SupportPage() {
           </div>
           <div className="min-w-0">
             <p className={`${STUDENT_TEXT.pageTitle} leading-tight truncate`} style={{ color: BRAND.blue }}>{t("dashboard", "supportTitle")}</p>
-            <p className={`${STUDENT_TEXT.subtitle} truncate`}>{user ? t("dashboard", "supportUserSubtitle") : t("dashboard", "supportGuestSubtitle")}</p>
+            <p className={`${STUDENT_TEXT.subtitle} truncate`}>
+              {user
+                ? (isCenterUser ? t("dashboard", "supportCenterSubtitle") : t("dashboard", "supportUserSubtitle"))
+                : t("dashboard", "supportGuestSubtitle")}
+            </p>
           </div>
         </div>
       </header>
@@ -316,7 +332,7 @@ export default function SupportPage() {
                 <ShieldCheck className="w-8 h-8 text-blue-600" />
               </div>
               <p className="font-black text-slate-800">{t("dashboard", "supportNeedHelp")}</p>
-              <p className="text-sm text-slate-400 mt-1">{t("dashboard", "supportEmptyBody")}</p>
+              <p className="text-sm text-slate-400 mt-1">{isCenterUser ? t("dashboard", "supportCenterEmptyBody") : t("dashboard", "supportEmptyBody")}</p>
             </div>
           ) : messages.map((msg, i) => {
             const isMe = user ? msg.from_user_id === user.id : msg.sender === "guest";

@@ -97,7 +97,7 @@ function MissionsPageContent() {
 
       if (!allowed) { setLoading(false); return; }
 
-      supabase.from("profiles").update({ current_activity: "En train de faire ses devoirs ✍️" }).eq("id", s.user.id);
+      supabase.from("profiles").update({ current_activity: t("dashboard", "missionsActivityDoingHomework") }).eq("id", s.user.id);
       logClientActivity("Ouverture missions", "Page Missions & Devoirs consultee");
 
       const res = await fetch("/api/missions/student", {
@@ -127,7 +127,7 @@ function MissionsPageContent() {
       setLoading(false);
     };
     init();
-  }, [router]);
+  }, [router, t]);
 
   useEffect(() => {
     if (!highlightMissionId || loading || scrolledToMissionRef.current) return;
@@ -207,7 +207,24 @@ function MissionsPageContent() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || t("dashboard", "missionsSubmitError"));
+        const code = data.errorCode as string | undefined;
+        const errKey =
+          code === "UNAUTHORIZED" ? "missionsErrUnauthorized"
+          : code === "MISSION_ID_REQUIRED" ? "missionsErrMissionIdRequired"
+          : code === "TEXT_OR_FILE_REQUIRED" ? "missionsErrTextOrFileRequired"
+          : code === "NOT_FOUND" ? "missionsErrNotFound"
+          : code === "NOT_ASSIGNED" ? "missionsErrNotAssigned"
+          : code === "TEXT_NOT_ALLOWED" ? "missionsErrTextNotAllowed"
+          : code === "FILE_TYPE_NOT_ALLOWED" ? "missionsErrFileTypeNotAllowed"
+          : code === "ALREADY_SUBMITTED" ? "missionsErrAlreadySubmitted"
+          : code === "SAVE_FAILED" ? "missionsErrSaveFailed"
+          : code === "SERVER" ? "missionsErrServer"
+          : null;
+        alert(
+          errKey
+            ? t("dashboard", errKey, data.format ? { format: data.format } : undefined)
+            : (data.error || t("dashboard", "missionsSubmitError")),
+        );
         return;
       }
 

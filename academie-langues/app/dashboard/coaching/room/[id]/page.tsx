@@ -10,6 +10,7 @@ import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import { peekStudentAccess } from "@/app/utils/student-access-cache";
 import { resolveMeetingExitPath } from "@/app/utils/student-routes";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeCoachingError } from "@/app/utils/coachingErrorI18n";
 
 type State = "loading" | "ready" | "error";
 
@@ -57,7 +58,7 @@ export default function CoachingRoomPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErrorMsg(json.error || t("dashboard", "coachingRoomJoinError"));
+        setErrorMsg(localizeCoachingError(json.error, t, "coachingRoomJoinError"));
         setState("error");
         return;
       }
@@ -66,8 +67,8 @@ export default function CoachingRoomPage() {
       setState("ready");
     };
 
-    init();
-  }, [router, sessionId]);
+    void init();
+  }, [router, sessionId, t]);
 
   // Coupure automatique à la fin de la séance (+30 min)
   useEffect(() => {
@@ -96,7 +97,7 @@ export default function CoachingRoomPage() {
           <div className="flex items-center gap-3 text-white">
             <div className="flex items-center gap-2">
               <Video size={16} className="text-orange-500" />
-              <span className="text-sm font-bold">Coaching Live</span>
+              <span className="text-sm font-bold">{t("dashboard", "coachingLiveRoomLabel")}</span>
             </div>
             <CoachingTimer endsAt={room.endsAt} />
           </div>

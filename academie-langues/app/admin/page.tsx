@@ -1366,30 +1366,30 @@ export default function RealAdminDashboard() {
     const decryptedSupportRows = await decryptRows(supportRows, (m: any) => {
       const fromP = profileMap.get(m.from_user_id);
       const toP = profileMap.get(m.to_user_id);
-      const sid = fromP?.role !== "admin" ? m.from_user_id : toP?.role !== "admin" ? m.to_user_id : m.from_user_id;
+      const isAgent = (role?: string | null) => role === "admin" || role === "superadmin";
+      const sid = !isAgent(fromP?.role) ? m.from_user_id : !isAgent(toP?.role) ? m.to_user_id : m.from_user_id;
       return { kind: "support", studentId: sid };
     });
     const decryptedGuestRows = await decryptRows(guestRows, (m: any) => ({ kind: "guest", token: m.guest_token }));
 
     const map = new Map<string, SupportConversation>();
+    const isAgent = (role?: string | null) => role === "admin" || role === "superadmin";
     decryptedSupportRows.forEach((msg: any) => {
       const fromProfile = profileMap.get(msg.from_user_id);
       const toProfile = profileMap.get(msg.to_user_id);
       if (!fromProfile && !toProfile) return;
-      const sid = fromProfile?.role !== "admin" ? msg.from_user_id : toProfile?.role !== "admin" ? msg.to_user_id : msg.from_user_id;
+      const sid = !isAgent(fromProfile?.role) ? msg.from_user_id : !isAgent(toProfile?.role) ? msg.to_user_id : msg.from_user_id;
       const profile: any = profileMap.get(sid);
-      const isCenterSupport = Boolean(profile?.center_id);
-      const centerName = profile?.centers?.name || null;
-      const prenom = isCenterSupport
-        ? (centerName || profile?.prenom || "Centre")
-        : profile?.prenom || students.find(s => s.id === sid)?.prenom || sid;
+      // Inbox B2C : étudiants / invités uniquement — jamais les fils centre.
+      if (profile?.center_id) return;
+      const prenom = profile?.prenom || students.find(s => s.id === sid)?.prenom || sid;
       if (!map.has(sid)) {
         map.set(sid, {
-          kind: isCenterSupport ? "center" : "student",
+          kind: "student",
           student_id: sid,
           prenom,
           email: profile?.email || null,
-          center_name: centerName,
+          center_name: null,
           last_message: msg.message,
           last_at: msg.created_at,
           unread: 0,
@@ -4420,7 +4420,7 @@ export default function RealAdminDashboard() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-black text-white">Support Client</h2>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Assistance compte, paiement et technique</p>
+                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">B2C uniquement · comptes et invités (hors centres)</p>
                 </div>
               </div>
 

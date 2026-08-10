@@ -116,11 +116,11 @@ export async function notifyCollectiveSlotStudents(opts: {
 
   let message: string;
   if (event === "cancelled") {
-    message = `❌ Séance annulée — « ${title} »${dateLabel ? ` · ${dateLabel}` : ""}${startTime ? ` · ${startTime}` : ""}.`;
+    message = `❌ Séance annulée : « ${title} »${dateLabel ? ` · ${dateLabel}` : ""}${startTime ? ` · ${startTime}` : ""}.`;
   } else if (event === "rescheduled") {
-    message = `↩️ Séance reportée — « ${title} » · ${dateLabel || "nouvelle date"} · ${startTime}${endTime ? `–${endTime}` : ""} · ${modeLabel}.`;
+    message = `↩️ Séance reportée : « ${title} » · ${dateLabel || "nouvelle date"} · ${startTime}${endTime ? `-${endTime}` : ""} · ${modeLabel}.`;
   } else {
-    message = `📅 Nouvelle séance programmée — « ${title} » · ${dateLabel} · ${startTime}${endTime ? `–${endTime}` : ""} · ${modeLabel}${slot.room_name && mode !== "en_ligne" ? ` · ${slot.room_name}` : ""}.`;
+    message = `📅 Nouvelle séance programmée : « ${title} » · ${dateLabel} · ${startTime}${endTime ? `-${endTime}` : ""} · ${modeLabel}${slot.room_name && mode !== "en_ligne" ? ` · ${slot.room_name}` : ""}.`;
   }
 
   const rows = studentIds.map((user_id) => ({
@@ -199,11 +199,11 @@ export async function notifyLiveSlotParticipants(opts: {
 
   let message: string;
   if (event === "cancelled") {
-    message = `❌ Session Live annulée — « ${title} »${dateLabel ? ` · ${dateLabel}` : ""}${startTime ? ` · ${startTime}` : ""}.`;
+    message = `❌ Session Live annulée : « ${title} »${dateLabel ? ` · ${dateLabel}` : ""}${startTime ? ` · ${startTime}` : ""}.`;
   } else if (event === "rescheduled") {
-    message = `↩️ Session Live modifiée — « ${title} » · ${dateLabel || "nouvelle date"} · ${startTime}${endTime ? `–${endTime}` : ""}.`;
+    message = `↩️ Session Live modifiée : « ${title} » · ${dateLabel || "nouvelle date"} · ${startTime}${endTime ? `-${endTime}` : ""}.`;
   } else {
-    message = `📅 Session Live — « ${title} » · ${dateLabel} · ${startTime}${endTime ? `–${endTime}` : ""}.`;
+    message = `📅 Session Live : « ${title} » · ${dateLabel} · ${startTime}${endTime ? `-${endTime}` : ""}.`;
   }
 
   const rows = participantIds.map((user_id) => ({ user_id, message }));

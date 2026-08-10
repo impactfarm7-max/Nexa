@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export default function CoachingTimer({ endsAt }: { endsAt: number }) {
+  const { t } = useI18n();
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -31,7 +33,7 @@ export default function CoachingTimer({ endsAt }: { endsAt: number }) {
       className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-black tabular-nums ${boxClass} ${
         urgent ? "animate-pulse" : ""
       }`}
-      aria-label="Temps restant"
+      aria-label={t("dashboard", "coachingTimerRemaining")}
     >
       <Clock size={14} className={iconClass} />
       {mm}:{ss}

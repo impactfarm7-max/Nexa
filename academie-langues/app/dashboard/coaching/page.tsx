@@ -26,6 +26,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import StudentRouteSkeleton from "@/app/components/StudentRouteSkeleton";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import { collectiveJoinPath, JOIN_BEFORE_MS, sessionEndMs, sessionStartMs } from "@/app/utils/collectiveLive";
+import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeCoachingError, localizeCollectiveTitle } from "@/app/utils/coachingErrorI18n";
 
 // --- TYPES EXISTANTS ---
 type SessionMode = "en_ligne" | "presentiel";
@@ -92,10 +94,8 @@ const timeSlots = Array.from({ length: 48 }, (_, i) => {
   const m = i % 2 === 0 ? "00" : "30";
   return `${String(h).padStart(2, "0")}:${m}`;
 });
-const weekDays = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"];
-
-function sessionModeLabel(mode?: SessionMode | string | null) {
-  return mode === "presentiel" ? "En présentiel" : "En visio";
+function sessionModeLabel(mode: SessionMode | string | null | undefined, inPerson: string, visio: string) {
+  return mode === "presentiel" ? inPerson : visio;
 }
 
 function inJoinWindow(startMs: number, endMs: number) {
@@ -113,6 +113,13 @@ function formatDateValue(date: Date) {
 export default function CoachingPage() {
   const router = useRouter();
   const pathname = usePathname();
+  const { t, locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) =>
+      new Date(2024, 0, 1 + i).toLocaleDateString(dateLocale, { weekday: "short" }),
+    );
+  }, [dateLocale]);
   const isCenterRoute = pathname?.startsWith("/centre/student");
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
@@ -164,7 +171,7 @@ export default function CoachingPage() {
     if (!token || refusing) return;
     const reason = refuseReason.trim();
     if (reason.length < 3) {
-      setRefuseError("Indiquez un motif (3 caractères minimum).");
+      setRefuseError(t("dashboard", "coachingErrorReasonMin"));
       return;
     }
     setRefusing(true);
@@ -184,7 +191,7 @@ export default function CoachingPage() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setRefuseError(json.error || "Impossible d'enregistrer le refus.");
+        setRefuseError(localizeCoachingError(json.error, t, "coachingErrorRefuse"));
         return;
       }
       setRefuseKey(null);
@@ -195,7 +202,7 @@ export default function CoachingPage() {
         reason,
       });
     } catch {
-      setRefuseError("Une erreur est survenue.");
+      setRefuseError(t("dashboard", "coachingErrorGeneric"));
     } finally {
       setRefusing(false);
     }
@@ -356,21 +363,21 @@ export default function CoachingPage() {
       const json = await res.json();
 
       if (!res.ok) {
-        setErrorMessage(json.error || "Une erreur est survenue.");
+        setErrorMessage(localizeCoachingError(json.error, t, "coachingErrorGeneric"));
         setBookingStep("select");
         return;
       }
 
       setBookingNote("");
       await fetchAppointments(token);
-      logClientActivity("Demande coaching présentiel", scheduledAt.toLocaleString("fr-FR"), { scheduled_at: scheduledAt.toISOString() });
+      logClientActivity("Demande coaching présentiel", scheduledAt.toLocaleString(dateLocale), { scheduled_at: scheduledAt.toISOString() });
       setSelectedDate(null);
       setSelectedTime(null);
       setBookingStep("select");
       setJustBooked(true);
       setTimeout(() => setJustBooked(false), 5000);
     } catch (error) {
-      setErrorMessage("Une erreur est survenue.");
+      setErrorMessage(t("dashboard", "coachingErrorGeneric"));
       setBookingStep("select");
     }
   };
@@ -385,7 +392,7 @@ export default function CoachingPage() {
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        setErrorMessage(json.error || "Impossible d'annuler ce rendez-vous.");
+        setErrorMessage(localizeCoachingError(json.error, t, "coachingErrorCancel"));
         return;
       }
       setActionMode("none");
@@ -399,7 +406,7 @@ export default function CoachingPage() {
       setErrorMessage("");
       await fetchAppointments(token);
     } catch {
-      setErrorMessage("Une erreur est survenue.");
+      setErrorMessage(t("dashboard", "coachingErrorGeneric"));
     } finally {
       setCancelling(false);
     }
@@ -407,7 +414,7 @@ export default function CoachingPage() {
 
   const handleRescheduleAppointment = async (id: string) => {
     if (!rescheduleDate || !rescheduleTime || !rescheduleReason.trim()) {
-      setErrorMessage("Choisissez une nouvelle date, un créneau et un motif.");
+      setErrorMessage(t("dashboard", "coachingErrorRescheduleFields"));
       return;
     }
     setRescheduling(true);
@@ -426,7 +433,7 @@ export default function CoachingPage() {
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setErrorMessage(json.error || "Impossible de reporter ce rendez-vous.");
+        setErrorMessage(localizeCoachingError(json.error, t, "coachingErrorReschedule"));
         return;
       }
       setActionMode("none");
@@ -435,26 +442,26 @@ export default function CoachingPage() {
       setRescheduleReason("");
       await fetchAppointments(token);
     } catch {
-      setErrorMessage("Une erreur est survenue.");
+      setErrorMessage(t("dashboard", "coachingErrorGeneric"));
     } finally {
       setRescheduling(false);
     }
   };
 
   const appointmentStatusMeta = (status: string) => {
-    if (status === "confirmed") return { label: "Confirmée", badge: "Session confirmée", className: "bg-emerald-50 text-emerald-600 border-emerald-200", icon: CheckCircle2 };
-    if (status === "reporte") return { label: "Report demandé", badge: "Nouvelle date en validation", className: "bg-blue-50 text-blue-600 border-blue-200", icon: CalendarClock };
-    if (status === "refused") return { label: "Refusée", badge: "Demande refusée", className: "bg-red-50 text-red-600 border-red-200", icon: XCircle };
-    if (status === "cancelled") return { label: "Annulée", badge: "Séance annulée", className: "bg-neutral-100 text-neutral-500 border-neutral-200", icon: XCircle };
-    return { label: "Réservée", badge: "Demande envoyée au centre", className: "bg-emerald-50 text-emerald-600 border-emerald-200", icon: CheckCircle2 };
+    if (status === "confirmed") return { label: t("dashboard", "coachingStatusConfirmed"), badge: t("dashboard", "coachingBadgeConfirmed"), className: "bg-emerald-50 text-emerald-600 border-emerald-200", icon: CheckCircle2 };
+    if (status === "reporte") return { label: t("dashboard", "coachingStatusReschedule"), badge: t("dashboard", "coachingBadgeReschedule"), className: "bg-blue-50 text-blue-600 border-blue-200", icon: CalendarClock };
+    if (status === "refused") return { label: t("dashboard", "coachingStatusRefused"), badge: t("dashboard", "coachingBadgeRefused"), className: "bg-red-50 text-red-600 border-red-200", icon: XCircle };
+    if (status === "cancelled") return { label: t("dashboard", "coachingStatusCancelled"), badge: t("dashboard", "coachingBadgeCancelled"), className: "bg-neutral-100 text-neutral-500 border-neutral-200", icon: XCircle };
+    return { label: t("dashboard", "coachingStatusReserved"), badge: t("dashboard", "coachingBadgeReserved"), className: "bg-emerald-50 text-emerald-600 border-emerald-200", icon: CheckCircle2 };
   };
 
   const statusMeta = (status: string) => {
-    if (status === "confirmed") return { label: "Confirmé", className: "text-emerald-700 bg-emerald-50 border-emerald-100", icon: CheckCircle2 };
-    if (status === "reporte") return { label: "Report demandé", className: "text-blue-700 bg-blue-50 border-blue-100", icon: CalendarClock };
-    if (status === "refused") return { label: "Refusé", className: "text-red-700 bg-red-50 border-red-100", icon: XCircle };
-    if (status === "cancelled") return { label: "Annulé", className: "text-neutral-500 bg-neutral-100 border-neutral-200", icon: XCircle };
-    return { label: "Réservée", className: "text-emerald-700 bg-emerald-50 border-emerald-100", icon: CheckCircle2 };
+    if (status === "confirmed") return { label: t("dashboard", "coachingStatusConfirmedM"), className: "text-emerald-700 bg-emerald-50 border-emerald-100", icon: CheckCircle2 };
+    if (status === "reporte") return { label: t("dashboard", "coachingStatusReschedule"), className: "text-blue-700 bg-blue-50 border-blue-100", icon: CalendarClock };
+    if (status === "refused") return { label: t("dashboard", "coachingStatusRefusedM"), className: "text-red-700 bg-red-50 border-red-100", icon: XCircle };
+    if (status === "cancelled") return { label: t("dashboard", "coachingStatusCancelledM"), className: "text-neutral-500 bg-neutral-100 border-neutral-200", icon: XCircle };
+    return { label: t("dashboard", "coachingStatusReserved"), className: "text-emerald-700 bg-emerald-50 border-emerald-100", icon: CheckCircle2 };
   };
 
   if (loading) {
@@ -468,10 +475,10 @@ export default function CoachingPage() {
           <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-6 border border-red-100">
             <Lock className="w-8 h-8 text-red-500" />
           </div>
-          <h1 className={`${STUDENT_TEXT.sectionTitle} mb-3`} style={{ color: BRAND.blue }}>Accès Premium</h1>
-          <p className="text-neutral-500 mb-8 font-medium text-sm">Les séances de coaching sont réservées aux membres Premium.</p>
+          <h1 className={`${STUDENT_TEXT.sectionTitle} mb-3`} style={{ color: BRAND.blue }}>{t("dashboard", "coachingPremiumTitle")}</h1>
+          <p className="text-neutral-500 mb-8 font-medium text-sm">{t("dashboard", "coachingPremiumBody")}</p>
           <button onClick={() => router.push(isCenterRoute ? "/dashboard" : "/profil")} className="w-full py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all" style={{ backgroundColor: BRAND.blue, color: BRAND.white }}>
-            Mettre à niveau
+            {t("dashboard", "coachingUpgrade")}
           </button>
         </div>
       </div>
@@ -490,12 +497,12 @@ export default function CoachingPage() {
             </button>
             <div className="min-w-0">
               <h1 className={`${STUDENT_TEXT.pageTitle} truncate`} style={{ color: BRAND.blue }}>
-                {userProfile?.center_id ? "Session Live" : "Séances & coaching"}
+                {userProfile?.center_id ? t("dashboard", "coachingLiveTitle") : t("dashboard", "coachingSessionsTitle")}
               </h1>
               <p className={`${STUDENT_TEXT.subtitle} mt-0.5`}>
                 {userProfile?.center_id
-                  ? "Rejoignez les sessions programmées par votre centre"
-                  : (userProfile?.coaching_total === 9999 ? "Séances illimitées" : `${Math.max(0, (userProfile?.coaching_total || 0) - (userProfile?.coaching_used || 0))} séance(s) restante(s)`)}
+                  ? t("dashboard", "coachingJoinCenterHint")
+                  : (userProfile?.coaching_total === 9999 ? t("dashboard", "coachingUnlimited") : t("dashboard", "coachingRemaining", { count: Math.max(0, (userProfile?.coaching_total || 0) - (userProfile?.coaching_used || 0)) }))}
               </p>
             </div>
           </div>
@@ -540,21 +547,21 @@ export default function CoachingPage() {
                       : "bg-blue-50 text-blue-700 border-blue-200"
                   }`}>
                     {upcomingAppointment.session_mode === "presentiel" ? <MapPin className="w-3 h-3" /> : <MonitorPlay className="w-3 h-3" />}
-                    {sessionModeLabel(upcomingAppointment.session_mode)}
+                    {sessionModeLabel(upcomingAppointment.session_mode, t("dashboard", "coachingModeInPerson"), t("dashboard", "coachingModeVisio"))}
                   </span>
                   </div>
                   <h3 className={`${STUDENT_TEXT.sectionTitle} mt-2`} style={{ color: BRAND.blue }}>
-                    {new Date(upcomingAppointment.scheduled_at).toLocaleDateString("fr-FR", { weekday: 'long', day: 'numeric', month: 'long' })} à {new Date(upcomingAppointment.scheduled_at).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(upcomingAppointment.scheduled_at).toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long' })} · {new Date(upcomingAppointment.scheduled_at).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}
                   </h3>
                   {upcomingAppointment.status === "pending" && (
-                    <p className="text-xs text-emerald-600 font-medium mt-1">Votre demande présentiel a bien été envoyée. Le centre va valider le créneau.</p>
+                    <p className="text-xs text-emerald-600 font-medium mt-1">{t("dashboard", "coachingPendingSent")}</p>
                   )}
                   {upcomingAppointment.status === "reporte" && upcomingAppointment.reschedule_reason && (
-                    <p className="text-xs text-blue-600 font-medium mt-1">Motif : {upcomingAppointment.reschedule_reason}</p>
+                    <p className="text-xs text-blue-600 font-medium mt-1">{t("dashboard", "coachingReason", { reason: upcomingAppointment.reschedule_reason })}</p>
                   )}
                   {upcomingAppointment.original_scheduled_at && upcomingAppointment.status === "reporte" && (
                     <p className="text-[10px] text-neutral-400 mt-1">
-                      Ancienne date : {new Date(upcomingAppointment.original_scheduled_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })}
+                      {t("dashboard", "coachingPreviousDate", { date: new Date(upcomingAppointment.original_scheduled_at).toLocaleString(dateLocale, { dateStyle: "medium", timeStyle: "short" }) })}
                     </p>
                   )}
                 </div>
@@ -565,8 +572,8 @@ export default function CoachingPage() {
                 <span className="text-xs font-semibold text-amber-800 border border-amber-200 px-4 py-3 rounded-xl bg-amber-50 flex items-center gap-2 justify-center text-center">
                   <MapPin className="w-4 h-4 shrink-0" />
                   {upcomingAppointment.status === "confirmed"
-                    ? "Rendez-vous confirmé — présentez-vous au centre à l'heure prévue."
-                    : "Demande présentiel envoyée — le centre validera votre créneau."}
+                    ? t("dashboard", "coachingConfirmedCenter")
+                    : t("dashboard", "coachingInPersonSent")}
                 </span>
                 ) : upcomingAppointment.status === "confirmed" && inJoinWindow(
                   new Date(upcomingAppointment.scheduled_at).getTime(),
@@ -578,14 +585,14 @@ export default function CoachingPage() {
                     className="w-full min-h-[44px] py-3 rounded-xl text-xs font-bold uppercase tracking-wider text-white flex items-center justify-center gap-2"
                     style={{ backgroundColor: BRAND.blue }}
                   >
-                    <Video className="w-4 h-4" /> Rejoindre la visio
+                    <Video className="w-4 h-4" /> {t("dashboard", "coachingJoinVisio")}
                   </button>
                 ) : (
                   <span className="text-xs font-semibold text-blue-800 border border-blue-200 px-4 py-3 rounded-xl bg-blue-50 flex items-center gap-2 justify-center text-center">
                     <Video className="w-4 h-4 shrink-0" />
                     {upcomingAppointment.status === "confirmed"
-                      ? "Salle ouverte 15 min avant l'heure prévue."
-                      : "En attente de confirmation du centre."}
+                      ? t("dashboard", "coachingRoomOpens")
+                      : t("dashboard", "coachingAwaitConfirm")}
                   </span>
                 )}
 
@@ -595,32 +602,32 @@ export default function CoachingPage() {
                       onClick={() => { setActionMode("reschedule"); setErrorMessage(""); }}
                       className="flex-1 min-h-[44px] px-4 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wider hover:bg-blue-100 transition-all flex items-center justify-center gap-2"
                     >
-                      <CalendarClock className="w-4 h-4" /> Reporter
+                      <CalendarClock className="w-4 h-4" /> {t("dashboard", "coachingReschedule")}
                     </button>
                     <button
                       onClick={() => { setActionMode("cancel"); setErrorMessage(""); }}
                       className="flex-1 min-h-[44px] px-4 py-2.5 rounded-xl border border-red-200 bg-red-50 text-red-700 text-xs font-bold uppercase tracking-wider hover:bg-red-100 transition-all flex items-center justify-center gap-2"
                     >
-                      <XCircle className="w-4 h-4" /> Annuler
+                      <XCircle className="w-4 h-4" /> {t("dashboard", "coachingCancel")}
                     </button>
                   </div>
                 )}
 
                 {actionMode === "cancel" && (
                   <div className="flex flex-col gap-2 bg-neutral-50 p-3 rounded-xl border border-neutral-200 w-full sm:w-72">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Annuler la séance</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("dashboard", "coachingCancelSession")}</p>
                     <textarea
                       value={cancelReason}
                       onChange={(e) => setCancelReason(e.target.value)}
                       maxLength={200}
                       rows={2}
-                      placeholder="Motif (optionnel)"
+                      placeholder={t("dashboard", "coachingReasonOptional")}
                       className="text-xs px-2 py-1.5 rounded-md border border-neutral-200 focus:border-red-400 outline-none resize-none"
                     />
                     <div className="flex gap-2">
-                      <button onClick={() => setActionMode("none")} className="flex-1 text-xs font-bold text-neutral-500 bg-white border border-neutral-200 py-1.5 rounded-md hover:bg-neutral-100">Retour</button>
+                      <button onClick={() => setActionMode("none")} className="flex-1 text-xs font-bold text-neutral-500 bg-white border border-neutral-200 py-1.5 rounded-md hover:bg-neutral-100">{t("dashboard", "coachingBack")}</button>
                       <button onClick={() => handleCancelAppointment(upcomingAppointment.id)} disabled={cancelling} className="flex-1 text-xs font-bold bg-red-600 text-white py-1.5 rounded-md hover:bg-red-500 disabled:opacity-50">
-                        {cancelling ? "..." : "Confirmer l'annulation"}
+                        {cancelling ? "..." : t("dashboard", "coachingConfirmCancel")}
                       </button>
                     </div>
                   </div>
@@ -628,7 +635,7 @@ export default function CoachingPage() {
 
                 {actionMode === "reschedule" && (
                   <div className="flex flex-col gap-2 bg-neutral-50 p-3 rounded-xl border border-neutral-200 w-full sm:w-80">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">Reporter la séance</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("dashboard", "coachingRescheduleSession")}</p>
                     <input
                       type="date"
                       value={rescheduleDate}
@@ -665,17 +672,17 @@ export default function CoachingPage() {
                       onChange={(e) => setRescheduleReason(e.target.value)}
                       maxLength={200}
                       rows={2}
-                      placeholder="Motif du report (obligatoire)"
+                      placeholder={t("dashboard", "coachingRescheduleReason")}
                       className="text-xs px-2 py-1.5 rounded-md border border-neutral-200 focus:border-blue-400 outline-none resize-none"
                     />
                     <div className="flex gap-2">
-                      <button onClick={() => setActionMode("none")} className="flex-1 text-xs font-bold text-neutral-500 bg-white border border-neutral-200 py-1.5 rounded-md hover:bg-neutral-100">Retour</button>
+                      <button onClick={() => setActionMode("none")} className="flex-1 text-xs font-bold text-neutral-500 bg-white border border-neutral-200 py-1.5 rounded-md hover:bg-neutral-100">{t("dashboard", "coachingBack")}</button>
                       <button
                         onClick={() => handleRescheduleAppointment(upcomingAppointment.id)}
                         disabled={rescheduling || !rescheduleDate || !rescheduleTime || !rescheduleReason.trim()}
                         className="flex-1 text-xs font-bold bg-blue-600 text-white py-1.5 rounded-md hover:bg-blue-500 disabled:opacity-50"
                       >
-                        {rescheduling ? "..." : "Envoyer le report"}
+                        {rescheduling ? "..." : t("dashboard", "coachingSendReschedule")}
                       </button>
                     </div>
                   </div>
@@ -696,7 +703,7 @@ export default function CoachingPage() {
                       <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center">
                         <CalendarDays className="w-5 h-5 text-[#eb670e]" />
                       </div>
-                      <h2 className={STUDENT_TEXT.sectionTitle} style={{ color: BRAND.blue }}>Réclamer une séance présentiel</h2>
+                      <h2 className={STUDENT_TEXT.sectionTitle} style={{ color: BRAND.blue }}>{t("dashboard", "coachingClaimInPerson")}</h2>
                     </div>
 
                     {errorMessage && (
@@ -710,7 +717,7 @@ export default function CoachingPage() {
                         <ChevronLeft size={14} />
                       </button>
                       <h3 className={STUDENT_TEXT.cardLabel} style={{ color: BRAND.blue }}>
-                        {currentMonth.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+                        {currentMonth.toLocaleDateString(dateLocale, { month: "long", year: "numeric" })}
                       </h3>
                       <button onClick={nextMonth} className="min-w-[44px] min-h-[44px] p-2 bg-white rounded-lg text-neutral-500 border border-neutral-200 shadow-sm">
                         <ChevronRight size={14} />
@@ -746,12 +753,12 @@ export default function CoachingPage() {
                   </div>
 
                   <div className="lg:col-span-5 border-t lg:border-t-0 lg:border-l border-orange-100/80 pt-6 lg:pt-0 lg:pl-8 flex flex-col">
-                    <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-4">Créneaux (Heure de Paris)</h3>
+                    <h3 className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mb-4">{t("dashboard", "coachingSlotsParis")}</h3>
                     
                     {!selectedDate ? (
                       <div className="flex-1 border border-dashed border-orange-200 rounded-xl flex flex-col items-center justify-center text-center p-6 bg-orange-50/30 min-h-[200px]">
                         <CalendarCheck className="w-6 h-6 text-neutral-300 mb-2" />
-                        <p className="text-xs font-semibold text-neutral-400">Sélectionnez une date pour voir les créneaux.</p>
+                        <p className="text-xs font-semibold text-neutral-400">{t("dashboard", "coachingPickDate")}</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
@@ -779,19 +786,19 @@ export default function CoachingPage() {
                             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 flex items-start gap-2">
                               <MapPin className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                               <p className="text-[11px] font-medium text-amber-800 leading-snug">
-                                Demande en <strong>présentiel</strong> uniquement. Les sessions live / visio sont programmées par le centre.
+                                {t("dashboard", "coachingInPersonOnly")}
                               </p>
                             </div>
                             <textarea
                               value={bookingNote} onChange={(e) => setBookingNote(e.target.value)} maxLength={100} rows={2}
-                              placeholder="Sujet précis à réviser ? (Optionnel)"
+                              placeholder={t("dashboard", "coachingTopicPlaceholder")}
                               className="w-full bg-neutral-50 border border-neutral-200 rounded-xl px-3 py-2.5 text-xs outline-none focus:border-[#eb670e] transition-colors resize-none"
                             />
                             <button
                               onClick={handleBooking}
                               className="w-full min-h-[44px] py-3.5 bg-[#11224E] hover:bg-blue-900 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-sm transition-all"
                             >
-                              Réclamer le {selectedDate.getDate()}/{selectedDate.getMonth()+1} à {selectedTime}
+                              {t("dashboard", "coachingClaimAt", { day: selectedDate.getDate(), month: selectedDate.getMonth() + 1, time: selectedTime })}
                             </button>
                           </motion.div>
                         )}
@@ -804,7 +811,7 @@ export default function CoachingPage() {
               {bookingStep === "confirming" && (
                 <motion.div key="confirming" className="py-12 text-center">
                   <div className="w-8 h-8 border-2 border-[#eb670e] border-t-transparent rounded-full animate-spin mx-auto" />
-                  <p className="text-xs text-neutral-500 font-medium mt-4">Envoi de votre demande…</p>
+                  <p className="text-xs text-neutral-500 font-medium mt-4">{t("dashboard", "coachingSendingRequest")}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -816,7 +823,7 @@ export default function CoachingPage() {
           <section className="w-full mb-8">
             <div className="flex items-center justify-between mb-3 ml-1 pr-1">
               <h3 className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                Programmées par le centre
+                {t("dashboard", "coachingScheduledByCenter")}
               </h3>
               
               {false && centerConfig?.allow_student_lives && (
@@ -832,9 +839,9 @@ export default function CoachingPage() {
             {liveSessions.length === 0 && visibleGroupSessions.length === 0 && collectiveSessions.length === 0 ? (
               <div className="bg-white border border-orange-100/80 rounded-2xl p-6 text-center">
                 <MonitorPlay className="w-8 h-8 text-orange-300 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-neutral-600">Aucune Session Live pour le moment</p>
+                <p className="text-sm font-semibold text-neutral-600">{t("dashboard", "coachingNoLive")}</p>
                 <p className="text-xs text-neutral-400 mt-1">
-                  Dès qu&apos;un formateur vous invite à une session, elle apparaîtra ici.
+                  {t("dashboard", "coachingNoLiveHint")}
                 </p>
               </div>
             ) : (
@@ -846,17 +853,17 @@ export default function CoachingPage() {
                   <div>
                     {live.session_type === "staff_live" ? (
                       <span className="text-[9px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md mb-2 inline-flex items-center gap-1">
-                        <MonitorPlay size={10} /> Cours Officiel
+                        <MonitorPlay size={10} /> {t("dashboard", "coachingOfficialCourse")}
                       </span>
                     ) : (
                       <span className="text-[9px] font-bold uppercase tracking-wider text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md mb-2 inline-flex items-center gap-1">
-                        <Users size={10} /> Salon Étudiant
+                        <Users size={10} /> {t("dashboard", "coachingStudentRoom")}
                       </span>
                     )}
                     <h4 className={`${STUDENT_TEXT.cardTitle} mt-1`} style={{ color: BRAND.blue }}>{live.title}</h4>
                     {live.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{live.description}</p>}
                     <p className="text-xs font-bold text-neutral-400 mt-3 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" /> {new Date(live.scheduled_at).toLocaleDateString("fr-FR", { weekday: 'short', day: 'numeric', month: 'short' })} à {new Date(live.scheduled_at).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
+                      <Clock className="w-3.5 h-3.5" /> {new Date(live.scheduled_at).toLocaleDateString(dateLocale, { weekday: 'short', day: 'numeric', month: 'short' })} · {new Date(live.scheduled_at).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   <div className="mt-4 pt-4 border-t border-neutral-100">
@@ -870,11 +877,11 @@ export default function CoachingPage() {
                         rel="noopener noreferrer"
                         className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5"
                       >
-                        <Video size={14} /> Rejoindre
+                        <Video size={14} /> {t("dashboard", "coachingJoin")}
                       </a>
                     ) : (
                       <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
-                        Programmé par le centre
+                        {t("dashboard", "coachingProgrammedByCenter")}
                       </button>
                     )}
                   </div>
@@ -884,9 +891,11 @@ export default function CoachingPage() {
               {/* COACHING DE GROUPE + SESSIONS LIVE (planning centre) */}
               {collectiveSessions.map((c) => {
                 const isLive = c.kind === "live" || c.session_scope === "live";
-                const badgeLabel =
-                  c.kind_label ||
-                  (isLive ? "Session Live" : c.mode === "en_ligne" ? "Cours en ligne" : "Séance");
+                const badgeLabel = isLive
+                  ? t("dashboard", "coachingLiveBadge")
+                  : c.mode === "en_ligne"
+                    ? t("dashboard", "coachingOnlineCourse")
+                    : t("dashboard", "coachingSession");
                 const key = sessionKey(c);
                 const refused = c.my_response?.status === "refused";
                 const isRefusingThis = refuseKey === key;
@@ -899,29 +908,31 @@ export default function CoachingPage() {
                     </span>
                     {refused && (
                       <span className="ml-1 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md mb-2 inline-flex items-center gap-1 text-red-700 bg-red-50 border border-red-100">
-                        Refusée
+                        {t("dashboard", "coachingStatusRefused")}
                       </span>
                     )}
-                    <h4 className={`${STUDENT_TEXT.cardTitle} mt-1`} style={{ color: BRAND.blue }}>{c.title}</h4>
+                    <h4 className={`${STUDENT_TEXT.cardTitle} mt-1`} style={{ color: BRAND.blue }}>
+                      {localizeCollectiveTitle(c.title, isLive ? "live" : "group", t)}
+                    </h4>
                     <p className="text-xs font-bold text-neutral-400 mt-3 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" /> {new Date(c.scheduled_at).toLocaleDateString("fr-FR", { weekday: 'short', day: 'numeric', month: 'short' })} à {c.start_time.slice(0, 5)}
+                      <Clock className="w-3.5 h-3.5" /> {new Date(c.scheduled_at).toLocaleDateString(dateLocale, { weekday: 'short', day: 'numeric', month: 'short' })} · {c.start_time.slice(0, 5)}
                     </p>
                     {!isLive && c.mode !== "en_ligne" && (
-                      <p className="text-[10px] font-bold text-amber-600 mt-1">Présentiel{c.room_name ? ` · ${c.room_name}` : ""}</p>
+                      <p className="text-[10px] font-bold text-amber-600 mt-1">{c.room_name ? t("dashboard", "coachingInPersonRoom", { room: c.room_name }) : t("dashboard", "coachingInPerson")}</p>
                     )}
                     {c.mode === "en_ligne" && (
-                      <p className="text-[10px] font-bold text-neutral-400 mt-1">Visio gérée par le centre</p>
+                      <p className="text-[10px] font-bold text-neutral-400 mt-1">{t("dashboard", "coachingVisioByCenter")}</p>
                     )}
                     {refused && c.my_response?.reason && (
                       <p className="text-[11px] text-red-700 mt-2 font-medium leading-snug">
-                        Motif : {c.my_response.reason}
+                        {t("dashboard", "coachingReason", { reason: c.my_response.reason })}
                       </p>
                     )}
                   </div>
                   <div className="mt-4 pt-4 border-t border-neutral-100 space-y-2">
                     {refused ? (
                       <button disabled className="w-full py-2 bg-red-50 text-red-600 rounded-lg text-xs font-bold border border-red-100 cursor-not-allowed">
-                        Vous avez refusé cette séance
+                        {t("dashboard", "coachingYouRefused")}
                       </button>
                     ) : isRefusingThis ? (
                       <div className="space-y-2">
@@ -935,7 +946,7 @@ export default function CoachingPage() {
                           onChange={(e) => setRefuseReason(e.target.value)}
                           maxLength={500}
                           rows={3}
-                          placeholder="Motif du refus (obligatoire)"
+                          placeholder={t("dashboard", "coachingRefuseReason")}
                           className="w-full text-xs px-2 py-1.5 rounded-md border border-neutral-200 focus:border-red-400 outline-none resize-none"
                         />
                         <div className="flex gap-2">
@@ -944,7 +955,7 @@ export default function CoachingPage() {
                             onClick={() => { setRefuseKey(null); setRefuseReason(""); setRefuseError(""); }}
                             className="flex-1 text-xs font-bold text-neutral-500 bg-white border border-neutral-200 py-2 rounded-md hover:bg-neutral-100"
                           >
-                            Retour
+                            {t("dashboard", "coachingBack")}
                           </button>
                           <button
                             type="button"
@@ -952,7 +963,7 @@ export default function CoachingPage() {
                             disabled={refusing}
                             className="flex-1 text-xs font-bold bg-red-600 text-white py-2 rounded-md hover:bg-red-500 disabled:opacity-50"
                           >
-                            {refusing ? "..." : "Confirmer le refus"}
+                            {refusing ? "..." : t("dashboard", "coachingConfirmRefuse")}
                           </button>
                         </div>
                       </div>
@@ -960,7 +971,7 @@ export default function CoachingPage() {
                       <>
                         {c.mode === "presentiel" || (!isLive && c.mode !== "en_ligne") ? (
                           <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
-                            {c.room_name ? `Présentiel · ${c.room_name}` : "En présentiel"}
+                            {c.room_name ? t("dashboard", "coachingInPersonRoom", { room: c.room_name }) : t("dashboard", "coachingModeInPerson")}
                           </button>
                         ) : inJoinWindow(sessionStartMs(c.session_date, c.start_time), sessionEndMs(c.session_date, c.end_time)) ? (
                           <button
@@ -968,11 +979,11 @@ export default function CoachingPage() {
                             onClick={() => router.push(collectiveJoinPath(c.slot_id, c.session_date))}
                             className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5"
                           >
-                            <Video size={14} /> Rejoindre
+                            <Video size={14} /> {t("dashboard", "coachingJoin")}
                           </button>
                         ) : (
                           <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
-                            Salle ouverte 15 min avant
+                            {t("dashboard", "coachingRoomOpensShort")}
                           </button>
                         )}
                         <button
@@ -980,7 +991,7 @@ export default function CoachingPage() {
                           onClick={() => { setRefuseKey(key); setRefuseReason(""); setRefuseError(""); }}
                           className="w-full min-h-[40px] py-2 rounded-lg text-xs font-bold border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5"
                         >
-                          <XCircle size={14} /> Refuser avec motif
+                          <XCircle size={14} /> {t("dashboard", "coachingRefuseWithReason")}
                         </button>
                       </>
                     )}
@@ -993,11 +1004,11 @@ export default function CoachingPage() {
               {visibleGroupSessions.map((g) => (
                 <div key={g.id} className="bg-white border border-orange-100/80 rounded-2xl p-5 shadow-sm flex flex-col justify-between">
                   <div>
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md mb-2 inline-block">Masterclass TCF</span>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md mb-2 inline-block">{t("dashboard", "coachingMasterclassTcf")}</span>
                     <h4 className={STUDENT_TEXT.cardTitle} style={{ color: BRAND.blue }}>{g.title}</h4>
                     {g.description && <p className="text-xs text-neutral-500 mt-1 line-clamp-2">{g.description}</p>}
                     <p className="text-xs font-bold text-neutral-400 mt-3 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" /> {new Date(groupStartMs(g)).toLocaleDateString("fr-FR", { weekday: 'short', day: 'numeric', month: 'short' })} à {new Date(groupStartMs(g)).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}
+                      <Clock className="w-3.5 h-3.5" /> {new Date(groupStartMs(g)).toLocaleDateString(dateLocale, { weekday: 'short', day: 'numeric', month: 'short' })} · {new Date(groupStartMs(g)).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   <div className="mt-4 pt-4 border-t border-neutral-100">
@@ -1007,11 +1018,11 @@ export default function CoachingPage() {
                         onClick={() => router.push(`/dashboard/coaching/room/group/${g.id}`)}
                         className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5"
                       >
-                        <Video size={14} /> Rejoindre
+                        <Video size={14} /> {t("dashboard", "coachingJoin")}
                       </button>
                     ) : (
                       <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
-                        Salle ouverte 15 min avant
+                        {t("dashboard", "coachingRoomOpensShort")}
                       </button>
                     )}
                   </div>
@@ -1025,11 +1036,11 @@ export default function CoachingPage() {
 
         {/* HISTORIQUE */}
         <section className="w-full">
-          <h3 className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-3 ml-1">Historique des entretiens</h3>
+          <h3 className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-3 ml-1">{t("dashboard", "coachingHistory")}</h3>
           <div className="bg-white border border-orange-100/80 rounded-2xl shadow-sm overflow-hidden">
             <div className="divide-y divide-neutral-100">
               {appointments.filter(a => new Date(a.scheduled_at).getTime() + 30 * 60 * 1000 < Date.now() || a.status === 'cancelled' || a.status === 'refused').length === 0 ? (
-                <p className="text-xs font-semibold text-neutral-400 text-center py-8">Aucune session passée dans votre historique.</p>
+                <p className="text-xs font-semibold text-neutral-400 text-center py-8">{t("dashboard", "coachingNoHistory")}</p>
               ) : (
                 appointments.filter(a => new Date(a.scheduled_at).getTime() + 30 * 60 * 1000 < Date.now() || a.status === 'cancelled' || a.status === 'refused')
                 .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())
@@ -1043,14 +1054,14 @@ export default function CoachingPage() {
                         </span>
                         <div>
                           <p className="font-bold" style={{ color: BRAND.blue }}>
-                            {new Date(appointment.scheduled_at).toLocaleDateString("fr-FR", { weekday: 'long', day: 'numeric', month: 'long' })}
+                            {new Date(appointment.scheduled_at).toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long' })}
                           </p>
-                          <p className="text-neutral-400 font-medium mt-0.5">{new Date(appointment.scheduled_at).toLocaleTimeString("fr-FR", { hour: '2-digit', minute: '2-digit' })}</p>
+                          <p className="text-neutral-400 font-medium mt-0.5">{new Date(appointment.scheduled_at).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}</p>
                         </div>
                       </div>
-                      {appointment.admin_note && <span className="text-neutral-500 italic max-w-xs truncate hidden sm:block bg-neutral-50 px-3 py-1.5 rounded-lg border border-neutral-200">Note: {appointment.admin_note}</span>}
-                      {appointment.cancel_reason && <span className="text-neutral-500 italic max-w-xs truncate hidden sm:block bg-red-50 px-3 py-1.5 rounded-lg border border-red-100">Motif annulation: {appointment.cancel_reason}</span>}
-                      {appointment.reschedule_reason && appointment.status === "reporte" && <span className="text-neutral-500 italic max-w-xs truncate hidden sm:block bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">Motif report: {appointment.reschedule_reason}</span>}
+                      {appointment.admin_note && <span className="text-neutral-500 italic max-w-xs truncate hidden sm:block bg-neutral-50 px-3 py-1.5 rounded-lg border border-neutral-200">{t("dashboard", "coachingNote")} {appointment.admin_note}</span>}
+                      {appointment.cancel_reason && <span className="text-neutral-500 italic max-w-xs truncate hidden sm:block bg-red-50 px-3 py-1.5 rounded-lg border border-red-100">{t("dashboard", "coachingCancelReasonLabel")} {appointment.cancel_reason}</span>}
+                      {appointment.reschedule_reason && appointment.status === "reporte" && <span className="text-neutral-500 italic max-w-xs truncate hidden sm:block bg-blue-50 px-3 py-1.5 rounded-lg border border-blue-100">{t("dashboard", "coachingRescheduleReasonLabel")} {appointment.reschedule_reason}</span>}
                     </div>
                   );
                 })

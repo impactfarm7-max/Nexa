@@ -16,9 +16,13 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function err(code: string, message: string, status: number, extra?: Record<string, string>) {
+  return NextResponse.json({ errorCode: code, error: message, ...extra }, { status });
+}
+
 export async function POST(req: Request) {
   const user = await getAuthUser(req);
-  if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+  if (!user) return err("UNAUTHORIZED", "Non autorisé.", 401);
 
   try {
     const {
@@ -32,10 +36,10 @@ export async function POST(req: Request) {
     } = await req.json();
 
     if (!mission_id) {
-      return NextResponse.json({ error: "mission_id requis." }, { status: 400 });
+      return err("MISSION_ID_REQUIRED", "mission_id requis.", 400);
     }
     if (!answer_text?.trim() && !file_url) {
-      return NextResponse.json({ error: "Un texte ou un fichier est requis." }, { status: 400 });
+      return err("TEXT_OR_FILE_REQUIRED", "Un texte ou un fichier est requis.", 400);
     }
 
     const { data: profile } = await supabaseAdmin
@@ -51,7 +55,7 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (missionError || !mission) {
-      return NextResponse.json({ error: "Mission introuvable." }, { status: 404 });
+      return err("NOT_FOUND", "Mission introuvable.", 404);
     }
 
     const allowedMission = profile?.center_id
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
       : !mission.center_id;
 
     if (!allowedMission) {
-      return NextResponse.json({ error: "Mission non assignée à cet étudiant." }, { status: 403 });
+      return err("NOT_ASSIGNED", "Mission non assignée à cet étudiant.", 403);
     }
 
     const formats = normalizeSubmissionFormats((mission as any).submission_formats);
@@ -68,24 +72,23 @@ export async function POST(req: Request) {
     const hasFile = !!file_url;
 
     if (hasText && !allowsFormat(formats, "text")) {
-      return NextResponse.json(
-        { error: "Ce devoir n’accepte pas de réponse textuelle." },
-        { status: 400 }
-      );
+      return err("TEXT_NOT_ALLOWED", "Ce devoir n’accepte pas de réponse textuelle.", 400);
     }
 
     if (hasFile) {
       const fileFormat = detectFileSubmissionFormat({ type: file_mime, name: file_name });
       if (!allowsFormat(formats, fileFormat)) {
-        return NextResponse.json(
-          { error: `Ce devoir n’accepte pas les fichiers de type « ${fileFormat} ».` },
-          { status: 400 }
+        return err(
+          "FILE_TYPE_NOT_ALLOWED",
+          `Ce devoir n’accepte pas les fichiers de type « ${fileFormat} ».`,
+          400,
+          { format: fileFormat },
         );
       }
     }
 
     if (!hasText && !hasFile) {
-      return NextResponse.json({ error: "Un texte ou un fichier est requis." }, { status: 400 });
+      return err("TEXT_OR_FILE_REQUIRED", "Un texte ou un fichier est requis.", 400);
     }
 
     const { data: existing } = await supabaseAdmin
@@ -96,7 +99,7 @@ export async function POST(req: Request) {
       .maybeSingle();
 
     if (existing) {
-      return NextResponse.json({ error: "Vous avez déjà soumis ce devoir." }, { status: 409 });
+      return err("ALREADY_SUBMITTED", "Vous avez déjà soumis ce devoir.", 409);
     }
 
     const correctionMode = mission.correction_mode || "auto";
@@ -118,7 +121,7 @@ export async function POST(req: Request) {
 
     if (insertError || !submission) {
       console.error("Insert error:", insertError);
-      return NextResponse.json({ error: "Erreur lors de la sauvegarde." }, { status: 500 });
+      return err("SAVE_FAILED", "Erreur lors de la sauvegarde.", 500);
     }
 
     if (needsManualReview) {
@@ -158,6 +161,7 @@ export async function POST(req: Request) {
       return NextResponse.json({
         submission_id: submission.id,
         status: "pending_review",
+        messageCode: correctionMode === "manual" ? "MANUAL_REVIEW_QUEUED" : undefined,
         message: correctionMode === "manual"
           ? "Votre devoir a été envoyé. Votre enseignant le corrigera prochainement."
           : undefined,
@@ -208,8 +212,8 @@ export async function POST(req: Request) {
       status: correction ? "done" : "pending_review",
       correction,
     });
-  } catch (err) {
-    console.error("Submit error:", err);
-    return NextResponse.json({ error: "Erreur serveur." }, { status: 500 });
+  } catch (errCatch) {
+    console.error("Submit error:", errCatch);
+    return err("SERVER", "Erreur serveur.", 500);
   }
 }

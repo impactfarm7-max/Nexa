@@ -10,6 +10,7 @@ import { ArrowLeft, Lock, Video } from "lucide-react";
 import { peekStudentAccess } from "@/app/utils/student-access-cache";
 import { resolveMeetingExitPath } from "@/app/utils/student-routes";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeCoachingError } from "@/app/utils/coachingErrorI18n";
 
 type State = "loading" | "ready" | "error";
 
@@ -57,7 +58,7 @@ export default function GroupCoachingRoomPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErrorMsg(json.error || t("dashboard", "coachingGroupRoomJoinError"));
+        setErrorMsg(localizeCoachingError(json.error, t, "coachingGroupRoomJoinError"));
         setState("error");
         return;
       }
@@ -66,8 +67,8 @@ export default function GroupCoachingRoomPage() {
       setState("ready");
     };
 
-    init();
-  }, [router, sessionId]);
+    void init();
+  }, [router, sessionId, t]);
 
   useEffect(() => {
     if (state !== "ready" || !room) return;

@@ -125,6 +125,16 @@ async function escalateToHuman(conversationKey: string, input: BotInput, lastUse
 export async function runSupportBot(input: BotInput): Promise<{ skipped?: boolean; replied?: boolean; escalated?: boolean }> {
   if (!process.env.ANTHROPIC_API_KEY) return { skipped: true };
 
+  // Support centre = suivi réseau humain — ne pas mélanger avec le bot B2C.
+  if (input.kind === "account") {
+    const { data: student } = await supabaseAdmin
+      .from("profiles")
+      .select("center_id")
+      .eq("id", input.studentId)
+      .maybeSingle();
+    if (student?.center_id) return { skipped: true };
+  }
+
   const conversationKey = input.kind === "account" ? input.studentId : input.token;
   const convo = await getOrCreateConversation(conversationKey, input.kind);
   if (!convo || convo.mode === "human") return { skipped: true };

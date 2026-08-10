@@ -9,11 +9,14 @@ import { ArrowLeft, Lock, Video } from "lucide-react";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import { peekStudentAccess } from "@/app/utils/student-access-cache";
 import { resolveMeetingExitPath } from "@/app/utils/student-routes";
+import { useI18n } from "@/app/i18n/I18nProvider";
+import { localizeCoachingError, localizeCollectiveTitle } from "@/app/utils/coachingErrorI18n";
 
 type State = "loading" | "ready" | "error";
 type MeetingKind = "live" | "group";
 
 export default function TcfCollectiveRoomPage() {
+  const { t } = useI18n();
   const router = useRouter();
   const params = useParams();
   const searchParams = useSearchParams();
@@ -22,7 +25,7 @@ export default function TcfCollectiveRoomPage() {
 
   const [state, setState] = useState<State>("loading");
   const [errorMsg, setErrorMsg] = useState("");
-  const [title, setTitle] = useState("Séance");
+  const [title, setTitle] = useState(() => t("dashboard", "coachingSession"));
   const [room, setRoom] = useState<{ url: string; token: string; endsAt: number } | null>(null);
   const [exitHref, setExitHref] = useState(() =>
     resolveMeetingExitPath("group", peekStudentAccess()?.profile)
@@ -35,7 +38,7 @@ export default function TcfCollectiveRoomPage() {
   useEffect(() => {
     const init = async () => {
       if (!slotId || !sessionDate) {
-        setErrorMsg("Lien de séance invalide.");
+        setErrorMsg(t("dashboard", "coachingRoomInvalidLink"));
         setState("error");
         return;
       }
@@ -64,9 +67,8 @@ export default function TcfCollectiveRoomPage() {
       const json = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setErrorMsg(json.error || "Impossible de rejoindre la séance.");
+        setErrorMsg(localizeCoachingError(json.error, t, "coachingRoomJoinError"));
         setState("error");
-        // Best-effort exit destination from scope if known
         const kind: MeetingKind = json.meeting_kind === "live" ? "live" : "group";
         setExitHref(resolveMeetingExitPath(kind, profile));
         return;
@@ -74,13 +76,13 @@ export default function TcfCollectiveRoomPage() {
 
       const kind: MeetingKind = json.meeting_kind === "live" ? "live" : "group";
       setExitHref(resolveMeetingExitPath(kind, profile));
-      setTitle(json.title || (kind === "live" ? "Session Live" : "Coaching de groupe"));
+      setTitle(localizeCollectiveTitle(json.title, kind, t));
       setRoom({ url: json.url, token: json.token, endsAt: json.endsAt });
       setState("ready");
     };
 
-    init();
-  }, [router, slotId, sessionDate]);
+    void init();
+  }, [router, slotId, sessionDate, t]);
 
   useEffect(() => {
     if (state !== "ready" || !room) return;
@@ -116,7 +118,7 @@ export default function TcfCollectiveRoomPage() {
             onClick={leave}
             className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-colors"
           >
-            Quitter
+            {t("dashboard", "coachingRoomLeaveButton")}
           </button>
         </div>
         <div className="flex-1 min-h-0 relative">
@@ -136,14 +138,16 @@ export default function TcfCollectiveRoomPage() {
         <div className="w-16 h-16 bg-orange-50 rounded-full flex items-center justify-center mb-6 border border-orange-100">
           <Lock className="w-8 h-8 text-orange-600" />
         </div>
-        <h1 className={`${STUDENT_TEXT.sectionTitle} mb-3`} style={{ color: BRAND.blue }}>Séance indisponible</h1>
+        <h1 className={`${STUDENT_TEXT.sectionTitle} mb-3`} style={{ color: BRAND.blue }}>
+          {t("dashboard", "coachingRoomUnavailableTitle")}
+        </h1>
         <p className={`${STUDENT_TEXT.subtitle} mb-8 leading-relaxed`}>{errorMsg}</p>
         <button
           onClick={leave}
           className="w-full text-white py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2"
           style={{ backgroundColor: BRAND.blue }}
         >
-          <ArrowLeft size={14} /> Retour
+          <ArrowLeft size={14} /> {t("dashboard", "coachingRoomBackButton")}
         </button>
       </div>
     </div>
