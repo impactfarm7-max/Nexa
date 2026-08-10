@@ -87,6 +87,41 @@ export default function GenericManagerDashboard({
 
   return (
     <>
+      {campuses.length > 1 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none max-w-full pb-0.5">
+          <button
+            type="button"
+            onClick={() => onCampusChange(null)}
+            className={`h-8 px-3.5 rounded-full text-[12px] font-medium shrink-0 transition-colors ${
+              !selectedCampus
+                ? "text-white"
+                : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+            }`}
+            style={!selectedCampus ? { backgroundColor: BLUE } : undefined}
+          >
+            {t("centre", "managerAllCampuses")}
+          </button>
+          {campuses.map((c) => {
+            const active = selectedCampus === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onCampusChange(c.id)}
+                className={`h-8 px-3.5 rounded-full text-[12px] font-medium shrink-0 transition-colors ${
+                  active
+                    ? "text-white"
+                    : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                }`}
+                style={active ? { backgroundColor: BLUE } : undefined}
+              >
+                {c.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {showFinance && (
         <section className="space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -99,41 +134,6 @@ export default function GenericManagerDashboard({
                 {t("centre", "managerDetails")} <ArrowUpRight size={13} style={{ color: ORANGE }} />
               </Link>
             </div>
-
-            {campuses.length > 1 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none max-w-full pb-0.5">
-                <button
-                  type="button"
-                  onClick={() => onCampusChange(null)}
-                  className={`h-8 px-3.5 rounded-full text-[12px] font-medium shrink-0 transition-colors ${
-                    !selectedCampus
-                      ? "text-white"
-                      : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
-                  }`}
-                  style={!selectedCampus ? { backgroundColor: BLUE } : undefined}
-                >
-                  {t("centre", "managerAllCampuses")}
-                </button>
-                {campuses.map((c) => {
-                  const active = selectedCampus === c.id;
-                  return (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => onCampusChange(c.id)}
-                      className={`h-8 px-3.5 rounded-full text-[12px] font-medium shrink-0 transition-colors ${
-                        active
-                          ? "text-white"
-                          : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
-                      }`}
-                      style={active ? { backgroundColor: BLUE } : undefined}
-                    >
-                      {c.name}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
 
             <Link
               href="/centre/finance"

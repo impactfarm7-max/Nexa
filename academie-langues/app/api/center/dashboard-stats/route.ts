@@ -3,7 +3,7 @@ import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-se
 import { getMonday, tcfEffectiveStatus } from "@/app/centre/dashboard/utils";
 import type { GenericDashboardStats, TcfDashboardStats } from "@/app/centre/dashboard/types";
 
-function aggregateFinance(rows: { tuition_fee?: number; tuition_paid?: number; financial_status?: string; campus_id?: string }[]) {
+function aggregateFinance(rows: { tuition_fee?: number; tuition_paid?: number; financial_status?: string }[]) {
   const ca = rows.reduce((s, r) => s + (r.tuition_fee || 0), 0);
   const paid = rows.reduce((s, r) => s + (r.tuition_paid || 0), 0);
   const late = rows.filter((r) => r.financial_status === "late").length;
@@ -13,43 +13,62 @@ function aggregateFinance(rows: { tuition_fee?: number; tuition_paid?: number; f
   return { ca, paid, pending: ca - paid, late, lateAmount };
 }
 
+type EnrollRow = { id: string; student_id: string; campus_id: string | null; status: string | null };
+type FinRow = { enrollment_id: string; tuition_fee?: number; tuition_paid?: number; financial_status?: string };
+
 async function loadGenericStats(cId: string, campusId: string | null): Promise<GenericDashboardStats> {
   const fiveDaysAgo = new Date(Date.now() - 5 * 86_400_000).toISOString();
   const monday = getMonday(new Date()).toISOString().split("T")[0];
   const sunday = new Date(getMonday(new Date()).getTime() + 6 * 86_400_000).toISOString().split("T")[0];
   const today = new Date().toISOString().split("T")[0];
 
-  const [{ data: filiereRows }, finRes, enrollRes, absentRes, msgRes] = await Promise.all([
+  const [{ data: filiereRows }, finRes, enrollRes, campusFiliereRes, absentRes, msgRes] = await Promise.all([
     supabaseAdmin.from("filieres").select("id").eq("center_id", cId),
     supabaseAdmin
       .from("student_finance_summary")
-      .select("tuition_fee, tuition_paid, financial_status, campus_id")
+      .select("enrollment_id, tuition_fee, tuition_paid, financial_status")
       .eq("center_id", cId),
     supabaseAdmin
       .from("enrollments")
-      .select("student_id", { count: "exact", head: true })
-      .eq("center_id", cId)
-      .eq("status", "active"),
+      .select("id, student_id, campus_id, status")
+      .eq("center_id", cId),
+    campusId
+      ? supabaseAdmin.from("filiere_campus").select("filiere_id").eq("campus_id", campusId)
+      : Promise.resolve({ data: [] as { filiere_id: string }[] }),
     supabaseAdmin
       .from("profiles")
       .select("id, prenom, nom")
       .eq("center_id", cId)
       .eq("role", "student")
       .lt("updated_at", fiveDaysAgo)
-      .limit(8),
+      .limit(40),
     supabaseAdmin.from("community_messages").select("id", { count: "exact", head: true }).eq("center_id", cId),
   ]);
 
-  const filiereIds = (filiereRows || []).map((f) => f.id);
-  let finRows = (finRes.data || []) as { tuition_fee?: number; tuition_paid?: number; financial_status?: string; campus_id?: string }[];
-  if (campusId) finRows = finRows.filter((r) => r.campus_id === campusId);
+  let enrollments = (enrollRes.data || []) as EnrollRow[];
+  if (campusId) enrollments = enrollments.filter((e) => e.campus_id === campusId);
+
+  const campusEnrollmentIds = new Set(enrollments.map((e) => e.id));
+  const campusStudentIds = new Set(enrollments.map((e) => e.student_id));
+  const activeStudents = enrollments.filter((e) => e.status === "active").length;
+
+  let finRows = (finRes.data || []) as FinRow[];
+  if (campusId) finRows = finRows.filter((r) => campusEnrollmentIds.has(r.enrollment_id));
   const finAgg = aggregateFinance(finRows);
+
+  const allFiliereIds = (filiereRows || []).map((f) => f.id);
+  const campusFiliereIds = new Set((campusFiliereRes.data || []).map((r) => r.filiere_id));
+  const filiereIds = campusId ? allFiliereIds.filter((id) => campusFiliereIds.has(id)) : allFiliereIds;
+
+  const absent = ((absentRes.data || []) as { id: string; prenom: string; nom: string }[])
+    .filter((p) => !campusId || campusStudentIds.has(p.id))
+    .slice(0, 8);
 
   if (filiereIds.length === 0) {
     return {
       fin: { ca: finAgg.ca, paid: finAgg.paid, pending: finAgg.pending, late: finAgg.late },
-      activeStudents: enrollRes.count ?? 0,
-      absent: absentRes.data || [],
+      activeStudents,
+      absent,
       coursesCount: 0,
       cancelledCount: 0,
       exams: [],
@@ -85,8 +104,8 @@ async function loadGenericStats(cId: string, campusId: string | null): Promise<G
 
   return {
     fin: { ca: finAgg.ca, paid: finAgg.paid, pending: finAgg.pending, late: finAgg.late },
-    activeStudents: enrollRes.count ?? 0,
-    absent: absentRes.data || [],
+    activeStudents,
+    absent,
     coursesCount: slotsRes.count ?? 0,
     cancelledCount: cancelRes.count ?? 0,
     exams: ((examsRes.data || []) as { id: string; actual_date: string; schedule_slots?: { title?: string; start_time?: string } }[]).map(
@@ -233,17 +252,26 @@ export async function GET(req: Request) {
   if (error) return error;
 
   const url = new URL(req.url);
-  const campusId = url.searchParams.get("campusId");
+  const requestedCampusId = url.searchParams.get("campusId");
   const isTCF = ctx!.centerType === "tcf_canada";
 
   const [{ data: campuses }, stats] = await Promise.all([
     supabaseAdmin.from("campuses").select("id, name").eq("center_id", ctx!.centerId).order("name"),
-    isTCF ? loadTcfStats(ctx!.centerId) : loadGenericStats(ctx!.centerId, campusId),
+    isTCF ? loadTcfStats(ctx!.centerId) : loadGenericStats(ctx!.centerId, requestedCampusId),
   ]);
+
+  const campusList = campuses || [];
+  const campusId =
+    requestedCampusId && campusList.some((c) => c.id === requestedCampusId) ? requestedCampusId : null;
+
+  if (!isTCF && requestedCampusId && !campusId) {
+    const generic = await loadGenericStats(ctx!.centerId, null);
+    return NextResponse.json({ isTCF, campuses: campusList, generic, tcf: null });
+  }
 
   return NextResponse.json({
     isTCF,
-    campuses: campuses || [],
+    campuses: campusList,
     generic: isTCF ? null : stats,
     tcf: isTCF ? stats : null,
   });

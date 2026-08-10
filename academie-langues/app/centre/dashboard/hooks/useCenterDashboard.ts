@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/app/utils/supabase";
 import { buildCenterSignupUrl } from "@/app/utils/center-signup-link";
@@ -83,11 +83,14 @@ export function useCenterDashboard() {
   const [copied, setCopied] = useState(false);
   const [role, setRole] = useState<string | null>(null);
   const [permissions, setPermissions] = useState<string[]>([]);
+  const statsRequestId = useRef(0);
+  const statsReady = useRef(false);
 
   const setters = { setStaffPrenom, setCenterId, setCenter, setIsTCF, setRole, setPermissions };
 
   const loadStats = useCallback(async (campusId: string | null, force = false) => {
-    setStatsLoading(true);
+    const requestId = ++statsRequestId.current;
+    if (!statsReady.current) setStatsLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
@@ -101,12 +104,15 @@ export function useCenterDashboard() {
         { force, params: Object.keys(params).length ? params : undefined },
       );
 
+      if (requestId !== statsRequestId.current) return;
+
       setIsTCF(data.isTCF);
       setCampuses(data.campuses || []);
       if (data.isTCF && data.tcf) setTcfStats(data.tcf);
       else if (data.generic) setGenericStats(data.generic);
+      statsReady.current = true;
     } finally {
-      setStatsLoading(false);
+      if (requestId === statsRequestId.current) setStatsLoading(false);
     }
   }, []);
 
