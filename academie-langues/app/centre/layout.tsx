@@ -10,7 +10,7 @@ const PUBLIC_CENTER_PATHS = [
   "/centre/acces-indisponible",
 ];
 /** Pages plein écran sans sidebar centre */
-const NO_SHELL_PATHS = ["/centre/admin", "/centre/mon-compte"];
+const NO_SHELL_PATHS = ["/centre/mon-compte"];
 
 export default function CentreLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

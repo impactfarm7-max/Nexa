@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import type { Campus, GenericDashboardStats } from "../types";
 import { BLUE, ORANGE, QuietKpi } from "../dashboard-ui";
-import { CENTER_TYPE, ToolbarFilterMenu } from "@/app/centre/center-page-ui";
+import { CENTER_TYPE } from "@/app/centre/center-page-ui";
 import { fmtXAF } from "../utils";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
@@ -88,22 +88,37 @@ export default function GenericManagerDashboard({
   return (
     <>
       {campuses.length > 1 && (
-        <div className="flex items-center">
-          <ToolbarFilterMenu
-            onReset={() => onCampusChange(null)}
-            sections={[
-              {
-                id: "campus",
-                label: t("centre", "settingsCampus"),
-                value: selectedCampus ?? "all",
-                options: [
-                  { value: "all", label: t("centre", "reportsAllCampuses") },
-                  ...campuses.map((c) => ({ value: c.id, label: c.name })),
-                ],
-                onChange: (v) => onCampusChange(v === "all" ? null : v),
-              },
-            ]}
-          />
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none max-w-full pb-0.5">
+          <button
+            type="button"
+            onClick={() => onCampusChange(null)}
+            className={`h-8 px-3.5 rounded-full text-[12px] font-medium shrink-0 transition-colors ${
+              !selectedCampus
+                ? "text-white"
+                : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+            }`}
+            style={!selectedCampus ? { backgroundColor: BLUE } : undefined}
+          >
+            {t("centre", "managerAllCampuses")}
+          </button>
+          {campuses.map((c) => {
+            const active = selectedCampus === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onCampusChange(c.id)}
+                className={`h-8 px-3.5 rounded-full text-[12px] font-medium shrink-0 transition-colors ${
+                  active
+                    ? "text-white"
+                    : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                }`}
+                style={active ? { backgroundColor: BLUE } : undefined}
+              >
+                {c.name}
+              </button>
+            );
+          })}
         </div>
       )}
 

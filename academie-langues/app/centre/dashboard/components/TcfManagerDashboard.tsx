@@ -6,14 +6,18 @@ import {
   Bell, WifiOff, Gamepad2, Video, BookOpen, AlertTriangle, TrendingUp,
   FileText, Link2, Check, MessageSquare,
 } from "lucide-react";
-import type { TcfDashboardStats } from "../types";
+import type { Campus, TcfDashboardStats } from "../types";
 import { Label, ORANGE, QuickAction } from "../dashboard-ui";
 import { fmtFCFA } from "../utils";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 const BLUE = "#11224E";
 
 type Props = {
   stats: TcfDashboardStats;
+  campuses?: Campus[];
+  selectedCampus?: string | null;
+  onCampusChange?: (id: string | null) => void;
   linkCopied: boolean;
   onCopyLink: () => void;
   showSignupLink: boolean;
@@ -21,8 +25,19 @@ type Props = {
   canAccess?: (...keys: string[]) => boolean;
 };
 
-export default function TcfManagerDashboard({ stats, linkCopied, onCopyLink, showSignupLink, signupUrl, canAccess = () => true }: Props) {
+export default function TcfManagerDashboard({
+  stats,
+  campuses = [],
+  selectedCampus = null,
+  onCampusChange,
+  linkCopied,
+  onCopyLink,
+  showSignupLink,
+  signupUrl,
+  canAccess = () => true,
+}: Props) {
   const router = useRouter();
+  const { t } = useI18n();
   const data = stats;
 
   const showStudents = canAccess("etudiants");
@@ -34,6 +49,40 @@ export default function TcfManagerDashboard({ stats, linkCopied, onCopyLink, sho
 
   return (
     <div className="space-y-4 sm:space-y-5">
+      {campuses.length > 1 && onCampusChange && (
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none max-w-full pb-0.5">
+          <button
+            type="button"
+            onClick={() => onCampusChange(null)}
+            className={`h-8 px-3.5 rounded-full text-[12px] font-medium shrink-0 transition-colors ${
+              !selectedCampus
+                ? "text-white"
+                : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+            }`}
+            style={!selectedCampus ? { backgroundColor: BLUE } : undefined}
+          >
+            {t("centre", "managerAllCampuses")}
+          </button>
+          {campuses.map((c) => {
+            const active = selectedCampus === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onCampusChange(c.id)}
+                className={`h-8 px-3.5 rounded-full text-[12px] font-medium shrink-0 transition-colors ${
+                  active
+                    ? "text-white"
+                    : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                }`}
+                style={active ? { backgroundColor: BLUE } : undefined}
+              >
+                {c.name}
+              </button>
+            );
+          })}
+        </div>
+      )}
       {showAnyCard && (
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
         {showStudents && (

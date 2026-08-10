@@ -67,15 +67,15 @@ export function CenterBrandMark({
  */
 export const CENTER_TYPE = {
   /** Titre principal de page (ex. « Bonjour, Marie ») */
-  h0: "text-[16px] font-extrabold tracking-tight leading-tight",
+  h0: "text-[17px] font-extrabold tracking-tight leading-tight",
   /** Nom de rubrique (ex. « Finances », « Cours · cette semaine ») */
-  h1: "text-[14px] font-extrabold tracking-tight leading-tight",
+  h1: "text-[15px] font-extrabold tracking-tight leading-tight",
   /** Libellé gris (ex. « C.A. attendu ») */
-  label: "text-[12px] font-medium leading-snug text-neutral-500",
+  label: "text-[13px] font-medium leading-snug text-neutral-500",
   /** Chiffre / KPI — aligné FinanceKpiCard (text-base → sm:text-lg) */
   figure: "text-base sm:text-lg font-extrabold tracking-tight tabular-nums leading-none",
   /** Texte secondaire / sous-libellé */
-  muted: "text-[12px] font-medium leading-snug text-neutral-400",
+  muted: "text-[13px] font-medium leading-snug text-neutral-400",
 } as const;
 
 const outlineBtn =

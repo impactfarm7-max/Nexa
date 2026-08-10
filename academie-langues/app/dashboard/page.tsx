@@ -73,7 +73,6 @@ import {
   Plus,
   Check,
   Trash2,
-  Sparkles,
   Lock,
   CalendarClock,
   BookOpen,
@@ -122,18 +121,9 @@ const BRAND = {
 // Salutation dynamique
 // ----------------------------------------------------------------------------
 function useGreeting() {
-  const [greeting, setGreeting] = useState("Bonjour");
-  useEffect(() => {
-    const compute = () => {
-      const h = new Date().getHours();
-      // 5h–17h59 -> Bonjour · 18h–4h59 -> Bonsoir
-      setGreeting(h >= 5 && h < 18 ? "Bonjour" : "Bonsoir");
-    };
-    compute();
-    const id = setInterval(compute, 5 * 60 * 1000); // recalcul toutes les 5 min
-    return () => clearInterval(id);
-  }, []);
-  return greeting;
+  const { t } = useI18n();
+  const h = new Date().getHours();
+  return h >= 5 && h < 18 ? t("dashboard", "greetingMorning") : t("dashboard", "greetingEvening");
 }
 
 // ----------------------------------------------------------------------------
@@ -195,6 +185,8 @@ type PendingAction = {
   kind: "mission" | "course";
   courseId?: string;
   courseVersion?: string;
+  dueAt?: string | null;
+  lessonCount?: number;
 };
 
 const SEEN_CENTER_COURSES_KEY = "iag_seen_center_courses_v1";
@@ -251,8 +243,8 @@ type DisciplineStats = {
 
 export default function Dashboard() {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const greeting = useGreeting();
-  const { t } = useI18n();
 
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -300,15 +292,14 @@ export default function Dashboard() {
   const { packType, isAdmin, isSubValid } = limitData;
   const isTrial = !isAdmin && !isSubValid;
   const isFormation = ["acceleree", "complete", "essai"].includes(packType);
-  const canUseAITodo = isAdmin || isFormation; // todo IA = fonctionnalité premium
   const { isPluriannual, showTcfPacks, loading: centerCtxLoading } = useStudentCenterContext();
 
   const activeProgramLabel = (() => {
-    if (isPluriannual) return "Formation pluri-annuelle";
-    if (isAdmin) return "Admin VIP";
-    if (packType === "essai") return "Période d'essai · TCF Canada";
-    if (isFormation) return packType === "acceleree" ? "Formation Accélérée · TCF Canada" : "Formation Complète · TCF Canada";
-    return "TCF Canada";
+    if (isPluriannual) return t("dashboard", "pluriannualProgram");
+    if (isAdmin) return t("dashboard", "programAdminVip");
+    if (packType === "essai") return t("dashboard", "programTrialTcf");
+    if (isFormation) return packType === "acceleree" ? t("dashboard", "programAccelTcf") : t("dashboard", "programFullTcf");
+    return t("dashboard", "programTcf");
   })();
 
   useEffect(() => {
@@ -326,10 +317,10 @@ export default function Dashboard() {
   const showPushBanner = !pushBannerDismissed && (pushStatus === "unsubscribed" || pushStatus === "error");
 
   const promos = isPluriannual
-    ? [{ title: "Votre espace formation", desc: "Consultez vos cours, devoirs et sessions live.", color: `linear-gradient(135deg, ${BRAND.blue}, #3B5BA9)` }]
+    ? [{ title: t("dashboard", "promoCenterTitle"), desc: t("dashboard", "promoCenterDesc"), color: `linear-gradient(135deg, ${BRAND.blue}, #3B5BA9)` }]
     : [
-        { title: "Nouveau : Simulateur Vocal IA", desc: "Pratiquez l'oral en illimité.", color: `linear-gradient(135deg, ${BRAND.orange}, #FBBF24)` },
-        { title: "Masterclass Écriture C1", desc: "Ce samedi à 18h en direct.", color: `linear-gradient(135deg, ${BRAND.blue}, #3B5BA9)` },
+        { title: t("dashboard", "promoVocalTitle"), desc: t("dashboard", "promoVocalDesc"), color: `linear-gradient(135deg, ${BRAND.orange}, #FBBF24)` },
+        { title: t("dashboard", "promoMasterclassTitle"), desc: t("dashboard", "promoMasterclassDesc"), color: `linear-gradient(135deg, ${BRAND.blue}, #3B5BA9)` },
       ];
   const totalSlides = promos.length + pinnedFeedbacks.length;
   const [activePromo, setActivePromo] = useState(0);
@@ -634,19 +625,50 @@ export default function Dashboard() {
           for (const s of examSessionsRes.data as any[]) {
             const date = s.finished_at;
             const ce = extractNote(s.ce_result);
-            if (ce) entries.push({ id: `${s.id}-ce`, subject: "Compréhension Écrite", score: ce.score, max: ce.max, date });
+            if (ce) entries.push({ id: `${s.id}-ce`, subject: t("dashboard", "ceTitle"), score: ce.score, max: ce.max, date });
             const co = extractNote(s.co_result);
-            if (co) entries.push({ id: `${s.id}-co`, subject: "Compréhension Orale", score: co.score, max: co.max, date });
+            if (co) entries.push({ id: `${s.id}-co`, subject: t("dashboard", "coTitle"), score: co.score, max: co.max, date });
             const ee = extractNote(s.ee_result);
-            if (ee) entries.push({ id: `${s.id}-ee`, subject: "Expression Écrite", score: ee.score, max: ee.max, date });
+            if (ee) entries.push({ id: `${s.id}-ee`, subject: t("dashboard", "eeTitle"), score: ee.score, max: ee.max, date });
             const eo = extractEONote(s.eo_result);
-            if (eo) entries.push({ id: `${s.id}-eo`, subject: "Expression Orale", score: eo.score, max: eo.max, date });
+            if (eo) entries.push({ id: `${s.id}-eo`, subject: t("dashboard", "eoTitle"), score: eo.score, max: eo.max, date });
           }
           entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
           setGrades(entries.slice(0, 5));
         }
       } else {
-        setGrades([]);
+        const { data: gradeRows } = await supabase
+          .from("grades")
+          .select("id, score, max_score, title, created_at, enrollment_id, filiere_matiere_id")
+          .gte("created_at", weekIso)
+          .order("created_at", { ascending: false })
+          .limit(20);
+        if (gradeRows && gradeRows.length > 0) {
+          const fmIds = [...new Set(gradeRows.map((g) => g.filiere_matiere_id).filter(Boolean))];
+          let matiereNames = new Map<string, string>();
+          if (fmIds.length > 0) {
+            const { data: fmRows } = await supabase
+              .from("filiere_matieres")
+              .select("id, matieres(name)")
+              .in("id", fmIds);
+            for (const row of fmRows || []) {
+              const matiere = row.matieres as { name?: string } | { name?: string }[] | null;
+              const name = Array.isArray(matiere) ? matiere[0]?.name : matiere?.name;
+              if (name) matiereNames.set(row.id, name);
+            }
+          }
+          setGrades(
+            gradeRows.slice(0, 5).map((g) => ({
+              id: g.id,
+              subject: g.title || matiereNames.get(g.filiere_matiere_id) || t("dashboard", "gradeFallback"),
+              score: Number(g.score) || 0,
+              max: Number(g.max_score) || 20,
+              date: g.created_at,
+            })),
+          );
+        } else {
+          setGrades([]);
+        }
       }
 
       // 2. Cours et devoirs en attente
@@ -667,10 +689,11 @@ export default function Dashboard() {
         .filter((m: any) => !submittedIds.has(m.id))
         .map((m: any) => ({
           id: `mission-${m.id}`,
-          title: m.title || "Devoir",
-          subtitle: `Devoir · ${formatShortDate(m.due_at)}`,
+          title: m.title || t("dashboard", "homeworkLabel"),
+          subtitle: "",
           href: `/tcf-canada/missions?mission=${m.id}`,
           kind: "mission" as const,
+          dueAt: m.due_at ?? null,
         }));
 
       let centerCourses: PendingAction[] = [];
@@ -693,14 +716,13 @@ export default function Dashboard() {
                 const courseVersion = String(course.updated_at || "seen");
                 return {
                   id: `course-${courseId}`,
-                  title: course.title || "Cours du centre",
-                  subtitle: course.lesson_count
-                    ? `Cours du centre · ${course.lesson_count} leçon${course.lesson_count > 1 ? "s" : ""}`
-                    : "Cours du centre",
+                  title: course.title || t("dashboard", "centerCourseLabel"),
+                  subtitle: "",
                   href: `/tcf-canada/cours?tab=centre&course=${courseId}`,
                   kind: "course" as const,
                   courseId,
                   courseVersion,
+                  lessonCount: Number(course.lesson_count) || 0,
                 };
               });
           }
@@ -736,15 +758,20 @@ export default function Dashboard() {
             for (const c of collJson.sessions || []) {
               const isLive = (c as { kind?: string }).kind === "live";
               const kindLabel =
-                (c as { kind_label?: string }).kind_label ||
-                (isLive ? "Session Live" : c.mode === "en_ligne" ? "Cours en ligne" : "Séance");
+                isLive
+                  ? t("dashboard", "liveBadgeLive")
+                  : c.mode === "en_ligne"
+                    ? t("dashboard", "liveOnlineCourse")
+                    : t("dashboard", "liveBadgeSession");
               liveItems.push({
                 id: `coll-${c.slot_id}-${c.session_date}`,
                 title: c.title || kindLabel,
                 type: isLive ? "live-centre" : "coaching-groupe",
                 scheduled_at: c.scheduled_at,
-                // Visio étudiant désactivée : toujours renvoyer vers la page coaching
-                href: "/dashboard/coaching",
+                href:
+                  c.mode === "en_ligne" || isLive
+                    ? `/tcf-canada/live/room/${c.slot_id}?date=${c.session_date}`
+                    : "/dashboard/coaching",
                 modeLabel: kindLabel,
               });
             }
@@ -766,11 +793,11 @@ export default function Dashboard() {
           for (const live of centerLives || []) {
             liveItems.push({
               id: `live-${live.id}`,
-              title: live.title || "Live du centre",
+              title: live.title || t("dashboard", "liveCenterFallback"),
               type: "live-centre",
               scheduled_at: live.scheduled_at,
-              href: "/dashboard/coaching",
-              modeLabel: "Live",
+              href: live.meeting_url || "/dashboard/coaching",
+              modeLabel: t("dashboard", "liveShort"),
             });
           }
         }
@@ -796,7 +823,7 @@ export default function Dashboard() {
               type: "coaching-groupe",
               scheduled_at: new Date(`${g.session_date}T${g.session_time.slice(0, 5)}:00+01:00`).toISOString(),
               href: `/dashboard/coaching/room/group/${g.id}`,
-              modeLabel: "Groupe",
+              modeLabel: t("dashboard", "liveBadgeGroup"),
             });
           }
         }
@@ -820,12 +847,15 @@ export default function Dashboard() {
                 id: `appt-${appt.id}`,
                 title:
                   appt.status === "confirmed"
-                    ? "Coaching individuel (confirmé)"
-                    : "Coaching individuel (en attente)",
+                    ? t("dashboard", "coachingConfirmed")
+                    : t("dashboard", "coachingPending"),
                 type: "coaching-individuel",
                 scheduled_at: appt.scheduled_at,
-                href: "/dashboard/coaching",
-                modeLabel: "Individuel",
+                href:
+                  appt.status === "confirmed" && appt.session_mode !== "presentiel"
+                    ? `/dashboard/coaching/room/${appt.id}`
+                    : "/dashboard/coaching",
+                modeLabel: t("dashboard", "liveBadgeIndividual"),
               });
             }
           }
@@ -868,9 +898,23 @@ export default function Dashboard() {
         console.warn("client_activity_logs non lisible (policy RLS manquante ?) :", activityLogsRes.error.message);
       }
 
+      let liveAttendanceCount: number | null = null;
+      const todayStr = new Date().toLocaleDateString("en-CA");
+      const weekStartStr = weekIso.slice(0, 10);
+      const { data: pastLives, error: liveAttErr } = await supabase
+        .from("coaching_sessions")
+        .select("id, status, session_date")
+        .eq("user_id", user.id)
+        .in("status", ["confirme", "confirmed", "completed", "bascule"])
+        .gte("session_date", weekStartStr)
+        .lte("session_date", todayStr);
+      if (!liveAttErr) {
+        liveAttendanceCount = (pastLives || []).length;
+      }
+
       setDiscipline({
         activeDays: activeDaysCount,
-        liveAttendance: null,
+        liveAttendance: liveAttendanceCount,
         homeworkSubmitted: submittedThisWeek,
       });
 
@@ -888,7 +932,7 @@ export default function Dashboard() {
     };
 
     fetchWidgets();
-  }, [user?.id, isPluriannual]);
+  }, [user?.id, isPluriannual, locale, t]);
 
   // -------------------- Actions Todo-list --------------------
   const addTodo = async () => {
@@ -963,8 +1007,8 @@ export default function Dashboard() {
 
   const displayName = useMemo(() => {
     const meta = user?.user_metadata ?? {};
-    return meta.name || meta.full_name || meta.nom || meta.prenom || (user?.email ? user.email.split("@")[0] : null) || "Champion";
-  }, [user]);
+    return meta.name || meta.full_name || meta.nom || meta.prenom || (user?.email ? user.email.split("@")[0] : null) || t("dashboard", "displayNameFallback");
+  }, [user, t]);
 
   const handleCallSupport = () => { setShowSupportMenu(false); window.location.href = "tel:+237683375069"; };
   const handleOpenSupportChat = () => { setShowSupportMenu(false); router.push("/support"); };
@@ -973,15 +1017,31 @@ export default function Dashboard() {
     setShowSupportMenu((p) => !p);
   };
 
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const formatShortDate = (iso: string | null) => {
-    if (!iso) return "Sans échéance";
-    return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" });
+    if (!iso) return t("dashboard", "noDueDate");
+    return new Date(iso).toLocaleDateString(dateLocale, { day: "2-digit", month: "short" });
   };
   const formatLiveDate = (iso: string) => {
     const d = new Date(iso);
-    const day = d.toLocaleDateString("fr-FR", { weekday: "short", day: "2-digit", month: "short" });
-    const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    const day = d.toLocaleDateString(dateLocale, { weekday: "short", day: "2-digit", month: "short" });
+    const time = d.toLocaleTimeString(dateLocale, { hour: "2-digit", minute: "2-digit" });
     return `${day} · ${time}`;
+  };
+  const pendingSubtitle = (h: PendingAction) => {
+    if (h.kind === "course") {
+      return h.lessonCount
+        ? t("dashboard", "centerCourseLessons", { count: h.lessonCount })
+        : t("dashboard", "centerCourseLabel");
+    }
+    return `${t("dashboard", "homeworkLabel")} · ${formatShortDate(h.dueAt ?? null)}`;
+  };
+  const liveBadgeLabel = (l: LiveSession) => {
+    if (l.type === "coaching-individuel") return t("dashboard", "liveBadgeIndividual");
+    if (l.type === "live-centre") return t("dashboard", "liveBadgeLive");
+    if (l.type === "coaching-groupe") return t("dashboard", "liveBadgeSession");
+    if (l.type === "collectif") return t("dashboard", "liveBadgeCollective");
+    return t("dashboard", "liveBadgeGroup");
   };
 
   // ============================================================
@@ -1018,8 +1078,8 @@ export default function Dashboard() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-extrabold uppercase tracking-widest text-white/60 mb-1 font-display">
-                          Message privé — Coach NEXA
-                          {activeDirectMsg.message.toLowerCase().includes("coaching") && <span className="ml-2 text-orange-300">· Voir ma session →</span>}
+                          {t("dashboard", "privateCoachLabel")}
+                          {activeDirectMsg.message.toLowerCase().includes("coaching") && <span className="ml-2 text-orange-300">{t("dashboard", "seeMySession")}</span>}
                         </p>
                         <p className="text-sm font-semibold text-white/90 leading-relaxed">{activeDirectMsg.message}</p>
                       </div>
@@ -1044,10 +1104,10 @@ export default function Dashboard() {
                         <Megaphone size={18} className="text-white" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-extrabold uppercase tracking-widest text-orange-400 mb-1 font-display">Annonce NEXA</p>
+                        <p className="text-[10px] font-extrabold uppercase tracking-widest text-orange-400 mb-1 font-display">{t("dashboard", "nexaAnnouncement")}</p>
                         <p className={`text-sm font-semibold text-white/90 leading-relaxed ${!broadcastExpanded ? "line-clamp-2" : ""}`}>{activeBroadcast.message}</p>
                         {activeBroadcast.message.length > 100 && !broadcastExpanded && (
-                          <button onClick={() => setBroadcastExpanded(true)} className="text-[10px] font-bold text-orange-400 hover:text-orange-300 mt-1 transition-colors">Voir plus ↓</button>
+                          <button onClick={() => setBroadcastExpanded(true)} className="text-[10px] font-bold text-orange-400 hover:text-orange-300 mt-1 transition-colors">{t("dashboard", "seeMore")}</button>
                         )}
                       </div>
                       <button onClick={dismissBroadcast} className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors shrink-0"><X size={16} className="text-white/70" /></button>
@@ -1067,10 +1127,10 @@ export default function Dashboard() {
                       <div className="w-10 h-10 bg-amber-500 rounded-2xl flex items-center justify-center shrink-0"><Bell size={18} className="text-white" /></div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] font-extrabold uppercase tracking-widest text-amber-300 mb-0.5 font-display">NEXA</p>
-                        <p className="text-sm font-semibold text-white/90 leading-snug">{subscribeError || "Recevez vos rappels et messages directement sur votre appareil."}</p>
+                        <p className="text-sm font-semibold text-white/90 leading-snug">{subscribeError || t("dashboard", "pushBannerBody")}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={async () => { const ok = await pushSubscribe(); if (ok) setPushBannerDismissed(true); }} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold rounded-xl transition-colors">Autoriser</button>
+                        <button onClick={async () => { const ok = await pushSubscribe(); if (ok) setPushBannerDismissed(true); }} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-white text-xs font-bold rounded-xl transition-colors">{t("dashboard", "pushAllow")}</button>
                         <button onClick={dismissPushBanner} className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-xl flex items-center justify-center transition-colors"><X size={16} className="text-white/70" /></button>
                       </div>
                     </div>
@@ -1087,27 +1147,27 @@ export default function Dashboard() {
             <div>
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="font-bold uppercase tracking-widest text-[8px] md:text-[9px] xl:text-[10px] px-1.5 py-0.5 rounded-full" style={{ color: BRAND.orange, backgroundColor: "#FFF3E8" }}>
-                  Espace Étudiant
+                  {t("dashboard", "studentSpace")}
                 </span>
                 {isViewAsStudentPreview() && (
                   <span className="font-bold uppercase tracking-widest text-[8px] md:text-[9px] xl:text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
-                    Aperçu
+                    {t("centre", "viewAsPreview")}
                   </span>
                 )}
               </div>
               <h1 className={`font-display font-black tracking-tight mt-0.5 transition-all duration-300 ${scrolled ? "text-sm md:text-base xl:text-lg" : "text-base md:text-lg xl:text-xl 2xl:text-2xl"}`} style={{ color: BRAND.blue }}>
                 {greeting}, {displayName}
               </h1>
-              {!scrolled && <p className="text-[10px] md:text-xs xl:text-sm text-neutral-400 font-medium mt-0.5">Voici votre semaine en un coup d'œil.</p>}
+              {!scrolled && <p className="text-[10px] md:text-xs xl:text-sm text-neutral-400 font-medium mt-0.5">{t("dashboard", "weekGlance")}</p>}
             </div>
 
             <div className="flex items-center gap-2 md:gap-3">
               <ViewAsMenu variant="student" />
               {/* Support */}
               <div className="relative">
-                <button onClick={handleSupportClick} title="Support" className="px-3 py-2 h-10 md:h-12 rounded-full flex items-center gap-2 border transition-colors shadow-sm" style={{ backgroundColor: "#EEF2FF", borderColor: "#DCE3FF" }}>
+                <button onClick={handleSupportClick} title={t("dashboard", "support")} className="px-3 py-2 h-10 md:h-12 rounded-full flex items-center gap-2 border transition-colors shadow-sm" style={{ backgroundColor: "#EEF2FF", borderColor: "#DCE3FF" }}>
                   <MessageCircle className="w-4 h-4 md:w-5 md:h-5" style={{ color: BRAND.blue }} />
-                  <span className="text-xs md:text-sm font-semibold hidden sm:inline" style={{ color: BRAND.blue }}>Support</span>
+                  <span className="text-xs md:text-sm font-semibold hidden sm:inline" style={{ color: BRAND.blue }}>{t("dashboard", "support")}</span>
                 </button>
 
                 <AnimatePresence>
@@ -1116,17 +1176,17 @@ export default function Dashboard() {
                       <div className="fixed inset-0 z-40 hidden md:block" onClick={() => setShowSupportMenu(false)} />
                       <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 6, scale: 0.95 }} className="hidden md:block absolute right-0 mt-3 w-[min(280px,calc(100vw-2rem))] bg-white border border-neutral-200 rounded-3xl shadow-2xl overflow-hidden z-50 origin-top-right">
                         <div className="p-3 border-b border-neutral-100 bg-neutral-50/60">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-display">Service client</p>
-                          <p className="text-sm font-bold text-neutral-900 mt-0.5">Comment voulez-vous nous joindre ?</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 font-display">{t("dashboard", "supportService")}</p>
+                          <p className="text-sm font-bold text-neutral-900 mt-0.5">{t("dashboard", "supportHowToReach")}</p>
                         </div>
                         <div className="p-2">
                           <button onClick={handleCallSupport} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-emerald-50 transition-colors text-left group">
                             <span className="w-10 h-10 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center"><Phone className="w-5 h-5 text-emerald-600" /></span>
-                            <span><span className="block text-sm font-black text-neutral-900">Appeler le service client</span><span className="block text-xs font-medium text-neutral-400">Assistance par téléphone</span></span>
+                            <span><span className="block text-sm font-black text-neutral-900">{t("dashboard", "supportCall")}</span><span className="block text-xs font-medium text-neutral-400">{t("dashboard", "supportCallHint")}</span></span>
                           </button>
                           <button onClick={handleOpenSupportChat} className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-blue-50 transition-colors text-left group">
                             <span className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center"><MessageCircle className="w-5 h-5 text-blue-600" /></span>
-                            <span><span className="block text-sm font-black text-neutral-900">Écrire au service client</span><span className="block text-xs font-medium text-neutral-400">Ouvre le chat avec un agent</span></span>
+                            <span><span className="block text-sm font-black text-neutral-900">{t("dashboard", "supportWrite")}</span><span className="block text-xs font-medium text-neutral-400">{t("dashboard", "supportWriteHint")}</span></span>
                           </button>
                         </div>
                       </motion.div>
@@ -1152,29 +1212,29 @@ export default function Dashboard() {
                       <div className="fixed inset-0 z-40 md:hidden" onClick={() => setShowNotifs(false)} />
                       <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="absolute right-0 mt-3 w-[min(320px,calc(100vw-2rem))] md:w-80 bg-white border border-neutral-200 rounded-3xl shadow-2xl overflow-hidden z-50 origin-top-right">
                         <div className="p-4 border-b border-neutral-100 flex justify-between items-center bg-neutral-50/50">
-                          <h3 className="font-bold text-xs uppercase tracking-widest text-neutral-900 font-display">Notifications</h3>
+                          <h3 className="font-bold text-xs uppercase tracking-widest text-neutral-900 font-display">{t("dashboard", "notifications")}</h3>
                           <button onClick={() => setShowNotifs(false)} className="p-1.5 text-neutral-400 hover:text-neutral-900 bg-white rounded-full shadow-sm border border-neutral-200"><X size={14} /></button>
                         </div>
                         <div className="max-h-[60vh] md:max-h-80 overflow-y-auto p-2">
                           {privateUnreadCount > 0 && (
                             <button onClick={openPrivateMessagesFromBell} className="w-full p-4 rounded-2xl hover:bg-orange-50 transition-colors text-left border-b border-neutral-50 flex items-center gap-3">
                               <span className="w-9 h-9 rounded-full bg-orange-50 border border-orange-100 flex items-center justify-center shrink-0"><MessageCircle className="w-4 h-4 text-orange-600" /></span>
-                              <span className="flex-1 min-w-0"><span className="block text-xs font-black text-neutral-900">Messages privés</span><span className="block text-[10px] font-semibold text-neutral-400">{privateUnreadCount} non lu(s)</span></span>
+                              <span className="flex-1 min-w-0"><span className="block text-xs font-black text-neutral-900">{t("dashboard", "privateMessages")}</span><span className="block text-[10px] font-semibold text-neutral-400">{t("dashboard", "unreadCount", { count: privateUnreadCount })}</span></span>
                             </button>
                           )}
                           {supportUnreadCount > 0 && (
                             <button onClick={openSupportFromBell} className="w-full p-4 rounded-2xl hover:bg-blue-50 transition-colors text-left border-b border-neutral-50 flex items-center gap-3">
                               <span className="w-9 h-9 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0"><MessageCircleQuestion className="w-4 h-4 text-blue-600" /></span>
-                              <span className="flex-1 min-w-0"><span className="block text-xs font-black text-neutral-900">Support client</span><span className="block text-[10px] font-semibold text-neutral-400">{supportUnreadCount} réponse(s) non lue(s)</span></span>
+                              <span className="flex-1 min-w-0"><span className="block text-xs font-black text-neutral-900">{t("dashboard", "supportClient")}</span><span className="block text-[10px] font-semibold text-neutral-400">{t("dashboard", "unreadReplies", { count: supportUnreadCount })}</span></span>
                             </button>
                           )}
                           {notifications.length === 0 && privateUnreadCount === 0 && supportUnreadCount === 0 ? (
-                            <div className="p-8 text-center text-xs font-bold text-neutral-400 uppercase tracking-widest font-display">Aucun message</div>
+                            <div className="p-8 text-center text-xs font-bold text-neutral-400 uppercase tracking-widest font-display">{t("dashboard", "noMessages")}</div>
                           ) : (
                             notifications.map((notif) => (
                               <div key={notif.id} className="p-4 rounded-2xl transition-colors border-b border-neutral-50 last:border-none hover:bg-neutral-50">
                                 <p className="text-xs font-medium text-neutral-800 leading-snug">{notif.message}</p>
-                                <p className="text-[10px] text-neutral-400 font-mono mt-1">{new Date(notif.created_at).toLocaleDateString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</p>
+                                <p className="text-[10px] text-neutral-400 font-mono mt-1">{new Date(notif.created_at).toLocaleDateString(dateLocale, { hour: "2-digit", minute: "2-digit" })}</p>
                               </div>
                             ))
                           )}
@@ -1196,15 +1256,15 @@ export default function Dashboard() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[90] bg-black/35 md:hidden" onClick={() => setShowSupportMenu(false)} />
               <motion.div initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }} transition={{ type: "spring", damping: 28, stiffness: 260 }} className="fixed inset-x-0 bottom-0 z-[100] rounded-t-[2rem] border border-blue-100 bg-white px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-5 shadow-2xl md:hidden">
                 <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-neutral-200" />
-                <h2 className="mb-5 text-center text-xl font-display font-black" style={{ color: BRAND.blue }}>Service client</h2>
+                <h2 className="mb-5 text-center text-xl font-display font-black" style={{ color: BRAND.blue }}>{t("dashboard", "supportService")}</h2>
                 <div className="space-y-3">
                   <button onClick={handleCallSupport} className="flex w-full items-center gap-4 rounded-2xl border-2 border-blue-100 bg-white p-4 text-left shadow-sm active:scale-[0.99]">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"><Phone className="h-5 w-5" /></span>
-                    <span className="min-w-0 flex-1"><span className="block text-base font-black text-neutral-950">Appeler le service client</span><span className="block text-xs font-semibold text-neutral-400">Assistance par téléphone</span></span>
+                    <span className="min-w-0 flex-1"><span className="block text-base font-black text-neutral-950">{t("dashboard", "supportCall")}</span><span className="block text-xs font-semibold text-neutral-400">{t("dashboard", "supportCallHint")}</span></span>
                   </button>
                   <button onClick={handleOpenSupportChat} className="flex w-full items-center gap-4 rounded-2xl border-2 border-blue-100 bg-white p-4 text-left shadow-sm active:scale-[0.99]">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-blue-600"><MessageCircle className="h-5 w-5" /></span>
-                    <span className="min-w-0 flex-1"><span className="block text-base font-black text-neutral-950">Écrire au support</span><span className="block text-xs font-semibold text-neutral-400">Ouvre le chat avec un agent</span></span>
+                    <span className="min-w-0 flex-1"><span className="block text-base font-black text-neutral-950">{t("dashboard", "supportWriteShort")}</span><span className="block text-xs font-semibold text-neutral-400">{t("dashboard", "supportWriteHint")}</span></span>
                   </button>
                 </div>
               </motion.div>
@@ -1221,7 +1281,7 @@ export default function Dashboard() {
           <section className="mb-10">
             <div className="flex items-center justify-between mb-4 ml-1 flex-wrap gap-2">
               <h3 className="font-display font-black text-lg md:text-xl xl:text-2xl 2xl:text-3xl tracking-tight" style={{ color: BRAND.blue }}>
-                Pack d'entraînement
+                {t("dashboard", "trainingPack")}
               </h3>
               <span className="text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full" style={{ color: BRAND.orange, backgroundColor: "#FFF3E8" }}>
                 {activeProgramLabel}
@@ -1229,45 +1289,45 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 md:gap-3.5 xl:gap-5 2xl:gap-6">
               <a href="/tcf-canada/comprehension/ecrit" className="relative bg-white rounded-2xl border border-neutral-200 p-3 md:p-4 xl:p-5 2xl:p-6 flex flex-col hover:shadow-md hover:-translate-y-0.5 hover:border-orange-200 transition-all duration-200 group">
-                {isTrial && <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ color: "#0E9F6E", backgroundColor: "#EAFBF2" }}>Essai</span>}
+                {isTrial && <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ color: "#0E9F6E", backgroundColor: "#EAFBF2" }}>{t("dashboard", "trialBadge")}</span>}
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform" style={{ backgroundColor: "#FFF3E8" }}>
                   <ScrollText className="w-4.5 h-4.5" style={{ color: BRAND.orange }} />
                 </div>
-                <h4 className="font-display font-black text-[11px] md:text-xs uppercase tracking-tight leading-tight mb-0.5" style={{ color: BRAND.blue }}>Compréhension Écrite</h4>
-                <p className="text-[9px] md:text-[10px] text-neutral-400 font-medium leading-snug">{isTrial ? "1 série gratuite" : "Lecture & analyse"}</p>
+                <h4 className="font-display font-black text-[11px] md:text-xs uppercase tracking-tight leading-tight mb-0.5" style={{ color: BRAND.blue }}>{t("dashboard", "ceTitle")}</h4>
+                <p className="text-[9px] md:text-[10px] text-neutral-400 font-medium leading-snug">{isTrial ? t("dashboard", "trialOneSeries") : t("dashboard", "ceHint")}</p>
               </a>
               <a href="/tcf-canada/comprehension/orale" className="relative bg-white rounded-2xl border border-neutral-200 p-3 md:p-4 flex flex-col hover:shadow-md hover:-translate-y-0.5 hover:border-orange-200 transition-all duration-200 group">
-                {isTrial && <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ color: "#0E9F6E", backgroundColor: "#EAFBF2" }}>Essai</span>}
+                {isTrial && <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ color: "#0E9F6E", backgroundColor: "#EAFBF2" }}>{t("dashboard", "trialBadge")}</span>}
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform" style={{ backgroundColor: "#FFF3E8" }}>
                   <Headphones className="w-4.5 h-4.5" style={{ color: BRAND.orange }} />
                 </div>
-                <h4 className="font-display font-black text-[11px] md:text-xs uppercase tracking-tight leading-tight mb-0.5" style={{ color: BRAND.blue }}>Compréhension Orale</h4>
-                <p className="text-[9px] md:text-[10px] text-neutral-400 font-medium leading-snug">{isTrial ? "1 série gratuite" : "Écoute & audio"}</p>
+                <h4 className="font-display font-black text-[11px] md:text-xs uppercase tracking-tight leading-tight mb-0.5" style={{ color: BRAND.blue }}>{t("dashboard", "coTitle")}</h4>
+                <p className="text-[9px] md:text-[10px] text-neutral-400 font-medium leading-snug">{isTrial ? t("dashboard", "trialOneSeries") : t("dashboard", "coHint")}</p>
               </a>
               <a href="/tcf-canada/expression-ecrite" className="relative bg-white rounded-2xl border border-neutral-200 p-3 md:p-4 flex flex-col hover:shadow-md hover:-translate-y-0.5 hover:border-orange-200 transition-all duration-200 group">
-                {isTrial && <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ color: "#0E9F6E", backgroundColor: "#EAFBF2" }}>Essai</span>}
+                {isTrial && <span className="absolute top-2 right-2 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ color: "#0E9F6E", backgroundColor: "#EAFBF2" }}>{t("dashboard", "trialBadge")}</span>}
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform" style={{ backgroundColor: "#FFF3E8" }}>
                   <PenTool className="w-4.5 h-4.5" style={{ color: BRAND.orange }} />
                 </div>
-                <h4 className="font-display font-black text-[11px] md:text-xs uppercase tracking-tight leading-tight mb-0.5" style={{ color: BRAND.blue }}>Expression Écrite</h4>
-                <p className="text-[9px] md:text-[10px] text-neutral-400 font-medium leading-snug">{isTrial ? "2 essais avec IA" : "Mode Zen"}</p>
+                <h4 className="font-display font-black text-[11px] md:text-xs uppercase tracking-tight leading-tight mb-0.5" style={{ color: BRAND.blue }}>{t("dashboard", "eeTitle")}</h4>
+                <p className="text-[9px] md:text-[10px] text-neutral-400 font-medium leading-snug">{isTrial ? t("dashboard", "trialTwoAiTries") : t("dashboard", "eeHint")}</p>
               </a>
               {isTrial ? (
                 <button onClick={() => router.push("/paywall")} className="relative bg-white rounded-2xl border border-neutral-200 p-3 md:p-4 flex flex-col text-left hover:shadow-md hover:-translate-y-0.5 hover:border-orange-200 transition-all duration-200 group">
-                  <span className="absolute top-2 right-2 flex items-center gap-0.5 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ color: BRAND.orange, backgroundColor: "#FFF3E8" }}><Star size={7} fill="currentColor" /> Pro</span>
+                  <span className="absolute top-2 right-2 flex items-center gap-0.5 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full" style={{ color: BRAND.orange, backgroundColor: "#FFF3E8" }}><Star size={7} fill="currentColor" /> {t("dashboard", "proBadge")}</span>
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5" style={{ backgroundColor: "#FFF3E8" }}>
                     <Mic className="w-4.5 h-4.5" style={{ color: BRAND.orange }} />
                   </div>
-                  <h4 className="font-display font-black text-[11px] md:text-xs uppercase tracking-tight leading-tight mb-0.5" style={{ color: BRAND.blue }}>Expression Orale</h4>
-                  <p className="text-[9px] md:text-[10px] font-semibold leading-snug" style={{ color: BRAND.orange }}>Débloquer →</p>
+                  <h4 className="font-display font-black text-[11px] md:text-xs uppercase tracking-tight leading-tight mb-0.5" style={{ color: BRAND.blue }}>{t("dashboard", "eoTitle")}</h4>
+                  <p className="text-[9px] md:text-[10px] font-semibold leading-snug" style={{ color: BRAND.orange }}>{t("dashboard", "unlock")}</p>
                 </button>
               ) : (
                 <a href="/tcf-canada/expression-orale" className="relative bg-white rounded-2xl border border-neutral-200 p-3 md:p-4 flex flex-col hover:shadow-md hover:-translate-y-0.5 hover:border-orange-200 transition-all duration-200 group">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center mb-2.5 group-hover:scale-110 transition-transform" style={{ backgroundColor: "#FFF3E8" }}>
                     <Mic className="w-4.5 h-4.5" style={{ color: BRAND.orange }} />
                   </div>
-                  <h4 className="font-display font-black text-[11px] md:text-xs uppercase tracking-tight leading-tight mb-0.5" style={{ color: BRAND.blue }}>Expression Orale</h4>
-                  <p className="text-[9px] md:text-[10px] text-neutral-400 font-medium leading-snug">Coach vocal IA</p>
+                  <h4 className="font-display font-black text-[11px] md:text-xs uppercase tracking-tight leading-tight mb-0.5" style={{ color: BRAND.blue }}>{t("dashboard", "eoTitle")}</h4>
+                  <p className="text-[9px] md:text-[10px] text-neutral-400 font-medium leading-snug">{t("dashboard", "eoHint")}</p>
                 </a>
               )}
             </div>
@@ -1277,12 +1337,12 @@ export default function Dashboard() {
           {isPluriannual && (
           <section className="mb-8">
             <div className="rounded-2xl border border-neutral-200 bg-white p-5 md:p-6 shadow-sm">
-              <p className="text-[10px] font-black uppercase tracking-widest text-orange-600">Votre parcours</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-orange-600">{t("dashboard", "yourPath")}</p>
               <h3 className="mt-1 font-display font-black text-lg md:text-xl" style={{ color: BRAND.blue }}>
-                Formation pluri-annuelle
+                {t("dashboard", "pluriannualProgram")}
               </h3>
               <p className="mt-2 text-sm font-medium text-neutral-500 leading-relaxed">
-                Suivez vos notes, devoirs et sessions live depuis cet espace. Les packs TCF ne s&apos;appliquent pas à votre centre.
+                {t("dashboard", "pluriannualPathHint")}
               </p>
             </div>
           </section>
@@ -1295,10 +1355,10 @@ export default function Dashboard() {
               <div className="flex items-center justify-between mb-2">
                 <h3 className="font-display font-black text-sm md:text-base xl:text-lg 2xl:text-xl flex items-center gap-2" style={{ color: BRAND.blue }}>
                   <NotebookPen className="w-4 h-4" style={{ color: BRAND.orange }} />
-                  {isPluriannual ? t("dashboard", "gradesWidgetTitle") : "Mes notes de la semaine"}
+                  {isPluriannual ? t("dashboard", "gradesWidgetTitle") : t("dashboard", "gradesThisWeek")}
                 </h3>
                 {!isPluriannual && (
-                <a href="/tcf-canada/simulateur/examen" className="text-[11px] font-bold text-neutral-400 hover:text-orange-500 transition-colors">Tout voir →</a>
+                <a href="/tcf-canada/simulateur/examen" className="text-[11px] font-bold text-neutral-400 hover:text-orange-500 transition-colors">{t("dashboard", "seeAll")}</a>
                 )}
               </div>
               {isPluriannual ? (
@@ -1318,11 +1378,11 @@ export default function Dashboard() {
                 </>
               ) : (
                 <>
-              <p className="text-[10px] text-neutral-400 font-medium mb-4">Résultats des examens complets uniquement, pour l'instant.</p>
+              <p className="text-[10px] text-neutral-400 font-medium mb-4">{t("dashboard", "gradesExamOnlyHint")}</p>
               {widgetsLoading ? (
                 <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-12 bg-neutral-100 rounded-xl animate-pulse" />)}</div>
               ) : grades.length === 0 ? (
-                <p className="text-sm text-neutral-400 font-medium py-6 text-center">Pas encore de résultat d'examen complet cette semaine.</p>
+                <p className="text-sm text-neutral-400 font-medium py-6 text-center">{t("dashboard", "gradesNoExamThisWeek")}</p>
               ) : (
                 <ul className={`space-y-2 ${pendingActions.length > 4 ? "max-h-[18rem] overflow-y-auto pr-1" : ""}`}>
                   {grades.map((g) => {
@@ -1332,7 +1392,7 @@ export default function Dashboard() {
                       <li key={g.id} className="flex items-center justify-between p-3 rounded-2xl border" style={{ borderColor: good ? "#D9F2E6" : "#FCE3D6", backgroundColor: good ? "#F2FBF7" : "#FFF8F2" }}>
                         <div className="min-w-0">
                           <p className="text-xs font-bold text-neutral-800 truncate">{g.subject}</p>
-                          <p className="text-[10px] text-neutral-400 font-medium">{new Date(g.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" })}</p>
+                          <p className="text-[10px] text-neutral-400 font-medium">{new Date(g.date).toLocaleDateString(dateLocale, { day: "2-digit", month: "short" })}</p>
                         </div>
                         <span className="text-sm font-black shrink-0 ml-2" style={{ color: good ? "#0E9F6E" : BRAND.orange }}>{g.score}/{g.max}</span>
                       </li>
@@ -1348,19 +1408,19 @@ export default function Dashboard() {
             <div className="bg-white rounded-[1.75rem] border border-neutral-200 shadow-sm p-5 md:p-6 xl:p-7 2xl:p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-display font-black text-sm md:text-base xl:text-lg 2xl:text-xl flex items-center gap-2" style={{ color: BRAND.blue }}>
-                  <FileWarning className="w-4 h-4 xl:w-5 xl:h-5" style={{ color: BRAND.orange }} /> Cours et devoirs en attente
+                  <FileWarning className="w-4 h-4 xl:w-5 xl:h-5" style={{ color: BRAND.orange }} /> {t("dashboard", "pendingHomeworkTitle")}
                 </h3>
                 <a
                   href={isPluriannual ? "/tcf-canada/cours" : "/tcf-canada/cours?tab=centre"}
                   className="text-[11px] font-bold text-neutral-400 hover:text-orange-500 transition-colors"
                 >
-                  Tout voir →
+                  {t("dashboard", "seeAll")}
                 </a>
               </div>
               {widgetsLoading ? (
                 <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-12 bg-neutral-100 rounded-xl animate-pulse" />)}</div>
               ) : pendingActions.length === 0 ? (
-                <p className="text-sm text-neutral-400 font-medium py-6 text-center">Tout est à jour, bravo ! 🎉</p>
+                <p className="text-sm text-neutral-400 font-medium py-6 text-center">{t("dashboard", "allCaughtUp")}</p>
               ) : (
                 <ul className="space-y-2">
                   {pendingActions.map((h) => (
@@ -1379,7 +1439,7 @@ export default function Dashboard() {
                           <p className="text-xs font-bold text-neutral-800 truncate">{h.title}</p>
                           <p className="text-[10px] font-medium flex items-center gap-1" style={{ color: BRAND.orange }}>
                             {h.kind === "course" ? <BookOpen size={10} /> : <CalendarClock size={10} />}
-                            {h.subtitle}
+                            {pendingSubtitle(h)}
                           </p>
                         </div>
                         <ChevronRight className="w-4 h-4 text-orange-400 shrink-0" />
@@ -1396,26 +1456,26 @@ export default function Dashboard() {
             <div className="rounded-[1.75rem] border border-neutral-200 shadow-sm p-5 md:p-6 xl:p-7 2xl:p-8" style={{ background: `linear-gradient(135deg, ${BRAND.blue}, #1B3370)` }}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-display font-black text-sm md:text-base xl:text-lg 2xl:text-xl flex items-center gap-2 text-white">
-                  <Flame className="w-4 h-4 text-orange-400" /> Ma discipline cette semaine
+                  <Flame className="w-4 h-4 text-orange-400" /> {t("dashboard", "disciplineTitle")}
                 </h3>
-                <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Continuez comme ça 💪</span>
+                <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{t("dashboard", "disciplineKeepGoing")}</span>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="bg-white/10 rounded-2xl p-3 text-center">
                   <p className="text-2xl font-display font-black text-white">
                     {discipline.activeDays === null ? "—" : <>{discipline.activeDays}<span className="text-xs text-white/50">/7</span></>}
                   </p>
-                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-wider mt-1">Jours actifs</p>
-                  {discipline.activeDays === null && <p className="text-[8px] text-white/30 font-medium mt-0.5">À connecter</p>}
+                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-wider mt-1">{t("dashboard", "activeDays")}</p>
+                  {discipline.activeDays === null && <p className="text-[8px] text-white/30 font-medium mt-0.5">{t("dashboard", "toConnect")}</p>}
                 </div>
                 <div className="bg-white/10 rounded-2xl p-3 text-center">
                   <p className="text-2xl font-display font-black text-white">{discipline.liveAttendance === null ? "—" : discipline.liveAttendance}</p>
-                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-wider mt-1">Lives suivis</p>
-                  {discipline.liveAttendance === null && <p className="text-[8px] text-white/30 font-medium mt-0.5">À connecter</p>}
+                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-wider mt-1">{t("dashboard", "livesAttended")}</p>
+                  {discipline.liveAttendance === null && <p className="text-[8px] text-white/30 font-medium mt-0.5">{t("dashboard", "toConnect")}</p>}
                 </div>
                 <div className="bg-white/10 rounded-2xl p-3 text-center">
                   <p className="text-2xl font-display font-black text-white">{discipline.homeworkSubmitted}</p>
-                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-wider mt-1">Devoirs rendus</p>
+                  <p className="text-[10px] font-bold text-white/60 uppercase tracking-wider mt-1">{t("dashboard", "homeworkSubmitted")}</p>
                 </div>
               </div>
             </div>
@@ -1427,28 +1487,18 @@ export default function Dashboard() {
             <div className="bg-white rounded-[1.75rem] border border-neutral-200 shadow-sm p-5 md:p-6 xl:p-7 2xl:p-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-display font-black text-sm md:text-base xl:text-lg 2xl:text-xl flex items-center gap-2" style={{ color: BRAND.blue }}>
-                  <Radio className="w-4 h-4" style={{ color: BRAND.orange }} /> Sessions live à venir
+                  <Radio className="w-4 h-4" style={{ color: BRAND.orange }} /> {t("dashboard", "upcomingLives")}
                 </h3>
-                <a href="/dashboard/coaching" className="text-[11px] font-bold text-neutral-400 hover:text-orange-500 transition-colors">Tout voir →</a>
+                <a href="/dashboard/coaching" className="text-[11px] font-bold text-neutral-400 hover:text-orange-500 transition-colors">{t("dashboard", "seeAll")}</a>
               </div>
               {widgetsLoading ? (
                 <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="h-14 bg-neutral-100 rounded-xl animate-pulse" />)}</div>
               ) : upcomingLives.length === 0 ? (
-                <p className="text-sm text-neutral-400 font-medium py-6 text-center">Aucune session programmée pour l'instant.</p>
+                <p className="text-sm text-neutral-400 font-medium py-6 text-center">{t("dashboard", "noLivesScheduled")}</p>
               ) : (
                 <ul className="space-y-2">
                   {upcomingLives.map((l) => {
-                    const badge =
-                      l.modeLabel ||
-                      (l.type === "coaching-individuel"
-                        ? "Individuel"
-                        : l.type === "live-centre"
-                          ? "Session Live"
-                          : l.type === "coaching-groupe"
-                            ? "Séance"
-                            : l.type === "collectif"
-                              ? "Collectif"
-                              : "Groupe");
+                    const badge = l.modeLabel || liveBadgeLabel(l);
                     const isExternal = !!l.href && /^https?:\/\//i.test(l.href);
                     const content = (
                       <>
@@ -1498,15 +1548,16 @@ export default function Dashboard() {
             <div className="bg-white rounded-[1.75rem] border border-neutral-200 shadow-sm p-5 md:p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-display font-black text-sm md:text-base flex items-center gap-2" style={{ color: BRAND.blue }}>
-                  <ListChecks className="w-4 h-4" style={{ color: BRAND.orange }} /> Ma todo-list
+                  <ListChecks className="w-4 h-4" style={{ color: BRAND.orange }} /> {t("dashboard", "todoTitle")}
                 </h3>
                 <button
-                  onClick={() => { if (!canUseAITodo) router.push("/paywall"); }}
-                  title={canUseAITodo ? "Suggestions IA" : "Fonctionnalité Premium"}
-                  className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide px-2 py-1 rounded-full"
-                  style={{ color: canUseAITodo ? "#0E9F6E" : "#9CA3AF", backgroundColor: canUseAITodo ? "#EAFBF2" : "#F3F4F6" }}
+                  type="button"
+                  disabled
+                  title={t("dashboard", "todoAiSoon")}
+                  className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wide px-2 py-1 rounded-full cursor-not-allowed"
+                  style={{ color: "#9CA3AF", backgroundColor: "#F3F4F6" }}
                 >
-                  {canUseAITodo ? <Sparkles size={10} /> : <Lock size={10} />} IA
+                  <Lock size={10} /> IA
                 </button>
               </div>
 
@@ -1515,7 +1566,7 @@ export default function Dashboard() {
                   value={newTodo}
                   onChange={(e) => setNewTodo(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addTodo()}
-                  placeholder="Ajouter une tâche pour la semaine…"
+                  placeholder={t("dashboard", "todoPlaceholder")}
                   className="flex-1 text-sm px-3 py-2.5 rounded-xl border border-neutral-200 focus:outline-none focus:ring-2 focus:ring-orange-200 focus:border-orange-300"
                 />
                 <button onClick={addTodo} className="w-10 h-10 rounded-xl flex items-center justify-center text-white shrink-0" style={{ backgroundColor: BRAND.orange }}>
@@ -1526,16 +1577,16 @@ export default function Dashboard() {
               {widgetsLoading ? (
                 <div className="space-y-2">{[1, 2, 3].map((i) => <div key={i} className="h-10 bg-neutral-100 rounded-xl animate-pulse" />)}</div>
               ) : todos.length === 0 ? (
-                <p className="text-sm text-neutral-400 font-medium py-4 text-center">Aucune tâche pour le moment — ajoutez votre premier objectif de la semaine.</p>
+                <p className="text-sm text-neutral-400 font-medium py-4 text-center">{t("dashboard", "todoEmpty")}</p>
               ) : (
                 <ul className="space-y-1.5">
-                  {todos.map((t) => (
-                    <li key={t.id} className="flex items-center gap-2 group p-2 rounded-xl hover:bg-neutral-50">
-                      <button onClick={() => toggleTodo(t.id, t.is_done)} className="w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors" style={{ borderColor: t.is_done ? "#0E9F6E" : "#D1D5DB", backgroundColor: t.is_done ? "#0E9F6E" : "transparent" }}>
-                        {t.is_done && <Check size={12} className="text-white" />}
+                  {todos.map((item) => (
+                    <li key={item.id} className="flex items-center gap-2 group p-2 rounded-xl hover:bg-neutral-50">
+                      <button onClick={() => toggleTodo(item.id, item.is_done)} className="w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors" style={{ borderColor: item.is_done ? "#0E9F6E" : "#D1D5DB", backgroundColor: item.is_done ? "#0E9F6E" : "transparent" }}>
+                        {item.is_done && <Check size={12} className="text-white" />}
                       </button>
-                      <span className={`flex-1 text-sm ${t.is_done ? "line-through text-neutral-400" : "text-neutral-700 font-medium"}`}>{t.content}</span>
-                      <button onClick={() => deleteTodo(t.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-neutral-300 hover:text-red-500"><Trash2 size={14} /></button>
+                      <span className={`flex-1 text-sm ${item.is_done ? "line-through text-neutral-400" : "text-neutral-700 font-medium"}`}>{item.content}</span>
+                      <button onClick={() => deleteTodo(item.id)} className="opacity-0 group-hover:opacity-100 transition-opacity text-neutral-300 hover:text-red-500"><Trash2 size={14} /></button>
                     </li>
                   ))}
                 </ul>
@@ -1547,7 +1598,7 @@ export default function Dashboard() {
           <section className="mb-10">
             <div className="flex items-center justify-between mb-4 ml-1">
               <h3 className="font-display font-black text-sm uppercase tracking-widest flex items-center gap-2" style={{ color: BRAND.blue }}>
-                <Megaphone className="w-4 h-4" style={{ color: BRAND.orange }} /> Actualités NEXA
+                <Megaphone className="w-4 h-4" style={{ color: BRAND.orange }} /> {t("dashboard", "nexaNews")}
               </h3>
               <div className="flex gap-1">
                 {Array.from({ length: totalSlides }).map((_, i) => (
@@ -1571,7 +1622,7 @@ export default function Dashboard() {
                     <motion.div key={`fb-${activePromo}`} initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }} transition={{ duration: 0.5 }} className="absolute inset-0 bg-slate-900 p-6 md:p-8 flex flex-col justify-center text-white">
                       <div className="flex gap-0.5 mb-2">{[1, 2, 3, 4, 5].map((s) => <Star key={s} size={14} fill={s <= fb.rating ? BRAND.orange : "none"} className={s <= fb.rating ? "" : "text-slate-600"} style={s <= fb.rating ? { color: BRAND.orange } : {}} />)}</div>
                       {fb.comment && <p className="text-sm md:text-base font-semibold text-white/90 line-clamp-3 mb-2 italic">"{fb.comment}"</p>}
-                      <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: "#FDBA74" }}>— {fb.prenom || "Étudiant NEXA"}</p>
+                      <p className="text-[11px] font-black uppercase tracking-widest" style={{ color: "#FDBA74" }}>— {fb.prenom || t("dashboard", "nexaStudentFallback")}</p>
                     </motion.div>
                   );
                 })()}

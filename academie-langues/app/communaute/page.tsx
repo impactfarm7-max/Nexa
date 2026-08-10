@@ -137,8 +137,8 @@ function CommunauteContent() {
         setUserRole(profile.role || "student");
         if (profile.prenom) setUserPrenom(profile.prenom);
         setUserAvatarUrl((profile.avatar_url as string | null) || null);
-        if ((profile.role === "center_manager" || profile.role === "trainer") && !isCenterRoute) {
-          router.replace("/centre/dashboard");
+        if ((profile.role === "center_manager" || profile.role === "campus_manager" || profile.role === "trainer" || profile.role === "staff" || profile.role === "manager") && !isCenterRoute) {
+          router.replace("/centre/communaute");
           return;
         }
         if (profile.role === "admin") setIsAdmin(true);

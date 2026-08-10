@@ -10,6 +10,7 @@ import type { CourseHighlight } from "./components/LessonReader";
 import { loadStudentAccess, peekStudentAccess } from "@/app/utils/student-access-cache";
 import { useStudentCenterContext } from "@/app/hooks/useStudentCenterContext";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type MainTab = "nexa" | "centre" | "notes";
 
@@ -22,6 +23,7 @@ function resolveMainTab(tabParam: string | null, isPluriannual: boolean): MainTa
 }
 
 function CoursPageContent() {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -102,16 +104,18 @@ function CoursPageContent() {
     router.replace(`/tcf-canada/cours?${params.toString()}`, { scroll: false });
   };
 
-  const centerTabLabel = centerName ? `Cours ${centerName}` : "Cours académie";
+  const centerTabLabel = centerName
+    ? t("dashboard", "coursesCenterNamed", { name: centerName })
+    : t("dashboard", "coursesAcademyTab");
 
   const tabs = useMemo(() => {
     const all = [
-      { id: "nexa" as const, label: "Cours TCF", shortLabel: "TCF", icon: BookOpen },
-      { id: "centre" as const, label: centerTabLabel, shortLabel: "Centre", icon: GraduationCap },
-      { id: "notes" as const, label: "Notes", shortLabel: "Notes", icon: Highlighter },
+      { id: "nexa" as const, label: t("dashboard", "coursesTcfTab"), shortLabel: t("dashboard", "coursesTcfShort"), icon: BookOpen },
+      { id: "centre" as const, label: centerTabLabel, shortLabel: t("dashboard", "coursesCenterShort"), icon: GraduationCap },
+      { id: "notes" as const, label: t("dashboard", "coursesNotesTab"), shortLabel: t("dashboard", "coursesNotesTab"), icon: Highlighter },
     ];
-    return isPluriannual ? all.filter((t) => t.id !== "nexa") : all;
-  }, [centerTabLabel, isPluriannual]);
+    return isPluriannual ? all.filter((tab) => tab.id !== "nexa") : all;
+  }, [centerTabLabel, isPluriannual, t]);
 
   const gridClass =
     tabs.length === 2
@@ -123,7 +127,7 @@ function CoursPageContent() {
       <nav className="sticky top-0 z-40 bg-[#FFFBF7]/95 backdrop-blur-xl border-b border-orange-100/60 py-2.5 md:py-3">
         <div className="nexa-student-shell">
           <span className={`${STUDENT_TEXT.pageTitle} block truncate`} style={{ color: BRAND.blue }}>
-            Mes cours
+            {t("dashboard", "myCourses")}
           </span>
         </div>
 
@@ -171,15 +175,18 @@ function CoursPageContent() {
   );
 }
 
+function CoursPageFallback() {
+  const { t } = useI18n();
+  return (
+    <div className="min-h-[100dvh] bg-[#FFFBF7] flex items-center justify-center text-sm font-display font-semibold" style={{ color: BRAND.orange }}>
+      {t("dashboard", "coursesLoading")}
+    </div>
+  );
+}
+
 export default function CoursPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-[100dvh] bg-[#FFFBF7] flex items-center justify-center text-sm font-display font-semibold" style={{ color: BRAND.orange }}>
-          Chargement...
-        </div>
-      }
-    >
+    <Suspense fallback={<CoursPageFallback />}>
       <CoursPageContent />
     </Suspense>
   );

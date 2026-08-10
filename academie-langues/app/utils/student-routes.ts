@@ -20,6 +20,7 @@ export const CENTER_STAFF_ROLES = new Set([
   "campus_manager",
   "trainer",
   "staff",
+  "manager",
 ]);
 
 export function isCenterStaff(profile: ProfileLike | null | undefined): boolean {
@@ -93,6 +94,8 @@ export const STAFF_PERMISSION_ROUTES: Record<string, string[]> = {
   examens: ["/centre/examens"],
   rapports: ["/centre/rapports"],
   lives: ["/centre/lives"],
+  bibliotheque: ["/centre/bibliotheque"],
+  abonnements: ["/centre/abonnements"],
 };
 
 export function canAccessCenterPath(
@@ -101,7 +104,7 @@ export function canAccessCenterPath(
   permissions: string[],
 ): boolean {
   if (!role) return false;
-  if (role === "admin" || role === "center_manager" || role === "campus_manager") return true;
+  if (role === "admin" || role === "center_manager" || role === "campus_manager" || role === "manager") return true;
   if (role === "trainer") {
     const trainerDefaults = [
       "/centre/dashboard",

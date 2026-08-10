@@ -12,6 +12,7 @@ import {
 import { supabase } from "@/app/utils/supabase";
 import { logClientActivity } from "@/app/utils/client-activity";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import {
   allowsFormat,
   normalizeSubmissionFormats,
@@ -54,6 +55,8 @@ type Submission = {
 const MISSIONS_PACKS = ["ivoire", "cauris", "acceleree", "complete"];
 
 function MissionsPageContent() {
+  const { t, locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -204,7 +207,7 @@ function MissionsPageContent() {
       const data = await res.json();
 
       if (!res.ok) {
-        alert(data.error || "Erreur lors de la soumission.");
+        alert(data.error || t("dashboard", "missionsSubmitError"));
         return;
       }
 
@@ -246,7 +249,7 @@ function MissionsPageContent() {
       setAttachedFile(prev => ({ ...prev, [mission.id]: null }));
 
     } catch (err) {
-      alert("Erreur réseau. Réessayez.");
+      alert(t("dashboard", "missionsNetworkError"));
     } finally {
       setSubmitting(prev => ({ ...prev, [mission.id]: false }));
     }
@@ -270,8 +273,8 @@ function MissionsPageContent() {
               <ArrowLeft className="w-4 h-4 text-neutral-600 group-hover:-translate-x-0.5 transition-transform" />
             </button>
             <div>
-              <h1 className={STUDENT_TEXT.pageTitle} style={{ color: BRAND.blue }}>Missions & Devoirs</h1>
-              <p className="text-[10px] font-semibold" style={{ color: BRAND.orange }}>Espace étudiant</p>
+              <h1 className={STUDENT_TEXT.pageTitle} style={{ color: BRAND.blue }}>{t("dashboard", "missionsTitle")}</h1>
+              <p className="text-[10px] font-semibold" style={{ color: BRAND.orange }}>{t("dashboard", "studentSpace")}</p>
             </div>
           </div>
         </header>
@@ -280,9 +283,9 @@ function MissionsPageContent() {
             <div className="w-14 h-14 bg-orange-50 rounded-xl flex items-center justify-center mx-auto mb-4 border border-orange-100">
               <Lock className="w-7 h-7 text-orange-400" />
             </div>
-            <h2 className={`${STUDENT_TEXT.sectionTitle} mb-2`} style={{ color: BRAND.blue }}>Accès réservé</h2>
+            <h2 className={`${STUDENT_TEXT.sectionTitle} mb-2`} style={{ color: BRAND.blue }}>{t("dashboard", "missionsReservedTitle")}</h2>
             <p className="text-neutral-500 text-sm leading-relaxed">
-              Les missions NEXA sont disponibles pour les packs <strong>Cauris</strong>, <strong>Ivoire</strong> et les <strong>Formations</strong>, ou via votre centre.
+              {t("dashboard", "missionsReservedBody")}
             </p>
           </div>
         </div>
@@ -299,8 +302,8 @@ function MissionsPageContent() {
             <ArrowLeft className="w-4 h-4 text-neutral-600 group-hover:-translate-x-0.5 transition-transform" />
           </button>
           <div>
-            <h1 className={STUDENT_TEXT.pageTitle} style={{ color: BRAND.blue }}>Missions & Devoirs</h1>
-            <p className="text-[10px] font-semibold" style={{ color: BRAND.orange }}>Rendez vos travaux ici</p>
+            <h1 className={STUDENT_TEXT.pageTitle} style={{ color: BRAND.blue }}>{t("dashboard", "missionsTitle")}</h1>
+            <p className="text-[10px] font-semibold" style={{ color: BRAND.orange }}>{t("dashboard", "missionsSubmitHere")}</p>
           </div>
         </div>
       </header>
@@ -309,19 +312,19 @@ function MissionsPageContent() {
 
         <div className="bg-white border border-orange-200 rounded-xl p-4 md:p-5 xl:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div>
-            <h2 className={`${STUDENT_TEXT.sectionTitle} mb-1`} style={{ color: BRAND.blue }}>Vos travaux pratiques</h2>
+            <h2 className={`${STUDENT_TEXT.sectionTitle} mb-1`} style={{ color: BRAND.blue }}>{t("dashboard", "missionsPracticalTitle")}</h2>
             <p className="text-neutral-500 text-sm xl:text-base max-w-md">
-              Devoirs du centre ou missions TCF. Correction automatique ou par votre enseignant.
+              {t("dashboard", "missionsPracticalHint")}
             </p>
           </div>
           <div className="flex gap-3 shrink-0">
             <div className="bg-orange-50 border border-orange-200 px-4 py-2 rounded-lg text-center min-w-[80px]">
               <span className="block text-xl font-bold" style={{ color: BRAND.orange }}>{missionsTodo.length}</span>
-              <span className="text-[10px] font-semibold text-neutral-500">En attente</span>
+              <span className="text-[10px] font-semibold text-neutral-500">{t("dashboard", "missionsPending")}</span>
             </div>
             <div className="bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg text-center min-w-[80px]">
               <span className="block text-xl font-bold text-emerald-600">{missionsDone.length}</span>
-              <span className="text-[10px] font-semibold text-emerald-600">Terminés</span>
+              <span className="text-[10px] font-semibold text-emerald-600">{t("dashboard", "missionsDone")}</span>
             </div>
           </div>
         </div>
@@ -335,7 +338,7 @@ function MissionsPageContent() {
                 : "bg-white text-neutral-600 border-orange-200 hover:border-orange-300"
             }`}
           >
-            À faire ({missionsTodo.length})
+            {t("dashboard", "missionsTodoTab", { count: missionsTodo.length })}
           </button>
           <button
             onClick={() => setActiveTab("done")}
@@ -345,7 +348,7 @@ function MissionsPageContent() {
                 : "bg-white text-neutral-600 border-orange-200 hover:border-orange-300"
             }`}
           >
-            Corrigés ({missionsDone.length})
+            {t("dashboard", "missionsDoneTab", { count: missionsDone.length })}
           </button>
         </div>
 
@@ -361,8 +364,8 @@ function MissionsPageContent() {
               {activeTab === "todo" && missionsTodo.length === 0 && (
                 <motion.div key="empty-todo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-14 bg-white rounded-xl border border-dashed border-orange-200">
                   <CheckCircle2 className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-                  <h3 className={`${STUDENT_TEXT.cardTitle} mb-1`} style={{ color: BRAND.blue }}>Tout est à jour</h3>
-                  <p className="text-neutral-500 text-sm">Aucun devoir en attente.</p>
+                  <h3 className={`${STUDENT_TEXT.cardTitle} mb-1`} style={{ color: BRAND.blue }}>{t("dashboard", "missionsAllCaughtUp")}</h3>
+                  <p className="text-neutral-500 text-sm">{t("dashboard", "missionsNoPending")}</p>
                 </motion.div>
               )}
 
@@ -395,31 +398,31 @@ function MissionsPageContent() {
                     </div>
                     <div>
                       <span className="text-[10px] font-semibold text-neutral-400 flex items-center gap-1 mb-1">
-                        <Clock className="w-3 h-3" /> Posté le {new Date(mission.created_at).toLocaleDateString("fr-FR")}
+                        <Clock className="w-3 h-3" /> {t("dashboard", "missionsPostedOn", { date: new Date(mission.created_at).toLocaleDateString(dateLocale) })}
                       </span>
                       <h3 className={`${STUDENT_TEXT.cardTitle} leading-snug mb-1`} style={{ color: BRAND.blue }}>{mission.title}</h3>
                       {mission.description && <p className="text-sm text-neutral-600 leading-relaxed font-medium">{mission.description}</p>}
                       <div className="flex flex-wrap gap-1.5 mt-2">
                         {formats.map((f) => (
                           <span key={f} className="text-[9px] font-bold uppercase tracking-wide text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded">
-                            {f === "text" ? "Texte" : f === "file" ? "Fichier" : f === "audio" ? "Audio" : "Vidéo"}
+                            {f === "text" ? t("dashboard", "missionsFormatText") : f === "file" ? t("dashboard", "missionsFormatFile") : f === "audio" ? t("dashboard", "missionsFormatAudio") : t("dashboard", "missionsFormatVideo")}
                           </span>
                         ))}
                       </div>
                       {mission.attachment_url && (
                         <a href={mission.attachment_url} target="_blank" rel="noopener noreferrer"
                           className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-orange-600 bg-orange-50 border border-orange-200 px-2.5 py-1.5 rounded-lg hover:bg-orange-100 transition-colors">
-                          <Paperclip className="w-3.5 h-3.5" /> {mission.attachment_name || "Consigne jointe"}
+                          <Paperclip className="w-3.5 h-3.5" /> {mission.attachment_name || t("dashboard", "missionsAttachment")}
                         </a>
                       )}
                     </div>
                   </div>
 
                   <div className="p-4 md:p-5 bg-orange-50/30">
-                    <h4 className="text-xs font-semibold mb-3" style={{ color: BRAND.blue }}>Votre rendu</h4>
+                    <h4 className="text-xs font-semibold mb-3" style={{ color: BRAND.blue }}>{t("dashboard", "missionsYourWork")}</h4>
                     {allowText && (
                       <textarea
-                        placeholder="Rédigez votre réponse ici..."
+                        placeholder={t("dashboard", "missionsAnswerPlaceholder")}
                         className="w-full h-28 bg-white border border-orange-200 rounded-lg p-3 text-sm text-neutral-700 outline-none focus:border-orange-400 transition-colors resize-none mb-3"
                         value={answerText[mission.id] || ""}
                         onChange={(e) => setAnswerText(prev => ({ ...prev, [mission.id]: e.target.value }))}
@@ -441,27 +444,27 @@ function MissionsPageContent() {
                       <div className="flex flex-wrap items-center gap-2">
                         {allowFile && (
                           <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-600 bg-white border border-orange-200 px-3 py-2 rounded-lg hover:border-orange-400 transition-colors cursor-pointer">
-                            <UploadCloud className="w-4 h-4" /> Fichier
+                            <UploadCloud className="w-4 h-4" /> {t("dashboard", "missionsFormatFile")}
                             <input type="file" accept=".pdf,image/*,.doc,.docx,.txt" className="hidden" onClick={(e) => (e.currentTarget.value = '')} onChange={(e) => handleFileChange(mission.id, e.target.files?.[0] || null)} />
                           </label>
                         )}
 
                         {allowAudio && (
                           <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-600 bg-white border border-orange-200 px-3 py-2 rounded-lg hover:border-orange-400 transition-colors cursor-pointer">
-                            <Mic className="w-4 h-4 text-rose-500" /> Audio
+                            <Mic className="w-4 h-4 text-rose-500" /> {t("dashboard", "missionsFormatAudio")}
                             <input type="file" accept="audio/*" capture="user" className="hidden" onClick={(e) => (e.currentTarget.value = '')} onChange={(e) => handleFileChange(mission.id, e.target.files?.[0] || null)} />
                           </label>
                         )}
 
                         {allowVideo && (
                           <label className="flex items-center gap-1.5 text-xs font-semibold text-neutral-600 bg-white border border-orange-200 px-3 py-2 rounded-lg hover:border-orange-400 transition-colors cursor-pointer">
-                            <Video className="w-4 h-4 text-blue-500" /> Vidéo
+                            <Video className="w-4 h-4 text-blue-500" /> {t("dashboard", "missionsFormatVideo")}
                             <input type="file" accept="video/*" capture="environment" className="hidden" onClick={(e) => (e.currentTarget.value = '')} onChange={(e) => handleFileChange(mission.id, e.target.files?.[0] || null)} />
                           </label>
                         )}
 
                         {!allowAnyMedia && !allowText && (
-                          <p className="text-xs text-amber-600">Aucun format de rendu disponible.</p>
+                          <p className="text-xs text-amber-600">{t("dashboard", "missionsNoFormat")}</p>
                         )}
                       </div>
 
@@ -471,9 +474,9 @@ function MissionsPageContent() {
                         className="w-full lg:w-auto min-h-[44px] bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold px-5 py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {submitting[mission.id] ? (
-                          <><Loader2 className="w-4 h-4 animate-spin" /> Envoi...</>
+                          <><Loader2 className="w-4 h-4 animate-spin" /> {t("dashboard", "missionsSending")}</>
                         ) : (
-                          <>Soumettre <Send className="w-4 h-4" /></>
+                          <>{t("dashboard", "missionsSubmit")} <Send className="w-4 h-4" /></>
                         )}
                       </button>
                     </div>
@@ -486,7 +489,7 @@ function MissionsPageContent() {
               {activeTab === "done" && missionsDone.length === 0 && (
                 <motion.div key="empty-done" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-14 bg-white rounded-xl border border-dashed border-orange-200">
                   <AlertCircle className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
-                  <p className="text-neutral-500 text-sm">Aucun devoir validé pour l&apos;instant.</p>
+                  <p className="text-neutral-500 text-sm">{t("dashboard", "missionsNoGraded")}</p>
                 </motion.div>
               )}
 
@@ -515,7 +518,7 @@ function MissionsPageContent() {
                         </div>
                         <div>
                           <h3 className={`${STUDENT_TEXT.cardTitle} mb-0.5`} style={{ color: BRAND.blue }}>{mission.title}</h3>
-                          <p className="text-xs text-neutral-500 font-medium">Soumis le {new Date(sub.created_at).toLocaleDateString("fr-FR")}</p>
+                          <p className="text-xs text-neutral-500 font-medium">{t("dashboard", "missionsSubmittedOn", { date: new Date(sub.created_at).toLocaleDateString(dateLocale) })}</p>
                         </div>
                       </div>
 
@@ -538,13 +541,15 @@ function MissionsPageContent() {
                           {mission.rank && mission.rank_total && mission.rank_total > 1 && (
                             <div className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-50 border border-purple-200 text-purple-700 text-xs font-black">
                               <Trophy className="w-4 h-4" />
-                              Tu es {mission.rank === 1 ? "1er" : `${mission.rank}ème`} sur {mission.rank_total}
+                              {mission.rank === 1
+                                ? t("dashboard", "missionsRankFirst", { total: mission.rank_total })
+                                : t("dashboard", "missionsRankNth", { rank: mission.rank, total: mission.rank_total })}
                             </div>
                           )}
                         </div>
                       ) : (
                         <span className="text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 px-4 py-2 rounded-xl">
-                          Correction en attente
+                          {t("dashboard", "missionsCorrectionPending")}
                         </span>
                       )}
                     </div>
@@ -561,7 +566,7 @@ function MissionsPageContent() {
                           onClick={() => setExpandedCorrection(prev => ({ ...prev, [mission.id]: !isExpanded }))}
                           className="w-full flex items-center justify-center gap-2 py-2.5 border-t border-orange-100 text-xs font-semibold text-neutral-500 hover:text-orange-600 hover:bg-orange-50/50 transition-colors"
                         >
-                          {isExpanded ? <><ChevronUp className="w-4 h-4" /> Masquer le détail</> : <><ChevronDown className="w-4 h-4" /> Voir la correction complète</>}
+                          {isExpanded ? <><ChevronUp className="w-4 h-4" /> {t("dashboard", "missionsHideDetail")}</> : <><ChevronDown className="w-4 h-4" /> {t("dashboard", "missionsShowCorrection")}</>}
                         </button>
 
                         <AnimatePresence>
@@ -571,13 +576,13 @@ function MissionsPageContent() {
 
                                 {corr.erreurs?.length > 0 && (
                                   <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-3">Points à corriger</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-600 mb-3">{t("dashboard", "missionsPointsToFix")}</p>
                                     <div className="space-y-3">
                                       {corr.erreurs.map((err, i) => (
                                         <div key={i} className="bg-amber-50 border border-amber-200/60 rounded-2xl p-4">
-                                          <p className="text-xs font-black text-red-500 mb-1">Faute</p>
+                                          <p className="text-xs font-black text-red-500 mb-1">{t("dashboard", "missionsFault")}</p>
                                           <p className="text-sm text-neutral-700 mb-2 line-through decoration-red-300">{err.faute}</p>
-                                          <p className="text-xs font-black text-emerald-600 mb-1">Correction</p>
+                                          <p className="text-xs font-black text-emerald-600 mb-1">{t("dashboard", "missionsCorrection")}</p>
                                           <p className="text-sm text-emerald-700 font-medium mb-2">{err.correction}</p>
                                           <p className="text-xs text-neutral-500 italic">{err.explication}</p>
                                         </div>
@@ -588,7 +593,7 @@ function MissionsPageContent() {
 
                                 {corr.version_ideale && (
                                   <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-3">Version idéale</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-600 mb-3">{t("dashboard", "missionsIdealVersion")}</p>
                                     <div className="bg-blue-50 border border-blue-200/60 rounded-2xl p-4">
                                       <p className="text-sm text-neutral-700 leading-relaxed font-medium">{corr.version_ideale}</p>
                                     </div>
@@ -597,17 +602,17 @@ function MissionsPageContent() {
 
                                 {corr.conseil_coach && (
                                   <div className="bg-white border border-orange-200 rounded-lg p-4">
-                                    <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: BRAND.orange }}>Conseil du coach</p>
+                                    <p className="text-[10px] font-semibold uppercase tracking-wide mb-1" style={{ color: BRAND.orange }}>{t("dashboard", "missionsCoachTip")}</p>
                                     <p className="text-sm text-neutral-700 leading-relaxed">{corr.conseil_coach}</p>
                                   </div>
                                 )}
 
                                 {sub.file_url && (
                                   <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-2">Fichier joint</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-2">{t("dashboard", "missionsAttachedFile")}</p>
                                     <a href={sub.file_url} target="_blank" rel="noopener noreferrer"
                                       className="flex items-center gap-2 text-sm font-bold text-[#eb670e] bg-orange-50 border border-orange-200 px-4 py-3 rounded-xl hover:bg-orange-100 transition-colors w-fit">
-                                      <FileText className="w-4 h-4" /> {sub.file_name || "Voir le fichier"}
+                                      <FileText className="w-4 h-4" /> {sub.file_name || t("dashboard", "missionsSeeFile")}
                                     </a>
                                   </div>
                                 )}

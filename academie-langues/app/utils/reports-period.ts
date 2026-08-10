@@ -156,6 +156,7 @@ export function parseReportFilters(url: URL, locale: ReportLocale = "fr") {
   return {
     period,
     campusId: url.searchParams.get("campusId") || null,
+    campusIds: null as string[] | null,
     filiereId: url.searchParams.get("filiereId") || null,
   };
 }

@@ -10,6 +10,7 @@ import { DEFAULT_HIGHLIGHT_THEMES } from "@/app/utils/highlightConstants";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import type { HighlightTheme } from "./CoursNotesPanel";
 import { useStudentCenterContext } from "@/app/hooks/useStudentCenterContext";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Props = {
   onNavigateToHighlight: (highlight: CourseHighlight, courseId?: string) => void;
@@ -38,6 +39,7 @@ async function resolveCourseId(highlight: CourseHighlight): Promise<string | und
 }
 
 export default function CoursNotesTab({ onNavigateToHighlight }: Props) {
+  const { t } = useI18n();
   const { isPluriannual } = useStudentCenterContext();
   const [loading, setLoading] = useState(true);
   const [highlights, setHighlights] = useState<CourseHighlight[]>([]);
@@ -89,11 +91,11 @@ export default function CoursNotesTab({ onNavigateToHighlight }: Props) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full">
       <div className="mb-6 xl:mb-8">
-        <h2 className={`${STUDENT_TEXT.sectionTitle} mb-1`} style={{ color: BRAND.blue }}>Mes notes</h2>
+        <h2 className={`${STUDENT_TEXT.sectionTitle} mb-1`} style={{ color: BRAND.blue }}>{t("dashboard", "notesTitle")}</h2>
         <p className="text-slate-500 text-sm xl:text-base">
           {isPluriannual
-            ? "Surlignages issus des cours de votre centre — ouvrez un passage pour y revenir."
-            : "Tous vos surlignages et annotations, regroupés par thème couleur."}
+            ? t("dashboard", "notesPluriannualHint")
+            : t("dashboard", "notesTcfHint")}
         </p>
       </div>
       <CoursNotesPanel
@@ -103,7 +105,7 @@ export default function CoursNotesTab({ onNavigateToHighlight }: Props) {
         groupByCourse={isPluriannual}
         emptyHint={
           isPluriannual
-            ? "Ouvrez un cours académie, sélectionnez du texte dans une leçon pour surligner. Les notes apparaîtront ici automatiquement."
+            ? t("dashboard", "notesPluriannualEmpty")
             : undefined
         }
         onThemesChange={setThemes}

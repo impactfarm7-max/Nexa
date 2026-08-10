@@ -148,16 +148,16 @@ export function evaluatePaywallAccess(profile: StudentAccessProfile): PaywallDec
     return { allowed: false, redirect: "/centre/dashboard" };
   }
 
+  if (profile.role !== "admin" && profile.tag_status === "revoque") {
+    return { allowed: false, redirect: "/revoque" };
+  }
+
   if (isCenterStudent(profile) && profile.tag_status === "pending_center_approval") {
     return { allowed: false, redirect: "/login", signOut: true };
   }
 
   if (isCenterStudent(profile)) {
     return { allowed: true };
-  }
-
-  if (profile.role !== "admin" && profile.tag_status === "revoque") {
-    return { allowed: false, redirect: "/revoque" };
   }
 
   if (profile.role !== "admin" && profile.tag_status === "termine") {

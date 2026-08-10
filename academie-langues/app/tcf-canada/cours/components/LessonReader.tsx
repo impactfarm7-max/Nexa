@@ -15,6 +15,7 @@ import { DEFAULT_HIGHLIGHT_THEMES, themeMapByKey, type HighlightSourceType } fro
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import type { HighlightTheme } from "./CoursNotesPanel";
 import { downloadLessonAttachment, downloadLessonContentPdf } from "@/app/utils/downloadLessonPack";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export type CourseHighlight = {
   id: string;
@@ -76,6 +77,7 @@ export default function LessonReader({
   courseId,
   orgName,
 }: Props) {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const pendingMarkRef = useRef<HTMLElement | null>(null);
   const [highlights, setHighlights] = useState<CourseHighlight[]>([]);
@@ -241,7 +243,7 @@ export default function LessonReader({
       window.getSelection()?.removeAllRanges();
       return;
     }
-    setHighlightError(json.error || "Impossible d'enregistrer le surlignage.");
+    setHighlightError(json.error || t("dashboard", "lessonHighlightSaveError"));
   };
 
   const handleDownloadContent = async () => {
@@ -249,7 +251,7 @@ export default function LessonReader({
     setDownloading(true);
     setDownloadError("");
     const result = await downloadLessonContentPdf({ title, subtitle, htmlContent, orgName });
-    if (!result.ok) setDownloadError(result.error || "Échec du téléchargement.");
+    if (!result.ok) setDownloadError(result.error || t("dashboard", "lessonDownloadError"));
     setDownloading(false);
   };
 
@@ -262,7 +264,7 @@ export default function LessonReader({
       label: m.label,
       type: m.type,
     });
-    if (!result.ok) setDownloadError(result.error || "Échec du téléchargement.");
+    if (!result.ok) setDownloadError(result.error || t("dashboard", "lessonDownloadError"));
     setDownloadingMediaId(null);
   };
 
@@ -278,14 +280,14 @@ export default function LessonReader({
             style={{ backgroundColor: BRAND.orange }}
           >
             {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-            {downloading ? "Préparation…" : "Télécharger le contenu"}
+            {downloading ? t("dashboard", "lessonPreparing") : t("dashboard", "lessonDownload")}
           </button>
         )}
         <button
           onClick={onClose}
           className="text-xs xl:text-sm font-semibold text-orange-600 bg-white border border-orange-200 px-3 py-2 rounded-lg hover:bg-orange-50 transition-colors flex items-center gap-1.5 shrink-0 min-h-[40px]"
         >
-          <X className="w-3.5 h-3.5" /> Fermer
+          <X className="w-3.5 h-3.5" /> {t("dashboard", "lessonClose")}
         </button>
       </div>
       {downloadError && (
@@ -303,7 +305,7 @@ export default function LessonReader({
           <h2 className={`${STUDENT_TEXT.sectionTitle} mb-4 sm:mb-5 leading-snug`} style={{ color: BRAND.blue }}>{title}</h2>
           {sourceType === "center_lesson" && (
             <p className="text-[11px] text-slate-500 mb-3">
-              Sélectionnez du texte pour surligner — vos notes apparaîtront dans l’onglet Notes.
+              {t("dashboard", "lessonHighlightHint")}
             </p>
           )}
           <div
@@ -319,9 +321,9 @@ export default function LessonReader({
           {media && media.length > 0 && (
             <div className="mt-8 pt-5 border-t border-orange-100 space-y-3">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-xs font-display font-black uppercase tracking-wider" style={{ color: BRAND.blue }}>Ressources</h3>
+                <h3 className="text-xs font-display font-black uppercase tracking-wider" style={{ color: BRAND.blue }}>{t("dashboard", "lessonResources")}</h3>
                 {!downloadable && (
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Lecture seule</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">{t("dashboard", "lessonReadOnly")}</span>
                 )}
               </div>
               {media.map((m) => {
@@ -332,22 +334,22 @@ export default function LessonReader({
                     <div className="flex-1 min-w-0">
                       {m.type === "video_link" && (
                         <a href={m.url} target="_blank" rel="noopener noreferrer" className="text-sm font-bold text-orange-600 hover:underline">
-                          {m.label || "Voir la vidéo"}
+                          {m.label || t("dashboard", "lessonSeeVideo")}
                         </a>
                       )}
                       {m.type === "pdf" && (
                         <a href={`/document/${m.id}`} className="text-sm font-bold text-orange-600 hover:underline truncate block">
-                          {m.label || "Ouvrir le PDF"}
+                          {m.label || t("dashboard", "lessonOpenPdf")}
                         </a>
                       )}
                       {m.type === "video_upload" && (
                         <a href={`/document/${m.id}`} className="text-sm font-bold text-orange-600 hover:underline truncate block">
-                          {m.label || "Voir la vidéo"}
+                          {m.label || t("dashboard", "lessonSeeVideo")}
                         </a>
                       )}
                       {m.type !== "video_link" && m.type !== "pdf" && m.type !== "video_upload" && (
                         <a href={`/document/${m.id}`} className="text-sm font-bold text-orange-600 hover:underline truncate block">
-                          {m.label || "Ouvrir"}
+                          {m.label || t("dashboard", "lessonOpen")}
                         </a>
                       )}
                     </div>
@@ -360,7 +362,7 @@ export default function LessonReader({
                         style={{ backgroundColor: BRAND.blue }}
                       >
                         {isBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
-                        Télécharger
+                        {t("dashboard", "lessonDownloadShort")}
                       </button>
                     )}
                   </div>
@@ -387,9 +389,9 @@ export default function LessonReader({
             className="md:hidden fixed inset-x-0 bottom-0 z-[101] bg-white border-t border-orange-200 rounded-t-2xl p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl max-h-[70vh] overflow-y-auto"
             onMouseDown={(e) => e.preventDefault()}
           >
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Surligner</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t("dashboard", "lessonHighlight")}</p>
             <p className="text-xs text-slate-500 line-clamp-3 mb-2 italic">&ldquo;{popover.text}&rdquo;</p>
-            <p className="text-[10px] text-orange-600 mb-3">Choisissez une couleur pour confirmer.</p>
+            <p className="text-[10px] text-orange-600 mb-3">{t("dashboard", "lessonPickColor")}</p>
             <div className="grid grid-cols-4 gap-2 mb-3">
               {themes.map((t) => (
                 <button
@@ -409,7 +411,7 @@ export default function LessonReader({
             </div>
             <input
               type="text"
-              placeholder="Note optionnelle..."
+              placeholder={t("dashboard", "lessonOptionalNote")}
               value={noteDraft}
               onChange={(e) => setNoteDraft(e.target.value)}
               className="w-full text-sm border border-orange-100 rounded-lg px-3 py-2.5 outline-none focus:border-orange-400"
@@ -424,9 +426,9 @@ export default function LessonReader({
             onMouseDown={(e) => e.preventDefault()}
           >
             <div className="bg-white border border-orange-200 shadow-md rounded-xl p-3 w-72 xl:w-80">
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Surligner</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">{t("dashboard", "lessonHighlight")}</p>
               <p className="text-[10px] xl:text-xs text-slate-500 line-clamp-2 mb-2 italic">&ldquo;{popover.text}&rdquo;</p>
-              <p className="text-[9px] text-orange-600 mb-2">Choisissez une couleur pour confirmer le surlignage.</p>
+              <p className="text-[9px] text-orange-600 mb-2">{t("dashboard", "lessonPickColorDesktop")}</p>
               <div className="grid grid-cols-4 gap-2 mb-2">
                 {themes.map((t) => (
                   <button
@@ -448,7 +450,7 @@ export default function LessonReader({
               </div>
               <input
                 type="text"
-                placeholder="Note optionnelle..."
+                placeholder={t("dashboard", "lessonOptionalNote")}
                 value={noteDraft}
                 onChange={(e) => setNoteDraft(e.target.value)}
                 className="w-full text-xs border border-orange-100 rounded-lg px-2 py-1.5 outline-none focus:border-orange-400"

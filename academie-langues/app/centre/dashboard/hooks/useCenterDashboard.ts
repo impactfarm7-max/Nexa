@@ -112,6 +112,12 @@ export function useCenterDashboard() {
       if (data.isTCF && data.tcf) setTcfStats(data.tcf);
       else if (data.generic) setGenericStats(data.generic);
       statsReady.current = true;
+    } catch (err) {
+      console.error("loadStats:", err);
+      if (requestId === statsRequestId.current) {
+        setGenericStats(EMPTY_GENERIC);
+        setTcfStats(EMPTY_TCF);
+      }
     } finally {
       if (requestId === statsRequestId.current) setStatsLoading(false);
     }
@@ -147,7 +153,7 @@ export function useCenterDashboard() {
 
   const handleCampus = async (id: string | null) => {
     setSelectedCampus(id);
-    if (!isTCF) await loadStats(id, true);
+    await loadStats(id, true);
   };
 
   const copyLink = async () => {

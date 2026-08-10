@@ -27,6 +27,12 @@ export async function getReportsContext(req: Request) {
   if (error) return { ctx: null, filters: null, locale, error };
 
   const filters = { ...parseReportFilters(new URL(req.url), locale), locale };
+  if (ctx!.scopedCampusIds?.length) {
+    filters.campusIds = ctx!.scopedCampusIds;
+    if (filters.campusId && !ctx!.scopedCampusIds.includes(filters.campusId)) {
+      filters.campusId = ctx!.scopedCampusIds.length === 1 ? ctx!.scopedCampusIds[0] : null;
+    }
+  }
 
   if (FULL_ACCESS_ROLES.has(ctx!.role)) {
     return { ctx, filters, locale, error: null };
@@ -81,10 +87,11 @@ export type FinanceSummaryRow = {
   campus_id: string | null;
   late_installments: number;
   next_due_date: string | null;
+  enrolled_at: string | null;
 };
 
 const FINANCE_SELECT =
-  "enrollment_id, student_id, prenom, nom, center_status, filiere_name, niveau_annee, groupe_nom, tuition_fee, tuition_paid, reste_a_payer, enrollment_status, financial_status, aging_bucket, late_installments, next_due_date";
+  "enrollment_id, student_id, prenom, nom, center_status, filiere_name, niveau_annee, groupe_nom, tuition_fee, tuition_paid, reste_a_payer, enrollment_status, financial_status, aging_bucket, late_installments, next_due_date, enrolled_at";
 
 export async function loadFinanceSummary(centerId: string) {
   const { data, error } = await supabaseAdmin
@@ -96,21 +103,24 @@ export async function loadFinanceSummary(centerId: string) {
   const rows = (data || []) as Omit<FinanceSummaryRow, "campus_id">[];
   const enrollmentIds = rows.map((r) => r.enrollment_id).filter(Boolean);
   const campusByEnrollment = new Map<string, string | null>();
+  const enrolledAtByEnrollment = new Map<string, string | null>();
 
   if (enrollmentIds.length > 0) {
     const { data: enrollRows, error: enrollError } = await supabaseAdmin
       .from("enrollments")
-      .select("id, campus_id")
+      .select("id, campus_id, enrolled_at")
       .in("id", enrollmentIds);
     if (enrollError) throw new Error(enrollError.message);
     for (const row of enrollRows || []) {
       campusByEnrollment.set(row.id, row.campus_id ?? null);
+      enrolledAtByEnrollment.set(row.id, row.enrolled_at ?? null);
     }
   }
 
   return rows.map((row) => ({
     ...row,
     campus_id: campusByEnrollment.get(row.enrollment_id) ?? null,
+    enrolled_at: row.enrolled_at ?? enrolledAtByEnrollment.get(row.enrollment_id) ?? null,
   })) as FinanceSummaryRow[];
 }
 
@@ -133,10 +143,16 @@ export async function enrollmentIdsForFiliere(centerId: string, filiereId: strin
 
 export function filterFinanceRows(
   rows: FinanceSummaryRow[],
-  opts: { campusId?: string | null; filiereId?: string | null; enrollmentIds?: Set<string> | null },
+  opts: {
+    campusId?: string | null;
+    campusIds?: string[] | null;
+    filiereId?: string | null;
+    enrollmentIds?: Set<string> | null;
+  },
 ) {
   let out = rows;
   if (opts.campusId) out = out.filter((r) => r.campus_id === opts.campusId);
+  else if (opts.campusIds?.length) out = out.filter((r) => r.campus_id && opts.campusIds!.includes(r.campus_id));
   if (opts.enrollmentIds) out = out.filter((r) => opts.enrollmentIds!.has(r.enrollment_id));
   return out;
 }

@@ -33,7 +33,12 @@ type Period = {
   starts_at: string | null;
   ends_at: string | null;
   is_active: boolean;
+  campus_id: string | null;
+  filiere_id: string | null;
 };
+
+type Campus = { id: string; name: string };
+type Filiere = { id: string; name: string };
 
 type TemplateKey = "trimestrial" | "semestrial" | "simple";
 
@@ -80,7 +85,7 @@ function buildPeriodsFromConfig(key: TemplateKey, cfg: TemplateConfig, name: (ke
   const coeff = cfg.coefficient > 0 ? cfg.coefficient : 1;
 
   if (key === "simple") {
-    const n = clamp(cfg.evalCount, 1, 12);
+    const n = clamp(cfg.evalCount, 1, 60);
     return Array.from({ length: n }, (_, i) => ({
       name: i === 0 ? name("periodGeneratedContinuous") : i === 1 ? name("periodGeneratedFinalExam") : name("periodGeneratedEvaluation", { number: i + 1 }),
       type: "autre" as const,
@@ -89,8 +94,8 @@ function buildPeriodsFromConfig(key: TemplateKey, cfg: TemplateConfig, name: (ke
   }
 
   if (key === "trimestrial") {
-    const groups = clamp(cfg.groups, 1, 6);
-    const per = clamp(cfg.childrenPerGroup, 1, 6);
+    const groups = clamp(cfg.groups, 1, 60);
+    const per = clamp(cfg.childrenPerGroup, 1, 60);
     const out: BuiltPeriod[] = [];
     let seq = 1;
     for (let g = 1; g <= groups; g++) {
@@ -105,8 +110,8 @@ function buildPeriodsFromConfig(key: TemplateKey, cfg: TemplateConfig, name: (ke
   }
 
   // semestrial
-  const groups = clamp(cfg.groups, 1, 4);
-  const sessions = clamp(cfg.childrenPerGroup, 1, 4);
+  const groups = clamp(cfg.groups, 1, 60);
+  const sessions = clamp(cfg.childrenPerGroup, 1, 60);
   const out: BuiltPeriod[] = [];
   let sessionNum = 1;
   for (let g = 1; g <= groups; g++) {
@@ -149,6 +154,8 @@ export default function PeriodConfigPage() {
   // Config modèle
   const [configKey, setConfigKey] = useState<TemplateKey | null>(null);
   const [config, setConfig] = useState<TemplateConfig>(TEMPLATE_META.trimestrial.defaults);
+  const [templateCampusId, setTemplateCampusId] = useState("");
+  const [templateFiliereId, setTemplateFiliereId] = useState("");
 
   // Formulaire d'ajout manuel
   const [showAddForm, setShowAddForm] = useState(false);
@@ -156,12 +163,26 @@ export default function PeriodConfigPage() {
   const [newType, setNewType] = useState<GradePeriodDbType>("autre");
   const [newParentId, setNewParentId] = useState("");
   const [newCoefficient, setNewCoefficient] = useState("1");
+  const [newCampusId, setNewCampusId] = useState("");
+  const [newFiliereId, setNewFiliereId] = useState("");
   const [addError, setAddError] = useState("");
 
+  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [filieres, setFilieres] = useState<Filiere[]>([]);
+
   const loadPeriods = useCallback(async (cId: string) => {
-    const { data, error } = await supabase.rpc("get_center_periods", { p_center_id: cId });
+    const [{ data, error }, { data: scopeRows }] = await Promise.all([
+      supabase.rpc("get_center_periods", { p_center_id: cId }),
+      supabase.from("grade_periods").select("id, campus_id, filiere_id").eq("center_id", cId),
+    ]);
     if (error) console.error("get_center_periods:", error.message);
-    setPeriods(data || []);
+    const scopeById = new Map((scopeRows || []).map((r: any) => [r.id, r]));
+    const merged = (data || []).map((p: Period) => ({
+      ...p,
+      campus_id: scopeById.get(p.id)?.campus_id ?? null,
+      filiere_id: scopeById.get(p.id)?.filiere_id ?? null,
+    }));
+    setPeriods(merged);
   }, []);
 
   useEffect(() => {
@@ -171,15 +192,30 @@ export default function PeriodConfigPage() {
       const { data: profile } = await supabase.from("profiles").select("center_id").eq("id", session.user.id).single();
       const cId = profile?.center_id || null;
       setCenterId(cId);
-      if (cId) await loadPeriods(cId);
+      if (cId) {
+        await loadPeriods(cId);
+        const [{ data: campusRows }, { data: filiereRows }] = await Promise.all([
+          supabase.from("campuses").select("id, name").eq("center_id", cId).order("is_main", { ascending: false }),
+          supabase.from("filieres").select("id, name").eq("center_id", cId).order("name"),
+        ]);
+        setCampuses(campusRows || []);
+        setFilieres(filiereRows || []);
+      }
       setLoading(false);
     })();
   }, [loadPeriods]);
+
+  const updateScope = async (id: string, campusId: string | null, filiereId: string | null) => {
+    await supabase.from("grade_periods").update({ campus_id: campusId, filiere_id: filiereId }).eq("id", id);
+    setPeriods((prev) => prev.map((p) => (p.id === id ? { ...p, campus_id: campusId, filiere_id: filiereId } : p)));
+  };
 
   const openTemplateConfig = (key: TemplateKey) => {
     setApplyError("");
     setConfigKey(key);
     setConfig({ ...TEMPLATE_META[key].defaults });
+    setTemplateCampusId("");
+    setTemplateFiliereId("");
   };
 
   const closeTemplateConfig = () => {
@@ -193,14 +229,13 @@ export default function PeriodConfigPage() {
     [configKey, config, generatedName],
   );
 
-  /** Applique la config → écrit grade_periods (même schéma qu’avant) */
+  /** Applique la config → AJOUTE des grade_periods, sans toucher à celles déjà là */
   const applyConfiguredTemplate = async () => {
     if (!configKey) return;
     if (!centerId) {
       setApplyError(t("centre", "periodCenterNotFound"));
       return;
     }
-    if (periods.length > 0 && !confirm(t("centre", "periodReplaceConfirm"))) return;
 
     const built = buildPeriodsFromConfig(configKey, config, generatedName);
     if (built.length === 0) {
@@ -211,14 +246,12 @@ export default function PeriodConfigPage() {
     setSaving(true);
     setApplyError("");
 
-    const { error: delErr } = await supabase.from("grade_periods").delete().eq("center_id", centerId);
-    if (delErr) {
-      setApplyError(delErr.message);
-      setSaving(false);
-      return;
-    }
+    const scopeCols = {
+      campus_id: templateCampusId || null,
+      filiere_id: templateFiliereId || null,
+    };
 
-    let position = 0;
+    let position = periods.length > 0 ? Math.max(...periods.map((p) => p.position)) + 1 : 0;
     for (const group of built) {
       if (group.children.length > 0) {
         const { data: parent, error: pErr } = await supabase
@@ -229,6 +262,7 @@ export default function PeriodConfigPage() {
             type: group.type, // trimestre | semestre
             position: position++,
             coefficient: 1,
+            ...scopeCols,
           })
           .select("id")
           .single();
@@ -248,6 +282,7 @@ export default function PeriodConfigPage() {
             parent_id: parent.id,
             position: position++,
             coefficient: child.coefficient,
+            ...scopeCols,
           });
           if (cErr) {
             setApplyError(cErr.message);
@@ -263,6 +298,7 @@ export default function PeriodConfigPage() {
           type: "autre",
           position: position++,
           coefficient: config.coefficient > 0 ? config.coefficient : 1,
+          ...scopeCols,
         });
         if (eErr) {
           setApplyError(eErr.message);
@@ -292,12 +328,14 @@ export default function PeriodConfigPage() {
       parent_id: isGradeLeafPeriod(newType) ? (newParentId || null) : null,
       position: maxPos,
       coefficient: Number(newCoefficient) || 1,
+      campus_id: newCampusId || null,
+      filiere_id: newFiliereId || null,
     });
 
     if (error) {
       setAddError(error.message);
     } else {
-      setNewName(""); setNewParentId(""); setNewCoefficient("1"); setShowAddForm(false);
+      setNewName(""); setNewParentId(""); setNewCoefficient("1"); setNewCampusId(""); setNewFiliereId(""); setShowAddForm(false);
       await loadPeriods(centerId);
     }
     setSaving(false);
@@ -409,6 +447,14 @@ export default function PeriodConfigPage() {
                     <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 shrink-0 hidden sm:inline">
                       {t("centre", "periodAutomaticAverage")}
                     </span>
+                    <ScopeBadge
+                      campusId={agg.campus_id}
+                      filiereId={agg.filiere_id}
+                      campuses={campuses}
+                      filieres={filieres}
+                      onChange={(c, f) => updateScope(agg.id, c, f)}
+                      t={t}
+                    />
                     <button
                       type="button"
                       onClick={() => toggleActive(agg.id, agg.is_active)}
@@ -431,6 +477,14 @@ export default function PeriodConfigPage() {
                         <FileText size={13} className="text-neutral-300 shrink-0" />
                         <PeriodNameEditor name={child.name} onRename={(n) => renamePeriod(child.id, n)} />
                         <span className="text-[11px] text-neutral-400 font-medium shrink-0">{t("centre", "periodCoefficientShort")} {child.coefficient}</span>
+                        <ScopeBadge
+                          campusId={child.campus_id}
+                          filiereId={child.filiere_id}
+                          campuses={campuses}
+                          filieres={filieres}
+                          onChange={(c, f) => updateScope(child.id, c, f)}
+                          t={t}
+                        />
                         <button
                           type="button"
                           onClick={() => toggleActive(child.id, child.is_active)}
@@ -469,6 +523,14 @@ export default function PeriodConfigPage() {
                       <FileText size={13} className="text-neutral-300 shrink-0" />
                       <PeriodNameEditor name={p.name} onRename={(n) => renamePeriod(p.id, n)} />
                       <span className="text-[11px] text-neutral-400 font-medium shrink-0">{t("centre", "periodCoefficientShort")} {p.coefficient}</span>
+                      <ScopeBadge
+                        campusId={p.campus_id}
+                        filiereId={p.filiere_id}
+                        campuses={campuses}
+                        filieres={filieres}
+                        onChange={(c, f) => updateScope(p.id, c, f)}
+                        t={t}
+                      />
                       <button
                         type="button"
                         onClick={() => toggleActive(p.id, p.is_active)}
@@ -570,6 +632,40 @@ export default function PeriodConfigPage() {
               </select>
             </div>
           )}
+          {(campuses.length > 0 || filieres.length > 0) && (
+            <div>
+              <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                {t("centre", "periodScope")}
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {campuses.length > 0 && (
+                  <select
+                    value={newCampusId}
+                    onChange={(e) => setNewCampusId(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">{t("centre", "periodScopeCampusPlaceholder")}</option>
+                    {campuses.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                )}
+                {filieres.length > 0 && (
+                  <select
+                    value={newFiliereId}
+                    onChange={(e) => setNewFiliereId(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">{t("centre", "periodScopeFilierePlaceholder")}</option>
+                    {filieres.map((f) => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <p className="text-[11px] text-neutral-400 font-medium mt-1.5">{t("centre", "periodScopeHint")}</p>
+            </div>
+          )}
           {addError && <p className="text-sm text-red-600 font-medium">{addError}</p>}
           <div className="flex gap-2 pt-1">
             <button
@@ -619,7 +715,7 @@ export default function PeriodConfigPage() {
                     <NumberInput
                       value={config.groups}
                       min={1}
-                      max={6}
+                      max={60}
                       onChange={(n) => setConfig((c) => ({ ...c, groups: n }))}
                     />
                   </Field>
@@ -627,7 +723,7 @@ export default function PeriodConfigPage() {
                     <NumberInput
                       value={config.childrenPerGroup}
                       min={1}
-                      max={6}
+                      max={60}
                       onChange={(n) => setConfig((c) => ({ ...c, childrenPerGroup: n }))}
                     />
                   </Field>
@@ -640,7 +736,7 @@ export default function PeriodConfigPage() {
                     <NumberInput
                       value={config.groups}
                       min={1}
-                      max={4}
+                      max={60}
                       onChange={(n) => setConfig((c) => ({ ...c, groups: n }))}
                     />
                   </Field>
@@ -648,7 +744,7 @@ export default function PeriodConfigPage() {
                     <NumberInput
                       value={config.childrenPerGroup}
                       min={1}
-                      max={4}
+                      max={60}
                       onChange={(n) => setConfig((c) => ({ ...c, childrenPerGroup: n }))}
                     />
                   </Field>
@@ -669,7 +765,7 @@ export default function PeriodConfigPage() {
                   <NumberInput
                     value={config.evalCount}
                     min={1}
-                    max={12}
+                    max={60}
                     onChange={(n) => setConfig((c) => ({ ...c, evalCount: n }))}
                   />
                 </Field>
@@ -679,11 +775,42 @@ export default function PeriodConfigPage() {
                 <NumberInput
                   value={config.coefficient}
                   min={0.5}
-                  max={10}
+                  max={100}
                   step={0.5}
                   onChange={(n) => setConfig((c) => ({ ...c, coefficient: n }))}
                 />
               </Field>
+
+              {(campuses.length > 0 || filieres.length > 0) && (
+                <Field label={t("centre", "periodScope")} hint={t("centre", "periodScopeHint")}>
+                  <div className="grid grid-cols-2 gap-2">
+                    {campuses.length > 0 && (
+                      <select
+                        value={templateCampusId}
+                        onChange={(e) => setTemplateCampusId(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">{t("centre", "periodScopeCampusPlaceholder")}</option>
+                        {campuses.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    {filieres.length > 0 && (
+                      <select
+                        value={templateFiliereId}
+                        onChange={(e) => setTemplateFiliereId(e.target.value)}
+                        className={inputCls}
+                      >
+                        <option value="">{t("centre", "periodScopeFilierePlaceholder")}</option>
+                        {filieres.map((f) => (
+                          <option key={f.id} value={f.id}>{f.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                </Field>
+              )}
 
               <div className="rounded-lg border border-black/[0.06] p-3" style={{ backgroundColor: SURFACE }}>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 mb-2">{t("centre", "periodPreview")}</p>
@@ -788,6 +915,79 @@ function PeriodNameEditor({ name, onRename }: { name: string; onRename: (n: stri
       style={{ color: BLUE }}
     >
       {name}
+    </button>
+  );
+}
+
+/** Portée d'une période : tout le centre par défaut, ou un campus / une filière précis. */
+function ScopeBadge({
+  campusId,
+  filiereId,
+  campuses,
+  filieres,
+  onChange,
+  t,
+}: {
+  campusId: string | null;
+  filiereId: string | null;
+  campuses: { id: string; name: string }[];
+  filieres: { id: string; name: string }[];
+  onChange: (campusId: string | null, filiereId: string | null) => void;
+  t: (namespace: "centre", key: string, params?: Record<string, string | number>) => string;
+}) {
+  const [open, setOpen] = useState(false);
+
+  if (campuses.length === 0 && filieres.length === 0) return null;
+
+  const campusName = campusId ? campuses.find((c) => c.id === campusId)?.name : null;
+  const filiereName = filiereId ? filieres.find((f) => f.id === filiereId)?.name : null;
+  const label = [campusName, filiereName].filter(Boolean).join(" · ") || t("centre", "periodScopeWholeCenter");
+  const scoped = Boolean(campusId || filiereId);
+
+  if (open) {
+    return (
+      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+        {campuses.length > 0 && (
+          <select
+            value={campusId ?? ""}
+            onChange={(e) => onChange(e.target.value || null, filiereId)}
+            className="h-7 px-1.5 rounded-md border border-black/[0.08] text-[11px] font-medium bg-white outline-none max-w-[7rem]"
+          >
+            <option value="">{t("centre", "periodScopeCampusPlaceholder")}</option>
+            {campuses.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        )}
+        {filieres.length > 0 && (
+          <select
+            value={filiereId ?? ""}
+            onChange={(e) => onChange(campusId, e.target.value || null)}
+            className="h-7 px-1.5 rounded-md border border-black/[0.08] text-[11px] font-medium bg-white outline-none max-w-[7rem]"
+          >
+            <option value="">{t("centre", "periodScopeFilierePlaceholder")}</option>
+            {filieres.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+        )}
+        <button type="button" onClick={() => setOpen(false)} className="p-1 text-neutral-400 hover:text-neutral-700">
+          <Check size={12} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setOpen(true)}
+      title={label}
+      className={`hidden sm:inline-flex text-[10px] font-semibold px-2 py-0.5 rounded-md border shrink-0 max-w-[8rem] truncate ${
+        scoped ? "border-orange-200 bg-orange-50 text-orange-700" : "border-black/[0.08] text-neutral-400 bg-white"
+      }`}
+    >
+      {label}
     </button>
   );
 }

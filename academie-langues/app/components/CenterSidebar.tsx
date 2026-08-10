@@ -28,7 +28,7 @@ const BLUE           = BRAND.blue;
 const ORANGE         = BRAND.orange;
 const CREAM          = BRAND.bg;
 
-const FULL_ACCESS_ROLES  = ["admin", "center_manager", "campus_manager"];
+const FULL_ACCESS_ROLES  = ["admin", "center_manager", "campus_manager", "manager"];
 const TRAINER_DEFAULT_PATHS = [
   "/centre/cours",
   "/centre/examens",
@@ -193,7 +193,7 @@ function readSidebarCache() {
   const centerType = normalizeCenterType(center.center_type);
   const staffPermissions =
     FULL_ACCESS_ROLES.includes(role)
-      ? ["finance", "etudiants", "filieres", "staff", "communaute", "parametres", "cours", "planning", "examens", "rapports", "activities", "lives"]
+      ? ["finance", "etudiants", "filieres", "staff", "communaute", "parametres", "cours", "planning", "examens", "rapports", "activities", "lives", "bibliotheque", "abonnements"]
       : ensureDefaultLivesPermission(ensureTcfCommunautePermission(permissions, centerType === "tcf_canada" ? "tcf_canada" : null));
 
   return {
@@ -346,7 +346,7 @@ function CenterSidebarInner() {
       setStaffPermissions(ensureDefaultLivesPermission(perms));
     } else if (FULL_ACCESS_ROLES.includes(profile.role)) {
       setStaffPermissions(["finance","etudiants","filieres","staff","communaute",
-        "parametres","cours","planning","examens","rapports","activities","lives"]);
+        "parametres","cours","planning","examens","rapports","activities","lives","bibliotheque","abonnements"]);
     }
 
     if (profile.center_id) {
@@ -482,7 +482,7 @@ function CenterSidebarInner() {
           style={{ color: isAct ? "#fff" : "rgba(17,34,78,0.45)" }}
         />
         {(!isCollapsed || indent) && (
-          <span className={indent ? "text-[12px]" : "text-[13px]"}>{t("centre", item.label)}</span>
+          <span className={indent ? "text-[13px]" : "text-[14px]"}>{t("centre", item.label)}</span>
         )}
       </Link>
     );
@@ -540,7 +540,7 @@ function CenterSidebarInner() {
   const SectionLabel = ({ label }: { label: string }) =>
     !isCollapsed ? (
       <p
-        className="px-3 pt-4 pb-1 text-[9px] font-black uppercase tracking-widest select-none"
+        className="px-3 pt-4 pb-1 text-[10px] font-black uppercase tracking-widest select-none"
         style={{ color: "rgba(17,34,78,0.35)" }}
       >
         {label}
@@ -593,7 +593,7 @@ function CenterSidebarInner() {
                     🇨🇦 TCF
                   </span>
                 )}
-                <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: "rgba(17,34,78,0.40)" }}>
+                <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: "rgba(17,34,78,0.40)" }}>
                   {uploadingLogo ? t("centre", "sidebarEnvoi") : t("centre", "sidebarPlan").replace("{plan}", planType)}
                 </span>
               </div>
@@ -634,7 +634,7 @@ function CenterSidebarInner() {
             className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors hover:bg-black/[0.04] border border-black/[0.06] bg-white"
           >
             <Building2 size={12} className="shrink-0" style={{ color: "rgba(17,34,78,0.40)" }} />
-            <span className="flex-1 text-left text-[11px] font-bold truncate" style={{ color: "rgba(17,34,78,0.70)" }}>
+            <span className="flex-1 text-left text-[12px] font-bold truncate" style={{ color: "rgba(17,34,78,0.70)" }}>
               {activeBranch?.name || t("centre", "sidebarCampus")}
             </span>
             <ChevronDown
@@ -651,7 +651,7 @@ function CenterSidebarInner() {
                 <button
                   key={b.id}
                   onClick={() => { setActiveBranchId(b.id); setBranchMenuOpen(false); }}
-                  className={`w-full text-left px-4 py-2.5 text-[11px] font-bold transition-colors ${
+                  className={`w-full text-left px-4 py-2.5 text-[12px] font-bold transition-colors ${
                     b.id === activeBranchId ? "text-white" : "hover:bg-black/[0.04]"
                   }`}
                   style={
@@ -737,8 +737,8 @@ function CenterSidebarInner() {
 
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-[12px] font-black truncate" style={{ color: BLUE }}>{userPrenom}</p>
-              <p className="text-[9px] font-bold uppercase tracking-wider truncate" style={{ color: "rgba(17,34,78,0.40)" }}>
+              <p className="text-[13px] font-black truncate" style={{ color: BLUE }}>{userPrenom}</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: "rgba(17,34,78,0.40)" }}>
                 {userRole === "admin"          ? t("centre", "roleAdministrateur")
                  : userRole === "center_manager" ? t("centre", "roleResponsable")
                  : userRole === "campus_manager" ? t("centre", "roleDirCampus")

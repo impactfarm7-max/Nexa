@@ -10,10 +10,21 @@
     padding: 0;
   }
 
+  html {
+    /* 16 → 17px : +1 cran rem (text-sm/base/lg…) sur toute l'app */
+    font-size: 17px;
+  }
+
   html, body {
     height: 100%;
     margin: 0;
     padding: 0;
+  }
+
+  @media print {
+    html {
+      font-size: 16px;
+    }
   }
 
   /* Champs numériques : saisie libre, sans flèches +/- */
@@ -137,7 +148,7 @@ body {
   border: 1px solid rgba(249, 115, 22, 0.25);
   border-radius: 999px;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -346,6 +357,9 @@ body {
 
 @theme {
   --font-display: "Google Sans", Inter, Roboto, system-ui, sans-serif;
+  /* Petits labels rem : +1 cran (le root 17px s'applique déjà au reste) */
+  --text-xs: 0.8125rem;
+  --text-sm: 0.9375rem;
 }
 
 /* Centre list pages — animations (style Programmes) */
@@ -373,6 +387,80 @@ body {
 .font-heading,
 .font-display {
   font-family: var(--font-display);
+}
+
+/* Profils centre, staff et étudiant : même langage visuel que les pages métier. */
+.platform-profile-page {
+  background: #fbfaf8 !important;
+  color: #11224e;
+}
+
+.platform-profile-page .font-black {
+  font-weight: 700 !important;
+}
+
+.platform-profile-page .font-extrabold {
+  font-weight: 600 !important;
+}
+
+.platform-profile-page .uppercase {
+  text-transform: none !important;
+  letter-spacing: 0.01em !important;
+}
+
+.platform-profile-page .tracking-widest,
+.platform-profile-page .tracking-wider {
+  letter-spacing: 0.01em !important;
+}
+
+.platform-profile-page section.bg-white,
+.platform-profile-page aside > section.bg-white,
+.platform-profile-page main section.bg-white {
+  border-color: #e5e7eb !important;
+  border-radius: 0.875rem !important;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04) !important;
+}
+
+.platform-profile-page button,
+.platform-profile-page a,
+.platform-profile-page input,
+.platform-profile-page select {
+  border-radius: 0.625rem !important;
+}
+
+.platform-profile-page [class*="rounded-[2rem]"],
+.platform-profile-page [class*="rounded-[1.5rem]"],
+.platform-profile-page .rounded-3xl,
+.platform-profile-page .rounded-2xl {
+  border-radius: 0.75rem !important;
+}
+
+.platform-profile-page header {
+  background-color: rgb(255 255 255 / 0.96) !important;
+}
+
+.platform-profile-page header button,
+.platform-profile-page header a {
+  min-height: 40px;
+  height: 40px;
+}
+
+.platform-profile-page header h1 {
+  font-size: 1.75rem !important;
+  line-height: 2rem !important;
+  font-weight: 700 !important;
+}
+
+.platform-profile-page header h1,
+.platform-profile-page header [class*="pageTitle"] {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
+}
+
+@media (min-width: 768px) {
+  .platform-profile-page header > div {
+    min-height: 72px;
+  }
 }
 
 /* Mode clair du superdashboard, limité à son contenu métier. */

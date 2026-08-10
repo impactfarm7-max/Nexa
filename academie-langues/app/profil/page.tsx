@@ -35,6 +35,7 @@ import { useSimulationLimit } from "@/app/hooks/useSimulationLimit";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import StudentRouteSkeleton from "@/app/components/StudentRouteSkeleton";
+import DownloadAppButton from "@/app/components/DownloadAppButton";
 import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
 
 type Profile = {
@@ -453,7 +454,7 @@ export default function ProfilPage() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-[#FFFBF7] text-neutral-900 font-sans pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-10 overflow-x-hidden">
+    <div className="platform-profile-page min-h-[100dvh] bg-[#FFFBF7] text-neutral-900 font-sans pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-10 overflow-x-hidden">
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-neutral-200/60">
         <div className="nexa-student-shell py-3 md:py-4 xl:py-5 flex items-center gap-3">
           <button
@@ -479,6 +480,7 @@ export default function ProfilPage() {
           </div>
 
           <div className="hidden md:flex items-center gap-4 shrink-0">
+            <DownloadAppButton />
             {!isEditing ? (
               <button
                 onClick={startEditing}
@@ -600,6 +602,7 @@ export default function ProfilPage() {
 
               {/* 🎯 BOUTONS MOBILE POUR L'ÉDITION */}
               <div className="md:hidden mt-6 space-y-3">
+                <DownloadAppButton className="w-full" labelClassName="inline" />
                 {!isEditing ? (
                   <button
                     onClick={startEditing}

@@ -1,4 +1,8 @@
-import { ensureTcfCommunautePermission, filterModulePermissions } from "@/app/data/tcf-teaching-subjects";
+import {
+  TRAINER_DEFAULT_MODULE_PERMISSIONS,
+  ensureTcfCommunautePermission,
+  filterModulePermissions,
+} from "@/app/data/tcf-teaching-subjects";
 
 const DASHBOARD_FULL_ACCESS_ROLES = new Set([
   "admin",
@@ -20,9 +24,11 @@ export function resolveDashboardModules(
   if (isFullAccess) {
     return { canAccess: () => true, isFullAccess: true };
   }
-  const effective = new Set(
-    ensureTcfCommunautePermission(filterModulePermissions(permissions || []), centerType),
-  );
+  let perms = filterModulePermissions(permissions || []);
+  if (role === "trainer" && perms.length === 0) {
+    perms = [...TRAINER_DEFAULT_MODULE_PERMISSIONS];
+  }
+  const effective = new Set(ensureTcfCommunautePermission(perms, centerType));
   return {
     canAccess: (...keys: string[]) => keys.some((k) => effective.has(k)),
     isFullAccess: false,

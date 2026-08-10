@@ -45,6 +45,9 @@ export default function CenterDashboardPage() {
       ) : isTCF ? (
         <TcfManagerDashboard
           stats={tcfStats}
+          campuses={campuses}
+          selectedCampus={selectedCampus}
+          onCampusChange={handleCampus}
           linkCopied={copied}
           onCopyLink={copyLink}
           canAccess={canAccess}

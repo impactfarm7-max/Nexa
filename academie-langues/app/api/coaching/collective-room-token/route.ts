@@ -115,14 +115,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Profil introuvable." }, { status: 403 });
   }
 
-  // Visio étudiant désactivée temporairement — le centre programme les séances.
-  if (!STAFF_ROLES.includes(profile.role) && profile.role !== "admin") {
-    return NextResponse.json(
-      { error: "La visio étudiant est temporairement indisponible. Les séances sont programmées par le centre." },
-      { status: 403 },
-    );
-  }
-
   const isLive = slot.session_scope === "live";
   const isStaff =
     profile.role === "admin" ||

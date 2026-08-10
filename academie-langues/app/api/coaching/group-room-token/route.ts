@@ -33,14 +33,6 @@ export async function POST(req: Request) {
 
   if (!session) return NextResponse.json({ error: "Séance introuvable." }, { status: 404 });
 
-  // Visio étudiant désactivée temporairement
-  if (profile && !STAFF_ROLES.includes(profile.role) && profile.role !== "admin") {
-    return NextResponse.json(
-      { error: "La visio étudiant est temporairement indisponible." },
-      { status: 403 },
-    );
-  }
-
   // Isolation stricte : la masterclass d'un centre n'est joignable que par ce centre
   // (ses étudiants éligibles + son staff). Les masterclass NEXA (center_id null)
   // ne concernent que les étudiants directs. L'admin plateforme reste bypass.

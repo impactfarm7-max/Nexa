@@ -16,7 +16,15 @@ export type CenterStaffContext = {
   centerId: string;
   role: string;
   centerType: string | null;
+  /** null = tous les campus ; tableau = restriction directeur de campus */
+  scopedCampusIds: string[] | null;
 };
+
+export function campusAllowed(campusId: string | null | undefined, allowed: string[] | null): boolean {
+  if (!allowed) return true;
+  if (!campusId) return false;
+  return allowed.includes(campusId);
+}
 
 type CenterStaffResult =
   | { ctx: CenterStaffContext; error: null }
@@ -64,12 +72,23 @@ export async function getCenterStaffContext(req: Request): Promise<CenterStaffRe
     };
   }
 
+  let scopedCampusIds: string[] | null = null;
+  if (role === "campus_manager") {
+    const { data: access } = await supabaseAdmin
+      .from("staff_campus_access")
+      .select("campus_id")
+      .eq("profile_id", user.id);
+    const ids = [...new Set((access || []).map((r) => r.campus_id).filter(Boolean))];
+    if (ids.length > 0) scopedCampusIds = ids;
+  }
+
   return {
     ctx: {
       user,
       centerId,
       role,
       centerType: (center?.center_type as string | null) ?? null,
+      scopedCampusIds,
     },
     error: null,
   };

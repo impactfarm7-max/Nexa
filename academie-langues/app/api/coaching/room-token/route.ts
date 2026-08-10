@@ -53,14 +53,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
 
-  // Visio étudiant désactivée temporairement — le centre programme / anime.
-  if (isOwner && !isAdmin && !isCenterStaff) {
-    return NextResponse.json(
-      { error: "La visio étudiant est temporairement indisponible. Demandez une séance présentiel." },
-      { status: 403 },
-    );
-  }
-
   if (!["confirme", "confirmed"].includes(appointment.status)) {
     return NextResponse.json({ error: "La séance n'est pas confirmée." }, { status: 409 });
   }

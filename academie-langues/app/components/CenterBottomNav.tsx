@@ -66,7 +66,7 @@ export default function CenterBottomNav() {
       >
         <Icon size={22} strokeWidth={isActive ? 2.5 : 2} style={{ color: isActive ? BLUE : "#94a3b8" }} />
         <span
-          className={`text-[10px] mt-1 text-center leading-tight truncate max-w-full ${
+          className={`text-[11px] mt-1 text-center leading-tight truncate max-w-full ${
             isActive ? "font-bold" : "font-medium text-slate-400"
           }`}
           style={isActive ? { color: BLUE } : undefined}
@@ -134,7 +134,7 @@ export default function CenterBottomNav() {
                     >
                       <Icon size={20} />
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 text-center leading-tight">{item.label}</span>
+                    <span className="text-[12px] font-bold text-slate-700 text-center leading-tight">{item.label}</span>
                   </Link>
                 );
               })}
@@ -148,7 +148,7 @@ export default function CenterBottomNav() {
                 <div className="w-11 h-11 rounded-full flex items-center justify-center text-[#11224E]" style={{ backgroundColor: "rgba(17,34,78,0.08)" }}>
                   <User size={20} />
                 </div>
-                <span className="text-[11px] font-bold text-slate-700">{t("centre", "bottomMyProfile")}</span>
+                <span className="text-[12px] font-bold text-slate-700">{t("centre", "bottomMyProfile")}</span>
               </Link>
             </div>
           </motion.div>

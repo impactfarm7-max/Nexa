@@ -7,6 +7,7 @@ import type { CourseHighlight } from "./LessonReader";
 
 import type { HighlightColorKey } from "@/app/utils/highlightConstants";
 import { BRAND } from "@/app/utils/brand";
+import { useI18n } from "@/app/i18n/I18nProvider";
 
 export type HighlightTheme = { color_key: HighlightColorKey; hex_color: string; label: string };
 
@@ -44,6 +45,7 @@ function HighlightCard({
   onDelete: () => void;
   showCourseMeta: boolean;
 }) {
+  const { t } = useI18n();
   return (
     <li className="group rounded-lg border border-orange-200 p-2.5 hover:border-orange-400 transition-colors bg-white">
       {showCourseMeta && (h.course_title || h.lesson_title) && (
@@ -56,13 +58,13 @@ function HighlightCard({
           &ldquo;{h.selected_text}&rdquo;
         </p>
         <span className="text-[9px] text-orange-500 font-bold uppercase tracking-widest flex items-center gap-1">
-          Aller au passage <ChevronRight className="w-3 h-3" />
+          {t("dashboard", "notesGoToPassage")} <ChevronRight className="w-3 h-3" />
         </span>
       </button>
       <input
         type="text"
         defaultValue={h.note ?? ""}
-        placeholder="Ajouter une note..."
+        placeholder={t("dashboard", "notesAddPlaceholder")}
         onBlur={(e) => {
           if (e.target.value !== (h.note ?? "")) onUpdateNote(e.target.value);
         }}
@@ -72,7 +74,7 @@ function HighlightCard({
         type="button"
         onClick={onDelete}
         className="mt-1 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity"
-        aria-label="Supprimer"
+        aria-label={t("dashboard", "notesDelete")}
       >
         <Trash2 className="w-3.5 h-3.5" />
       </button>
@@ -91,6 +93,7 @@ export default function CoursNotesPanel({
   groupByCourse = false,
   emptyHint,
 }: Props) {
+  const { t } = useI18n();
   const [editingThemes, setEditingThemes] = useState(false);
   const [themeDrafts, setThemeDrafts] = useState(themes);
   const [savingThemes, setSavingThemes] = useState(false);
@@ -152,13 +155,13 @@ export default function CoursNotesPanel({
     const map = new Map<string, { key: string; title: string; items: CourseHighlight[] }>();
     for (const h of visibleHighlights) {
       const key = h.course_id || h.course_title || "autre";
-      const title = h.course_title || "Cours du centre";
+      const title = h.course_title || t("dashboard", "centerCourseLabel");
       const existing = map.get(key);
       if (existing) existing.items.push(h);
       else map.set(key, { key, title, items: [h] });
     }
     return [...map.values()];
-  }, [groupByCourse, visibleHighlights]);
+  }, [groupByCourse, visibleHighlights, t]);
 
   const shellClass =
     variant === "page"
@@ -168,10 +171,10 @@ export default function CoursNotesPanel({
   return (
     <aside className={shellClass}>
       <div className="flex items-start justify-between gap-3 mb-4 border-b border-orange-50 pb-3">
-        <h3 className="text-sm xl:text-base 2xl:text-lg font-display font-black tracking-tight shrink-0" style={{ color: BRAND.blue }}>Mes notes</h3>
+        <h3 className="text-sm xl:text-base 2xl:text-lg font-display font-black tracking-tight shrink-0" style={{ color: BRAND.blue }}>{t("dashboard", "notesTitle")}</h3>
         <div className="flex items-center gap-2 min-w-0">
           <p className="text-[10px] text-slate-400 leading-snug text-right hidden sm:block">
-            Renommer vos couleurs pour un meilleur suivi
+            {t("dashboard", "notesRenameColors")}
           </p>
           <button
             type="button"
@@ -180,8 +183,8 @@ export default function CoursNotesPanel({
               setEditingThemes((v) => !v);
             }}
             className="text-orange-600 hover:bg-orange-50 p-1.5 rounded-lg shrink-0"
-            title="Renommer vos couleurs pour un meilleur suivi"
-            aria-label="Renommer vos couleurs pour un meilleur suivi"
+            title={t("dashboard", "notesRenameColors")}
+            aria-label={t("dashboard", "notesRenameColors")}
           >
             <Palette className="w-4 h-4" />
           </button>
@@ -190,9 +193,9 @@ export default function CoursNotesPanel({
 
       {editingThemes && (
         <div className="mb-4 p-3 bg-orange-50/50 rounded-xl border border-orange-100 space-y-2">
-          <p className="text-[9px] font-black uppercase tracking-widest text-orange-600">Mes thèmes</p>
+          <p className="text-[9px] font-black uppercase tracking-widest text-orange-600">{t("dashboard", "notesMyThemes")}</p>
           <p className="text-[11px] text-slate-500">
-            Renommez vos couleurs pour un meilleur suivi (ex. Vocabulaire, Grammaire, À revoir…).
+            {t("dashboard", "notesThemesHint")}
           </p>
           {themeDrafts.map((t, i) => (
             <div key={t.color_key} className="flex items-center gap-2">
@@ -214,7 +217,7 @@ export default function CoursNotesPanel({
             onClick={() => void saveThemes()}
             className="w-full text-[10px] font-black uppercase tracking-widest bg-orange-500 text-white py-2 rounded-lg disabled:opacity-50"
           >
-            {savingThemes ? "..." : "Enregistrer"}
+            {savingThemes ? "..." : t("dashboard", "notesSave")}
           </button>
         </div>
       )}
@@ -230,7 +233,7 @@ export default function CoursNotesPanel({
                 : "bg-white text-slate-600 border-orange-200 hover:border-orange-300"
             }`}
           >
-            Toutes
+            {t("dashboard", "notesAll")}
           </button>
           {themes.map((t) => {
             const count = highlights.filter((h) => h.color_key === t.color_key).length;
@@ -257,10 +260,10 @@ export default function CoursNotesPanel({
 
       {highlights.length === 0 ? (
         <p className="text-xs text-slate-400 font-medium">
-          {emptyHint ?? "Sélectionnez du texte dans la leçon pour surligner et ajouter une note."}
+          {emptyHint ?? t("dashboard", "notesEmptyDefault")}
         </p>
       ) : visibleHighlights.length === 0 ? (
-        <p className="text-xs text-slate-400 font-medium">Aucune note pour ce thème.</p>
+        <p className="text-xs text-slate-400 font-medium">{t("dashboard", "notesEmptyTheme")}</p>
       ) : groupByCourse ? (
         <div className="space-y-5">
           {courseGroups.map((group) => (

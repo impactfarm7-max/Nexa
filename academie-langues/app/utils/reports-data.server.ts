@@ -12,12 +12,12 @@ import {
 } from "@/app/api/center/reports/shared";
 import {
   loadEffectifsByFiliereFromView,
-  loadFinanceByFiliereFromView,
 } from "@/app/utils/reports-sql-views.server";
 
 export type ReportFilters = {
   period: ReportPeriod;
   campusId: string | null;
+  campusIds?: string[] | null;
   filiereId: string | null;
   locale?: "fr" | "en";
 };
@@ -76,6 +76,9 @@ function filterEnrollments(rows: EnrollRow[], filters: ReportFilters) {
   let out = rows;
   if (filters.filiereId) out = out.filter((e) => e.filiere_id === filters.filiereId);
   if (filters.campusId) out = out.filter((e) => e.campus_id === filters.campusId);
+  else if (filters.campusIds?.length) {
+    out = out.filter((e) => e.campus_id && filters.campusIds!.includes(e.campus_id));
+  }
   return out;
 }
 
@@ -93,6 +96,7 @@ async function financeContext(centerId: string, filters: ReportFilters) {
   }
   return filterFinanceRows(all, {
     campusId: filters.campusId,
+    campusIds: filters.campusIds,
     enrollmentIds,
   });
 }
@@ -194,7 +198,12 @@ export async function buildEffectifsReport(centerId: string, filters: ReportFilt
 }
 
 export async function buildRecouvrementReport(centerId: string, filters: ReportFilters) {
-  const rows = activeFinanceRows(await financeContext(centerId, filters));
+  const allRows = activeFinanceRows(await financeContext(centerId, filters));
+  const rows = allRows.filter((r) => {
+    if (!r.enrolled_at) return true;
+    const d = r.enrolled_at.slice(0, 10);
+    return d >= filters.period.from && d <= filters.period.to;
+  });
   const caFacture = sum(rows.map((r) => r.tuition_fee));
   const encaisse = sum(rows.map((r) => r.tuition_paid));
   const reste = sum(rows.map((r) => r.reste_a_payer));
@@ -211,22 +220,6 @@ export async function buildRecouvrementReport(centerId: string, filters: ReportF
     const rest = sum(filiereRows.map((r) => r.reste_a_payer));
     return { ...g, ca, encaisse: enc, reste: rest, taux: roundPct(enc, ca) };
   });
-
-  if (!filters.campusId && !filters.filiereId) {
-    const fromView = await loadFinanceByFiliereFromView(centerId);
-    if (fromView?.length) {
-      byFiliere = fromView.map((x) => ({
-        key: x.label,
-        label: x.label,
-        amount: x.encaisse,
-        count: x.nbDossiers,
-        ca: x.ca,
-        encaisse: x.encaisse,
-        reste: x.reste,
-        taux: roundPct(x.encaisse, x.ca),
-      }));
-    }
-  }
 
   return {
     period: filters.period,
@@ -347,7 +340,11 @@ export async function buildEncaissementsReport(centerId: string, filters: Report
 
 export async function buildRetardsReport(centerId: string, filters: ReportFilters) {
   const rows = activeFinanceRows(await financeContext(centerId, filters));
-  const lateRows = rows.filter((r) => r.financial_status === "late");
+  const lateRows = rows.filter((r) => {
+    if (r.financial_status !== "late") return false;
+    if (!r.next_due_date) return true;
+    return r.next_due_date.slice(0, 10) <= filters.period.to;
+  });
 
   const montantRetard = sum(lateRows.map((r) => r.reste_a_payer));
 
@@ -846,6 +843,25 @@ export async function buildPersonnelReport(centerId: string, filters: ReportFilt
 
   if (filters.campusId) {
     staff = staff.filter((s) => (campusByStaff.get(s.id) || []).includes(filters.campusId!));
+  } else if (filters.campusIds?.length) {
+    staff = staff.filter((s) => (campusByStaff.get(s.id) || []).some((id) => filters.campusIds!.includes(id)));
+  }
+
+  if (filters.filiereId) {
+    const { data: groupes } = await supabaseAdmin.from("groupes").select("id").eq("filiere_id", filters.filiereId);
+    const gids = (groupes || []).map((g) => g.id);
+    if (gids.length === 0) {
+      staff = staff.filter((s) => s.role !== "trainer");
+    } else {
+      const { data: fg, error: fgErr } = await supabaseAdmin
+        .from("formateur_groupes")
+        .select("formateur_id")
+        .in("groupe_id", gids);
+      if (!fgErr) {
+        const trainerIds = new Set((fg || []).map((r) => r.formateur_id));
+        staff = staff.filter((s) => s.role !== "trainer" || trainerIds.has(s.id));
+      }
+    }
   }
 
   let academic = 0;
@@ -978,6 +994,24 @@ export async function buildMasseSalarialeReport(centerId: string, filters: Repor
     periodList = periodList.filter((p) =>
       (campusByStaff.get(p.staff_id) || []).includes(filters.campusId!),
     );
+  } else if (filters.campusIds?.length) {
+    periodList = periodList.filter((p) =>
+      (campusByStaff.get(p.staff_id) || []).some((id) => filters.campusIds!.includes(id)),
+    );
+  }
+
+  if (filters.filiereId) {
+    const { data: groupes } = await supabaseAdmin.from("groupes").select("id").eq("filiere_id", filters.filiereId);
+    const gids = (groupes || []).map((g) => g.id);
+    let trainerIds = new Set<string>();
+    if (gids.length > 0) {
+      const { data: fg, error: fgErr } = await supabaseAdmin
+        .from("formateur_groupes")
+        .select("formateur_id")
+        .in("groupe_id", gids);
+      if (!fgErr) trainerIds = new Set((fg || []).map((r) => r.formateur_id));
+    }
+    periodList = periodList.filter((p) => trainerIds.has(p.staff_id));
   }
 
   const staffIds = [...new Set(periodList.map((p) => p.staff_id))];
@@ -1112,19 +1146,41 @@ export async function buildExamensReport(
       session_type: string;
     }[];
 
+    let sessionList = sessions;
+    if (filters.campusId || filters.campusIds?.length || filters.filiereId) {
+      const { enrollments } = await loadEnrollments(centerId);
+      const scoped = filterEnrollments(enrollments, filters);
+      const studentIds = new Set(scoped.map((e) => e.student_id));
+      const sessionIdsAll = sessionList.map((s) => s.id);
+      if (sessionIdsAll.length > 0 && studentIds.size > 0) {
+        const { data: assigns } = await supabaseAdmin
+          .from("tcf_exam_assignments")
+          .select("session_id, user_id")
+          .in("session_id", sessionIdsAll);
+        const keep = new Set(
+          (assigns || [])
+            .filter((a) => studentIds.has(a.user_id))
+            .map((a) => a.session_id),
+        );
+        sessionList = sessionList.filter((s) => keep.has(s.id));
+      } else {
+        sessionList = [];
+      }
+    }
+
     let programmes = 0;
     let realises = 0;
     let annules = 0;
     let enCours = 0;
 
-    for (const s of sessions) {
+    for (const s of sessionList) {
       if (s.status === "cancelled") annules += 1;
       else if (s.status === "closed") realises += 1;
       else if (s.status === "open") enCours += 1;
       else programmes += 1;
     }
 
-    const sessionIds = sessions.map((s) => s.id);
+    const sessionIds = sessionList.map((s) => s.id);
     let participations = 0;
     if (sessionIds.length > 0) {
       const { data: assigns } = await supabaseAdmin
@@ -1153,7 +1209,7 @@ export async function buildExamensReport(
         enCours,
         participations,
         genericCompleted: 0,
-        totalSessions: sessions.length,
+        totalSessions: sessionList.length,
       },
       byStatus: [
         { label: rtl(loc, "Programmés", "Scheduled"), count: programmes },
@@ -1161,7 +1217,7 @@ export async function buildExamensReport(
         { label: rtl(loc, "Réalisés", "Completed"), count: realises },
         { label: rtl(loc, "Annulés", "Cancelled"), count: annules },
       ],
-      rows: sessions.map((s) => ({
+      rows: sessionList.map((s) => ({
         title: s.title,
         examenId: s.examen_id,
         date: s.scheduled_at.slice(0, 10),
@@ -1187,15 +1243,20 @@ export async function buildExamensReport(
   let studentIds = (profiles || []).map((p) => p.id);
   const profileMap = new Map((profiles || []).map((p) => [p.id, p]));
 
-  if (filters.campusId && studentIds.length > 0) {
+  if ((filters.campusId || filters.campusIds?.length || filters.filiereId) && studentIds.length > 0) {
     const { data: enrollments } = await supabaseAdmin
       .from("enrollments")
-      .select("student_id, campus_id")
+      .select("student_id, campus_id, filiere_id")
       .in("student_id", studentIds);
     studentIds = [
       ...new Set(
         (enrollments || [])
-          .filter((e) => e.campus_id === filters.campusId)
+          .filter((e) => {
+            if (filters.filiereId && e.filiere_id !== filters.filiereId) return false;
+            if (filters.campusId) return e.campus_id === filters.campusId;
+            if (filters.campusIds?.length) return !!e.campus_id && filters.campusIds.includes(e.campus_id);
+            return true;
+          })
           .map((e) => e.student_id),
       ),
     ];
@@ -1326,8 +1387,7 @@ export async function buildReductionsReport(centerId: string, filters: ReportFil
     })
     .filter((r) => r.amount > 0);
 
-  const activeRows = rows.filter((r) => r.enrolledAt === "—" || inPeriod(r.enrolledAt, filters.period));
-  const displayRows = activeRows.length ? activeRows : rows;
+  const displayRows = rows.filter((r) => r.enrolledAt === "—" || inPeriod(r.enrolledAt, filters.period));
   const totalReductions = sum(displayRows.map((r) => r.amount));
 
   const { data: coupons, error: couponErr } = await supabaseAdmin

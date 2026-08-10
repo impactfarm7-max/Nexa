@@ -184,7 +184,7 @@ export default function CenterAccountPage() {
   if (!account) return null;
 
   return (
-    <main className="min-h-[100dvh] bg-[#FAFAFA] text-slate-950">
+    <main className="platform-profile-page min-h-[100dvh] bg-[#FAFAFA] text-slate-950">
       <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/85 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-8">
           <Link href={backHref} className="flex h-11 w-11 items-center justify-center rounded-full border border-neutral-200 bg-white text-slate-600 shadow-sm hover:bg-neutral-50">
@@ -330,11 +330,6 @@ export default function CenterAccountPage() {
             <Link href={dashboardHref} className="flex h-12 items-center justify-center rounded-2xl bg-orange-600 px-5 text-xs font-black uppercase tracking-widest text-white hover:bg-orange-500">
               {t("centre", "accountBackDashboardShort")}
             </Link>
-            {!isStudent && (
-              <Link href="/centre/admin" className="flex h-12 items-center justify-center rounded-2xl border border-neutral-200 bg-white px-5 text-xs font-black uppercase tracking-widest text-slate-700 hover:bg-neutral-50">
-                {t("centre", "accountAdminDashboard")}
-              </Link>
-            )}
           </div>
         </div>
       </section>

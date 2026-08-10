@@ -6,6 +6,7 @@ import { BookOpen, Lock, ChevronRight, Loader2, Building2 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import { loadStudentAccess, peekStudentAccess } from "@/app/utils/student-access-cache";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import LessonReader from "./LessonReader";
 
 type CourseSummary = {
@@ -49,6 +50,8 @@ export default function CenterCoursTab({
   scrollToHighlightId,
   onScrollToHighlightDone,
 }: Props) {
+  const { t, locale } = useI18n();
+  const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const [loading, setLoading] = useState(true);
   const [hasCenter, setHasCenter] = useState(true);
   const [courses, setCourses] = useState<CourseSummary[]>([]);
@@ -162,9 +165,9 @@ export default function CenterCoursTab({
     return (
       <div className={`${CONTENT_WIDTH} text-center py-10 sm:py-12 px-5 sm:px-6 bg-white border border-orange-200 rounded-xl xl:rounded-2xl`}>
         <Building2 className="w-10 h-10 xl:w-12 xl:h-12 text-orange-300 mx-auto mb-3" />
-        <h2 className={`${STUDENT_TEXT.cardTitle} mb-2`} style={{ color: BRAND.blue }}>Pas de centre associé</h2>
+        <h2 className={`${STUDENT_TEXT.cardTitle} mb-2`} style={{ color: BRAND.blue }}>{t("dashboard", "coursesNoCenterTitle")}</h2>
         <p className="text-sm xl:text-base text-slate-500">
-          Les cours de votre école apparaîtront ici lorsque votre compte sera rattaché à un centre.
+          {t("dashboard", "coursesNoCenterBody")}
         </p>
       </div>
     );
@@ -201,7 +204,7 @@ export default function CenterCoursTab({
           }}
           className="mb-4 text-xs xl:text-sm font-semibold text-orange-600 bg-white border border-orange-200 px-3 py-2 rounded-lg hover:bg-orange-50 transition-colors min-h-[40px]"
         >
-          Retour aux cours
+          {t("dashboard", "coursesBack")}
         </button>
 
         {detailLoading ? (
@@ -211,7 +214,7 @@ export default function CenterCoursTab({
         ) : (
           <>
             <div className="bg-white border border-orange-200 rounded-xl xl:rounded-2xl p-4 md:p-5 xl:p-6 mb-5">
-              <span className="text-[10px] xl:text-xs font-semibold text-orange-500 block mb-1">Cours du centre</span>
+              <span className="text-[10px] xl:text-xs font-semibold text-orange-500 block mb-1">{t("dashboard", "centerCourseLabel")}</span>
               <h2 className={STUDENT_TEXT.sectionTitle} style={{ color: BRAND.blue }}>{courseTitle}</h2>
             </div>
 
@@ -234,12 +237,12 @@ export default function CenterCoursTab({
                   </div>
                   <div className="flex-1 min-w-0">
                     <span className="text-[10px] xl:text-xs font-semibold text-orange-500 block mb-0.5">
-                      Leçon {String(index + 1).padStart(2, "0")}
+                      {t("dashboard", "coursesLessonN", { n: String(index + 1).padStart(2, "0") })}
                     </span>
                     <h3 className={`${STUDENT_TEXT.cardTitle} truncate`} style={{ color: BRAND.blue }}>{lesson.title}</h3>
                     {lesson.locked && lesson.unlock_at && (
                       <p className="text-[10px] xl:text-xs text-slate-400 mt-0.5">
-                        Disponible le {new Date(lesson.unlock_at).toLocaleDateString("fr-FR")}
+                        {t("dashboard", "coursesAvailableOn", { date: new Date(lesson.unlock_at).toLocaleDateString(dateLocale) })}
                       </p>
                     )}
                   </div>
@@ -247,7 +250,7 @@ export default function CenterCoursTab({
                 </button>
               ))}
               {lessons.length === 0 && (
-                <p className="text-center text-sm xl:text-base text-slate-400 py-6">Ce cours ne contient pas encore de leçons.</p>
+                <p className="text-center text-sm xl:text-base text-slate-400 py-6">{t("dashboard", "coursesNoLessons")}</p>
               )}
             </div>
           </>
@@ -259,8 +262,8 @@ export default function CenterCoursTab({
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={CONTENT_WIDTH}>
       <div className="mb-5 xl:mb-7">
-        <h2 className={`${STUDENT_TEXT.sectionTitle} mb-1`} style={{ color: BRAND.blue }}>Cours de votre centre</h2>
-        <p className="text-slate-500 text-sm xl:text-base">Contenus publiés par votre école, accessibles selon votre classe.</p>
+        <h2 className={`${STUDENT_TEXT.sectionTitle} mb-1`} style={{ color: BRAND.blue }}>{t("dashboard", "coursesCenterTitle")}</h2>
+        <p className="text-slate-500 text-sm xl:text-base">{t("dashboard", "coursesCenterHint")}</p>
       </div>
 
       {courses.length === 0 ? (
@@ -268,10 +271,10 @@ export default function CenterCoursTab({
           <BookOpen className="w-8 h-8 xl:w-10 xl:h-10 text-orange-200 mx-auto mb-2" />
           <p className="text-sm xl:text-base text-slate-500">
             {emptyHint === "no_class"
-              ? "Aucune salle de classe n'est associée à votre inscription. Contactez votre centre pour finaliser votre affectation."
+              ? t("dashboard", "coursesEmptyNoClass")
               : emptyHint === "no_match"
-                ? "Des cours existent pour d'autres classes. Vérifiez avec votre centre que vous êtes dans la bonne salle."
-                : "Aucun cours publié pour le moment."}
+                ? t("dashboard", "coursesEmptyNoMatch")
+                : t("dashboard", "coursesEmptyNone")}
           </p>
         </div>
       ) : (
@@ -292,7 +295,7 @@ export default function CenterCoursTab({
                 <p className="text-xs xl:text-sm text-slate-500 line-clamp-2 mb-2">{course.description}</p>
               )}
               <span className="text-[10px] xl:text-xs font-semibold text-orange-600">
-                {course.lesson_count} leçon{course.lesson_count !== 1 ? "s" : ""}
+                {t("dashboard", "coursesLessonCount", { count: course.lesson_count })}
               </span>
             </button>
           ))}

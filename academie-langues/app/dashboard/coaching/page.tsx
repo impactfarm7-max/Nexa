@@ -25,6 +25,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import StudentRouteSkeleton from "@/app/components/StudentRouteSkeleton";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
+import { collectiveJoinPath, JOIN_BEFORE_MS, sessionEndMs, sessionStartMs } from "@/app/utils/collectiveLive";
 
 // --- TYPES EXISTANTS ---
 type SessionMode = "en_ligne" | "presentiel";
@@ -95,6 +96,11 @@ const weekDays = ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"];
 
 function sessionModeLabel(mode?: SessionMode | string | null) {
   return mode === "presentiel" ? "En présentiel" : "En visio";
+}
+
+function inJoinWindow(startMs: number, endMs: number) {
+  const now = Date.now();
+  return now >= startMs - JOIN_BEFORE_MS && now <= endMs + 30 * 60 * 1000;
 }
 
 function formatDateValue(date: Date) {
@@ -464,7 +470,7 @@ export default function CoachingPage() {
           </div>
           <h1 className={`${STUDENT_TEXT.sectionTitle} mb-3`} style={{ color: BRAND.blue }}>Accès Premium</h1>
           <p className="text-neutral-500 mb-8 font-medium text-sm">Les séances de coaching sont réservées aux membres Premium.</p>
-          <button onClick={() => router.push(isCenterRoute ? "/centre/student/dashboard" : "/profil")} className="w-full py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all" style={{ backgroundColor: BRAND.blue, color: BRAND.white }}>
+          <button onClick={() => router.push(isCenterRoute ? "/dashboard" : "/profil")} className="w-full py-3.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all" style={{ backgroundColor: BRAND.blue, color: BRAND.white }}>
             Mettre à niveau
           </button>
         </div>
@@ -479,7 +485,7 @@ export default function CoachingPage() {
       <header className="bg-[#FFFBF7]/95 backdrop-blur-xl border-b border-orange-100/60 sticky top-0 z-40 py-3 md:py-4 shrink-0">
         <div className="nexa-student-shell flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 md:gap-4 min-w-0">
-            <button onClick={() => router.push(isCenterRoute ? "/centre/student/dashboard" : "/dashboard")} className="min-w-[44px] min-h-[44px] w-11 h-11 bg-orange-50/80 rounded-xl flex items-center justify-center border border-orange-100 hover:bg-orange-100/60 transition-colors shrink-0">
+            <button onClick={() => router.push("/dashboard")} className="min-w-[44px] min-h-[44px] w-11 h-11 bg-orange-50/80 rounded-xl flex items-center justify-center border border-orange-100 hover:bg-orange-100/60 transition-colors shrink-0">
               <ArrowLeft className="w-4 h-4 text-neutral-600" />
             </button>
             <div className="min-w-0">
@@ -555,12 +561,33 @@ export default function CoachingPage() {
               </div>
 
               <div className="w-full md:w-auto flex flex-col gap-3">
+                {upcomingAppointment.session_mode === "presentiel" ? (
                 <span className="text-xs font-semibold text-amber-800 border border-amber-200 px-4 py-3 rounded-xl bg-amber-50 flex items-center gap-2 justify-center text-center">
                   <MapPin className="w-4 h-4 shrink-0" />
                   {upcomingAppointment.status === "confirmed"
                     ? "Rendez-vous confirmé — présentez-vous au centre à l'heure prévue."
                     : "Demande présentiel envoyée — le centre validera votre créneau."}
                 </span>
+                ) : upcomingAppointment.status === "confirmed" && inJoinWindow(
+                  new Date(upcomingAppointment.scheduled_at).getTime(),
+                  new Date(upcomingAppointment.scheduled_at).getTime() + 60 * 60 * 1000,
+                ) ? (
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/dashboard/coaching/room/${upcomingAppointment.id}`)}
+                    className="w-full min-h-[44px] py-3 rounded-xl text-xs font-bold uppercase tracking-wider text-white flex items-center justify-center gap-2"
+                    style={{ backgroundColor: BRAND.blue }}
+                  >
+                    <Video className="w-4 h-4" /> Rejoindre la visio
+                  </button>
+                ) : (
+                  <span className="text-xs font-semibold text-blue-800 border border-blue-200 px-4 py-3 rounded-xl bg-blue-50 flex items-center gap-2 justify-center text-center">
+                    <Video className="w-4 h-4 shrink-0" />
+                    {upcomingAppointment.status === "confirmed"
+                      ? "Salle ouverte 15 min avant l'heure prévue."
+                      : "En attente de confirmation du centre."}
+                  </span>
+                )}
 
                 {actionMode === "none" && (
                   <div className="flex flex-col sm:flex-row gap-2">
@@ -833,9 +860,23 @@ export default function CoachingPage() {
                     </p>
                   </div>
                   <div className="mt-4 pt-4 border-t border-neutral-100">
-                    <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
-                      Programmé par le centre
-                    </button>
+                    {live.meeting_url && inJoinWindow(
+                      new Date(live.scheduled_at).getTime(),
+                      new Date(live.scheduled_at).getTime() + (live.duration_minutes || 60) * 60 * 1000,
+                    ) ? (
+                      <a
+                        href={live.meeting_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5"
+                      >
+                        <Video size={14} /> Rejoindre
+                      </a>
+                    ) : (
+                      <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
+                        Programmé par le centre
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -917,11 +958,23 @@ export default function CoachingPage() {
                       </div>
                     ) : (
                       <>
-                        <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
-                          {c.mode === "presentiel" || (!isLive && c.mode !== "en_ligne")
-                            ? (c.room_name ? `Présentiel · ${c.room_name}` : "En présentiel")
-                            : "Programmé par le centre"}
-                        </button>
+                        {c.mode === "presentiel" || (!isLive && c.mode !== "en_ligne") ? (
+                          <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
+                            {c.room_name ? `Présentiel · ${c.room_name}` : "En présentiel"}
+                          </button>
+                        ) : inJoinWindow(sessionStartMs(c.session_date, c.start_time), sessionEndMs(c.session_date, c.end_time)) ? (
+                          <button
+                            type="button"
+                            onClick={() => router.push(collectiveJoinPath(c.slot_id, c.session_date))}
+                            className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5"
+                          >
+                            <Video size={14} /> Rejoindre
+                          </button>
+                        ) : (
+                          <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
+                            Salle ouverte 15 min avant
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => { setRefuseKey(key); setRefuseReason(""); setRefuseError(""); }}
@@ -948,9 +1001,19 @@ export default function CoachingPage() {
                     </p>
                   </div>
                   <div className="mt-4 pt-4 border-t border-neutral-100">
-                    <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
-                      Programmé par le centre
-                    </button>
+                    {inJoinWindow(groupStartMs(g), groupStartMs(g) + (g.duration_min || 60) * 60 * 1000) ? (
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/dashboard/coaching/room/group/${g.id}`)}
+                        className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1.5"
+                      >
+                        <Video size={14} /> Rejoindre
+                      </button>
+                    ) : (
+                      <button disabled className="w-full py-2 bg-neutral-50 text-neutral-400 rounded-lg text-xs font-bold border border-neutral-200 cursor-not-allowed">
+                        Salle ouverte 15 min avant
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}

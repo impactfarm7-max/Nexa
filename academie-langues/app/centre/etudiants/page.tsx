@@ -61,6 +61,7 @@ type Enrollment = {
   passage_reason?: string | null;
   groupe_id: string | null;
   groupe_nom: string | null;
+  campus_id?: string | null;
   tuition_fee: number;
   status: "draft" | "active" | "completed" | "cancelled";
   enrolled_at: string | null;
@@ -268,6 +269,8 @@ export default function CenterStudentsPage() {
   const [centerId,           setCenterId]           = useState<string | null>(null);
   const [userId,             setUserId]             = useState<string | null>(null);
   const [filiereFilter,      setFiliereFilter]      = useState<string | null>(null);
+  const [campusFilter,       setCampusFilter]       = useState<string | null>(null);
+  const [campuses,           setCampuses]           = useState<{ id: string; name: string }[]>([]);
   const [statusFilter,       setStatusFilter]       = useState<StatusFilter>("all");
   const [selectedStudentId,  setSelectedStudentId]  = useState<string | null>(null);
   const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<string | null>(null);
@@ -294,11 +297,12 @@ export default function CenterStudentsPage() {
         return;
       }
 
-      const data = await fetchCenterApi<{ students: StudentRow[] }>(
+      const data = await fetchCenterApi<{ students: StudentRow[]; campuses?: { id: string; name: string }[] }>(
         "/api/center/enrollments-list",
         session.access_token,
         options?.force ? { force: true } : undefined,
       );
+      setCampuses(data.campuses || []);
       const localizedStudents = (data.students || []).map((student) => ({
         ...student,
         enrollments: student.enrollments.map((enrollment) => ({
@@ -480,8 +484,9 @@ export default function CenterStudentsPage() {
   const filtered = students.filter((s) => {
     const matchSearch   = !search || `${s.prenom} ${s.nom} ${s.email}`.toLowerCase().includes(search.toLowerCase());
     const matchFiliere  = !filiereFilter || s.enrollments.some((e) => e.filiere_id === filiereFilter);
+    const matchCampus   = !campusFilter || s.enrollments.some((e) => e.campus_id === campusFilter);
     const matchStatus   = statusFilter === "all" || s.center_status === statusFilter;
-    return matchSearch && matchFiliere && matchStatus;
+    return matchSearch && matchFiliere && matchCampus && matchStatus;
   });
 
   const exportRows = toStudentExportRows(filtered, exportLabels);
@@ -649,7 +654,7 @@ export default function CenterStudentsPage() {
               >
                 <ToolbarSearch value={search} onChange={setSearch} placeholder={t("centre", "financeSearch")} />
                 <ToolbarFilterMenu
-                  onReset={() => { setStatusFilter("all"); setFiliereFilter(null); }}
+                  onReset={() => { setStatusFilter("all"); setFiliereFilter(null); setCampusFilter(null); }}
                   sections={[
                     {
                       id: "status",
@@ -677,6 +682,18 @@ export default function CenterStudentsPage() {
                       ],
                       onChange: (v) => setFiliereFilter(v === "all" ? null : v),
                     },
+                    ...(campuses.length > 1
+                      ? [{
+                          id: "campus",
+                          label: t("centre", "settingsCampus"),
+                          value: campusFilter ?? "all",
+                          options: [
+                            { value: "all", label: t("centre", "reportsAllCampuses") },
+                            ...campuses.map((c) => ({ value: c.id, label: c.name })),
+                          ],
+                          onChange: (v: string) => setCampusFilter(v === "all" ? null : v),
+                        }]
+                      : []),
                   ]}
                 />
               </CenterToolbar>
@@ -694,6 +711,7 @@ export default function CenterStudentsPage() {
                         setSearch("");
                         setStatusFilter("all");
                         setFiliereFilter(null);
+                        setCampusFilter(null);
                       }}
                     >
                       {t("centre", "studentsResetFilters")}

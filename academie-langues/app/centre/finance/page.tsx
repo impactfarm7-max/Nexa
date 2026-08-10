@@ -60,6 +60,7 @@ type FinanceRow = {
   filiere_name: string;
   niveau_annee: number | null;
   groupe_nom: string | null;
+  campus_id?: string | null;
   tuition_fee: number;
   tuition_paid: number;
   reste_a_payer: number;
@@ -419,6 +420,8 @@ export default function CenterFinancePage() {
 
   const [activeTab, setActiveTab] = useState<"ledger" | "overdue" | "journal" | "coupons">("ledger");
   const [records, setRecords] = useState<FinanceRow[]>([]);
+  const [campuses, setCampuses] = useState<{ id: string; name: string }[]>([]);
+  const [campusFilter, setCampusFilter] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   // Journal
@@ -476,6 +479,7 @@ export default function CenterFinancePage() {
       try {
         const data = await fetchCenterApi<{
           records: FinanceRow[];
+          campuses?: { id: string; name: string }[];
           branding: Record<string, unknown> | null;
           docConfig: DocumentExportConfig;
           signatures: { id: string; label: string; signatureUrl?: string | null }[];
@@ -486,6 +490,7 @@ export default function CenterFinancePage() {
           ...signature,
           label: locale === "en" && signature.label === "Signataire" ? "Signatory" : signature.label,
         })));
+        setCampuses(data.campuses || []);
         setRecords(data.records || []);
       } catch (e) {
         setLoadError(e instanceof Error ? e.message : t("common", "actionLoadError"));
@@ -518,6 +523,7 @@ export default function CenterFinancePage() {
 
         const data = await fetchCenterApi<{
           records: FinanceRow[];
+          campuses?: { id: string; name: string }[];
           branding: Record<string, unknown> | null;
           docConfig: DocumentExportConfig;
           signatures: { id: string; label: string; signatureUrl?: string | null }[];
@@ -529,6 +535,7 @@ export default function CenterFinancePage() {
           ...signature,
           label: locale === "en" && signature.label === "Signataire" ? "Signatory" : signature.label,
         })));
+        setCampuses(data.campuses || []);
         setRecords(data.records || []);
       } catch (e) {
         setLoadError(e instanceof Error ? e.message : t("common", "actionLoadError"));
@@ -543,11 +550,12 @@ export default function CenterFinancePage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return [];
     clearCenterApiCache("/api/center/finance-ledger");
-    const data = await fetchCenterApi<{ records: FinanceRow[] }>(
+    const data = await fetchCenterApi<{ records: FinanceRow[]; campuses?: { id: string; name: string }[] }>(
       "/api/center/finance-ledger",
       session.access_token,
       { force: true },
     );
+    if (data.campuses) setCampuses(data.campuses);
     const rows = data.records || [];
     setRecords(rows);
     return rows;
@@ -975,7 +983,11 @@ export default function CenterFinancePage() {
   const journalTotal = payments.reduce((s, p) => s + p.amount, 0);
   const journalByMethod = METHOD_OPTIONS.map(m => ({ method: m, total: payments.filter(p => p.payment_method === m).reduce((s, p) => s + p.amount, 0) })).filter(m => m.total > 0);
 
-  const filtered = records.filter(r => `${r.prenom} ${r.nom}`.toLowerCase().includes(search.toLowerCase()));
+  const filtered = records.filter((r) => {
+    const matchSearch = `${r.prenom} ${r.nom}`.toLowerCase().includes(search.toLowerCase());
+    const matchCampus = !campusFilter || r.campus_id === campusFilter;
+    return matchSearch && matchCampus;
+  });
   const overdueRows = records.filter((r) => r.financial_status === "late");
   const exportRows = activeTab === "overdue" ? overdueRows : filtered;
   const canExport = activeTab === "journal"
@@ -1119,7 +1131,7 @@ export default function CenterFinancePage() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <ToolbarSearch value={search} onChange={setSearch} placeholder={t("centre", "financeSearch")} />
             <ToolbarFilterMenu
-              onReset={() => setActiveTab("ledger")}
+              onReset={() => { setActiveTab("ledger"); setCampusFilter(null); }}
               sections={[
                 {
                   id: "view",
@@ -1134,6 +1146,18 @@ export default function CenterFinancePage() {
                   ],
                   onChange: (v) => setActiveTab(v as typeof activeTab),
                 },
+                ...(campuses.length > 1
+                  ? [{
+                      id: "campus",
+                      label: t("centre", "settingsCampus"),
+                      value: campusFilter ?? "all",
+                      options: [
+                        { value: "all", label: t("centre", "reportsAllCampuses") },
+                        ...campuses.map((c) => ({ value: c.id, label: c.name })),
+                      ],
+                      onChange: (v: string) => setCampusFilter(v === "all" ? null : v),
+                    }]
+                  : []),
               ]}
             />
           </div>

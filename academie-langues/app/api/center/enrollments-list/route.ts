@@ -8,6 +8,7 @@ type EnrollRow = {
   filiere_id: string;
   niveau_id: string | null;
   groupe_id: string | null;
+  campus_id: string | null;
   tuition_fee: number | null;
   enrolled_at: string | null;
   duration_value: number | null;
@@ -46,6 +47,20 @@ function shortDurationLabel(e: EnrollRow): string {
 export async function GET(req: Request) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+
+  const requestedCampusId = new URL(req.url).searchParams.get("campusId");
+  const { data: campusRows } = await supabaseAdmin
+    .from("campuses")
+    .select("id, name")
+    .eq("center_id", ctx!.centerId)
+    .order("name");
+  let campusList = campusRows || [];
+  if (ctx!.scopedCampusIds?.length) {
+    campusList = campusList.filter((c) => ctx!.scopedCampusIds!.includes(c.id));
+  }
+  const campusId =
+    requestedCampusId && campusList.some((c) => c.id === requestedCampusId) ? requestedCampusId : null;
+  const allowedCampusIds = campusId ? [campusId] : ctx!.scopedCampusIds;
 
   type ProfileRow = {
     id: string;
@@ -90,7 +105,7 @@ export async function GET(req: Request) {
     const res = await supabaseAdmin
       .from("enrollments")
       .select(`
-        id, student_id, status, filiere_id, niveau_id, groupe_id,
+        id, student_id, status, filiere_id, niveau_id, groupe_id, campus_id,
         tuition_fee, enrolled_at, duration_value, duration_unit, duration_months,
         academic_year, passage_decision, passage_reason,
         filieres(name, type, duree_valeur, duree_unite),
@@ -102,7 +117,7 @@ export async function GET(req: Request) {
       const fallback = await supabaseAdmin
         .from("enrollments")
         .select(`
-          id, student_id, status, filiere_id, niveau_id, groupe_id,
+          id, student_id, status, filiere_id, niveau_id, groupe_id, campus_id,
           tuition_fee, enrolled_at, duration_value, duration_unit, duration_months,
           academic_year, passage_decision,
           filieres(name, type, duree_valeur, duree_unite),
@@ -119,6 +134,10 @@ export async function GET(req: Request) {
     } else {
       enrollRows = (res.data || []) as EnrollRow[];
     }
+  }
+
+  if (allowedCampusIds?.length) {
+    enrollRows = enrollRows.filter((e) => e.campus_id && allowedCampusIds.includes(e.campus_id));
   }
 
   const students = profileRows.map((p) => {
@@ -157,13 +176,14 @@ export async function GET(req: Request) {
           passage_reason: isShort ? null : (e.passage_reason ?? null),
           groupe_id: e.groupe_id,
           groupe_nom: e.groupes?.nom ?? null,
+          campus_id: e.campus_id ?? null,
           tuition_fee: Number(e.tuition_fee) || 0,
           status: e.status ?? "draft",
           enrolled_at: e.enrolled_at,
         };
       }),
     };
-  });
+  }).filter((s) => !allowedCampusIds?.length || s.enrollments.length > 0);
 
-  return NextResponse.json({ students });
+  return NextResponse.json({ students, campuses: campusList });
 }

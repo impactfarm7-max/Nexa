@@ -158,7 +158,7 @@ export default function BottomNav() {
             J-{tutorLock.daysRemaining}
           </span>
         )}
-        <span className={`text-[10px] mt-1 text-center leading-tight transition-colors truncate max-w-full ${isActive ? "text-[#11224E] font-bold" : "text-slate-400 font-medium"}`}>
+        <span className={`text-[11px] mt-1 text-center leading-tight transition-colors truncate max-w-full ${isActive ? "text-[#11224E] font-bold" : "text-slate-400 font-medium"}`}>
           {navLabel({
             label: item.shortLabel ?? item.label,
             labelKey: item.shortLabelKey ?? item.labelKey,
