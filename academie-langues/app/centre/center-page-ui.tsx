@@ -1,9 +1,11 @@
 "use client";
 
-import type { CSSProperties, ElementType, ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ElementType, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Noto_Sans } from "next/font/google";
-import { Search } from "lucide-react";
+import { Check, ChevronDown, Filter, Search } from "lucide-react";
 import { BRAND } from "@/app/utils/brand";
+import { ACTION_TONE } from "@/app/utils/action-tones";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
 /** UI Google-class — aligné page Programmes */
@@ -250,6 +252,138 @@ export function ToolbarSearch({
   );
 }
 
+export function CenterSelect({
+  value,
+  onChange,
+  options,
+  label,
+  placeholder,
+  disabled = false,
+  size = "md",
+  className = "",
+  align = "start",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  label?: string;
+  placeholder?: string;
+  disabled?: boolean;
+  size?: "sm" | "md" | "lg";
+  className?: string;
+  align?: "start" | "end";
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const selected = options.find((o) => o.value === value);
+  const display = selected?.label || placeholder || "—";
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const el = rootRef.current;
+      const panel = panelRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const width = Math.max(r.width, size === "sm" ? 140 : 192);
+      const panelH = panel?.offsetHeight ?? 220;
+      let top = r.bottom + 6;
+      if (top + panelH > window.innerHeight - 8) {
+        top = Math.max(8, r.top - panelH - 6);
+      }
+      let left = align === "end" ? r.right - width : r.left;
+      if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - width);
+      if (left < 8) left = 8;
+      setPos({ top, left, width });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open, align, size, options.length, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const heightCls = size === "sm" ? "h-8 text-[12px]" : size === "lg" ? "h-12 text-base" : "h-10 text-sm";
+  const padCls = size === "sm" ? "px-2.5" : size === "lg" ? "px-4" : "px-3";
+
+  const menu = open ? (
+    <div
+      ref={panelRef}
+      className="fixed z-[100] max-h-[min(16rem,50vh)] overflow-y-auto rounded-lg border border-black/[0.08] bg-white shadow-xl"
+      style={{ top: pos.top, left: pos.left, width: pos.width }}
+      role="listbox"
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {options.map((o) => {
+        const active = o.value === value;
+        return (
+          <button
+            key={o.value || "__empty"}
+            type="button"
+            role="option"
+            aria-selected={active}
+            onClick={(e) => {
+              e.stopPropagation();
+              onChange(o.value);
+              setOpen(false);
+            }}
+            className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-[12px] font-semibold hover:bg-black/[0.04] transition-colors cursor-pointer ${
+              active ? "text-[#11224E] bg-blue-50/50" : "text-neutral-700"
+            }`}
+          >
+            <span className="w-4 shrink-0 flex justify-center">
+              {active ? <Check size={13} strokeWidth={2.5} /> : null}
+            </span>
+            <span className="truncate">{o.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  ) : null;
+
+  return (
+    <div ref={rootRef} className={`relative min-w-0 ${className}`}>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-label={label}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        onClick={() => { if (!disabled) setOpen((v) => !v); }}
+        className={`w-full ${heightCls} ${padCls} rounded-lg border border-black/[0.08] bg-white font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 inline-flex items-center justify-between gap-2 transition-colors disabled:opacity-40 cursor-pointer`}
+      >
+        <span className={`truncate text-left ${selected ? "text-neutral-800" : "text-neutral-400"}`}>
+          {display}
+        </span>
+        <ChevronDown size={size === "sm" ? 13 : 15} className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {typeof document !== "undefined" && menu ? createPortal(menu, document.body) : null}
+    </div>
+  );
+}
+
 export function ToolbarSelect({
   value,
   onChange,
@@ -264,17 +398,187 @@ export function ToolbarSelect({
   minWidth?: string;
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={label}
-      className="h-9 px-2.5 rounded-lg border border-black/[0.08] bg-white text-[12px] font-semibold text-neutral-700 outline-none focus:border-[#11224E]/40 transition-colors duration-200"
-      style={{ minWidth }}
+    <div className="shrink-0" style={{ minWidth }}>
+      <CenterSelect
+        value={value}
+        onChange={onChange}
+        options={options}
+        label={label}
+        size="sm"
+      />
+    </div>
+  );
+}
+
+export type ToolbarFilterOption = { value: string; label: string };
+
+export type ToolbarFilterSection = {
+  id: string;
+  label: string;
+  value: string;
+  defaultValue?: string;
+  options: ToolbarFilterOption[];
+  onChange: (value: string) => void;
+};
+
+/** Popover Filtres — même chrome que Programmes (recherche + bouton, sections, check navy). */
+export function ToolbarFilterMenu({
+  sections,
+  idleLabel,
+  ariaLabel,
+  resetLabel,
+  onReset,
+}: {
+  sections: ToolbarFilterSection[];
+  idleLabel?: string;
+  ariaLabel?: string;
+  resetLabel?: string;
+  onReset?: () => void;
+}) {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelPos, setPanelPos] = useState({ top: 0, right: 0 });
+
+  const resolvedIdle = idleLabel ?? t("centre", "programsFilters");
+  const resolvedAria = ariaLabel ?? t("centre", "toolbarFiltersAria");
+  const resolvedReset = resetLabel ?? t("centre", "programsResetFilters");
+
+  const defaultOf = (s: ToolbarFilterSection) => s.defaultValue ?? "all";
+  const activeSections = sections.filter((s) => s.value !== defaultOf(s));
+  const activeCount = activeSections.length;
+  const summary = activeCount === 0
+    ? resolvedIdle
+    : activeSections
+        .map((s) => s.options.find((o) => o.value === s.value)?.label)
+        .filter(Boolean)
+        .join(" · ");
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const el = rootRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setPanelPos({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const menu = open ? (
+    <div
+      ref={panelRef}
+      className="fixed z-[80] w-[16.5rem] max-h-[min(24rem,70vh)] overflow-y-auto rounded-lg border border-black/[0.08] bg-white shadow-xl"
+      style={{ top: panelPos.top, right: panelPos.right }}
+      role="menu"
     >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>{o.label}</option>
+      {sections.map((section, idx) => (
+        <div key={section.id}>
+          {idx > 0 && <div className="mx-3 border-t border-black/[0.06]" />}
+          <div className="px-3 pt-2.5 pb-1">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{section.label}</p>
+          </div>
+          {section.options.map((o) => {
+            const active = section.value === o.value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={active}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  section.onChange(o.value);
+                }}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-[12px] font-semibold hover:bg-black/[0.04] transition-colors cursor-pointer ${
+                  active ? "text-[#11224E] bg-blue-50/50" : "text-neutral-700"
+                }`}
+              >
+                <span className="w-4 shrink-0 flex justify-center">
+                  {active ? <Check size={13} strokeWidth={2.5} /> : null}
+                </span>
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
       ))}
-    </select>
+      {activeCount > 0 && onReset && (
+        <>
+          <div className="mx-3 border-t border-black/[0.06]" />
+          <button
+            type="button"
+            role="menuitem"
+            onClick={(e) => {
+              e.stopPropagation();
+              onReset();
+              setOpen(false);
+            }}
+            className="w-full px-3 py-2.5 text-left text-[12px] font-semibold text-neutral-500 hover:bg-black/[0.04] hover:text-neutral-800 transition-colors cursor-pointer"
+          >
+            {resolvedReset}
+          </button>
+        </>
+      )}
+    </div>
+  ) : null;
+
+  return (
+    <div ref={rootRef} className="relative shrink-0">
+      <button
+        type="button"
+        aria-label={resolvedAria}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={() => setOpen((v) => !v)}
+        className="h-9 px-3 rounded-lg border border-black/[0.08] text-[12px] font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 inline-flex items-center gap-1.5 transition-colors duration-200 max-w-[14rem] cursor-pointer"
+        style={{
+          backgroundColor: SURFACE,
+          color: activeCount > 0 ? BLUE : undefined,
+          borderColor: activeCount > 0 ? `${BLUE}55` : undefined,
+        }}
+      >
+        <Filter size={14} className="shrink-0 text-neutral-400" style={activeCount > 0 ? { color: BLUE } : undefined} />
+        <span className="truncate text-neutral-700" style={activeCount > 0 ? { color: BLUE } : undefined}>
+          {summary}
+        </span>
+        {activeCount > 0 && (
+          <span
+            className="shrink-0 h-4 min-w-[1rem] px-1 rounded-md text-[10px] font-bold text-white inline-flex items-center justify-center"
+            style={{ backgroundColor: BLUE }}
+          >
+            {activeCount}
+          </span>
+        )}
+        <ChevronDown size={14} className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {typeof document !== "undefined" && menu ? createPortal(menu, document.body) : null}
+    </div>
   );
 }
 
@@ -381,6 +685,26 @@ export function TableActions({ children }: { children: ReactNode }) {
     <td className="px-3 py-4 text-center align-top whitespace-nowrap">
       <div className="inline-flex items-center justify-center gap-1.5 flex-nowrap">{children}</div>
     </td>
+  );
+}
+
+export function LoadErrorState({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry?: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <div className={`${ACTION_TONE.errorBox} flex flex-col sm:flex-row sm:items-center gap-3`}>
+      <p className="flex-1 m-0">{message}</p>
+      {onRetry ? (
+        <button type="button" onClick={onRetry} className={ACTION_TONE.ghostBtnMd}>
+          {t("common", "actionRetry")}
+        </button>
+      ) : null}
+    </div>
   );
 }
 

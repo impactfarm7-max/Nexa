@@ -12,6 +12,13 @@ export const ACTION_TONE = {
     "inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-red-700 border border-red-200 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50",
   negativeOutlineMd:
     "inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-lg text-sm font-semibold text-red-700 border border-red-200 bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50",
+  /** Same chrome as centre Edit buttons, tinted for semantic actions */
+  ghostBtnMd:
+    "h-10 px-4 rounded-lg border border-black/[0.08] bg-white inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-neutral-700 hover:bg-black/[0.03] transition-colors disabled:opacity-50",
+  negativeGhostMd:
+    "h-10 px-4 rounded-lg border border-red-200 bg-white inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50",
+  positiveGhostMd:
+    "h-10 px-4 rounded-lg border border-emerald-200 bg-white inline-flex items-center justify-center gap-1.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors disabled:opacity-50",
   warningBtn:
     "inline-flex items-center justify-center gap-1.5 h-8 px-3 rounded-lg text-xs font-semibold text-amber-900 border border-amber-200 bg-amber-50 hover:bg-amber-100 transition-colors",
   positiveText: "text-emerald-700",

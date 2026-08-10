@@ -8,7 +8,7 @@ import Link from "next/link";
 import { supabase } from "@/app/utils/supabase";
 import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
-import { BLUE, PAGE_BG } from "@/app/centre/center-page-ui";
+import { BLUE, PAGE_BG, ToolbarSearch, ToolbarFilterMenu } from "@/app/centre/center-page-ui";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
 type ResultRow = {
@@ -42,7 +42,7 @@ function extractScore(val: unknown): string {
 }
 
 export default function TcfExamResultsPage() {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [centerType, setCenterType] = useState("generic");
   const [results, setResults] = useState<ResultRow[]>([]);
@@ -203,21 +203,25 @@ export default function TcfExamResultsPage() {
         )}
 
         <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={sessionFilter}
-            onChange={(e) => setSessionFilter(e.target.value)}
-            className="h-9 px-3 rounded-xl border border-black/[0.08] bg-white text-xs font-semibold outline-none"
-          >
-            <option value="all">Toutes les séances</option>
-            {sessionOptions.map((o) => (
-              <option key={o.id} value={o.id}>{o.label}</option>
-            ))}
-          </select>
-          <input
+          <ToolbarSearch
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Rechercher un élève…"
-            className="h-9 px-3 rounded-xl border border-black/[0.08] bg-white text-xs font-medium outline-none min-w-[12rem]"
+            onChange={setSearch}
+            placeholder={locale === "en" ? "Search a learner…" : "Rechercher un élève…"}
+          />
+          <ToolbarFilterMenu
+            onReset={() => setSessionFilter("all")}
+            sections={[
+              {
+                id: "session",
+                label: locale === "en" ? "Session" : "Séance",
+                value: sessionFilter,
+                options: [
+                  { value: "all", label: locale === "en" ? "All sessions" : "Toutes les séances" },
+                  ...sessionOptions.map((o) => ({ value: o.id, label: o.label })),
+                ],
+                onChange: setSessionFilter,
+              },
+            ]}
           />
         </div>
 

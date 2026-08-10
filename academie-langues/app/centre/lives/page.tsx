@@ -12,6 +12,8 @@ import { loadCenterBootstrap } from "@/app/utils/center-me-cache";
 import { JOIN_BEFORE_MS, sessionStartMs, sessionEndMs } from "@/app/utils/collectiveLive";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { ACTION_TONE } from "@/app/utils/action-tones";
+import { ActionConfirmModal } from "@/app/components/centre/ActionConfirmModal";
+import { useActionFeedback } from "@/app/components/ActionFeedback";
 import {
   BLUE,
   CenterPageLayout,
@@ -19,6 +21,7 @@ import {
   CenterPageBody,
   OutlineHeaderButton,
   EmptyState,
+  LoadErrorState,
 } from "../center-page-ui";
 
 const ORANGE = "#eb670e";
@@ -104,8 +107,9 @@ function sessionStatus(item: LiveItem): "join" | "upcoming" | "ended" | "cancell
 }
 
 export default function CentreLivesPage() {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const en = locale === "en";
+  const feedback = useActionFeedback();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -327,37 +331,46 @@ export default function CentreLivesPage() {
     setSaving(true);
     setFormError("");
 
-    const payload = {
-      title: title.trim(),
-      specific_date: date,
-      start_time: startTime,
-      end_time: endTime,
-      formateur_id: formateurId || null,
-      participant_ids: selectedIds,
-      ...(editing ? { id: editing.slot_id } : {}),
-    };
+    const wasEditing = Boolean(editing);
+    const result = await feedback.run(async () => {
+      const payload = {
+        title: title.trim(),
+        specific_date: date,
+        start_time: startTime,
+        end_time: endTime,
+        formateur_id: formateurId || null,
+        participant_ids: selectedIds,
+        ...(editing ? { id: editing.slot_id } : {}),
+      };
 
-    const res = await fetch("/api/centre/lives", {
-      method: editing ? "PATCH" : "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-        "X-Nexa-Locale": locale,
-      },
-      body: JSON.stringify(payload),
+      const res = await fetch("/api/centre/lives", {
+        method: wasEditing ? "PATCH" : "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "X-Nexa-Locale": locale,
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || (en ? "Unable to save." : "Enregistrement impossible."));
+      await load();
+    }, {
+      successTitle: t("centre", wasEditing ? "livesActionUpdateOk" : "livesActionCreateOk"),
     });
-    const json = await res.json().catch(() => ({}));
     setSaving(false);
-    if (!res.ok) {
-      setFormError(json.error || (en ? "Unable to save." : "Enregistrement impossible."));
+    if (!result.ok) {
+      setFormError(en ? "Unable to save." : "Enregistrement impossible.");
       return;
     }
     setPanelOpen(false);
-    await load();
   };
 
+  const [confirmLive, setConfirmLive] = useState<null | { kind: "cancel" | "delete"; item: LiveItem }>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+
   const handleCancel = async (item: LiveItem) => {
-    if (!token || !confirm(en ? "Cancel this live session?" : "Annuler cette Session Live ?")) return;
+    if (!token) throw new Error(en ? "Session expired." : "Session expirée.");
     const res = await fetch("/api/centre/lives", {
       method: "PATCH",
       headers: {
@@ -367,16 +380,34 @@ export default function CentreLivesPage() {
       },
       body: JSON.stringify({ id: item.slot_id, action: "cancel" }),
     });
-    if (res.ok) await load();
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || (en ? "Unable to cancel." : "Annulation impossible."));
+    await load();
   };
 
   const handleDelete = async (item: LiveItem) => {
-    if (!token || !confirm(en ? "Permanently delete this session?" : "Supprimer définitivement cette session ?")) return;
+    if (!token) throw new Error(en ? "Session expired." : "Session expirée.");
     const res = await fetch(`/api/centre/lives?id=${item.slot_id}`, {
       method: "DELETE",
       headers: { Authorization: `Bearer ${token}`, "X-Nexa-Locale": locale },
     });
-    if (res.ok) await load();
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.error || (en ? "Unable to delete." : "Suppression impossible."));
+    await load();
+  };
+
+  const runLiveConfirm = async () => {
+    if (!confirmLive) return;
+    const pending = confirmLive;
+    setConfirmBusy(true);
+    setConfirmLive(null);
+    setConfirmBusy(false);
+    await feedback.run(async () => {
+      if (pending.kind === "cancel") await handleCancel(pending.item);
+      else await handleDelete(pending.item);
+    }, {
+      successTitle: t("centre", pending.kind === "cancel" ? "livesActionCancelOk" : "livesActionDeleteOk"),
+    });
   };
 
   const { joinable, upcoming, past } = useMemo(() => {
@@ -420,9 +451,7 @@ export default function CentreLivesPage() {
         </p>
 
         {error && (
-          <div className={ACTION_TONE.errorBox}>
-            {error}
-          </div>
+          <LoadErrorState message={error} onRetry={() => void load()} />
         )}
 
         {livesReady && joinable.length > 0 && (
@@ -435,7 +464,7 @@ export default function CentreLivesPage() {
                   item={s}
                   onJoin={() => router.push(`/tcf-canada/live/room/${s.slot_id}?date=${s.date}`)}
                   onEdit={() => openEdit(s)}
-                  onCancel={() => handleCancel(s)}
+                  onCancel={() => setConfirmLive({ kind: "cancel", item: s })}
                   joinable
                   locale={locale}
                 />
@@ -453,8 +482,8 @@ export default function CentreLivesPage() {
                   key={s.id}
                   item={s}
                   onEdit={() => openEdit(s)}
-                  onCancel={() => handleCancel(s)}
-                  onDelete={() => handleDelete(s)}
+                  onCancel={() => setConfirmLive({ kind: "cancel", item: s })}
+                  onDelete={() => setConfirmLive({ kind: "delete", item: s })}
                   locale={locale}
                 />
               ))}
@@ -812,6 +841,18 @@ export default function CentreLivesPage() {
             </div>
           </div>
         </div>
+      )}
+      {confirmLive && (
+        <ActionConfirmModal
+          title={confirmLive.kind === "delete" ? (en ? "Delete this session?" : "Supprimer cette session ?") : (en ? "Cancel this session?" : "Annuler cette session ?")}
+          message={confirmLive.kind === "delete" ? (en ? "This session will be permanently deleted." : "Cette session sera définitivement supprimée.") : (en ? "Participants will no longer be able to join." : "Les participants ne pourront plus la rejoindre.")}
+          confirmLabel={confirmLive.kind === "delete" ? (en ? "Delete" : "Supprimer") : (en ? "Cancel session" : "Annuler la session")}
+          cancelLabel={en ? "Back" : "Retour"}
+          tone="danger"
+          busy={confirmBusy}
+          onConfirm={() => void runLiveConfirm()}
+          onCancel={() => { if (!confirmBusy) setConfirmLive(null); }}
+        />
       )}
     </CenterPageLayout>
   );

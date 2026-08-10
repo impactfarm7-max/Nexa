@@ -8,7 +8,7 @@ import {
   MessageSquare, Building2, BookOpen,
   ClipboardList, Calendar, Camera, Settings2, BarChart3,
   BookMarked, PenTool, ChevronDown, ChevronUp,
-  PanelLeftClose, PanelLeftOpen, Video, Flag,
+  PanelLeftClose, PanelLeftOpen, Video, Flag, Gem, LibraryBig,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { STAFF_PERMISSION_ROUTES } from "@/app/utils/student-routes";
@@ -19,6 +19,7 @@ import { BRAND } from "@/app/utils/brand";
 import { CenterBrandMark } from "@/app/centre/center-page-ui";
 import LanguageSwitcher from "@/app/components/LanguageSwitcher";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { ALL_STAFF_MODULE_PERMS, VIEW_AS_EVENT, isViewAsStaffPreview } from "@/app/utils/view-as";
 
 /* ─── Constantes ────────────────────────────────────────────────────────── */
 const SIDEBAR_W_VAR  = "--nexa-center-sidebar-w";
@@ -56,6 +57,8 @@ const MANAGER_NAV: NavItem[] = [
   { label: "navExamensNotes",     icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
   { label: "navRapports",         icon: BarChart3,       path: "/centre/rapports",                   permKey: "rapports" },
   { label: "navCommunaute",       icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
+  { label: "navBibliotheque",     icon: LibraryBig,      path: "/centre/bibliotheque",               permKey: "bibliotheque" },
+  { label: "navAbonnements",      icon: Gem,             path: "/centre/abonnements",                permKey: "abonnements" },
   { label: "navParametres",       icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
@@ -108,6 +111,7 @@ const TCF_MANAGER_NAV: NavItem[] = [
   { label: "navFinance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
   { label: "navCommunaute",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
   { label: "navSessionsLive",  icon: Video,           path: "/centre/lives",                      permKey: "lives" },
+  { label: "navAbonnements",   icon: Gem,             path: "/centre/abonnements",                permKey: "abonnements" },
   { label: "navParametres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
@@ -140,6 +144,7 @@ const SHORT_MANAGER_NAV: NavItem[] = [
   { label: "navRapports",      icon: BarChart3,       path: "/centre/rapports",                   permKey: "rapports" },
   { label: "navCommunaute",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
   { label: "navSessionsLive",  icon: Video,           path: "/centre/lives",                      permKey: "lives" },
+  { label: "navAbonnements",   icon: Gem,             path: "/centre/abonnements",                permKey: "abonnements" },
   { label: "navParametres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
@@ -227,6 +232,14 @@ function CenterSidebarInner() {
   const [branches,          setBranches]          = useState<Branch[]>([]);
   const [activeBranchId,    setActiveBranchId]    = useState<string | null>(null);
   const [coursOpen,         setCoursOpen]         = useState(false);
+  const [previewStaff,      setPreviewStaff]      = useState(false);
+
+  useEffect(() => {
+    const sync = () => setPreviewStaff(isViewAsStaffPreview());
+    sync();
+    window.addEventListener(VIEW_AS_EVENT, sync);
+    return () => window.removeEventListener(VIEW_AS_EVENT, sync);
+  }, []);
 
   /* Init cache + collapse */
   useEffect(() => {
@@ -379,9 +392,10 @@ function CenterSidebarInner() {
     setUploadingLogo(false);
   };
 
-  const canManage = userRole === "admin" || userRole === "center_manager";
-  const isTrainer = userRole === "trainer";
-  const isManager = FULL_ACCESS_ROLES.includes(userRole || "");
+  const canManage = !previewStaff && (userRole === "admin" || userRole === "center_manager");
+  const isTrainer = !previewStaff && userRole === "trainer";
+  const isManager = !previewStaff && FULL_ACCESS_ROLES.includes(userRole || "");
+  const navPerms = previewStaff ? [...ALL_STAFF_MODULE_PERMS] : staffPermissions;
 
   /* Actif */
   const active = (path: string) =>
@@ -396,7 +410,7 @@ function CenterSidebarInner() {
     const baseNav = isTCF ? TCF_MANAGER_NAV : isShort ? SHORT_MANAGER_NAV : MANAGER_NAV;
     if (isManager) return baseNav;
     return baseNav
-      .map((item) => filterNavItemForStaff(item, staffPermissions))
+      .map((item) => filterNavItemForStaff(item, navPerms))
       .filter((item): item is NavItem => item !== null);
   };
 

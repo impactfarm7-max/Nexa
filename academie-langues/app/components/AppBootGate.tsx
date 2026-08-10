@@ -6,6 +6,7 @@ import { supabase } from "@/app/utils/supabase";
 import { isCenterStaff } from "@/app/utils/student-routes";
 import { isPublicAppRoute } from "@/app/utils/public-routes";
 import { clearStaleAuthSession, isRefreshTokenError } from "@/app/utils/supabase-auth";
+import { clearViewAs, isStudentPreviewPath, isViewAsStudentPreview } from "@/app/utils/view-as";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -68,8 +69,10 @@ export default function AppBootGate({ children }: { children: React.ReactNode })
         pathname.startsWith("/dashboard/coaching/room");
 
       if (isCenterStaff(profile) && !pathname.startsWith("/centre") && !isLiveRoomPath) {
-        router.replace("/centre/dashboard");
-        return;
+        if (!(isViewAsStudentPreview() && isStudentPreviewPath(pathname))) {
+          router.replace("/centre/dashboard");
+          return;
+        }
       }
 
       if (profile?.role !== "admin" && profile?.tag_status === "revoque") {
@@ -115,6 +118,7 @@ export default function AppBootGate({ children }: { children: React.ReactNode })
       if (event === "SIGNED_OUT" || !session) {
         localStorage.removeItem("iag_last_active");
         localStorage.removeItem("session_token");
+        clearViewAs();
         if (!isPublicAppRoute(window.location.pathname)) {
           router.replace("/login");
         }

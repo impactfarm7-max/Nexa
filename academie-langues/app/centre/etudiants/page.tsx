@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useLayoutEffect, useRef } fr
 import {
   Users, Wallet, AlertTriangle, GraduationCap,
   Plus, X, Loader2, Edit3, Check, Download, FileText,
-  Share2, Printer, Calendar, BookOpen,
+  Share2, Printer, Calendar, BookOpen, Upload,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -12,6 +12,7 @@ import { loadCenterBootstrap, peekCenterBootstrap } from "@/app/utils/center-me-
 import { fetchCenterApi, clearCenterApiCache } from "@/app/utils/center-api-client";
 import CenterContentSkeleton from "@/app/components/CenterContentSkeleton";
 import CreateStudentModal from "@/app/components/centre/students/CreateStudentModal";
+import ImportStudentsCsvModal from "@/app/components/centre/students/ImportStudentsCsvModal";
 import StudentIdentityTab from "@/app/components/centre/students/StudentIdentityTab";
 import StudentFinanceTab from "@/app/components/centre/students/StudentFinanceTab";
 import PassageNiveauPanel from "@/app/components/centre/students/PassageNiveauPanel";
@@ -20,6 +21,8 @@ import {
   passageDecisionLabel,
 } from "@/app/utils/cursus-passage";
 import { ACTION_TONE } from "@/app/utils/action-tones";
+import { ActionConfirmModal } from "@/app/components/centre/ActionConfirmModal";
+import { useActionFeedback } from "@/app/components/ActionFeedback";
 import {
   CenterPageLayout,
   CenterPageHeader,
@@ -28,7 +31,7 @@ import {
   CenterToolbar,
   StatSep,
   ToolbarSearch,
-  ToolbarSelect,
+  ToolbarFilterMenu,
   CenterPageBody,
   CenterDataTable,
   CenterTableRow,
@@ -36,6 +39,7 @@ import {
   TableBtnModify,
   TableActions,
   EmptyState,
+  LoadErrorState,
   BLUE,
   ORANGE,
   SURFACE,
@@ -247,6 +251,7 @@ function openWhatsApp(text: string, phone?: string) {
 // ════════════════════════════════════════════════════════════════════════════
 export default function CenterStudentsPage() {
   const { t, locale } = useI18n();
+  const feedback = useActionFeedback();
   const exportLabels: StudentExportLabels = {
     title: t("centre", "studentsTitle"), lastName: t("centre", "enrollmentLastName"), firstName: t("centre", "enrollmentFirstName"),
     email: t("centre", "accountEmail"), phone: t("centre", "accountPhone"), program: t("centre", "enrollmentProgram"), status: t("centre", "settingsStatus"),
@@ -258,6 +263,7 @@ export default function CenterStudentsPage() {
   const [students,           setStudents]           = useState<StudentRow[]>([]);
   const [shellLoading,       setShellLoading]       = useState(true);
   const [dataLoading,        setDataLoading]        = useState(true);
+  const [loadError,          setLoadError]          = useState<string | null>(null);
   const [search,             setSearch]             = useState("");
   const [centerId,           setCenterId]           = useState<string | null>(null);
   const [userId,             setUserId]             = useState<string | null>(null);
@@ -267,6 +273,7 @@ export default function CenterStudentsPage() {
   const [selectedEnrollmentId, setSelectedEnrollmentId] = useState<string | null>(null);
   const [activeTab,          setActiveTab]          = useState<"identity" | "grades" | "finance">("identity");
   const [showCreateModal,    setShowCreateModal]    = useState(false);
+  const [showImportCsv,      setShowImportCsv]      = useState(false);
   const [viewingStudent,     setViewingStudent]     = useState<StudentRow | null>(null);
   const [activating,         setActivating]         = useState(false);
   const [shareBusy,          setShareBusy]          = useState(false);
@@ -279,6 +286,7 @@ export default function CenterStudentsPage() {
   // ── load ─────────────────────────────────────────────────────────────────
   const loadStudents = useCallback(async (cId: string, options?: { silent?: boolean; force?: boolean }) => {
     if (!options?.silent) setDataLoading(true);
+    setLoadError(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -308,10 +316,11 @@ export default function CenterStudentsPage() {
     } catch (err) {
       console.error("loadStudents:", err);
       setStudents([]);
+      setLoadError(err instanceof Error ? err.message : t("common", "actionLoadError"));
     } finally {
       if (!options?.silent) setDataLoading(false);
     }
-  }, [locale]);
+  }, [locale, t]);
 
   useLayoutEffect(() => {
     const bootstrap = peekCenterBootstrap();
@@ -380,45 +389,61 @@ export default function CenterStudentsPage() {
           ? { center_status: "active", tag_status: "normal" }
           : { center_status: "paused" };
     const { error } = await supabase.from("profiles").update(patch).eq("id", id);
-    if (error) {
-      alert(`${t("centre", "membersError")} : ${error.message}`);
-      return;
-    }
+    if (error) throw new Error(error.message);
     setStudents((prev) => prev.map((s) => (s.id === id ? { ...s, center_status: st } : s)));
   };
 
   const activateEnrollment = async (enrollmentId: string, studentId?: string) => {
     if (!centerId) return;
     setActivating(true);
-    const { error } = await supabase.from("enrollments").update({ status: "active" }).eq("id", enrollmentId);
-    if (error) {
-      alert(`${t("centre", "membersError")} : ${error.message}`);
-    } else {
+    const result = await feedback.run(async () => {
+      const { error } = await supabase.from("enrollments").update({ status: "active" }).eq("id", enrollmentId);
+      if (error) throw new Error(error.message);
       if (studentId) {
-        await supabase.from("profiles").update({ center_status: "active", tag_status: "normal" }).eq("id", studentId);
+        const { error: profileErr } = await supabase.from("profiles").update({ center_status: "active", tag_status: "normal" }).eq("id", studentId);
+        if (profileErr) throw new Error(profileErr.message);
       }
       await loadStudents(centerId, { silent: true, force: true });
-    }
-    clearCenterApiCache("/api/center/enrollments-list");
+      clearCenterApiCache("/api/center/enrollments-list");
+    }, { successTitle: t("centre", "studentsActionActivateOk") });
     setActivating(false);
+    return result.ok;
   };
 
+  const [confirmAction, setConfirmAction] = useState<null | { kind: "revoke" | "reactivate"; id: string }>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+
   const revokeStudent = async (studentId: string) => {
-    if (!confirm(t("centre", "studentsRevokeConfirm"))) return;
     await setAccessStatus(studentId, "revoked");
   };
 
   const reactivateStudent = async (studentId: string) => {
-    if (!confirm(t("centre", "studentsReactivateConfirm"))) return;
     await setAccessStatus(studentId, "active");
+  };
+
+  const runStudentConfirm = async () => {
+    if (!confirmAction) return;
+    const pending = confirmAction;
+    setConfirmBusy(true);
+    setConfirmAction(null);
+    setConfirmBusy(false);
+    await feedback.run(async () => {
+      if (pending.kind === "revoke") await revokeStudent(pending.id);
+      else await reactivateStudent(pending.id);
+    }, {
+      successTitle: t("centre", pending.kind === "revoke" ? "studentsActionRevokeOk" : "studentsActionReactivateOk"),
+    });
   };
 
   const approvePendingStudent = async (studentId: string) => {
     setActivating(true);
-    await setAccessStatus(studentId, "active");
-    if (centerId) await loadStudents(centerId, { silent: true, force: true });
-    clearCenterApiCache("/api/center/enrollments-list");
+    const result = await feedback.run(async () => {
+      await setAccessStatus(studentId, "active");
+      if (centerId) await loadStudents(centerId, { silent: true, force: true });
+      clearCenterApiCache("/api/center/enrollments-list");
+    }, { successTitle: t("centre", "studentsActionActivateOk") });
     setActivating(false);
+    return result.ok;
   };
 
   const handleAvatarUpdated = (url: string) => {
@@ -538,16 +563,16 @@ export default function CenterStudentsPage() {
                 {selectedStudent.center_status === "revoked" ? (
                   <button
                     type="button"
-                    onClick={() => void reactivateStudent(selectedStudent.id)}
-                    className={ACTION_TONE.positiveBtn}
+                    onClick={() => setConfirmAction({ kind: "reactivate", id: selectedStudent.id })}
+                    className={ACTION_TONE.positiveGhostMd}
                   >
                     {t("centre", "studentsReactivate")}
                   </button>
                 ) : (
                   <button
                     type="button"
-                    onClick={() => void revokeStudent(selectedStudent.id)}
-                    className={ACTION_TONE.negativeOutline}
+                    onClick={() => setConfirmAction({ kind: "revoke", id: selectedStudent.id })}
+                    className={ACTION_TONE.negativeGhostMd}
                   >
                     {t("centre", "studentsRevoked")}
                   </button>
@@ -582,6 +607,11 @@ export default function CenterStudentsPage() {
                   }}
                 />
                 <AgentIaComingSoonButton />
+                <OutlineHeaderButton onClick={() => setShowImportCsv(true)}>
+                  <Upload size={15} strokeWidth={2.25} />
+                  <span className="hidden sm:inline">{t("centre", "studentsCsvImportBtn")}</span>
+                  <span className="sm:hidden">CSV</span>
+                </OutlineHeaderButton>
                 <OutlineHeaderButton onClick={() => setShowCreateModal(true)}>
                   <Plus size={15} strokeWidth={2.25} />
                   <span className="hidden sm:inline">{t("centre", "studentsCreateLearner")}</span>
@@ -618,35 +648,42 @@ export default function CenterStudentsPage() {
                 }
               >
                 <ToolbarSearch value={search} onChange={setSearch} placeholder={t("centre", "financeSearch")} />
-                <ToolbarSelect
-                  label={t("centre", "studentsFilterStatus")}
-                  value={statusFilter}
-                  onChange={(v) => setStatusFilter(v as StatusFilter)}
-                  minWidth="7.5rem"
-                  options={[
-                    { value: "all", label: t("centre", "studentsAllStatuses") },
-                    { value: "active", label: t("centre", "summaryActive") },
-                    { value: "pending_center_approval", label: t("centre", "studentsPendingApproval") },
-                    { value: "paused", label: t("centre", "summarySuspended") },
-                    { value: "revoked", label: t("centre", "studentsRevokedPlural") },
-                  ]}
-                />
-                <ToolbarSelect
-                  label={t("centre", "studentsFilterProgram")}
-                  value={filiereFilter ?? "all"}
-                  onChange={(v) => setFiliereFilter(v === "all" ? null : v)}
-                  minWidth="10rem"
-                  options={[
-                    { value: "all", label: t("centre", "reportsAllPrograms") },
-                    ...filiereStats.map(([id, { name, count }]) => ({
-                      value: id,
-                      label: `${name} (${count})`,
-                    })),
+                <ToolbarFilterMenu
+                  onReset={() => { setStatusFilter("all"); setFiliereFilter(null); }}
+                  sections={[
+                    {
+                      id: "status",
+                      label: t("centre", "settingsStatus"),
+                      value: statusFilter,
+                      options: [
+                        { value: "all", label: t("centre", "studentsAllStatuses") },
+                        { value: "active", label: t("centre", "summaryActive") },
+                        { value: "pending_center_approval", label: t("centre", "studentsPendingApproval") },
+                        { value: "paused", label: t("centre", "summarySuspended") },
+                        { value: "revoked", label: t("centre", "studentsRevokedPlural") },
+                      ],
+                      onChange: (v) => setStatusFilter(v as StatusFilter),
+                    },
+                    {
+                      id: "program",
+                      label: t("centre", "enrollmentProgram"),
+                      value: filiereFilter ?? "all",
+                      options: [
+                        { value: "all", label: t("centre", "reportsAllPrograms") },
+                        ...filiereStats.map(([id, { name, count }]) => ({
+                          value: id,
+                          label: `${name} (${count})`,
+                        })),
+                      ],
+                      onChange: (v) => setFiliereFilter(v === "all" ? null : v),
+                    },
                   ]}
                 />
               </CenterToolbar>
 
-              {filtered.length === 0 ? (
+              {loadError ? (
+                <LoadErrorState message={loadError} onRetry={() => { if (centerId) void loadStudents(centerId, { force: true }); }} />
+              ) : filtered.length === 0 ? (
                 <EmptyState
                   title={t("centre", "studentsNoneFound")}
                   hint={t("centre", "studentsChangeSearchFilters")}
@@ -679,9 +716,9 @@ export default function CenterStudentsPage() {
                     });
                     const enrStatus = hasDraft ? t("centre", "enrollmentDraft") : primaryEnr?.status === "active" ? t("centre", "studentsActiveEnrollment") : primaryEnr ? t("centre", "studentsRegistered") : "—";
                     const statusTone =
-                      hasDraft || s.center_status === "revoked" || s.center_status === "paused" ? ACTION_TONE.negativeText
-                      : s.center_status === "pending_center_approval" ? ACTION_TONE.warningText
-                      : ACTION_TONE.positiveText;
+                      hasDraft || s.center_status === "revoked" || s.center_status === "paused" ? ACTION_TONE.negativePill
+                      : s.center_status === "pending_center_approval" ? ACTION_TONE.warningPill
+                      : ACTION_TONE.positivePill;
 
                     return (
                       <CenterTableRow key={s.id} index={i}>
@@ -695,7 +732,7 @@ export default function CenterStudentsPage() {
                           {primaryEnr?.filiere_name_raw ? primaryEnr.filiere_name_raw.toUpperCase() : "—"}
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span className={`text-[12px] font-semibold ${statusTone}`}>
+                          <span className={statusTone}>
                             {hasDraft ? t("centre", "enrollmentDraft") : statusLabel}
                           </span>
                         </td>
@@ -841,6 +878,13 @@ export default function CenterStudentsPage() {
           onCreated={async () => { setShowCreateModal(false); await loadStudents(centerId!, { force: true }); }}
         />
       )}
+      {showImportCsv && centerId && (
+        <ImportStudentsCsvModal
+          centerId={centerId}
+          onClose={() => setShowImportCsv(false)}
+          onImported={async () => { setShowImportCsv(false); await loadStudents(centerId, { force: true }); }}
+        />
+      )}
       {viewingStudent && (
         <StudentViewModal
           student={viewingStudent}
@@ -850,6 +894,18 @@ export default function CenterStudentsPage() {
             setViewingStudent(null);
             selectStudent(s);
           }}
+        />
+      )}
+      {confirmAction && (
+        <ActionConfirmModal
+          title={confirmAction.kind === "revoke" ? t("centre", "studentsRevoked") : t("centre", "studentsReactivate")}
+          message={confirmAction.kind === "revoke" ? t("centre", "studentsRevokeConfirm") : t("centre", "studentsReactivateConfirm")}
+          confirmLabel={confirmAction.kind === "revoke" ? t("centre", "studentsRevoked") : t("centre", "studentsReactivate")}
+          cancelLabel={t("centre", "identityCancel")}
+          tone={confirmAction.kind === "revoke" ? "danger" : "positive"}
+          busy={confirmBusy}
+          onConfirm={() => void runStudentConfirm()}
+          onCancel={() => { if (!confirmBusy) setConfirmAction(null); }}
         />
       )}
       {waPhoneOpen && (

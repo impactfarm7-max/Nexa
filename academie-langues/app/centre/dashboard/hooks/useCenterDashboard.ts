@@ -7,6 +7,7 @@ import { buildCenterSignupUrl } from "@/app/utils/center-signup-link";
 import { loadCenterBootstrap, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import { fetchCenterApi } from "@/app/utils/center-api-client";
 import { resolveDashboardModules } from "../utils";
+import { VIEW_AS_EVENT, isViewAsStaffPreview } from "@/app/utils/view-as";
 import type {
   Campus,
   CenterInfo,
@@ -158,7 +159,16 @@ export function useCenterDashboard() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const { canAccess } = resolveDashboardModules(role, permissions, center?.center_type);
+  const [viewAsStaff, setViewAsStaff] = useState(false);
+  useEffect(() => {
+    const sync = () => setViewAsStaff(isViewAsStaffPreview());
+    sync();
+    window.addEventListener(VIEW_AS_EVENT, sync);
+    return () => window.removeEventListener(VIEW_AS_EVENT, sync);
+  }, []);
+
+  const resolved = resolveDashboardModules(role, permissions, center?.center_type);
+  const canAccess = viewAsStaff ? () => true : resolved.canAccess;
 
   return {
     statsLoading,

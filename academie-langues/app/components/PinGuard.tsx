@@ -6,6 +6,7 @@ import { supabase } from "@/app/utils/supabase";
 import { loadStudentAccess, clearStudentAccessCache } from "@/app/utils/student-access-cache";
 import { Lock, LogOut } from "lucide-react";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { isViewAsStudentPreview } from "@/app/utils/view-as";
 
 export default function PinGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -23,6 +24,12 @@ export default function PinGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const checkSecurity = async () => {
+      if (isViewAsStudentPreview()) {
+        setIsUnlocked(true);
+        setIsLoading(false);
+        return;
+      }
+
       const access = await loadStudentAccess();
 
       if (!access?.session) {

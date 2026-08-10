@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   BarChart3, Bell, Building2, ChevronRight, Command, Inbox, LayoutDashboard,
   LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck,
-  Star, Sun, ScrollText, Users, X,
+  Star, Sun, ScrollText, Users, X, LibraryBig,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { superadminFetch } from "../utils/superadmin-api-client";
@@ -22,6 +22,7 @@ const NAV_CONFIG = [
   { href: "/superadmin/centres", labelKey: "navCentersLabel", descKey: "navCentersDesc", icon: Building2, groupKey: "groupNetwork" },
   { href: "/superadmin/etudiants", labelKey: "navStudentsLabel", descKey: "navStudentsDesc", icon: Users, groupKey: "groupNetwork" },
   { href: "/superadmin/demandes", labelKey: "navRequestsLabel", descKey: "navRequestsDesc", icon: Inbox, groupKey: "groupOperations" },
+  { href: "/superadmin/bibliotheque", labelKey: "navLibraryLabel", descKey: "navLibraryDesc", icon: LibraryBig, groupKey: "groupOperations" },
   { href: "/superadmin/audit", labelKey: "navAuditLabel", descKey: "navAuditDesc", icon: ScrollText, groupKey: "groupSecurity" },
 ] as const;
 

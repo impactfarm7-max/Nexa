@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useLayoutEffect, useRef } from "react";
 import {
-  Wallet, Search, Plus, X, Printer,
+  Wallet, Plus, X, Printer,
   Loader2, Filter, Download, Tag, Percent, Hash,
   ArrowDownCircle, CheckCircle2,
   Receipt, Users, AlertTriangle, Eye, MessageCircle, ArrowLeft, Clock, TrendingUp,
@@ -20,13 +20,17 @@ import { AmountInWords } from "@/app/components/AmountInWords";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/financeI18n";
 import { ACTION_TONE } from "@/app/utils/action-tones";
+import { useActionFeedback } from "@/app/components/ActionFeedback";
+import { ActionConfirmModal } from "@/app/components/centre/ActionConfirmModal";
 import { deactivateExpiredCoupons, isCouponExpired } from "@/app/utils/coupon.client";
 import {
   CenterPageLayout,
   CenterPageHeader,
   OutlineHeaderButton,
   StatSep,
-  ToolbarSelect,
+  ToolbarSearch,
+  ToolbarFilterMenu,
+  CenterSelect,
   CenterPageBody,
   CenterDataTable,
   CenterTableRow,
@@ -34,6 +38,7 @@ import {
   TableBtnModify,
   TableActions,
   EmptyState,
+  LoadErrorState,
   BLUE,
   ORANGE,
   SURFACE,
@@ -392,6 +397,7 @@ function FinanceKpiCard({
 
 export default function CenterFinancePage() {
   const { t, locale } = useI18n();
+  const feedback = useActionFeedback();
   const paymentMethodLabel = (method: string) => {
     if (method === "Espèces") return t("centre", "collectionsMethodCash");
     if (method === "Virement") return t("centre", "collectionsMethodTransfer");
@@ -409,6 +415,7 @@ export default function CenterFinancePage() {
   const [centerId, setCenterId] = useState("");
   const [shellLoading, setShellLoading] = useState(true);
   const [dataLoading, setDataLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<"ledger" | "overdue" | "journal" | "coupons">("ledger");
   const [records, setRecords] = useState<FinanceRow[]>([]);
@@ -433,6 +440,8 @@ export default function CenterFinancePage() {
   const [payInstallments, setPayInstallments] = useState<Installment[]>([]);
   const [payError, setPayError] = useState("");
   const [paySaving, setPaySaving] = useState(false);
+  const [confirmPay, setConfirmPay] = useState(false);
+  const [confirmCoupon, setConfirmCoupon] = useState<null | { id: string; active: boolean; code: string }>(null);
   const [printFormat, setPrintFormat] = useState<PrintFormat>("a4");
   const [paymentSuccess, setPaymentSuccess] = useState<PaymentSuccess | null>(null);
 
@@ -463,6 +472,7 @@ export default function CenterFinancePage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       setDataLoading(true);
+      setLoadError(null);
       try {
         const data = await fetchCenterApi<{
           records: FinanceRow[];
@@ -477,6 +487,9 @@ export default function CenterFinancePage() {
           label: locale === "en" && signature.label === "Signataire" ? "Signatory" : signature.label,
         })));
         setRecords(data.records || []);
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : t("common", "actionLoadError"));
+        setRecords([]);
       } finally {
         setDataLoading(false);
       }
@@ -498,6 +511,7 @@ export default function CenterFinancePage() {
       if (hadCache) return;
 
       setDataLoading(true);
+      setLoadError(null);
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -516,6 +530,9 @@ export default function CenterFinancePage() {
           label: locale === "en" && signature.label === "Signataire" ? "Signatory" : signature.label,
         })));
         setRecords(data.records || []);
+      } catch (e) {
+        setLoadError(e instanceof Error ? e.message : t("common", "actionLoadError"));
+        setRecords([]);
       } finally {
         setDataLoading(false);
       }
@@ -589,25 +606,32 @@ export default function CenterFinancePage() {
   const createCoupon = async () => {
     if (!couponForm.code.trim() || !couponForm.value.trim()) { setCouponError(t("centre", "financeCouponRequired")); return; }
     setCouponSaving(true); setCouponError("");
-    const { data: { session } } = await supabase.auth.getSession();
-    const { error } = await supabase.from("coupons").insert({
-      center_id: centerId,
-      code: couponForm.code.trim().toUpperCase(),
-      type: couponForm.type,
-      value: Number(couponForm.value),
-      max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : null,
-      expires_at: couponForm.expires_at ? new Date(couponForm.expires_at).toISOString() : null,
-      is_active: true,
-      created_by: session?.user?.id || null,
-    });
-    if (error) setCouponError(t("centre", "financeCouponCreateError"));
-    else { setCouponForm({ code: "", type: "fixed", value: "", max_uses: "", expires_at: "" }); await loadCoupons(); }
+    const result = await feedback.run(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      const { error } = await supabase.from("coupons").insert({
+        center_id: centerId,
+        code: couponForm.code.trim().toUpperCase(),
+        type: couponForm.type,
+        value: Number(couponForm.value),
+        max_uses: couponForm.max_uses ? Number(couponForm.max_uses) : null,
+        expires_at: couponForm.expires_at ? new Date(couponForm.expires_at).toISOString() : null,
+        is_active: true,
+        created_by: session?.user?.id || null,
+      });
+      if (error) throw new Error(error.message);
+      await loadCoupons();
+    }, { successTitle: t("centre", "financeCouponCreatedOk") });
     setCouponSaving(false);
+    if (!result.ok) { setCouponError(t("centre", "financeCouponCreateError")); return; }
+    setCouponForm({ code: "", type: "fixed", value: "", max_uses: "", expires_at: "" });
   };
 
   const toggleCoupon = async (id: string, active: boolean) => {
-    await supabase.from("coupons").update({ is_active: !active }).eq("id", id);
-    await loadCoupons();
+    await feedback.run(async () => {
+      const { error } = await supabase.from("coupons").update({ is_active: !active }).eq("id", id);
+      if (error) throw new Error(error.message);
+      await loadCoupons();
+    }, { successTitle: t("centre", "financeCouponUpdatedOk") });
   };
 
   // ============================================================
@@ -649,38 +673,38 @@ export default function CenterFinancePage() {
     if (num > payModal.reste_a_payer) { setPayError(t("centre", "financeExceedsBalance", { balance: `${fmtFCFA(payModal.reste_a_payer)} F` })); return; }
 
     setPaySaving(true); setPayError("");
-    const { data, error } = await supabase.rpc("record_payment", {
-      p_enrollment_id: payModal.enrollment_id,
-      p_center_id: centerId,
-      p_amount: num,
-      p_method: payMethod,
-      p_installment_id: payInstallmentId || null,
-      p_notes: payNotes.trim() || null,
-    });
-
-    if (error) { setPayError(t("centre", "financePaymentRecordError")); }
-    else {
+    const result = await feedback.run(async () => {
+      const { data, error } = await supabase.rpc("record_payment", {
+        p_enrollment_id: payModal.enrollment_id,
+        p_center_id: centerId,
+        p_amount: num,
+        p_method: payMethod,
+        p_installment_id: payInstallmentId || null,
+        p_notes: payNotes.trim() || null,
+      });
+      if (error) throw new Error(error.message);
       const paymentId = data as string;
       const { data: paymentRow } = await supabase
         .from("student_payments")
         .select("receipt_number, amount, payment_method, payment_date, notes, recorded_by")
         .eq("id", paymentId)
         .single();
-
-      const enrollmentId = payModal.enrollment_id;
-      const studentName = `${payModal.prenom} ${payModal.nom}`;
-      const resteApres = Math.max(0, payModal.reste_a_payer - num);
-      setPayModal(null);
-      await loadRecords(centerId);
-      setPaymentSuccess({
-        enrollmentId,
+      return {
+        enrollmentId: payModal.enrollment_id,
         amount: num,
         receiptNumber: paymentRow?.receipt_number || "—",
-        studentName,
-        resteApres,
-      });
-    }
+        studentName: `${payModal.prenom} ${payModal.nom}`,
+        resteApres: Math.max(0, payModal.reste_a_payer - num),
+      };
+    }, {
+      silentSuccess: true,
+      errorTitle: t("centre", "financePaymentRecordError"),
+    });
     setPaySaving(false);
+    if (!result.ok) { setPayError(t("centre", "financePaymentRecordError")); return; }
+    setPayModal(null);
+    await loadRecords(centerId);
+    setPaymentSuccess(result.data);
   };
 
   // ============================================================
@@ -825,15 +849,18 @@ export default function CenterFinancePage() {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
-        <select
+        <CenterSelect
+          size="sm"
+          align="end"
+          label={t("centre", "financePrint")}
           value={printFormat}
-          onChange={(e) => setPrintFormat(e.target.value as PrintFormat)}
-          className="h-8 px-2 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
-        >
-          {(Object.keys(PRINT_FORMATS) as PrintFormat[]).map((f) => (
-            <option key={f} value={f}>{PRINT_FORMATS[f].label}</option>
-          ))}
-        </select>
+          onChange={(v) => setPrintFormat(v as PrintFormat)}
+          options={(Object.keys(PRINT_FORMATS) as PrintFormat[]).map((f) => ({
+            value: f,
+            label: PRINT_FORMATS[f].label,
+          }))}
+          className="w-[7.5rem]"
+        />
         {onDownloadPdf && (
           <button
             type="button"
@@ -1086,37 +1113,36 @@ export default function CenterFinancePage() {
             <FinanceKpiCard label={t("centre", "summaryOpenReceivables")} value={`${fmtFCFA(totalImpayes)} F`} tone="red" />
             <FinanceKpiCard label={t("centre", "summaryRecovery")} value={`${tauxRecouvrement} %`} tone="blue" />
             <FinanceKpiCard label={t("centre", "financeOverdue")} value={String(lateCount)} tone={lateCount > 0 ? "red" : "blue"} />
-            <FinanceKpiCard label={locale === "en" ? t("centre", "summaryInvoicedRevenue") : "C.A."} value={`${fmtFCFA(totalCA)} F`} tone="blue" />
+            <FinanceKpiCard label={locale === "en" ? t("centre", "summaryInvoicedRevenue") : "C.A."} value={`${fmtFCFA(totalCA)} F`} tone="green" />
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <div className="relative w-full sm:w-44 shrink-0">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={t("centre", "financeSearch")}
-                className="w-full h-8 pl-8 pr-2.5 rounded-lg border border-black/[0.08] text-[12px] font-medium outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 placeholder:text-neutral-400"
-                style={{ backgroundColor: SURFACE }}
-              />
-            </div>
-            <ToolbarSelect
-              label={t("centre", "financeView")}
-              value={activeTab}
-              onChange={(v) => setActiveTab(v as typeof activeTab)}
-              minWidth="8.5rem"
-              options={[
-                { value: "ledger", label: t("centre", "financeLedger") },
-                { value: "overdue", label: `${t("centre", "financeUnpaid")} (${lateCount})` },
-                { value: "journal", label: t("centre", "collectionsJournalShort") },
-                { value: "coupons", label: t("centre", "discountCenterCoupons") },
+            <ToolbarSearch value={search} onChange={setSearch} placeholder={t("centre", "financeSearch")} />
+            <ToolbarFilterMenu
+              onReset={() => setActiveTab("ledger")}
+              sections={[
+                {
+                  id: "view",
+                  label: t("centre", "financeView"),
+                  value: activeTab,
+                  defaultValue: "ledger",
+                  options: [
+                    { value: "ledger", label: t("centre", "financeLedger") },
+                    { value: "overdue", label: `${t("centre", "financeUnpaid")} (${lateCount})` },
+                    { value: "journal", label: t("centre", "collectionsJournalShort") },
+                    { value: "coupons", label: t("centre", "discountCenterCoupons") },
+                  ],
+                  onChange: (v) => setActiveTab(v as typeof activeTab),
+                },
               ]}
             />
           </div>
         </div>
 
         {activeTab === "ledger" && (
-          filtered.length === 0 ? (
+          loadError ? (
+            <LoadErrorState message={loadError} />
+          ) : filtered.length === 0 ? (
             <EmptyState title={t("centre", "financeNoRecord")} hint={t("centre", "financeChangeSearch")} />
           ) : (
             <CenterDataTable
@@ -1142,13 +1168,15 @@ export default function CenterFinancePage() {
                       <p className="text-[12px] font-medium text-neutral-600 leading-snug truncate uppercase">{r.filiere_name}</p>
                     </td>
                     <td className="px-4 py-4 min-w-0 align-top">
-                      <span className={`text-[12px] font-semibold ${isLate || (!isPaid && r.reste_a_payer > 0) ? ACTION_TONE.negativeText : "text-neutral-500"}`}>
+                      <span className={isPaid ? ACTION_TONE.positivePill : isLate || r.reste_a_payer > 0 ? ACTION_TONE.negativePill : ACTION_TONE.warningPill}>
                         {statusLabel}
                       </span>
                     </td>
                     <td className="px-4 py-4 min-w-0 align-top">
-                      <p className="text-[12px] font-medium text-neutral-700 tabular-nums leading-relaxed">
-                        {fmtFCFA(r.tuition_paid)} / {fmtFCFA(r.tuition_fee)} F
+                      <p className="text-[12px] font-medium tabular-nums leading-relaxed">
+                        <span className={ACTION_TONE.positiveText}>{fmtFCFA(r.tuition_paid)}</span>
+                        <span className="text-neutral-400"> / </span>
+                        <span className="text-neutral-700">{fmtFCFA(r.tuition_fee)} F</span>
                       </p>
                       {r.reste_a_payer > 0 && (
                         <p className={`text-[11px] ${ACTION_TONE.negativeText} mt-1 tabular-nums`}>{t("centre", "summaryBalance")} {fmtFCFA(r.reste_a_payer)} F</p>
@@ -1157,8 +1185,8 @@ export default function CenterFinancePage() {
                     <td className="px-4 py-4 min-w-0 align-top">
                       {discount > 0 ? (
                         <div>
-                          <p className="text-[12px] font-semibold text-violet-700 tabular-nums">−{fmtFCFA(discount)} F</p>
-                          <p className="text-[10px] font-bold uppercase tracking-wide text-violet-500 mt-0.5 truncate">
+                          <p className={`text-[12px] font-semibold tabular-nums ${ACTION_TONE.negativeText}`}>−{fmtFCFA(discount)} F</p>
+                          <p className={`text-[10px] font-bold uppercase tracking-wide mt-0.5 truncate ${ACTION_TONE.negativeText}`}>
                             {couponCode || r.discount_reason || t("centre", "financeDiscount")}
                           </p>
                         </div>
@@ -1183,11 +1211,11 @@ export default function CenterFinancePage() {
             <div className="space-y-4">
               <p className="text-sm font-medium" style={{ color: BLUE }}>
                 <span className="inline-flex items-center gap-1">
-                  <span className="font-bold">{fmtFCFA(agingAmounts.current)} F</span>
+                  <span className={ACTION_TONE.positiveStat}>{fmtFCFA(agingAmounts.current)} F</span>
                   <span>{t("centre", "financeCurrent")}</span>
                 </span>
                 <StatSep />
-                <span className="font-semibold text-amber-700">{fmtFCFA(agingAmounts.d30)} F</span> {locale === "en" ? "30d" : "30j"}
+                <span className={ACTION_TONE.negativeStat}>{fmtFCFA(agingAmounts.d30)} F</span> {locale === "en" ? "30d" : "30j"}
                 <StatSep />
                 <span className={ACTION_TONE.negativeStat}>{fmtFCFA(agingAmounts.d60)} F</span> {locale === "en" ? "60d" : "60j"}
                 <StatSep />
@@ -1281,14 +1309,17 @@ export default function CenterFinancePage() {
                   </div>
                   <div className="shrink-0">
                     <label className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1">{t("centre", "collectionsMethod")}</label>
-                    <select
+                    <CenterSelect
+                      size="sm"
+                      label={t("centre", "collectionsMethod")}
                       value={methodFilter}
-                      onChange={(e) => setMethodFilter(e.target.value)}
-                      className="h-8 px-2 rounded-lg border border-black/[0.08] bg-white text-[12px] font-medium text-neutral-700 outline-none"
-                    >
-                      <option value="all">{t("centre", "financeAll")}</option>
-                      {METHOD_OPTIONS.map((m) => <option key={m} value={m}>{paymentMethodLabel(m)}</option>)}
-                    </select>
+                      onChange={setMethodFilter}
+                      options={[
+                        { value: "all", label: t("centre", "financeAll") },
+                        ...METHOD_OPTIONS.map((m) => ({ value: m, label: paymentMethodLabel(m) })),
+                      ]}
+                      className="min-w-[9rem]"
+                    />
                   </div>
                   <button
                     type="button"
@@ -1331,7 +1362,7 @@ export default function CenterFinancePage() {
                 <div className="flex gap-3 flex-wrap print:hidden">
                   <div className="bg-white p-3 rounded-xl border flex items-center gap-2">
                     <p className="text-[9px] font-black uppercase text-neutral-400">Total</p>
-                    <p className="text-sm font-black" style={{ color: BLUE }}>{fmtFCFA(journalTotal)} F</p>
+                    <p className={`text-sm font-black ${ACTION_TONE.positiveText}`}>{fmtFCFA(journalTotal)} F</p>
                   </div>
                   {journalByMethod.map(m => (
                     <div key={m.method} className="bg-white p-3 rounded-xl border flex items-center gap-2">
@@ -1368,7 +1399,7 @@ export default function CenterFinancePage() {
                           <p className="text-[10px] text-neutral-400 uppercase">{p.filiere_name}</p>
                         </td>
                         <td className="p-4 text-neutral-500 font-medium">{paymentMethodLabel(p.payment_method)}</td>
-                        <td className="p-4 text-right font-medium tabular-nums text-neutral-900 finance-col-amount">+{fmtFCFA(p.amount)} F</td>
+                        <td className={`p-4 text-right font-medium tabular-nums finance-col-amount ${ACTION_TONE.positiveText}`}>+{fmtFCFA(p.amount)} F</td>
                       </tr>
                     ))}
                   </tbody>
@@ -1390,10 +1421,14 @@ export default function CenterFinancePage() {
                   </div>
                   <div>
                     <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "programType")}</label>
-                    <select value={couponForm.type} onChange={e => setCouponForm(f => ({ ...f, type: e.target.value as "fixed" | "percentage" }))} className="w-full h-10 px-3 rounded-lg border bg-neutral-50 text-xs font-bold outline-none">
-                      <option value="fixed">{t("centre", "financeFixedAmount")}</option>
-                      <option value="percentage">{t("centre", "financePercentage")}</option>
-                    </select>
+                    <CenterSelect
+                      value={couponForm.type}
+                      onChange={(v) => setCouponForm((f) => ({ ...f, type: v as "fixed" | "percentage" }))}
+                      options={[
+                        { value: "fixed", label: t("centre", "financeFixedAmount") },
+                        { value: "percentage", label: t("centre", "financePercentage") },
+                      ]}
+                    />
                   </div>
                   <div>
                     <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "summaryValue")} *</label>
@@ -1451,7 +1486,7 @@ export default function CenterFinancePage() {
                         </div>
                       </div>
                       <button
-                        onClick={() => toggleCoupon(c.id, c.is_active)}
+                        onClick={() => setConfirmCoupon({ id: c.id, active: c.is_active, code: c.code })}
                         disabled={expired && !c.is_active}
                         className={c.is_active && !expired ? ACTION_TONE.negativeOutline : ACTION_TONE.positiveBtn}
                       >
@@ -1527,10 +1562,10 @@ export default function CenterFinancePage() {
               {payInstallments.length > 0 && (
                 <div>
                   <label className="text-xs text-neutral-500 block mb-1">{t("centre", "financeTargetInstallment")}</label>
-                  <select
+                  <CenterSelect
+                    label={t("centre", "financeTargetInstallment")}
                     value={payInstallmentId}
-                    onChange={(e) => {
-                      const id = e.target.value;
+                    onChange={(id) => {
                       setPayInstallmentId(id);
                       setPayError("");
                       if (!id) return;
@@ -1539,13 +1574,14 @@ export default function CenterFinancePage() {
                       const remaining = Math.max(0, inst.amount - (inst.paid_amount || 0));
                       if (remaining > 0) setPayAmount(String(remaining));
                     }}
-                    className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-700 outline-none focus:ring-2 focus:ring-neutral-900/10"
-                  >
-                    <option value="">{t("centre", "financeAutomaticAllocation")}</option>
-                    {payInstallments.map(inst => (
-                      <option key={inst.id} value={inst.id}>{localizeInstallmentLabel(inst.label, locale)}{locale === "en" ? ": " : " — "}{fmtFCFA(Math.max(0, inst.amount - (inst.paid_amount || 0)))} F {t("centre", "financeRemainingLower")} ({t("centre", "financeDueLower")} {fmtDateShort(inst.due_date, locale)})</option>
-                    ))}
-                  </select>
+                    options={[
+                      { value: "", label: t("centre", "financeAutomaticAllocation") },
+                      ...payInstallments.map((inst) => ({
+                        value: inst.id,
+                        label: `${localizeInstallmentLabel(inst.label, locale)}${locale === "en" ? ": " : " — "}${fmtFCFA(Math.max(0, inst.amount - (inst.paid_amount || 0)))} F ${t("centre", "financeRemainingLower")} (${t("centre", "financeDueLower")} ${fmtDateShort(inst.due_date, locale)})`,
+                      })),
+                    ]}
+                  />
                   <p className="text-[9px] text-neutral-400 mt-1">
                     {t("centre", "financeCascadeHelp")}
                   </p>
@@ -1567,21 +1603,61 @@ export default function CenterFinancePage() {
               </div>
               <div>
                 <label className="text-xs text-neutral-500 block mb-1">{t("centre", "financePaymentMethod")}</label>
-                <select value={payMethod} onChange={e => setPayMethod(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm text-neutral-700 outline-none focus:ring-2 focus:ring-neutral-900/10">
-                  {METHOD_OPTIONS.map(m => <option key={m} value={m}>{paymentMethodLabel(m)}</option>)}
-                </select>
+                <CenterSelect
+                  label={t("centre", "financePaymentMethod")}
+                  value={payMethod}
+                  onChange={setPayMethod}
+                  options={METHOD_OPTIONS.map((m) => ({ value: m, label: paymentMethodLabel(m) }))}
+                />
               </div>
               <div>
                 <label className="text-xs text-neutral-500 block mb-1">{t("centre", "financeOptionalNote")}</label>
                 <input value={payNotes} onChange={e => setPayNotes(e.target.value)} placeholder={t("centre", "financeNotePlaceholder")} className="w-full h-10 px-3 rounded-xl border border-neutral-200 bg-white text-sm font-medium outline-none focus:ring-2 focus:ring-neutral-900/10" />
               </div>
               {payError && <p className="text-sm text-neutral-800 bg-neutral-100 border border-neutral-200 rounded-lg px-3 py-2">{payError}</p>}
-              <button onClick={submitPayment} disabled={paySaving} className="w-full h-11 rounded-full text-sm font-medium text-white disabled:opacity-50 inline-flex items-center justify-center gap-2 hover:opacity-90 transition-opacity" style={{ backgroundColor: BLUE }}>
+              <button onClick={() => setConfirmPay(true)} disabled={paySaving} className="w-full h-11 rounded-full text-sm font-medium text-white disabled:opacity-50 inline-flex items-center justify-center gap-2 hover:opacity-90 transition-opacity" style={{ backgroundColor: BLUE }}>
                 {paySaving ? <Loader2 size={14} className="animate-spin" /> : <Wallet size={14} />} {t("centre", "financeValidateOperation")}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {confirmPay && payModal && (
+        <ActionConfirmModal
+          title={t("centre", "financeValidateOperation")}
+          message={t("centre", "financeCollectConfirm", {
+            amount: fmtFCFA(parseInt(payAmount, 10) || 0),
+            name: `${payModal.prenom} ${payModal.nom}`,
+          })}
+          confirmLabel={t("centre", "financeCollect")}
+          cancelLabel={t("centre", "financeBack")}
+          tone="positive"
+          busy={paySaving}
+          onCancel={() => { if (!paySaving) setConfirmPay(false); }}
+          onConfirm={() => {
+            setConfirmPay(false);
+            void submitPayment();
+          }}
+        />
+      )}
+      {confirmCoupon && (
+        <ActionConfirmModal
+          title={confirmCoupon.active ? t("centre", "financeCouponDisable") : t("centre", "financeEnableAgain")}
+          message={t("centre", "financeCouponToggleConfirm", {
+            action: confirmCoupon.active ? t("centre", "financeCouponDisable") : t("centre", "financeCouponEnable"),
+            code: confirmCoupon.code,
+          })}
+          confirmLabel={confirmCoupon.active ? t("centre", "financeCouponDisable") : t("centre", "financeEnableAgain")}
+          cancelLabel={t("centre", "financeBack")}
+          tone={confirmCoupon.active ? "danger" : "positive"}
+          onCancel={() => setConfirmCoupon(null)}
+          onConfirm={() => {
+            const c = confirmCoupon;
+            setConfirmCoupon(null);
+            void toggleCoupon(c.id, c.active);
+          }}
+        />
       )}
 
       {/* ══════════ POPUP PAIEMENT VALIDÉ ══════════ */}

@@ -1,18 +1,25 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type ElementType, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import {
-  Loader2, Plus, Trash2, X, AlertTriangle,
+  Loader2, Plus, Trash2, X, AlertTriangle, Eye, ArrowLeft,
   Download, Pencil, RotateCcw, CalendarDays, ClipboardList,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
-import { downloadPayslipPdf } from "@/app/utils/centerPdfExport";
-import { fetchDocumentExportConfig } from "@/app/utils/documentConfig";
+import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 import { AmountInWords } from "@/app/components/AmountInWords";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { ACTION_TONE } from "@/app/utils/action-tones";
+import { ActionConfirmModal } from "@/app/components/centre/ActionConfirmModal";
+import { useActionFeedback } from "@/app/components/ActionFeedback";
+import DocumentOfficialHeader from "@/app/components/centre/DocumentOfficialHeader";
+import { printElementClean } from "@/app/utils/print-clean";
+import { CenterSelect } from "@/app/centre/center-page-ui";
 
 const BLUE = "#11224E";
 const SURFACE = "#F7F7F6";
+const ORANGE = "#eb670e";
 
 type LineType = "prime" | "retenue" | "ajustement";
 
@@ -114,8 +121,18 @@ type Props = {
   centerId: string;
 };
 
+type ConfirmKind =
+  | { kind: "pay" }
+  | { kind: "validate" }
+  | { kind: "reopen" }
+  | { kind: "deleteLine"; id: string }
+  | { kind: "deletePay"; id: string }
+  | { kind: "applyBase" }
+  | { kind: "includePrime" };
+
 export default function StaffPayrollTab({ staff, centerId }: Props) {
   const { locale, t } = useI18n();
+  const feedback = useActionFeedback();
   const statusLabel = (status: string) => t("centre", status === "draft" ? "staffPayrollDraft" : status === "validated" ? "staffPayrollValidated" : status === "paid" ? "staffPayrollPaid" : status);
   const lineTitle = (type: LineType) => t("centre", type === "prime" ? "staffPayrollBonus" : type === "retenue" ? "staffPayrollDeduction" : "staffPayrollAdjustment");
   const lineHint = (type: LineType) => t("centre", type === "prime" ? "staffPayrollBonusHint" : type === "retenue" ? "staffPayrollDeductionHint" : "staffPayrollAdjustmentHint");
@@ -123,7 +140,6 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
   const [periodYm, setPeriodYm] = useState(currentYm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState("");
   const [missingTable, setMissingTable] = useState(false);
   const [journalYear, setJournalYear] = useState(() => String(new Date().getFullYear()));
@@ -148,6 +164,9 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
   const [payMethod, setPayMethod] = useState("especes");
   const [payDate, setPayDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [payNotes, setPayNotes] = useState("");
+  const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const applyBundle = (json: {
     period?: Period | null;
@@ -230,10 +249,10 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         setHistory(histJson.history || []);
         if (histJson.contract) setContract(histJson.contract);
       }
-      return true;
     } catch (e: unknown) {
-      setError(locale === "en" ? t("centre", "staffPayrollError") : (e instanceof Error ? e.message : t("centre", "staffPayrollError")));
-      return false;
+      const message = locale === "en" ? t("centre", "staffPayrollError") : (e instanceof Error ? e.message : t("centre", "staffPayrollError"));
+      setError(message);
+      throw e instanceof Error ? e : new Error(message);
     } finally {
       setSaving(false);
     }
@@ -261,27 +280,30 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
       setError(t("centre", "staffPayrollReasonRequired"));
       return;
     }
-    const ok = editingLineId
-      ? await post({
+    const result = await feedback.run(async () => {
+      if (editingLineId) {
+        await post({
           action: "update_line",
           line_id: editingLineId,
           type: lineType,
           amount: Number(lineAmount),
           reason: lineReason.trim(),
-        })
-      : await post({
+        });
+      } else {
+        await post({
           action: "add_line",
           period_id: period.id,
           type: lineType,
           amount: Number(lineAmount),
           reason: lineReason.trim(),
         });
-    if (ok) {
-      setLineOpen(false);
-      setEditingLineId(null);
-      setLineAmount("");
-      setLineReason("");
-    }
+      }
+    }, { successTitle: t("centre", "staffPayrollSavedOk") });
+    if (!result.ok) return;
+    setLineOpen(false);
+    setEditingLineId(null);
+    setLineAmount("");
+    setLineReason("");
   };
 
   const openNewPay = () => {
@@ -304,16 +326,18 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
 
   const submitPay = async () => {
     if (!period) return;
-    const ok = editingPayId
-      ? await post({
+    const result = await feedback.run(async () => {
+      if (editingPayId) {
+        await post({
           action: "update_payment",
           payment_id: editingPayId,
           amount: Number(payAmount),
           payment_method: payMethod,
           payment_date: payDate,
           notes: payNotes.trim() || undefined,
-        })
-      : await post({
+        });
+      } else {
+        await post({
           action: "record_payment",
           period_id: period.id,
           amount: Number(payAmount),
@@ -321,45 +345,58 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
           payment_date: payDate,
           notes: payNotes.trim() || undefined,
         });
-    if (ok) {
-      setPayOpen(false);
-      setEditingPayId(null);
-      setPayAmount("");
-      setPayNotes("");
-    }
+      }
+    }, { successTitle: t("centre", "staffPayrollPaidOk") });
+    if (!result.ok) return;
+    setPayOpen(false);
+    setEditingPayId(null);
+    setPayAmount("");
+    setPayNotes("");
   };
 
-  const handleDownload = async () => {
-    if (!totals || !period) return;
-    setDownloading(true);
-    try {
-      const config = await fetchDocumentExportConfig(supabase, centerId).catch(() => undefined);
-      await downloadPayslipPdf({
-        locale,
-        staffName: `${staff.prenom} ${staff.nom}`,
-        jobTitle: staff.job_title,
-        periodYm,
-        periodLabel: periodLabel(periodYm, locale),
-        statusLabel: statusLabel(period.status),
-        base: totals.base,
-        primes: totals.primes,
-        retenues: totals.retenues,
-        brut: totals.brut,
-        net: totals.net,
-        paid: totals.paid,
-        reste: totals.reste,
-        lines,
-        payments: payments.map((p) => ({
-          ...p,
-          payment_method: methodLabel(p.payment_method),
-        })),
-        config,
-      });
-    } catch (e: unknown) {
-      setError(locale === "en" ? t("centre", "staffPayrollDownloadError") : (e instanceof Error ? e.message : t("centre", "staffPayrollDownloadError")));
-    } finally {
-      setDownloading(false);
-    }
+  const runConfirmed = async () => {
+    if (!confirm || !period) return;
+    setConfirmBusy(true);
+    const pending = confirm;
+    setConfirm(null);
+    const successTitle =
+      pending.kind === "pay" ? t("centre", "staffPayrollPaidOk")
+      : pending.kind === "validate" ? t("centre", "staffPayrollValidatedOk")
+      : pending.kind === "reopen" ? t("centre", "staffPayrollReopenedOk")
+      : t("centre", "staffPayrollSavedOk");
+    await feedback.run(async () => {
+      if (pending.kind === "pay") {
+        const amount = Math.round(Number(totals?.reste || totals?.net || 0));
+        if (amount <= 0) {
+          await post({ action: "set_status", period_id: period.id, status: "paid" });
+        } else {
+          await post({
+            action: "record_payment",
+            period_id: period.id,
+            amount,
+            payment_method: "especes",
+            payment_date: new Date().toISOString().slice(0, 10),
+          });
+        }
+      } else if (pending.kind === "validate") {
+        await post({ action: "set_status", period_id: period.id, status: "validated" });
+      } else if (pending.kind === "reopen") {
+        await post({ action: "reopen", period_id: period.id });
+      } else if (pending.kind === "deleteLine") {
+        await post({ action: "delete_line", line_id: pending.id });
+      } else if (pending.kind === "deletePay") {
+        await post({ action: "delete_payment", payment_id: pending.id });
+      } else if (pending.kind === "applyBase") {
+        await post({
+          action: "update_base_snapshot",
+          period_id: period.id,
+          base_salary_snapshot: Number(baseEdit) || 0,
+        });
+      } else if (pending.kind === "includePrime") {
+        await post({ action: "include_contract_prime", period_id: period.id });
+      }
+    }, { successTitle });
+    setConfirmBusy(false);
   };
 
   const yearOptions = useMemo(() => {
@@ -404,16 +441,15 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         title={t("centre", "staffPayrollYearJournal")}
         description={t("centre", "staffPayrollYearJournalHelp")}
         actions={
-          <select
+          <CenterSelect
+            size="sm"
+            align="end"
+            label={t("centre", "staffPayrollYear")}
             value={journalYear}
-            onChange={(e) => setJournalYear(e.target.value)}
-            className="h-8 px-2.5 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 outline-none"
-            aria-label={t("centre", "staffPayrollYear")}
-          >
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+            onChange={setJournalYear}
+            options={yearOptions.map((y) => ({ value: y, label: y }))}
+            className="w-[6.5rem]"
+          />
         }
       >
         {yearJournal.length === 0 ? (
@@ -441,8 +477,14 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                         </p>
                         <p className="text-xs text-neutral-400 font-medium mt-0.5">{h.period_ym}</p>
                       </td>
-                      <td className="px-3.5 py-3 text-sm font-medium text-neutral-600">
-                        {statusLabel(h.status)}
+                      <td className="px-3.5 py-3">
+                        <span className={
+                          h.status === "paid" ? ACTION_TONE.positivePill
+                          : h.status === "validated" ? ACTION_TONE.warningPill
+                          : ACTION_TONE.neutralPill
+                        }>
+                          {statusLabel(h.status)}
+                        </span>
                       </td>
                       <td className="px-3.5 py-3">
                         <button
@@ -473,20 +515,22 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         description={locale === "en" ? "Enter bonuses, deductions, payments, and approval for the selected month." : "Saisie du mois sélectionné : primes, retenues, versements et validation."}
         actions={
           <>
-            <input
-              type="month"
-              value={periodYm}
-              onChange={(e) => setPeriodYm(e.target.value)}
-              className="h-8 px-2.5 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 outline-none"
-            />
+            <label className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border-2 bg-white text-xs font-bold" style={{ borderColor: ORANGE, color: BLUE }}>
+              {locale === "en" ? "Period" : "Période"} :
+              <input
+                type="month"
+                value={periodYm}
+                onChange={(e) => setPeriodYm(e.target.value)}
+                className="h-full bg-transparent text-xs font-semibold text-neutral-700 outline-none"
+              />
+            </label>
             <button
               type="button"
-              onClick={handleDownload}
-              disabled={!totals || downloading}
+              onClick={() => setPreviewOpen(true)}
+              disabled={!totals || !period}
               className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 inline-flex items-center gap-1.5 disabled:opacity-40"
             >
-              {downloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-              PDF
+              <Eye size={12} /> {t("centre", "staffPayrollPreview")}
             </button>
           </>
         }
@@ -498,7 +542,18 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             </p>
             <p className="text-sm text-neutral-500 font-medium mt-0.5">
               {staff.prenom} {staff.nom}
-              {period ? ` · ${statusLabel(period.status)}` : ""}
+              {period ? (
+                <>
+                  {" · "}
+                  <span className={
+                    period.status === "paid" ? ACTION_TONE.positiveText
+                    : period.status === "validated" ? ACTION_TONE.warningText
+                    : "text-neutral-600"
+                  }>
+                    {statusLabel(period.status)}
+                  </span>
+                </>
+              ) : null}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -507,7 +562,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                 type="button"
                 className="h-8 px-3 rounded-lg text-xs font-semibold text-white"
                 style={{ backgroundColor: BLUE }}
-                onClick={() => void post({ action: "set_status", period_id: period.id, status: "validated" })}
+                onClick={() => setConfirm({ kind: "validate" })}
               >
                 {locale === "en" ? "Approve" : "Valider"}
               </button>
@@ -516,7 +571,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
               <button
                 type="button"
                 className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-600 inline-flex items-center gap-1.5"
-                onClick={() => void post({ action: "reopen", period_id: period.id })}
+                onClick={() => setConfirm({ kind: "reopen" })}
               >
                 <RotateCcw size={12} /> {locale === "en" ? "Reopen" : "Rouvrir"}
               </button>
@@ -528,17 +583,17 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
           <div className="rounded-lg border border-black/[0.06] bg-white p-4">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Net payable" : "Net à payer"}</p>
-                <p className="text-2xl font-extrabold tracking-tight tabular-nums mt-1" style={{ color: BLUE }}>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "staffPayrollNetPay")}</p>
+                <p className={`text-2xl font-extrabold tracking-tight tabular-nums mt-1 ${totals.reste > 0 ? ACTION_TONE.negativeText : ACTION_TONE.positiveText}`}>
                   {fmt(totals.net, locale)}
                   <span className="text-sm text-neutral-400 ml-1.5 font-semibold">XAF</span>
                 </p>
               </div>
               <div className="text-right text-sm text-neutral-500 font-medium space-y-0.5">
-                <p>{locale === "en" ? "Paid" : "Versé"} <span className="text-neutral-800 tabular-nums font-semibold">{fmt(totals.paid, locale)}</span></p>
+                <p>{t("centre", "staffPayrollPaidLabel")} <span className={`${ACTION_TONE.positiveText} tabular-nums font-semibold`}>{fmt(totals.paid, locale)}</span></p>
                 <p>
-                  {locale === "en" ? "Balance" : "Reste"}{" "}
-                  <span className={`tabular-nums font-semibold ${totals.reste > 0 ? "text-neutral-900" : "text-neutral-500"}`}>
+                  {t("centre", "staffPayrollBalance")}{" "}
+                  <span className={`tabular-nums font-semibold ${totals.reste > 0 ? ACTION_TONE.negativeText : ACTION_TONE.positiveText}`}>
                     {totals.reste > 0 ? fmt(totals.reste, locale) : t("centre", "financeAccountSettled")}
                   </span>
                 </p>
@@ -547,32 +602,33 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             <div className="mt-4 pt-3 border-t border-black/[0.06] grid grid-cols-3 gap-3 text-sm">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Base</p>
-                <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>{fmt(totals.base, locale)}</p>
+                <p className={`tabular-nums font-semibold mt-0.5 ${ACTION_TONE.positiveText}`}>{fmt(totals.base, locale)}</p>
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Bonuses" : "Primes"}</p>
-                <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>+{fmt(totals.primes, locale)}</p>
+                <p className={`tabular-nums font-semibold mt-0.5 ${ACTION_TONE.positiveText}`}>+{fmt(totals.primes, locale)}</p>
               </div>
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Deductions" : "Retenues"}</p>
-                <p className="tabular-nums font-semibold mt-0.5" style={{ color: BLUE }}>−{fmt(totals.retenues, locale)}</p>
+                <p className={`tabular-nums font-semibold mt-0.5 ${ACTION_TONE.negativeText}`}>−{fmt(totals.retenues, locale)}</p>
               </div>
             </div>
           </div>
         )}
 
+        {period?.status !== "paid" && (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => openNewLine("prime")}
-            className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 inline-flex items-center gap-1.5 hover:bg-black/[0.03]"
+            className="h-9 px-3 rounded-lg border border-emerald-200 bg-white text-xs font-semibold text-emerald-700 inline-flex items-center gap-1.5 hover:bg-emerald-50"
           >
             <Plus size={14} /> {locale === "en" ? "Bonus" : "Prime"}
           </button>
           <button
             type="button"
             onClick={() => openNewLine("retenue")}
-            className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 inline-flex items-center gap-1.5 hover:bg-black/[0.03]"
+            className="h-9 px-3 rounded-lg border border-red-200 bg-white text-xs font-semibold text-red-600 inline-flex items-center gap-1.5 hover:bg-red-50"
           >
             <Plus size={14} /> {locale === "en" ? "Deduction" : "Retenue"}
           </button>
@@ -585,13 +641,14 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
           </button>
           <button
             type="button"
-            onClick={openNewPay}
-            className="h-9 px-3 rounded-lg text-xs font-semibold text-white inline-flex items-center gap-1.5"
-            style={{ backgroundColor: BLUE }}
+            onClick={() => setConfirm({ kind: "pay" })}
+            disabled={!period || !totals}
+            className={ACTION_TONE.positiveBtnMd}
           >
-            <Plus size={14} /> {locale === "en" ? "Payment" : "Versement"}
+            {t("centre", "staffPayrollPay")}
           </button>
         </div>
+        )}
 
         {error && (
           <p className="text-sm font-medium text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
@@ -620,15 +677,19 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                       <p className="text-sm font-semibold mt-0.5 truncate" style={{ color: BLUE }}>{l.reason}</p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-sm tabular-nums font-semibold mr-1" style={{ color: BLUE }}>
+                      <span className={`text-sm tabular-nums font-semibold mr-1 ${l.type === "retenue" ? ACTION_TONE.negativeText : ACTION_TONE.positiveText}`}>
                         {l.type === "retenue" ? "−" : "+"}{fmt(Number(l.amount), locale)}
                       </span>
+                      {period?.status !== "paid" && (
+                        <>
                       <button type="button" onClick={() => openEditLine(l)} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]" title={locale === "en" ? "Edit" : "Modifier"}>
                         <Pencil size={14} />
                       </button>
-                      <button type="button" disabled={saving} onClick={() => post({ action: "delete_line", line_id: l.id })} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]" title={locale === "en" ? "Delete" : "Supprimer"}>
+                      <button type="button" disabled={saving} onClick={() => setConfirm({ kind: "deleteLine", id: l.id })} className="p-1.5 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50" title={locale === "en" ? "Delete" : "Supprimer"}>
                         <Trash2 size={14} />
                       </button>
+                        </>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -639,10 +700,12 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Payments" : "Versements"}</p>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Payment history" : "Historique des versements"}</p>
+            {period?.status !== "paid" && (
             <button type="button" onClick={openNewPay} className="text-xs font-semibold" style={{ color: BLUE }}>
               {locale === "en" ? "Add" : "Ajouter"}
             </button>
+            )}
           </div>
           <div className="rounded-lg border border-black/[0.06] bg-white overflow-hidden">
             {payments.length === 0 ? (
@@ -661,22 +724,22 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <span className="text-sm tabular-nums font-semibold mr-1" style={{ color: BLUE }}>+{fmt(Number(p.amount), locale)}</span>
+                      <span className={`text-sm tabular-nums font-semibold mr-1 ${ACTION_TONE.positiveText}`}>+{fmt(Number(p.amount), locale)}</span>
+                      {period?.status !== "paid" && (
+                        <>
                       <button type="button" onClick={() => openEditPay(p)} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]">
                         <Pencil size={14} />
                       </button>
                       <button
                         type="button"
                         disabled={saving}
-                        onClick={() => {
-                          if (window.confirm(locale === "en" ? "Delete this payment?" : "Supprimer ce versement ?")) {
-                            void post({ action: "delete_payment", payment_id: p.id });
-                          }
-                        }}
-                        className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]"
+                        onClick={() => setConfirm({ kind: "deletePay", id: p.id })}
+                        className="p-1.5 rounded-md text-neutral-400 hover:text-red-600 hover:bg-red-50"
                       >
                         <Trash2 size={14} />
                       </button>
+                        </>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -685,70 +748,78 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
           </div>
         </div>
 
-        <div className="rounded-lg border border-black/[0.06] bg-white p-4 space-y-3">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Contract and monthly base" : "Contrat & base du mois"}</p>
-          <div className="flex flex-wrap gap-4 text-sm text-neutral-600 font-medium">
-            <span>{locale === "en" ? "Contract salary" : "Salaire contrat"} <strong className="font-semibold" style={{ color: BLUE }}>{fmt(contract.base_salary, locale)}</strong></span>
-            <span>{locale === "en" ? "Contract bonus" : "Prime contrat"} <strong className="font-semibold" style={{ color: BLUE }}>{contract.prime > 0 ? fmt(contract.prime, locale) : "—"}</strong></span>
-          </div>
-          {contract.prime > 0 && period ? (
-            <label className="flex items-center gap-2 text-sm font-medium text-neutral-700">
-              <input
-                type="checkbox"
-                checked={lines.some(
-                  (l) =>
-                    l.type === "prime" &&
-                    /prime\s*contrat/i.test(l.reason || "") &&
-                    Math.round(Number(l.amount) || 0) === Math.round(Number(contract.prime) || 0),
-                )}
-                disabled={
-                  saving ||
-                  lines.some(
+        <div className="rounded-lg border border-black/[0.06] bg-white p-4 space-y-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">
+              {locale === "en" ? "Contract (reference, fixed)" : "Contrat (référence, fixe)"}
+            </p>
+            <div className="rounded-lg bg-black/[0.02] border border-black/[0.05] px-3.5 py-2.5 flex flex-wrap gap-x-6 gap-y-1.5 text-sm text-neutral-600 font-medium">
+              <span>{locale === "en" ? "Base salary" : "Salaire de base"} <strong className={`font-semibold ${ACTION_TONE.positiveText}`}>{fmt(contract.base_salary, locale)}</strong></span>
+              <span>{locale === "en" ? "Fixed bonus" : "Prime fixe"} <strong className={`font-semibold ${ACTION_TONE.positiveText}`}>{contract.prime > 0 ? fmt(contract.prime, locale) : "—"}</strong></span>
+            </div>
+            {contract.prime > 0 && period ? (
+              <label className="flex items-start gap-2 text-sm font-medium text-neutral-700 mt-2">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={lines.some(
                     (l) =>
                       l.type === "prime" &&
                       /prime\s*contrat/i.test(l.reason || "") &&
                       Math.round(Number(l.amount) || 0) === Math.round(Number(contract.prime) || 0),
-                  )
-                }
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    void post({
-                      action: "include_contract_prime",
-                      period_id: period.id,
-                    });
+                  )}
+                  disabled={
+                    saving ||
+                    period.status === "paid" ||
+                    lines.some(
+                      (l) =>
+                        l.type === "prime" &&
+                        /prime\s*contrat/i.test(l.reason || "") &&
+                        Math.round(Number(l.amount) || 0) === Math.round(Number(contract.prime) || 0),
+                    )
                   }
-                }}
-              />
-              {locale === "en" ? "Include contract bonus" : "Inclure la prime contrat"} ({fmt(contract.prime, locale)})
-            </label>
-          ) : null}
+                  onChange={(e) => {
+                    if (e.target.checked) setConfirm({ kind: "includePrime" });
+                  }}
+                />
+                <span>
+                  {locale === "en" ? "Pay this contract bonus this month" : "Verser cette prime de contrat ce mois-ci"} ({fmt(contract.prime, locale)})
+                  <span className="block text-xs text-neutral-400 font-normal mt-0.5">
+                    {locale === "en" ? "Adds it once to \"Monthly entries\" below." : "L'ajoute une fois dans « Mouvements du mois » ci-dessous."}
+                  </span>
+                </span>
+              </label>
+            ) : null}
+          </div>
+
           {period && (
-            <div className="flex flex-wrap items-end gap-2">
-              <div className="flex-1 min-w-[140px]">
-                <label className="text-xs font-semibold text-neutral-500 block mb-1">{locale === "en" ? "Fixed base for this month" : "Base figée ce mois"}</label>
+            <div className="pt-3 border-t border-black/[0.06]">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-1">
+                {locale === "en" ? "Base salary paid this month" : "Salaire de base versé ce mois-ci"}
+              </p>
+              <p className="text-xs text-neutral-400 font-medium mb-2">
+                {locale === "en"
+                  ? "Same as the contract by default. Change it only if this month is different (mid-month hire, raise, unpaid leave…), then click Apply."
+                  : "Identique au contrat par défaut. Changez-le seulement si ce mois est différent (embauche en cours de mois, augmentation, congé sans solde…), puis cliquez sur Appliquer."}
+              </p>
+              <div className="flex flex-wrap gap-2">
                 <input
                   type="number"
                   value={baseEdit}
                   placeholder={String(Math.round(Number(contract.base_salary) || 0))}
                   onChange={(e) => setBaseEdit(e.target.value)}
-                  className="w-full h-10 px-3 rounded-lg border border-black/[0.08] text-sm font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
+                  className="flex-1 min-w-[140px] h-10 px-3 rounded-lg border border-black/[0.08] text-sm font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
                 />
-                <AmountInWords amount={baseEdit} />
+                <button
+                  type="button"
+                  disabled={saving || period.status === "paid" || Math.round(Number(baseEdit) || 0) === Math.round(Number(period.base_salary_snapshot) || 0)}
+                  onClick={() => setConfirm({ kind: "applyBase" })}
+                  className="h-10 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 hover:bg-black/[0.03] disabled:opacity-40 shrink-0"
+                >
+                  {locale === "en" ? "Apply" : "Appliquer"}
+                </button>
               </div>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() =>
-                  post({
-                    action: "update_base_snapshot",
-                    period_id: period.id,
-                    base_salary_snapshot: Number(baseEdit) || 0,
-                  })
-                }
-                className="h-10 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 hover:bg-black/[0.03]"
-              >
-                {locale === "en" ? "Apply" : "Appliquer"}
-              </button>
+              <AmountInWords amount={baseEdit} />
             </div>
           )}
           <p className="text-xs text-neutral-400 font-medium">
@@ -860,15 +931,14 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-semibold text-neutral-600 block mb-1.5">{locale === "en" ? "Method" : "Mode"}</label>
-                <select
+                <CenterSelect
                   value={payMethod}
-                  onChange={(e) => setPayMethod(e.target.value)}
-                  className="w-full h-11 px-3 rounded-lg border border-black/[0.08] text-sm font-semibold outline-none bg-white"
-                >
-                  {["especes", "mobile_money", "virement", "cheque", "autre"].map((k) => (
-                    <option key={k} value={k}>{methodLabel(k)}</option>
-                  ))}
-                </select>
+                  onChange={setPayMethod}
+                  options={["especes", "mobile_money", "virement", "cheque", "autre"].map((k) => ({
+                    value: k,
+                    label: methodLabel(k),
+                  }))}
+                />
               </div>
               <div>
                 <label className="text-sm font-semibold text-neutral-600 block mb-1.5">Date</label>
@@ -912,6 +982,208 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
           </div>
         </div>
       )}
+
+      {confirm && (
+        <ActionConfirmModal
+          title={
+            confirm.kind === "pay" ? t("centre", "staffPayrollPay")
+            : confirm.kind === "validate" ? (locale === "en" ? "Approve" : "Valider")
+            : confirm.kind === "reopen" ? (locale === "en" ? "Reopen" : "Rouvrir")
+            : confirm.kind === "deleteLine" || confirm.kind === "deletePay" ? (locale === "en" ? "Delete" : "Supprimer")
+            : confirm.kind === "includePrime" ? (locale === "en" ? "Bonus" : "Prime")
+            : (locale === "en" ? "Apply" : "Appliquer")
+          }
+          message={
+            confirm.kind === "pay" ? t("centre", "staffPayrollPayConfirm", {
+              amount: fmt(totals?.reste || totals?.net || 0, locale),
+              name: `${staff.prenom} ${staff.nom}`,
+            })
+            : confirm.kind === "validate" ? t("centre", "staffPayrollValidateConfirm")
+            : confirm.kind === "reopen" ? t("centre", "staffPayrollReopenConfirm")
+            : confirm.kind === "deleteLine" ? t("centre", "staffPayrollDeleteLineConfirm")
+            : confirm.kind === "deletePay" ? t("centre", "staffPayrollDeletePayConfirm")
+            : confirm.kind === "includePrime" ? t("centre", "staffPayrollIncludePrimeConfirm", { amount: fmt(contract.prime, locale) })
+            : t("centre", "staffPayrollApplyBaseConfirm")
+          }
+          confirmLabel={
+            confirm.kind === "pay" ? t("centre", "staffPayrollPay")
+            : confirm.kind === "validate" ? (locale === "en" ? "Approve" : "Valider")
+            : confirm.kind === "reopen" ? (locale === "en" ? "Reopen" : "Rouvrir")
+            : confirm.kind === "deleteLine" || confirm.kind === "deletePay" ? (locale === "en" ? "Delete" : "Supprimer")
+            : (locale === "en" ? "Confirm" : "Confirmer")
+          }
+          cancelLabel={locale === "en" ? "Cancel" : "Annuler"}
+          tone={confirm.kind === "pay" || confirm.kind === "validate" || confirm.kind === "includePrime" ? "positive" : confirm.kind === "reopen" ? "warning" : "danger"}
+          busy={confirmBusy}
+          onConfirm={() => void runConfirmed()}
+          onCancel={() => { if (!confirmBusy) setConfirm(null); }}
+        />
+      )}
+
+      {previewOpen && totals && period && (
+        <PayslipPreviewModal
+          staffName={`${staff.prenom} ${staff.nom}`}
+          jobTitle={staff.job_title}
+          centerId={centerId}
+          periodYm={periodYm}
+          periodLabelText={periodLabel(periodYm, locale)}
+          statusText={statusLabel(period.status)}
+          totals={totals}
+          lines={lines}
+          payments={payments}
+          lineTitle={lineTitle}
+          methodLabel={methodLabel}
+          locale={locale}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
     </div>
+  );
+}
+
+function PayslipPreviewModal({
+  staffName,
+  jobTitle,
+  centerId,
+  periodYm,
+  periodLabelText,
+  statusText,
+  totals,
+  lines,
+  payments,
+  lineTitle,
+  methodLabel,
+  locale,
+  onClose,
+}: {
+  staffName: string;
+  jobTitle?: string | null;
+  centerId: string;
+  periodYm: string;
+  periodLabelText: string;
+  statusText: string;
+  totals: Totals;
+  lines: PayrollLine[];
+  payments: PayrollPayment[];
+  lineTitle: (type: LineType) => string;
+  methodLabel: (method: string) => string;
+  locale: "fr" | "en";
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const en = locale === "en";
+  const [docConfig, setDocConfig] = useState<DocumentExportConfig | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const cfg = await fetchDocumentExportConfig(supabase, centerId).catch(() => null);
+      if (!cancelled) setDocConfig(cfg);
+    })();
+    return () => { cancelled = true; };
+  }, [centerId]);
+
+  const row = (label: string, value: string, tone?: "pos" | "neg") => (
+    <div className="flex items-center justify-between gap-3 py-2 border-b border-black/[0.05] last:border-0">
+      <span className="text-sm font-medium text-neutral-600">{label}</span>
+      <span className={`text-sm font-bold tabular-nums ${tone === "neg" ? ACTION_TONE.negativeText : tone === "pos" ? ACTION_TONE.positiveText : "text-neutral-900"}`}>
+        {value}
+      </span>
+    </div>
+  );
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex flex-col">
+      <div className="print:hidden shrink-0 flex items-center justify-between gap-3 px-4 py-3 bg-white border-b border-neutral-200 shadow-sm">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex items-center gap-2 h-9 px-3 rounded-xl border border-neutral-200 text-[11px] font-bold text-neutral-700 hover:bg-neutral-50"
+        >
+          <ArrowLeft size={15} /> {en ? "Back" : "Retour"}
+        </button>
+        <p className="text-[11px] font-black uppercase tracking-wider text-neutral-400 hidden sm:block">
+          {t("centre", "staffPayrollPreview")}
+        </p>
+        <button
+          type="button"
+          onClick={() => printElementClean("staff-payslip-preview")}
+          className="flex items-center gap-2 h-9 px-4 rounded-xl text-[11px] font-black uppercase text-white"
+          style={{ backgroundColor: ORANGE }}
+        >
+          <Download size={14} />
+          {en ? "Download" : "Télécharger"}
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto bg-black/75 p-4 md:p-8 print:bg-white print:p-0 print:overflow-visible">
+        <div
+          id="staff-payslip-preview"
+          className="bg-white max-w-[680px] w-full mx-auto p-4 sm:p-6 md:p-8 rounded-2xl shadow-2xl print:shadow-none print:rounded-none print:max-w-none"
+        >
+          <DocumentOfficialHeader
+            config={docConfig}
+            fallbackTitle={t("centre", "staffPayrollPayslipTitle")}
+            rightExtra={
+              <p>{en ? "Issue date" : "Date d'édition"} : {new Date().toLocaleDateString(en ? "en-GB" : "fr-FR")}</p>
+            }
+          />
+          <h2 className="text-xl sm:text-2xl font-black uppercase" style={{ color: BLUE }}>{staffName}</h2>
+          {jobTitle ? <p className="text-xs font-bold mt-1" style={{ color: docConfig?.accentColor || ORANGE }}>{jobTitle}</p> : null}
+          <p className="text-[11px] text-neutral-500 mt-1.5 font-medium capitalize">
+            {periodLabelText} ({periodYm}) · {statusText}
+          </p>
+
+          <div className="mt-6 rounded-xl border border-black/[0.06] px-4">
+            {row(en ? "Base salary" : "Salaire de base", `${fmt(totals.base, locale)} XAF`, "pos")}
+            {row(en ? "Bonuses / adjustments" : "Primes / ajustements", `+${fmt(totals.primes, locale)} XAF`, "pos")}
+            {row(en ? "Deductions" : "Retenues", `−${fmt(totals.retenues, locale)} XAF`, "neg")}
+            {row(en ? "Gross pay" : "Brut", `${fmt(totals.brut, locale)} XAF`, "pos")}
+            {row(t("centre", "staffPayrollNetPay"), `${fmt(totals.net, locale)} XAF`, totals.reste > 0 ? "neg" : "pos")}
+            {row(t("centre", "staffPayrollPaidLabel"), `${fmt(totals.paid, locale)} XAF`, "pos")}
+            {row(t("centre", "staffPayrollBalance"), totals.reste > 0 ? `${fmt(totals.reste, locale)} XAF` : t("centre", "financeAccountSettled"), totals.reste > 0 ? "neg" : "pos")}
+          </div>
+
+          {lines.length > 0 && (
+            <div className="mt-6">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">{en ? "Monthly entries" : "Mouvements du mois"}</p>
+              <div className="rounded-xl border border-black/[0.06] divide-y divide-black/[0.05]">
+                {lines.map((l) => (
+                  <div key={l.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs text-neutral-400 font-medium">{lineTitle(l.type)}</p>
+                      <p className="text-sm font-semibold truncate" style={{ color: BLUE }}>{l.reason}</p>
+                    </div>
+                    <span className={`text-sm font-bold tabular-nums shrink-0 ${l.type === "retenue" ? ACTION_TONE.negativeText : ACTION_TONE.positiveText}`}>
+                      {l.type === "retenue" ? "−" : "+"}{fmt(Number(l.amount), locale)} XAF
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {payments.length > 0 && (
+            <div className="mt-6">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">{en ? "Payment history" : "Historique des versements"}</p>
+              <div className="rounded-xl border border-black/[0.06] divide-y divide-black/[0.05]">
+                {payments.map((p) => (
+                  <div key={p.id} className="px-4 py-2.5 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: BLUE }}>
+                        {new Date(p.payment_date).toLocaleDateString(en ? "en-GB" : "fr-FR")}
+                      </p>
+                      <p className="text-xs text-neutral-400 font-medium">{methodLabel(p.payment_method)}{p.notes ? ` · ${p.notes}` : ""}</p>
+                    </div>
+                    <span className={`text-sm font-bold tabular-nums ${ACTION_TONE.positiveText}`}>+{fmt(Number(p.amount), locale)} XAF</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, Clock, BookOpen, Trash2, X, Loader2, AlertTriangle, Layers, Tag,
-  MapPin, CheckCircle2, PartyPopper, Share2, FileText, Download, Filter, ChevronDown, Check,
+  MapPin, CheckCircle2, PartyPopper, Share2, FileText, Download,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
@@ -18,18 +18,22 @@ import {
   CenterToolbar,
   StatSep,
   ToolbarSearch,
+  ToolbarFilterMenu,
   CenterDataTable,
   CenterTableRow,
   TableBtnPreview,
   TableBtnModify,
   TableActions,
   EmptyState,
+  LoadErrorState,
   OutlineHeaderButton,
   AgentIaComingSoonButton,
 } from "../center-page-ui";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { ACTION_TONE } from "@/app/utils/action-tones";
+import { ActionConfirmModal } from "@/app/components/centre/ActionConfirmModal";
+import { useActionFeedback } from "@/app/components/ActionFeedback";
 
 const fcfa = (n: number | null | undefined, locale: "fr" | "en" = "fr") => (Number(n) || 0).toLocaleString(locale === "fr" ? "fr-FR" : "en-GB") + " FCFA";
 
@@ -301,9 +305,13 @@ function openWhatsApp(text: string, phone?: string) {
 
 export default function CenterFilieresPage() {
   const { locale, t } = useI18n();
+  const feedback = useActionFeedback();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [programmes, setProgrammes] = useState<ProgrammeCard[]>([]);
+  const [confirmPublish, setConfirmPublish] = useState<ProgrammeCard | null>(null);
+  const [confirmPublishBusy, setConfirmPublishBusy] = useState(false);
   const [viewing, setViewing] = useState<ProgrammeCard | null>(null);
   const [deleting, setDeleting] = useState<ProgrammeCard | null>(null);
   const [publishSuccess, setPublishSuccess] = useState<ProgrammeCard | null>(null);
@@ -316,35 +324,42 @@ export default function CenterFilieresPage() {
 
   const loadProgrammes = useCallback(async () => {
     setLoading(true);
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setLoading(false); return; }
-    const { data: profile } = await supabase.from("profiles").select("center_id").eq("id", session.user.id).single();
-    if (!profile?.center_id) { setLoading(false); return; }
+    setLoadError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setLoading(false); return; }
+      const { data: profile } = await supabase.from("profiles").select("center_id").eq("id", session.user.id).single();
+      if (!profile?.center_id) { setLoading(false); return; }
 
-    const { data: rows, error } = await supabase
-      .from("filieres")
-      .select(`
-        id, name, description, type, mode, created_at, nb_niveaux, duree_valeur, duree_unite, status, default_tuition_fee, pricing_mode,
-        filiere_matieres(id, exam_disciplines(name)),
-        filiere_campus(campus_id, campuses(name))
-      `)
-      .eq("center_id", profile.center_id)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.error("filieres:", error.message);
-      // Fallback sans jointures si le schéma relationnel bloque
-      const { data: simple } = await supabase
+      const { data: rows, error } = await supabase
         .from("filieres")
-        .select(`id, name, description, type, mode, created_at, nb_niveaux, duree_valeur, duree_unite, status, default_tuition_fee, pricing_mode, filiere_matieres(id)`)
+        .select(`
+          id, name, description, type, mode, created_at, nb_niveaux, duree_valeur, duree_unite, status, default_tuition_fee, pricing_mode,
+          filiere_matieres(id, exam_disciplines(name)),
+          filiere_campus(campus_id, campuses(name))
+        `)
         .eq("center_id", profile.center_id)
         .order("created_at", { ascending: false });
-      setProgrammes((simple || []).map((f: any) => mapRow(f)));
-    } else {
-      setProgrammes((rows || []).map((f: any) => mapRow(f)));
+
+      if (error) {
+        console.error("filieres:", error.message);
+        const { data: simple, error: simpleErr } = await supabase
+          .from("filieres")
+          .select(`id, name, description, type, mode, created_at, nb_niveaux, duree_valeur, duree_unite, status, default_tuition_fee, pricing_mode, filiere_matieres(id)`)
+          .eq("center_id", profile.center_id)
+          .order("created_at", { ascending: false });
+        if (simpleErr) throw new Error(simpleErr.message);
+        setProgrammes((simple || []).map((f: any) => mapRow(f)));
+      } else {
+        setProgrammes((rows || []).map((f: any) => mapRow(f)));
+      }
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : t("common", "actionLoadError"));
+      setProgrammes([]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, []);
+  }, [t]);
 
   useEffect(() => { loadProgrammes(); }, [loadProgrammes]);
 
@@ -373,21 +388,30 @@ export default function CenterFilieresPage() {
     matieres: new Set(programmes.flatMap((p) => p.matiere_names)).size,
   }), [programmes]);
 
+  const applyPublish = async (prog: ProgrammeCard, next: "published" | "draft") => {
+    const previous = prog.status;
+    setProgrammes((prev) => prev.map((p) => (p.id === prog.id ? { ...p, status: next } : p)));
+    const result = await feedback.run(async () => {
+      const { error } = await supabase.from("filieres").update({ status: next }).eq("id", prog.id);
+      if (error) throw new Error(error.message);
+    }, {
+      silentSuccess: next === "published",
+      successTitle: t("centre", "programsUnpublishedOk"),
+    });
+    if (!result.ok) {
+      setProgrammes((prev) => prev.map((p) => (p.id === prog.id ? { ...p, status: previous } : p)));
+      return;
+    }
+    if (next === "published") setPublishSuccess({ ...prog, status: "published" });
+  };
+
   const togglePublish = async (prog: ProgrammeCard) => {
     const next = prog.status === "published" ? "draft" : "published";
     if (next === "published" && !prog.default_tuition_fee) {
-      if (!window.confirm(t("centre", "programsNoPriceConfirm"))) return;
-    }
-    setProgrammes((prev) => prev.map((p) => (p.id === prog.id ? { ...p, status: next } : p)));
-    const { error } = await supabase.from("filieres").update({ status: next }).eq("id", prog.id);
-    if (error) {
-      setProgrammes((prev) => prev.map((p) => (p.id === prog.id ? { ...p, status: prog.status } : p)));
-      alert(t("centre", "programsStatusError", { message: error.message }));
+      setConfirmPublish(prog);
       return;
     }
-    if (next === "published") {
-      setPublishSuccess({ ...prog, status: "published" });
-    }
+    await applyPublish(prog, next);
   };
 
   if (loading) return <CenterPageLoading className="bg-[#FFFBF7]" />;
@@ -470,17 +494,40 @@ export default function CenterFilieresPage() {
             }
           >
             <ToolbarSearch value={query} onChange={setQuery} placeholder={locale === "en" ? "Search…" : "Rechercher…"} />
-            <ProgrammesFilterMenu
-              statusFilter={statusFilter}
-              typeFilter={typeFilter}
-              onStatusChange={setStatusFilter}
-              onTypeChange={setTypeFilter}
+            <ToolbarFilterMenu
+              ariaLabel={t("centre", "programsFilterAria")}
               onReset={() => { setStatusFilter("all"); setTypeFilter("all"); }}
+              sections={[
+                {
+                  id: "status",
+                  label: t("centre", "programsStatus"),
+                  value: statusFilter,
+                  options: [
+                    { value: "all", label: t("centre", "programsAllStatuses") },
+                    { value: "published", label: t("centre", "programsPublished") },
+                    { value: "draft", label: t("centre", "programsDrafts") },
+                  ],
+                  onChange: (v) => setStatusFilter(v as StatusFilter),
+                },
+                {
+                  id: "type",
+                  label: t("centre", "programsType"),
+                  value: typeFilter,
+                  options: [
+                    { value: "all", label: t("centre", "programsAllTypes") },
+                    { value: "cursus", label: t("centre", "programsCourse") },
+                    { value: "formation_courte", label: t("centre", "programsShortCourses") },
+                  ],
+                  onChange: (v) => setTypeFilter(v as TypeFilter),
+                },
+              ]}
             />
           </CenterToolbar>
         )}
 
-        {programmes.length === 0 ? (
+        {loadError ? (
+          <LoadErrorState message={loadError} onRetry={() => void loadProgrammes()} />
+        ) : programmes.length === 0 ? (
           <EmptyState
             title={t("centre", "programsNone")}
             hint={t("centre", "programsNoneHelp")}
@@ -569,6 +616,24 @@ export default function CenterFilieresPage() {
           onClose={() => setPublishSuccess(null)}
         />
       )}
+      {confirmPublish && (
+        <ActionConfirmModal
+          title={t("centre", "programsDraftToggle")}
+          message={t("centre", "programsNoPriceConfirm")}
+          confirmLabel={t("centre", "programsPublishedStatus")}
+          cancelLabel={t("centre", "identityCancel")}
+          tone="warning"
+          busy={confirmPublishBusy}
+          onCancel={() => { if (!confirmPublishBusy) setConfirmPublish(null); }}
+          onConfirm={() => {
+            const prog = confirmPublish;
+            setConfirmPublishBusy(true);
+            setConfirmPublish(null);
+            setConfirmPublishBusy(false);
+            void applyPublish(prog, "published");
+          }}
+        />
+      )}
       {waPhoneOpen && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => !shareBusy && setWaPhoneOpen(false)}>
           <div
@@ -617,178 +682,6 @@ export default function CenterFilieresPage() {
         </div>
       )}
     </CenterPageLayout>
-  );
-}
-
-function ProgrammesFilterMenu({
-  statusFilter,
-  typeFilter,
-  onStatusChange,
-  onTypeChange,
-  onReset,
-}: {
-  statusFilter: StatusFilter;
-  typeFilter: TypeFilter;
-  onStatusChange: (v: StatusFilter) => void;
-  onTypeChange: (v: TypeFilter) => void;
-  onReset: () => void;
-}) {
-  const { t } = useI18n();
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const activeCount =
-    (statusFilter !== "all" ? 1 : 0) + (typeFilter !== "all" ? 1 : 0);
-
-  const summary =
-    activeCount === 0
-      ? t("centre", "programsFilters")
-      : [
-          statusFilter === "published" ? t("centre", "programsPublished") : statusFilter === "draft" ? t("centre", "programsDrafts") : null,
-          typeFilter === "cursus" ? t("centre", "programsCourse") : typeFilter === "formation_courte" ? t("centre", "programsShortCoursesAbbr") : null,
-        ]
-          .filter(Boolean)
-          .join(" · ");
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  const statusOpts: { value: StatusFilter; label: string }[] = [
-    { value: "all", label: t("centre", "programsAllStatuses") },
-    { value: "published", label: t("centre", "programsPublished") },
-    { value: "draft", label: t("centre", "programsDrafts") },
-  ];
-  const typeOpts: { value: TypeFilter; label: string }[] = [
-    { value: "all", label: t("centre", "programsAllTypes") },
-    { value: "cursus", label: t("centre", "programsCourse") },
-    { value: "formation_courte", label: t("centre", "programsShortCourses") },
-  ];
-
-  return (
-    <div ref={rootRef} className="relative shrink-0 z-30">
-      <button
-        type="button"
-        aria-label={t("centre", "programsFilterAria")}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        onClick={() => setOpen((v) => !v)}
-        className="h-9 px-3 rounded-lg border border-black/[0.08] text-[12px] font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 inline-flex items-center gap-1.5 transition-colors duration-200 max-w-[14rem] cursor-pointer"
-        style={{
-          backgroundColor: SURFACE,
-          color: activeCount > 0 ? BLUE : undefined,
-          borderColor: activeCount > 0 ? `${BLUE}55` : undefined,
-        }}
-      >
-        <Filter size={14} className="shrink-0 text-neutral-400" style={activeCount > 0 ? { color: BLUE } : undefined} />
-        <span className="truncate text-neutral-700" style={activeCount > 0 ? { color: BLUE } : undefined}>
-          {summary}
-        </span>
-        {activeCount > 0 && (
-          <span
-            className="shrink-0 h-4 min-w-[1rem] px-1 rounded-md text-[10px] font-bold text-white inline-flex items-center justify-center"
-            style={{ backgroundColor: BLUE }}
-          >
-            {activeCount}
-          </span>
-        )}
-        <ChevronDown size={14} className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <div
-          className="absolute right-0 top-full mt-1.5 z-50 w-[16.5rem] rounded-lg border border-black/[0.08] bg-white shadow-xl overflow-hidden"
-          role="menu"
-        >
-          <div className="px-3 pt-2.5 pb-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "programsStatus")}</p>
-          </div>
-          {statusOpts.map((o) => {
-            const active = statusFilter === o.value;
-            return (
-              <button
-                key={o.value}
-                type="button"
-                role="menuitemradio"
-                aria-checked={active}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onStatusChange(o.value);
-                  setOpen(false);
-                }}
-                className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-[12px] font-semibold hover:bg-black/[0.04] transition-colors cursor-pointer ${
-                  active ? "text-[#11224E] bg-blue-50/50" : "text-neutral-700"
-                }`}
-              >
-                <span className="w-4 shrink-0 flex justify-center">
-                  {active ? <Check size={13} strokeWidth={2.5} /> : null}
-                </span>
-                {o.label}
-              </button>
-            );
-          })}
-
-          <div className="mx-3 border-t border-black/[0.06]" />
-
-          <div className="px-3 pt-2.5 pb-1">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "programsType")}</p>
-          </div>
-          {typeOpts.map((o) => {
-            const active = typeFilter === o.value;
-            return (
-              <button
-                key={o.value}
-                type="button"
-                role="menuitemradio"
-                aria-checked={active}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTypeChange(o.value);
-                  setOpen(false);
-                }}
-                className={`w-full flex items-center gap-2 px-3 py-2.5 text-left text-[12px] font-semibold hover:bg-black/[0.04] transition-colors cursor-pointer ${
-                  active ? "text-[#11224E] bg-blue-50/50" : "text-neutral-700"
-                }`}
-              >
-                <span className="w-4 shrink-0 flex justify-center">
-                  {active ? <Check size={13} strokeWidth={2.5} /> : null}
-                </span>
-                {o.label}
-              </button>
-            );
-          })}
-
-          {activeCount > 0 && (
-            <>
-              <div className="mx-3 border-t border-black/[0.06]" />
-              <button
-                type="button"
-                role="menuitem"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onReset();
-                  setOpen(false);
-                }}
-                className="w-full px-3 py-2.5 text-left text-[12px] font-semibold text-neutral-500 hover:bg-black/[0.04] hover:text-neutral-800 transition-colors cursor-pointer"
-              >
-                {t("centre", "programsResetFilters")}
-              </button>
-            </>
-          )}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -1331,6 +1224,7 @@ function PublishSuccessModal({ prog, onClose }: { prog: ProgrammeCard; onClose: 
 
 function DeleteModal({ prog, onClose, onDeleted }: { prog: ProgrammeCard; onClose: () => void; onDeleted: () => void }) {
   const { t } = useI18n();
+  const feedback = useActionFeedback();
   const [checking, setChecking] = useState(true);
   const [enrollCount, setEnrollCount] = useState(0);
   const [deleting, setDeleting] = useState(false);
@@ -1346,9 +1240,12 @@ function DeleteModal({ prog, onClose, onDeleted }: { prog: ProgrammeCard; onClos
 
   const confirmDelete = async () => {
     setDeleting(true);
-    const { error } = await supabase.from("filieres").delete().eq("id", prog.id);
+    const result = await feedback.run(async () => {
+      const { error: delErr } = await supabase.from("filieres").delete().eq("id", prog.id);
+      if (delErr) throw new Error(delErr.message);
+    }, { successTitle: t("centre", "programsDelete") });
     setDeleting(false);
-    if (error) { setError(t("centre", "programsDeleteImpossible")); return; }
+    if (!result.ok) { setError(t("centre", "programsDeleteImpossible")); return; }
     onDeleted();
   };
 

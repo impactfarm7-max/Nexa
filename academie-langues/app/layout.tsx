@@ -6,6 +6,7 @@ import ClientLayout from "./components/ClientLayout";
 import AppBootGate from "./components/AppBootGate";
 import OfflineBanner from "./components/OfflineBanner";
 import { I18nProvider } from "./i18n/I18nProvider";
+import { ActionFeedbackProvider } from "./components/ActionFeedback";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -63,10 +64,12 @@ export default function RootLayout({
         {/* Le contenu de l'application passe au premier plan (z-10) */}
         <div className="relative z-10 flex flex-col min-h-screen">
           <I18nProvider>
-            <OfflineBanner />
-            <AppBootGate>
-              <ClientLayout>{children}</ClientLayout>
-            </AppBootGate>
+            <ActionFeedbackProvider>
+              <OfflineBanner />
+              <AppBootGate>
+                <ClientLayout>{children}</ClientLayout>
+              </AppBootGate>
+            </ActionFeedbackProvider>
           </I18nProvider>
         </div>
       </body>

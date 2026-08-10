@@ -11,6 +11,7 @@ import {
 } from "@/app/utils/student-access-cache";
 import { isCenterStaff } from "@/app/utils/student-routes";
 import StudentRouteSkeleton from "@/app/components/StudentRouteSkeleton";
+import { isViewAsStudentPreview } from "@/app/utils/view-as";
 
 function isStaffLiveRoomPath(pathname: string | null) {
   if (!pathname) return false;
@@ -28,6 +29,12 @@ export default function PaywallGuard({ children }: { children: React.ReactNode }
 
   useLayoutEffect(() => {
     if (isPasswordRecoveryBypass()) {
+      setIsAuthorized(true);
+      setChecking(false);
+      return;
+    }
+
+    if (isViewAsStudentPreview()) {
       setIsAuthorized(true);
       setChecking(false);
       return;
@@ -58,6 +65,14 @@ export default function PaywallGuard({ children }: { children: React.ReactNode }
     let cancelled = false;
 
     (async () => {
+      if (isViewAsStudentPreview()) {
+        if (!cancelled) {
+          setIsAuthorized(true);
+          setChecking(false);
+        }
+        return;
+      }
+
       // Staff sur salle live : autoriser sans paywall étudiant
       if (isStaffLiveRoomPath(pathname)) {
         const access = await loadStudentAccess();

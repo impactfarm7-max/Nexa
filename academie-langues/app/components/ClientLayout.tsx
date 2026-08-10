@@ -18,6 +18,7 @@ import { isPublicAppRoute } from "@/app/utils/public-routes";
 import { BRAND } from "@/app/utils/brand";
 import { initPwaInstallCapture } from "@/app/utils/pwa-install";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { isViewAsStudentPreview } from "@/app/utils/view-as";
 
 const EXAM_PASSAGE_KEY = "nexa_exam_passage";
 
@@ -85,6 +86,11 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
       if (isPublic || hideSidebar || inExamPassage) {
         setShowSidebar(false);
+        return;
+      }
+
+      if (isViewAsStudentPreview()) {
+        setShowSidebar(true);
         return;
       }
 

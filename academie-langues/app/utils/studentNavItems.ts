@@ -5,6 +5,7 @@ import {
   BookOpen,
   FileText,
   Library,
+  LibraryBig,
   Timer,
   Users,
   ShieldCheck,
@@ -62,6 +63,7 @@ function getPluriannualNavItems(centerId: string | null): StudentNavItem[] {
     { label: "Session Live", shortLabel: "Live", icon: Video, path: navPaths.coaching },
     { label: "Mes cours", shortLabel: "Cours", icon: BookOpen, path: "/tcf-canada/cours?tab=centre" },
     { label: "Mes Devoirs", shortLabel: "Devoirs", icon: FileText, path: navPaths.missions },
+    { label: "Bibliothèque publique", shortLabel: "Bibliothèque", labelKey: "navPublicLibrary", icon: LibraryBig, path: "/bibliotheque-publique" },
     { label: "Communauté", shortLabel: "Communauté", labelKey: "navCommunity", shortLabelKey: "navCommunity", icon: Users, path: navPaths.communaute },
   ];
 }

@@ -20,6 +20,8 @@ import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/util
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { centre as centreMessages } from "@/app/i18n/messages/centre";
 import { ACTION_TONE } from "@/app/utils/action-tones";
+import { ActionConfirmModal } from "@/app/components/centre/ActionConfirmModal";
+import { useActionFeedback } from "@/app/components/ActionFeedback";
 import { localizeCountryName } from "@/app/utils/countryI18n";
 import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
 import {
@@ -38,7 +40,7 @@ import {
   CenterToolbar,
   StatSep,
   ToolbarSearch,
-  ToolbarSelect,
+  ToolbarFilterMenu,
   CenterPageBody,
   CenterDataTable,
   CenterTableRow,
@@ -46,6 +48,7 @@ import {
   TableBtnModify,
   TableActions,
   EmptyState,
+  LoadErrorState,
   BLUE,
   ORANGE,
   PAGE_BG,
@@ -326,9 +329,11 @@ function openWhatsApp(text: string, phone?: string) {
 // PAGE PRINCIPALE
 // ════════════════════════════════════════════════════════════════════════════
 export default function CenterStaffPage() {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const en = locale === "en";
+  const feedback = useActionFeedback();
   const [staffList,       setStaffList]       = useState<StaffRow[]>([]);
+  const [loadError,       setLoadError]       = useState<string | null>(null);
   const [campuses,        setCampuses]        = useState<Campus[]>([]);
   const [centerId,        setCenterId]        = useState<string | null>(null);
   const [centerType,      setCenterType]      = useState<string>("generic");
@@ -347,6 +352,8 @@ export default function CenterStaffPage() {
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) setLoading(true);
+    setLoadError(null);
+    try {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); return; }
 
@@ -487,8 +494,13 @@ export default function CenterStaffPage() {
       })(),
       tcfSubjects: tcfMap[s.id] ?? [],
     })));
-    setLoading(false);
-  }, []);
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : t("common", "actionLoadError"));
+      setStaffList([]);
+    } finally {
+      if (!options?.silent) setLoading(false);
+    }
+  }, [en, t]);
 
   useLayoutEffect(() => {
     const bootstrap = peekCenterBootstrap();
@@ -520,17 +532,37 @@ export default function CenterStaffPage() {
     setShowPrint(false);
   };
 
+  const [confirmAction, setConfirmAction] = useState<null | { kind: "suspend" | "reactivate" | "delete"; id: string }>(null);
+  const [confirmBusy, setConfirmBusy] = useState(false);
+
   const toggleStatus = async (id: string, current: string) => {
     const next = current === "active" ? "paused" : "active";
-    await supabase.from("profiles").update({ center_status: next }).eq("id", id);
+    const { error } = await supabase.from("profiles").update({ center_status: next }).eq("id", id);
+    if (error) throw new Error(error.message);
     setStaffList((prev) => prev.map((s) => s.id === id ? { ...s, center_status: next } : s));
   };
 
   const deleteStaff = async (id: string) => {
-    if (!window.confirm(en ? "Permanently delete this staff member?" : "Supprimer définitivement ce membre du staff ?")) return;
-    await supabase.from("profiles").delete().eq("id", id);
+    const { error } = await supabase.from("profiles").delete().eq("id", id);
+    if (error) throw new Error(error.message);
     setStaffList((prev) => prev.filter((s) => s.id !== id));
     setSelectedStaffId(null);
+  };
+
+  const runConfirmAction = async () => {
+    if (!confirmAction) return;
+    const pending = confirmAction;
+    setConfirmBusy(true);
+    setConfirmAction(null);
+    setConfirmBusy(false);
+    const successKey =
+      pending.kind === "delete" ? "staffActionDeleteOk"
+      : pending.kind === "suspend" ? "staffActionSuspendOk"
+      : "staffActionReactivateOk";
+    await feedback.run(async () => {
+      if (pending.kind === "delete") await deleteStaff(pending.id);
+      else await toggleStatus(pending.id, pending.kind === "suspend" ? "active" : "paused");
+    }, { successTitle: t("centre", successKey) });
   };
 
   const selectedStaff = staffList.find((s) => s.id === selectedStaffId) ?? null;
@@ -573,6 +605,42 @@ export default function CenterStaffPage() {
       setShareBusy(false);
     }
   };
+
+  const confirmCopy = confirmAction
+    ? {
+        suspend: {
+          title: en ? "Suspend this account?" : "Suspendre ce compte ?",
+          message: en ? "This staff member will no longer be able to access the center." : "Ce collaborateur n'aura plus accès au centre.",
+          confirmLabel: en ? "Suspend" : "Suspendre",
+          tone: "danger" as const,
+        },
+        reactivate: {
+          title: en ? "Reactivate this account?" : "Réactiver ce compte ?",
+          message: en ? "Access to the center will be restored." : "L'accès au centre sera rétabli.",
+          confirmLabel: en ? "Reactivate" : "Réactiver",
+          tone: "positive" as const,
+        },
+        delete: {
+          title: en ? "Delete this staff member?" : "Supprimer ce collaborateur ?",
+          message: en ? "This action is permanent." : "Cette action est définitive.",
+          confirmLabel: en ? "Delete" : "Supprimer",
+          tone: "danger" as const,
+        },
+      }[confirmAction.kind]
+    : null;
+
+  const confirmModal = confirmCopy ? (
+    <ActionConfirmModal
+      title={confirmCopy.title}
+      message={confirmCopy.message}
+      confirmLabel={confirmCopy.confirmLabel}
+      cancelLabel={en ? "Cancel" : "Annuler"}
+      tone={confirmCopy.tone}
+      busy={confirmBusy}
+      onConfirm={() => void runConfirmAction()}
+      onCancel={() => { if (!confirmBusy) setConfirmAction(null); }}
+    />
+  ) : null;
 
   const openStaff = (id: string) => {
     setSelectedStaffId(id);
@@ -646,20 +714,27 @@ export default function CenterStaffPage() {
             }
           >
             <ToolbarSearch value={search} onChange={setSearch} placeholder={en ? "Search…" : "Rechercher…"} />
-            <ToolbarSelect
-              label={en ? "Filter by category" : "Filtrer par catégorie"}
-              value={filter}
-              onChange={(v) => setFilter(v as typeof filter)}
-              minWidth="9rem"
-              options={[
-                { value: "all", label: en ? "All categories" : "Toutes catégories" },
-                { value: "academique", label: en ? "Academic" : "Académique" },
-                { value: "administratif", label: en ? "Administrative" : "Administratif" },
+            <ToolbarFilterMenu
+              onReset={() => setFilter("all")}
+              sections={[
+                {
+                  id: "category",
+                  label: t("centre", "staffCategory"),
+                  value: filter,
+                  options: [
+                    { value: "all", label: en ? "All categories" : "Toutes catégories" },
+                    { value: "academique", label: t("centre", "staffAcademic") },
+                    { value: "administratif", label: t("centre", "staffAdministrative") },
+                  ],
+                  onChange: (v) => setFilter(v as typeof filter),
+                },
               ]}
             />
           </CenterToolbar>
 
-          {listStaff.length === 0 ? (
+          {loadError ? (
+            <LoadErrorState message={loadError} onRetry={() => void load()} />
+          ) : listStaff.length === 0 ? (
             <EmptyState title={en ? "No staff member found" : "Aucun collaborateur trouvé"} hint={en ? "Change your search or filters." : "Modifiez la recherche ou les filtres."} />
           ) : (
             <CenterDataTable columns={[en ? "Name" : "Nom", en ? "Type" : "Type", en ? "Status" : "Statut", en ? "Role" : "Rôle", en ? "Actions" : "Actions"]}>
@@ -677,7 +752,7 @@ export default function CenterStaffPage() {
                       {isAcademic ? (en ? "Academic" : "Académique") : (en ? "Administrative" : "Administratif")}
                     </td>
                     <td className="px-4 py-3.5 whitespace-nowrap">
-                      <span className={`text-[13px] font-semibold ${s.center_status === "active" ? ACTION_TONE.positiveText : ACTION_TONE.negativeText}`}>
+                      <span className={s.center_status === "active" ? ACTION_TONE.positivePill : ACTION_TONE.negativePill}>
                         {s.center_status === "active" ? (en ? "Active" : "Actif") : (en ? "Suspended" : "Suspendu")}
                       </span>
                     </td>
@@ -695,6 +770,7 @@ export default function CenterStaffPage() {
           )}
         </CenterPageBody>
 
+        {confirmModal}
         {showCreate && (
           <CreateStaffModal
             centerId={centerId!}
@@ -894,6 +970,7 @@ export default function CenterStaffPage() {
                 />
               )}
 
+              {activeTab === "rh" && (
               <div className="mt-6 pt-4 border-t border-black/[0.06] flex flex-wrap gap-2 justify-end">
                 {!rhEditing && (
                   <button
@@ -909,12 +986,16 @@ export default function CenterStaffPage() {
                 )}
                 <button
                   type="button"
-                  onClick={() => void toggleStatus(selectedStaff.id, selectedStaff.center_status)}
-                  className={selectedStaff.center_status === "active" ? ACTION_TONE.negativeOutlineMd : ACTION_TONE.positiveBtnMd}
+                  onClick={() => setConfirmAction({
+                    kind: selectedStaff.center_status === "active" ? "suspend" : "reactivate",
+                    id: selectedStaff.id,
+                  })}
+                  className={selectedStaff.center_status === "active" ? ACTION_TONE.negativeGhostMd : ACTION_TONE.positiveGhostMd}
                 >
                   {selectedStaff.center_status === "active" ? (en ? "Suspend" : "Suspendre") : (en ? "Reactivate" : "Réactiver")}
                 </button>
               </div>
+              )}
             </div>
           </div>
         )}
@@ -931,6 +1012,7 @@ export default function CenterStaffPage() {
         />
       )}
 
+      {confirmModal}
       {showPrint && selectedStaff && centerId && (
         <StaffPrintModal
           staff={selectedStaff}
@@ -1278,8 +1360,9 @@ function StaffRHTab({
   onUpdate: () => void;
   onExport?: () => void;
 }) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const en = locale === "en";
+  const feedback = useActionFeedback();
   const staffCountryRef = AFRICA_54.find((country) => country.name === staff.country || country.dial === staff.country_code);
   const staffCountryLabel = staff.country
     ? localizeCountryName(staffCountryRef?.code || "", staff.country, locale)
@@ -1454,17 +1537,15 @@ function StaffRHTab({
       birth_date:   form.birth_date     || null,
     };
 
-    // Tentative avec les champs optionnels, fallback sans si erreur
-    const { error } = await supabase.from("profiles").update({ ...baseUpdate, ...optionalUpdate }).eq("id", staff.id);
-    if (error) {
-      const { error: fallbackErr } = await supabase.from("profiles").update(baseUpdate).eq("id", staff.id);
-      if (fallbackErr) {
-        alert(en ? "Unable to save the changes." : `Erreur lors de la sauvegarde : ${fallbackErr.message}`);
-        setSaving(false);
-        return;
+    const result = await feedback.run(async () => {
+      const { error } = await supabase.from("profiles").update({ ...baseUpdate, ...optionalUpdate }).eq("id", staff.id);
+      if (error) {
+        const { error: fallbackErr } = await supabase.from("profiles").update(baseUpdate).eq("id", staff.id);
+        if (fallbackErr) throw new Error(fallbackErr.message);
       }
-    }
+    }, { successTitle: t("centre", "staffActionSaveOk") });
     setSaving(false);
+    if (!result.ok) return;
     onEditingChange(false);
     onUpdate();
   };
@@ -1823,8 +1904,9 @@ function StaffAccessTab({
   onUpdate: () => void;
   onAccessSaved: (staffId: string, next: { permissions: string[]; campusIds: string[]; campusNames: string[] }) => void;
 }) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const en = locale === "en";
+  const feedback = useActionFeedback();
   const isManager = staff.role === "campus_manager";
   const [editing,     setEditing]     = useState(false);
   const [selCampuses, setSelCampuses] = useState<string[]>(staff.campusIds);
@@ -1850,7 +1932,7 @@ function StaffAccessTab({
   const handleSave = async () => {
     setSaving(true);
     setSaveError(null);
-    try {
+    const result = await feedback.run(async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error(en ? "Session expired." : "Session expirée.");
 
@@ -1876,22 +1958,23 @@ function StaffAccessTab({
         ? json.campus_ids.map(String)
         : selCampuses;
       const campusNameById = Object.fromEntries(campuses.map((c) => [c.id, c.name]));
-      const nextCampusNames = nextCampusIds.map((id: string) => campusNameById[id] ?? "—");
-
-      onAccessSaved(staff.id, {
-        permissions: nextPerms,
-        campusIds: nextCampusIds,
-        campusNames: nextCampusNames,
-      });
-      setSelPerms(nextPerms);
-      setSelCampuses(nextCampusIds);
-      setEditing(false);
-      onUpdate();
-    } catch (e: any) {
-      setSaveError(en ? "Error while saving." : (e.message || "Erreur lors de la sauvegarde."));
-    } finally {
-      setSaving(false);
-    }
+      return {
+        nextPerms,
+        nextCampusIds,
+        nextCampusNames: nextCampusIds.map((id: string) => campusNameById[id] ?? "—"),
+      };
+    }, { successTitle: t("centre", "staffActionSaveOk") });
+    setSaving(false);
+    if (!result.ok) return;
+    onAccessSaved(staff.id, {
+      permissions: result.data.nextPerms,
+      campusIds: result.data.nextCampusIds,
+      campusNames: result.data.nextCampusNames,
+    });
+    setSelPerms(result.data.nextPerms);
+    setSelCampuses(result.data.nextCampusIds);
+    setEditing(false);
+    onUpdate();
   };
 
   const handleCancel = () => {

@@ -24,6 +24,7 @@ import { isPluriannualCenter } from "@/app/data/center-types";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { localizeCountryName } from "@/app/utils/countryI18n";
 import { fetchUsableCoupons, type CouponListItem } from "@/app/utils/coupon.client";
+import { CenterSelect } from "@/app/centre/center-page-ui";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -486,12 +487,18 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={FIELD_LABEL}>{t("centre", "createStudentGender")}</label>
-                  <select value={genre} onChange={(e) => setGenre(e.target.value)} className={FIELD_INPUT}>
-                    <option value="">{t("centre", "identityChoose")}</option>
-                    <option value="Homme">{t("centre", "studentsBoyMan")}</option>
-                    <option value="Femme">{t("centre", "studentsGirlWoman")}</option>
-                    <option value="Autre">{t("centre", "studentsOther")}</option>
-                  </select>
+                  <CenterSelect
+                    size="lg"
+                    value={genre}
+                    onChange={setGenre}
+                    placeholder={t("centre", "identityChoose")}
+                    options={[
+                      { value: "", label: t("centre", "identityChoose") },
+                      { value: "Homme", label: t("centre", "studentsBoyMan") },
+                      { value: "Femme", label: t("centre", "studentsGirlWoman") },
+                      { value: "Autre", label: t("centre", "studentsOther") },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className={FIELD_LABEL}>{t("centre", "createStudentBirthDate")}</label>
@@ -508,23 +515,34 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             <div>
               <label className={FIELD_LABEL_INLINE}><Globe size={14} /> {t("centre", "identityCountry")}</label>
-              <select value={countryCode} onChange={(e) => handleCountryChange(e.target.value)} className={FIELD_INPUT}>
-                <option value="">{t("centre", "createStudentSelectCountry")}</option>
-                {AFRICA_54.map((c) => (
-                  <option key={c.code} value={c.code}>{c.flag} {localizeCountryName(c.code, c.name, locale)} ({c.dial})</option>
-                ))}
-              </select>
+              <CenterSelect
+                size="lg"
+                value={countryCode}
+                onChange={handleCountryChange}
+                placeholder={t("centre", "createStudentSelectCountry")}
+                options={[
+                  { value: "", label: t("centre", "createStudentSelectCountry") },
+                  ...AFRICA_54.map((c) => ({
+                    value: c.code,
+                    label: `${c.flag} ${localizeCountryName(c.code, c.name, locale)} (${c.dial})`,
+                  })),
+                ]}
+              />
             </div>
 
             {regions.length > 0 && (
               <div>
                 <label className={FIELD_LABEL_INLINE}><MapPin size={14} /> {t("centre", "identityRegion")}</label>
-                <select value={region} onChange={(e) => setRegion(e.target.value)} className={FIELD_INPUT}>
-                  <option value="">{t("centre", "identitySelect")}</option>
-                  {regions.map((r) => (
-                    <option key={r} value={r}>{r}</option>
-                  ))}
-                </select>
+                <CenterSelect
+                  size="lg"
+                  value={region}
+                  onChange={setRegion}
+                  placeholder={t("centre", "identitySelect")}
+                  options={[
+                    { value: "", label: t("centre", "identitySelect") },
+                    ...regions.map((r) => ({ value: r, label: r })),
+                  ]}
+                />
               </div>
             )}
 
@@ -548,22 +566,33 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                 </div>
                 <div>
                   <label className={FIELD_LABEL}>{t("centre", "identityRelationship")} <span className="font-normal text-neutral-400">{t("centre", "createStudentOptional")}</span></label>
-                  <select value={guardianRelation} onChange={(e) => setGuardianRelation(e.target.value)} className={FIELD_INPUT}>
-                    <option value="">{t("centre", "identitySelect")}</option>
-                    {["Père", "Mère", "Tuteur", "Oncle", "Tante", "Frère", "Sœur", "Autre"].map((r) => (
-                      <option key={r} value={r}>{relationLabel(r)}</option>
-                    ))}
-                  </select>
+                  <CenterSelect
+                    size="lg"
+                    value={guardianRelation}
+                    onChange={setGuardianRelation}
+                    placeholder={t("centre", "identitySelect")}
+                    options={[
+                      { value: "", label: t("centre", "identitySelect") },
+                      ...["Père", "Mère", "Tuteur", "Oncle", "Tante", "Frère", "Sœur", "Autre"].map((r) => ({
+                        value: r,
+                        label: relationLabel(r),
+                      })),
+                    ]}
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={FIELD_LABEL_INLINE}><Globe size={14} /> {t("centre", "identityGuardianCountry")}</label>
-                  <select value={guardianCountryCode} onChange={(e) => handleGuardianCountryChange(e.target.value)} className={FIELD_INPUT}>
-                    {AFRICA_54.map((c) => (
-                      <option key={c.code} value={c.code}>{c.flag} {localizeCountryName(c.code, c.name, locale)} ({c.dial})</option>
-                    ))}
-                  </select>
+                  <CenterSelect
+                    size="lg"
+                    value={guardianCountryCode}
+                    onChange={handleGuardianCountryChange}
+                    options={AFRICA_54.map((c) => ({
+                      value: c.code,
+                      label: `${c.flag} ${localizeCountryName(c.code, c.name, locale)} (${c.dial})`,
+                    }))}
+                  />
                 </div>
                 <div>
                   <label className={FIELD_LABEL_INLINE}><Phone size={14} /> {t("centre", "identityGuardianPhone")}</label>
@@ -588,10 +617,16 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
           <div className="space-y-3.5">
             <div>
               <label className={FIELD_LABEL}>{t("centre", "createStudentProgramRequired")}</label>
-              <select value={filiereId} onChange={(e) => setFiliereId(e.target.value)} className={FIELD_INPUT}>
-                <option value="">{t("centre", "createStudentChooseProgram")}</option>
-                {filieres.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
+              <CenterSelect
+                size="lg"
+                value={filiereId}
+                onChange={setFiliereId}
+                placeholder={t("centre", "createStudentChooseProgram")}
+                options={[
+                  { value: "", label: t("centre", "createStudentChooseProgram") },
+                  ...filieres.map((f) => ({ value: f.id, label: f.name })),
+                ]}
+              />
               {filieres.length === 0 && (
                 <p className="text-sm text-amber-600 font-medium mt-1.5">{t("centre", "createStudentNoPublishedProgram")}</p>
               )}
@@ -600,10 +635,19 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             {campuses.length > 1 && (
               <div>
                 <label className={FIELD_LABEL_INLINE}><MapPin size={14} /> {t("centre", "createStudentCampusRequired")}</label>
-                <select value={campusId} onChange={(e) => setCampusId(e.target.value)} className={FIELD_INPUT}>
-                  <option value="">{t("centre", "createStudentChooseCampus")}</option>
-                  {campuses.map((c) => <option key={c.id} value={c.id}>{c.name}{c.city ? `${locale === "en" ? ": " : " — "}${c.city}` : ""}</option>)}
-                </select>
+                <CenterSelect
+                  size="lg"
+                  value={campusId}
+                  onChange={setCampusId}
+                  placeholder={t("centre", "createStudentChooseCampus")}
+                  options={[
+                    { value: "", label: t("centre", "createStudentChooseCampus") },
+                    ...campuses.map((c) => ({
+                      value: c.id,
+                      label: `${c.name}${c.city ? `${locale === "en" ? ": " : " — "}${c.city}` : ""}`,
+                    })),
+                  ]}
+                />
               </div>
             )}
 
@@ -617,10 +661,16 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             {selectedFiliere?.type === "cursus" && niveaux.length > 0 && (
               <div>
                 <label className={FIELD_LABEL}>{t("centre", "createStudentLevelRequired")}</label>
-                <select value={niveauId} onChange={(e) => setNiveauId(e.target.value)} className={FIELD_INPUT}>
-                  <option value="">{t("centre", "createStudentChooseLevel")}</option>
-                  {niveaux.map((n) => <option key={n.id} value={n.id}>{t("centre", "identityLevel")} {n.annee}</option>)}
-                </select>
+                <CenterSelect
+                  size="lg"
+                  value={niveauId}
+                  onChange={setNiveauId}
+                  placeholder={t("centre", "createStudentChooseLevel")}
+                  options={[
+                    { value: "", label: t("centre", "createStudentChooseLevel") },
+                    ...niveaux.map((n) => ({ value: n.id, label: `${t("centre", "identityLevel")} ${n.annee}` })),
+                  ]}
+                />
               </div>
             )}
 
@@ -700,10 +750,16 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             {groupes.length > 1 && (
               <div>
                 <label className={FIELD_LABEL}>{t("centre", "createStudentClassroom")}</label>
-                <select value={groupeId} onChange={(e) => setGroupeId(e.target.value)} className={FIELD_INPUT}>
-                  <option value="">{t("centre", "createStudentChooseClassroom")}</option>
-                  {groupes.map((g) => <option key={g.id} value={g.id}>{g.nom}</option>)}
-                </select>
+                <CenterSelect
+                  size="lg"
+                  value={groupeId}
+                  onChange={setGroupeId}
+                  placeholder={t("centre", "createStudentChooseClassroom")}
+                  options={[
+                    { value: "", label: t("centre", "createStudentChooseClassroom") },
+                    ...groupes.map((g) => ({ value: g.id, label: g.nom })),
+                  ]}
+                />
               </div>
             )}
 
@@ -733,18 +789,21 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             {filiereId && (
               <div>
                 <label className="text-[10px] font-black uppercase text-neutral-400 block mb-1">{t("centre", "createStudentCouponCode")}</label>
-                <select
+                <CenterSelect
                   value={couponCode}
-                  onChange={(e) => setCouponCode(e.target.value)}
-                  className="w-full h-11 px-3 bg-neutral-50 rounded-xl border text-xs font-black uppercase outline-none focus:border-blue-500 transition-colors"
-                >
-                  <option value="">{availableCoupons.length ? t("centre", "createStudentNoCoupon") : t("centre", "financeNoCouponAvailable")}</option>
-                  {availableCoupons.map((c) => (
-                    <option key={c.id} value={c.code}>
-                      {c.code} ({c.type === "percentage" ? `${c.value}%` : `${c.value.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")} FCFA`})
-                    </option>
-                  ))}
-                </select>
+                  onChange={setCouponCode}
+                  placeholder={availableCoupons.length ? t("centre", "createStudentNoCoupon") : t("centre", "financeNoCouponAvailable")}
+                  options={[
+                    {
+                      value: "",
+                      label: availableCoupons.length ? t("centre", "createStudentNoCoupon") : t("centre", "financeNoCouponAvailable"),
+                    },
+                    ...availableCoupons.map((c) => ({
+                      value: c.code,
+                      label: `${c.code} (${c.type === "percentage" ? `${c.value}%` : `${c.value.toLocaleString(locale === "fr" ? "fr-FR" : "en-GB")} FCFA`})`,
+                    })),
+                  ]}
+                />
               </div>
             )}
 

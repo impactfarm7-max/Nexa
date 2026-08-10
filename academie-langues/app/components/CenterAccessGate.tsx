@@ -12,6 +12,7 @@ import { isCenterOperational } from "@/app/utils/center-trial";
 import CenterAppShell from "@/app/components/CenterAppShell";
 import CenterRouteSkeleton from "@/app/components/CenterRouteSkeleton";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { isViewAsStudentPreview } from "@/app/utils/view-as";
 
 const CENTER_UNAVAILABLE_PATH = "/centre/acces-indisponible";
 
@@ -89,6 +90,10 @@ export default function CenterAccessGate({
   }, [isTcfCenter, setLocaleOverride]);
 
   useLayoutEffect(() => {
+    if (isViewAsStudentPreview()) {
+      router.replace("/dashboard");
+      return;
+    }
     const cached = peekCenterBootstrap();
     if (cached && evaluateCenterAccess(cached.me, pathname).ok) {
       setIsTcfCenter(isTcfBootstrap(cached));
@@ -101,6 +106,10 @@ export default function CenterAccessGate({
     let cancelled = false;
 
     const verify = async () => {
+      if (isViewAsStudentPreview()) {
+        router.replace("/dashboard");
+        return;
+      }
       const bootstrap = await loadCenterBootstrap();
       if (!bootstrap) {
         router.replace("/login");

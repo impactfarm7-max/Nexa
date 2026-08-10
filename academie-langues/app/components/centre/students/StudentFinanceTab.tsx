@@ -13,6 +13,7 @@ import { useI18n } from "@/app/i18n/I18nProvider";
 import { ACTION_TONE } from "@/app/utils/action-tones";
 import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/financeI18n";
 import { fetchUsableCoupons, type CouponListItem } from "@/app/utils/coupon.client";
+import { CenterSelect } from "@/app/centre/center-page-ui";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -514,26 +515,32 @@ export default function StudentFinanceTab({
               <Tag size={14} style={{ color: ORANGE }} /> {t("centre", "studentFinanceApplyCouponTitle")}
             </p>
             <div className="flex flex-col sm:flex-row gap-2">
-              <select
+              <CenterSelect
+                className="flex-1"
                 value={couponCode}
-                onChange={(e) => {
-                  setCouponCode(e.target.value);
+                onChange={(v) => {
+                  setCouponCode(v);
                   setCouponError("");
                   setCouponSuccess("");
                 }}
-                className={`${FIELD_INPUT} flex-1 uppercase text-sm`}
-              >
-                <option value="">
-                  {availableCoupons.length
+                placeholder={
+                  availableCoupons.length
                     ? t("centre", "studentFinanceSelectCoupon")
-                    : t("centre", "financeNoCouponAvailable")}
-                </option>
-                {availableCoupons.map((c) => (
-                  <option key={c.id} value={c.code}>
-                    {c.code} ({c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value, locale)} FCFA`})
-                  </option>
-                ))}
-              </select>
+                    : t("centre", "financeNoCouponAvailable")
+                }
+                options={[
+                  {
+                    value: "",
+                    label: availableCoupons.length
+                      ? t("centre", "studentFinanceSelectCoupon")
+                      : t("centre", "financeNoCouponAvailable"),
+                  },
+                  ...availableCoupons.map((c) => ({
+                    value: c.code,
+                    label: `${c.code} (${c.type === "percentage" ? `${c.value}%` : `${fmtFCFA(c.value, locale)} FCFA`})`,
+                  })),
+                ]}
+              />
               <button
                 type="button"
                 onClick={submitCoupon}

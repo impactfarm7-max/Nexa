@@ -9,6 +9,7 @@ import {
   type CenterGuardStatus,
 } from "@/app/utils/student-access-cache";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { isViewAsStudentPreview } from "@/app/utils/view-as";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -27,6 +28,12 @@ export default function StudentCenterGuard({ children, overlayMode = false }: Pr
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    if (isViewAsStudentPreview()) {
+      setStatus("none");
+      setLoaded(true);
+      return;
+    }
+
     const initial = peekStudentAccess();
     if (initial) {
       const resolved = resolveCenterGuardStatus(initial.profile, initial.centerInfo);

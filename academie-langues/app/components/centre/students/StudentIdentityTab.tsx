@@ -19,6 +19,7 @@ import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documen
 import { downloadAttestationReussitePdf } from "@/app/utils/centerPdfExport";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { localizeCountryName } from "@/app/utils/countryI18n";
+import { CenterSelect } from "@/app/centre/center-page-ui";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -573,54 +574,55 @@ export default function StudentIdentityTab({
               <div className="space-y-3">
                 <div>
                   <label className={FIELD_LABEL}>{t("centre", "identityProgramTrack")}</label>
-                  <select
+                  <CenterSelect
+                    size="lg"
                     value={placeFiliereId}
-                    onChange={(e) => {
-                      setPlaceFiliereId(e.target.value);
+                    onChange={(v) => {
+                      setPlaceFiliereId(v);
                       setPlaceNiveauId("");
                       setPlaceGroupeId("");
                     }}
-                    className={FIELD_INPUT}
-                  >
-                    <option value="">{t("centre", "identityChoose")}</option>
-                    {filieres.map((f) => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
-                    ))}
-                  </select>
+                    placeholder={t("centre", "identityChoose")}
+                    options={[
+                      { value: "", label: t("centre", "identityChoose") },
+                      ...filieres.map((f) => ({ value: f.id, label: f.name })),
+                    ]}
+                  />
                 </div>
                 {(needsNiveau || niveaux.length > 0) && (
                   <div>
                     <label className={FIELD_LABEL}>{t("centre", "identityLevel")}</label>
-                    <select
+                    <CenterSelect
+                      size="lg"
                       value={placeNiveauId}
-                      onChange={(e) => {
-                        setPlaceNiveauId(e.target.value);
+                      onChange={(v) => {
+                        setPlaceNiveauId(v);
                         setPlaceGroupeId("");
                       }}
-                      className={FIELD_INPUT}
-                    >
-                      <option value="">{t("centre", "identityChoose")}</option>
-                      {niveaux.map((n) => (
-                        <option key={n.id} value={n.id}>
-                          {n.annee != null ? `${t("centre", "identityLevel")} ${n.annee}` : t("centre", "identityLevel")}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder={t("centre", "identityChoose")}
+                      options={[
+                        { value: "", label: t("centre", "identityChoose") },
+                        ...niveaux.map((n) => ({
+                          value: n.id,
+                          label: n.annee != null ? `${t("centre", "identityLevel")} ${n.annee}` : t("centre", "identityLevel"),
+                        })),
+                      ]}
+                    />
                   </div>
                 )}
                 <div>
                   <label className={FIELD_LABEL}>{t("centre", "identityClass")}</label>
-                  <select
+                  <CenterSelect
+                    size="lg"
                     value={placeGroupeId}
-                    onChange={(e) => setPlaceGroupeId(e.target.value)}
+                    onChange={setPlaceGroupeId}
                     disabled={placeLoadingOpts}
-                    className={`${FIELD_INPUT} disabled:opacity-50`}
-                  >
-                    <option value="">{t("centre", "identityNoneDefine")}</option>
-                    {groupes.map((g) => (
-                      <option key={g.id} value={g.id}>{g.nom}</option>
-                    ))}
-                  </select>
+                    placeholder={t("centre", "identityNoneDefine")}
+                    options={[
+                      { value: "", label: t("centre", "identityNoneDefine") },
+                      ...groupes.map((g) => ({ value: g.id, label: g.nom })),
+                    ]}
+                  />
                 </div>
                 {placementError && (
                   <p className="text-sm font-semibold text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
@@ -717,10 +719,16 @@ export default function StudentIdentityTab({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={FIELD_LABEL}>{t("centre", "identityType")}</label>
-                <select value={form.id_type || ""} onChange={(e) => setForm((f) => ({ ...f, id_type: e.target.value || null }))} className={FIELD_INPUT}>
-                  <option value="">{t("centre", "identitySelect")}</option>
-                  {Object.entries(idTypeLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
+                <CenterSelect
+                  size="lg"
+                  value={form.id_type || ""}
+                  onChange={(v) => setForm((f) => ({ ...f, id_type: v || null }))}
+                  placeholder={t("centre", "identitySelect")}
+                  options={[
+                    { value: "", label: t("centre", "identitySelect") },
+                    ...Object.entries(idTypeLabels).map(([k, v]) => ({ value: k, label: v })),
+                  ]}
+                />
               </div>
               <div>
                 <label className={FIELD_LABEL}>{t("centre", "identityNumber")}</label>
@@ -743,18 +751,30 @@ export default function StudentIdentityTab({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={FIELD_LABEL}>{t("centre", "identityCountry")}</label>
-                <select value={selectedCountryCode} onChange={(e) => handleFormCountryChange(e.target.value)} className={FIELD_INPUT}>
-                  <option value="">{t("centre", "identitySelect")}</option>
-                  {COUNTRY_OPTIONS.map((c) => <option key={c.code} value={c.code}>{c.name} ({c.phone_code})</option>)}
-                </select>
+                <CenterSelect
+                  size="lg"
+                  value={selectedCountryCode}
+                  onChange={handleFormCountryChange}
+                  placeholder={t("centre", "identitySelect")}
+                  options={[
+                    { value: "", label: t("centre", "identitySelect") },
+                    ...COUNTRY_OPTIONS.map((c) => ({ value: c.code, label: `${c.name} (${c.phone_code})` })),
+                  ]}
+                />
               </div>
               <div>
                 <label className={FIELD_LABEL}>{t("centre", "identityRegion")}</label>
                 {regions.length > 0 ? (
-                  <select value={form.region || ""} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value || null }))} className={FIELD_INPUT}>
-                    <option value="">{t("centre", "identitySelect")}</option>
-                    {regions.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
+                  <CenterSelect
+                    size="lg"
+                    value={form.region || ""}
+                    onChange={(v) => setForm((f) => ({ ...f, region: v || null }))}
+                    placeholder={t("centre", "identitySelect")}
+                    options={[
+                      { value: "", label: t("centre", "identitySelect") },
+                      ...regions.map((r) => ({ value: r, label: r })),
+                    ]}
+                  />
                 ) : (
                   <input value={form.region || ""} onChange={(e) => setForm((f) => ({ ...f, region: e.target.value || null }))} placeholder={t("centre", "identityEnterRegion")} className={FIELD_INPUT} />
                 )}
@@ -784,21 +804,28 @@ export default function StudentIdentityTab({
               </div>
               <div>
                 <label className={FIELD_LABEL}>{t("centre", "identityRelationship")}</label>
-                <select value={form.guardian_relation || ""} onChange={(e) => setForm((f) => ({ ...f, guardian_relation: e.target.value || null }))} className={FIELD_INPUT}>
-                  <option value="">{t("centre", "identitySelect")}</option>
-                  {RELATION_OPTIONS.map((r) => <option key={r} value={r}>{relationLabel(r)}</option>)}
-                </select>
+                <CenterSelect
+                  size="lg"
+                  value={form.guardian_relation || ""}
+                  onChange={(v) => setForm((f) => ({ ...f, guardian_relation: v || null }))}
+                  placeholder={t("centre", "identitySelect")}
+                  options={[
+                    { value: "", label: t("centre", "identitySelect") },
+                    ...RELATION_OPTIONS.map((r) => ({ value: r, label: relationLabel(r) })),
+                  ]}
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={`${FIELD_LABEL} flex items-center gap-1.5`}><Globe size={14} /> {t("centre", "identityGuardianCountry")}</label>
-                <select value={guardianCountryCode} onChange={(e) => handleGuardianCountryChange(e.target.value)} className={FIELD_INPUT}>
-                  {COUNTRY_OPTIONS.map((c) => (
-                    <option key={c.code} value={c.code}>{c.name} ({c.phone_code})</option>
-                  ))}
-                </select>
+                <CenterSelect
+                  size="lg"
+                  value={guardianCountryCode}
+                  onChange={handleGuardianCountryChange}
+                  options={COUNTRY_OPTIONS.map((c) => ({ value: c.code, label: `${c.name} (${c.phone_code})` }))}
+                />
               </div>
 
               <div>

@@ -80,6 +80,8 @@ import {
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { isCenterStaff, CENTER_HOME } from "../utils/student-routes";
+import { isViewAsStudentPreview } from "../utils/view-as";
+import ViewAsMenu from "@/app/components/ViewAsMenu";
 import { logClientActivity } from "../utils/client-activity";
 import { loadStudentAccess } from "../utils/student-access-cache";
 import { decryptMessage } from "@/app/utils/messageCrypto.client";
@@ -414,7 +416,7 @@ export default function Dashboard() {
 
       const { session, profile } = access;
 
-      if (isCenterStaff(profile)) {
+      if (isCenterStaff(profile) && !isViewAsStudentPreview()) {
         router.replace(CENTER_HOME);
         return;
       }
@@ -1083,9 +1085,16 @@ export default function Dashboard() {
         <header className={`sticky top-0 z-40 bg-[#FFFBF7]/95 backdrop-blur-xl border-b border-orange-100/60 transition-all duration-300 ${scrolled ? "py-1.5 shadow-sm shadow-orange-100/40" : "py-2.5 md:py-3 xl:py-4"}`}>
           <div className="nexa-student-shell flex items-center justify-between">
             <div>
-              <span className="font-bold uppercase tracking-widest text-[8px] md:text-[9px] xl:text-[10px] px-1.5 py-0.5 rounded-full" style={{ color: BRAND.orange, backgroundColor: "#FFF3E8" }}>
-                Espace Étudiant
-              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-bold uppercase tracking-widest text-[8px] md:text-[9px] xl:text-[10px] px-1.5 py-0.5 rounded-full" style={{ color: BRAND.orange, backgroundColor: "#FFF3E8" }}>
+                  Espace Étudiant
+                </span>
+                {isViewAsStudentPreview() && (
+                  <span className="font-bold uppercase tracking-widest text-[8px] md:text-[9px] xl:text-[10px] px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                    Aperçu
+                  </span>
+                )}
+              </div>
               <h1 className={`font-display font-black tracking-tight mt-0.5 transition-all duration-300 ${scrolled ? "text-sm md:text-base xl:text-lg" : "text-base md:text-lg xl:text-xl 2xl:text-2xl"}`} style={{ color: BRAND.blue }}>
                 {greeting}, {displayName}
               </h1>
@@ -1093,6 +1102,7 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-center gap-2 md:gap-3">
+              <ViewAsMenu variant="student" />
               {/* Support */}
               <div className="relative">
                 <button onClick={handleSupportClick} title="Support" className="px-3 py-2 h-10 md:h-12 rounded-full flex items-center gap-2 border transition-colors shadow-sm" style={{ backgroundColor: "#EEF2FF", borderColor: "#DCE3FF" }}>

@@ -17,6 +17,7 @@ import type { CenterInfo } from "../types";
 import { PendingBanner } from "../dashboard-ui";
 import { greeting, todayLabel } from "../utils";
 import ShareSignupLinkMenu from "./ShareSignupLinkMenu";
+import ViewAsMenu from "@/app/components/ViewAsMenu";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
 type Props = {
@@ -104,6 +105,7 @@ export default function DashboardShell({
               </div>
 
               <div className="flex items-center gap-2 shrink-0 sm:pl-2 relative z-50">
+                <ViewAsMenu variant="dark" />
                 <div className="[&_button]:border-white/20 [&_button]:bg-white/10 [&_button]:text-white [&_button]:h-8 [&_button]:w-8">
                   <CenterNotifications />
                 </div>
@@ -170,6 +172,7 @@ export default function DashboardShell({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <ViewAsMenu variant="light" />
             <CenterNotifications />
             {center?.code && (
               <span
