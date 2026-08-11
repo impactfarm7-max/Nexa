@@ -19,6 +19,7 @@ import { BRAND } from "@/app/utils/brand";
 import { CenterBrandMark } from "@/app/centre/center-page-ui";
 import LanguageSwitcher from "@/app/components/LanguageSwitcher";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { nexaOfferLabel, normalizeNexaOffer } from "@/app/data/nexaOffers";
 import { ALL_STAFF_MODULE_PERMS, VIEW_AS_EVENT, isViewAsStaffPreview } from "@/app/utils/view-as";
 
 /* ─── Constantes ────────────────────────────────────────────────────────── */
@@ -174,6 +175,11 @@ function filterNavItemForStaff(item: NavItem, perms: string[]): NavItem | null {
   return hasPermForNavItem(item, perms) ? item : null;
 }
 
+function resolvePlanLabel(nexaOffer: string | null | undefined): string {
+  if (!normalizeNexaOffer(nexaOffer)) return "Essai";
+  return nexaOfferLabel(nexaOffer);
+}
+
 function readSidebarCache() {
   const json = getCenterMeCache();
   if (!json) return null;
@@ -181,7 +187,6 @@ function readSidebarCache() {
   const center = json.center as {
     id?: string;
     name?: string;
-    plan_type?: string;
     center_type?: string;
     nexa_offer?: string | null;
   } | null;
@@ -200,9 +205,7 @@ function readSidebarCache() {
     centerId: center.id,
     centerName: center.name || "Mon Établissement",
     centerType,
-    planType: center.nexa_offer
-      ? String(center.nexa_offer).charAt(0).toUpperCase() + String(center.nexa_offer).slice(1)
-      : center.plan_type || "Essai Ultra",
+    planType: resolvePlanLabel(center.nexa_offer),
     userRole: role,
     staffPermissions,
     branches: [{ id: center.id, name: center.name || "Mon Établissement" }] as Branch[],
@@ -221,7 +224,7 @@ function CenterSidebarInner() {
   const [centerName,        setCenterName]        = useState("Mon Établissement");
   const [centerType,        setCenterType]        = useState<CenterTypeCode | null>(null);
   const [logoUrl,           setLogoUrl]           = useState<string | null>(null);
-  const [planType,          setPlanType]          = useState("Starter");
+  const [planType,          setPlanType]          = useState("Essai");
   const [isCollapsed,       setIsCollapsed]       = useState(false);
   const [hydrated,          setHydrated]          = useState(false);
   const [userRole,          setUserRole]          = useState<string | null>(null);
@@ -352,14 +355,10 @@ function CenterSidebarInner() {
     if (profile.center_id) {
       setCenterId(profile.center_id);
       const { data: center } = await supabase
-        .from("centers").select("name, plan_type, center_type, nexa_offer").eq("id", profile.center_id).single();
+        .from("centers").select("name, center_type, nexa_offer").eq("id", profile.center_id).single();
       if (center) {
         setCenterName(center.name);
-        setPlanType(
-          center.nexa_offer
-            ? String(center.nexa_offer).charAt(0).toUpperCase() + String(center.nexa_offer).slice(1)
-            : center.plan_type || "Essai Ultra"
-        );
+        setPlanType(resolvePlanLabel(center.nexa_offer));
         setCenterType(normalizeCenterType(center.center_type));
         setBranches([{ id: profile.center_id, name: center.name }]);
         setActiveBranchId(profile.center_id);
