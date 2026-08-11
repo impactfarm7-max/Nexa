@@ -8,7 +8,7 @@ import {
   peekCenterBootstrap,
 } from "@/app/utils/center-me-cache";
 import { prefetchCenterPagesFireAndForget } from "@/app/utils/center-prefetch";
-import { isCenterOperational } from "@/app/utils/center-trial";
+import { isCenterOperational, resolveCenterAccess, type CenterAccessState } from "@/app/utils/center-trial";
 import CenterAppShell from "@/app/components/CenterAppShell";
 import CenterRouteSkeleton from "@/app/components/CenterRouteSkeleton";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -37,13 +37,14 @@ function evaluateCenterAccess(
   const role = json.role as string | null;
   const permissions = (json.permissions || []) as string[];
   const onboardingStep = json.onboarding_step as string | null;
-  const center = json.center as { id?: string; name?: string; status?: string; created_at?: string } | null;
+  const center = json.center as { id?: string; name?: string; status?: string; created_at?: string; trial_ends_at?: string; renewal_at?: string } | null;
 
   if (!role || (!isCenterStaff({ role, center_id: center?.id }) && role !== "manager")) {
     return { ok: false, redirect: "/dashboard" };
   }
 
-  if (center && !isCenterOperational(center)) {
+  const accessState = resolveCenterAccess(center);
+  if (accessState === "blocked") {
     return { ok: false, redirect: CENTER_UNAVAILABLE_PATH };
   }
 
