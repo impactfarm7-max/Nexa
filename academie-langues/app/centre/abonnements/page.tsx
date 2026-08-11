@@ -15,19 +15,31 @@ import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { BLUE, ORANGE, CenterPageLayout, CenterPageHeader, CenterPageBody } from "../center-page-ui";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
-const OFFER_NAME_KEYS: Record<Exclude<NexaOfferKey, "custom">, string> = {
-  decouverte: "offerNameDecouverte",
-  croissance: "offerNameCroissance",
-  pro: "offerNamePro",
-  entreprise: "offerNameEntreprise",
-};
+function offerDisplayName(key: Exclude<NexaOfferKey, "custom">, t: ReturnType<typeof useI18n>["t"]): string {
+  switch (key) {
+    case "decouverte":
+      return t("centre", "offerNameDecouverte");
+    case "croissance":
+      return t("centre", "offerNameCroissance");
+    case "pro":
+      return t("centre", "offerNamePro");
+    case "entreprise":
+      return t("centre", "offerNameEntreprise");
+  }
+}
 
-const OFFER_TAGLINE_KEYS: Record<Exclude<NexaOfferKey, "custom">, string> = {
-  decouverte: "offerTaglineDecouverte",
-  croissance: "offerTaglineCroissance",
-  pro: "offerTaglinePro",
-  entreprise: "offerTaglineEntreprise",
-};
+function offerDisplayTagline(key: Exclude<NexaOfferKey, "custom">, t: ReturnType<typeof useI18n>["t"]): string {
+  switch (key) {
+    case "decouverte":
+      return t("centre", "offerTaglineDecouverte");
+    case "croissance":
+      return t("centre", "offerTaglineCroissance");
+    case "pro":
+      return t("centre", "offerTaglinePro");
+    case "entreprise":
+      return t("centre", "offerTaglineEntreprise");
+  }
+}
 
 const CORE_FEATURE_KEYS = [
   "abonnementsCoreDashboard",
@@ -98,7 +110,7 @@ export default function AbonnementsPage() {
   const currentPlanLabel = useMemo(() => {
     if (!currentOfferKey) return t("centre", "abonnementsTrial");
     if (currentOfferKey === "custom") return t("centre", "offerNameCustom");
-    return t("centre", OFFER_NAME_KEYS[currentOfferKey]);
+    return offerDisplayName(currentOfferKey, t);
   }, [currentOfferKey, t]);
 
   if (loading) return <CenterPageLoading />;
@@ -162,10 +174,10 @@ export default function AbonnementsPage() {
                   </span>
                 )}
                 <h3 className="text-lg font-black" style={{ color: BLUE }}>
-                  {t("centre", OFFER_NAME_KEYS[key])}
+                  {offerDisplayName(key, t)}
                 </h3>
                 <p className="text-[12px] mt-1 font-medium" style={{ color: "rgba(17,34,78,0.55)" }}>
-                  {t("centre", OFFER_TAGLINE_KEYS[key])}
+                  {offerDisplayTagline(key, t)}
                 </p>
                 <p className="text-xl font-black mt-3" style={{ color: BLUE }}>{price}</p>
                 <ul className="mt-5 space-y-2.5 flex-1">

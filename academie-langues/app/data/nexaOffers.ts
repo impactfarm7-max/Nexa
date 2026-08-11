@@ -125,7 +125,7 @@ export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfi
   pro: {
     key: "pro",
     name: "Pro",
-    tagline: "Rapports personnalisés, sessions illimitées",
+    tagline: "Rapports personnalisés, jusqu'à 250 apprenants",
     minStudents: 101,
     maxStudents: 250,
     maxCampus: 10,
