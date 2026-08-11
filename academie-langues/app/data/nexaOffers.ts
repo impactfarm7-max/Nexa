@@ -243,10 +243,22 @@ export function getNexaB2bProfileQuotas() {
   };
 }
 
-export function nexaOfferLabel(key: string | null | undefined): string {
+export function nexaOfferLabel(
+  key: string | null | undefined,
+  locale: "fr" | "en" = "fr",
+): string {
   const normalized = normalizeNexaOffer(key);
-  if (!normalized) return "Non attribuée";
-  if (normalized === "custom") return "Sur devis";
+  if (!normalized) return locale === "en" ? "Not assigned" : "Non attribuée";
+  if (normalized === "custom") return locale === "en" ? "Custom quote" : "Sur devis";
+  if (locale === "en") {
+    const enNames: Record<Exclude<NexaOfferKey, "custom">, string> = {
+      decouverte: "Discovery",
+      croissance: "Growth",
+      pro: "Pro",
+      entreprise: "Enterprise",
+    };
+    return enNames[normalized];
+  }
   return NEXA_OFFERS[normalized].name;
 }
 

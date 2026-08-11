@@ -193,7 +193,15 @@ export default function SuperadminAnalyticsPage() {
   };
 
   const offerLabel = (key: NexaOfferKey) =>
-    key === "custom" ? t("superadmin", "analyticsOfferCustom") : (NEXA_OFFERS[key]?.name ?? key);
+    key === "custom"
+      ? t("superadmin", "centresOfferCustom")
+      : key === "decouverte"
+        ? t("superadmin", "centresOfferDecouverte")
+        : key === "croissance"
+          ? t("superadmin", "centresOfferCroissance")
+          : key === "pro"
+            ? t("superadmin", "centresOfferPro")
+            : t("superadmin", "centresOfferEntreprise");
 
   const statusLabel = (key: CenterDerivedStatus) =>
     t("superadmin", `centresDerivedStatus_${key}` as "centresDerivedStatus_active");

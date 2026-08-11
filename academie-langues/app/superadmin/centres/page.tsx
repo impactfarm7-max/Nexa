@@ -202,10 +202,19 @@ function OfferFormModal({
             >
               {NEXA_OFFER_KEYS.map((key) => (
                 <option key={key} value={key}>
-                  {NEXA_OFFERS[key].name}
+                  {t(
+                    "superadmin",
+                    key === "decouverte"
+                      ? "centresOfferDecouverte"
+                      : key === "croissance"
+                        ? "centresOfferCroissance"
+                        : key === "pro"
+                          ? "centresOfferPro"
+                          : "centresOfferEntreprise",
+                  )}
                 </option>
               ))}
-              <option value="custom">{t("superadmin", "centresModalOfferCustom")}</option>
+              <option value="custom">{t("superadmin", "centresOfferCustom")}</option>
             </select>
           </div>
 
