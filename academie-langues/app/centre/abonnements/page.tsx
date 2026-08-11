@@ -81,7 +81,9 @@ function buildOfferFeatures(
 
   return [
     students,
-    t("centre", "abonnementsCampus", { count: fmtLimit(offer.maxCampus, unlimited) }),
+    offer.maxCampus === 1
+      ? t("centre", "abonnementsCampusOne")
+      : t("centre", "abonnementsCampus", { count: fmtLimit(offer.maxCampus, unlimited) }),
     t("centre", "abonnementsStaff", { count: fmtLimit(offer.maxStaffAccounts, unlimited) }),
     t("centre", "abonnementsTutor", { count: fmtLimit(offer.tutorInteractionsPerStudent, unlimited) }),
     t("centre", "abonnementsLive", { count: fmtLimit(offer.liveHoursPerStudent, unlimited) }),
@@ -142,12 +144,8 @@ export default function AbonnementsPage() {
             const isRecommended = !currentOfferKey && key === "pro";
             const highlighted = isCurrent || isRecommended;
             const features = buildOfferFeatures(offer, t);
-            const price =
-              offer.monthlyFeeMax == null && offer.key === "entreprise"
-                ? t("centre", "abonnementsPriceQuote")
-                : t("centre", "abonnementsPriceFrom", {
-                    amount: offer.monthlyFeeMin.toLocaleString(locale === "en" ? "en-US" : "fr-FR"),
-                  });
+            const isQuote = offer.monthlyFeeMax == null && offer.key === "entreprise";
+            const amountLabel = offer.monthlyFeeMin.toLocaleString(locale === "en" ? "en-US" : "fr-FR");
 
             return (
               <div
@@ -159,7 +157,7 @@ export default function AbonnementsPage() {
               >
                 {isCurrent && (
                   <span
-                    className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
+                    className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white"
                     style={{ backgroundColor: BLUE }}
                   >
                     {t("centre", "abonnementsCurrentBadge")}
@@ -179,7 +177,23 @@ export default function AbonnementsPage() {
                 <p className="text-[12px] mt-1 font-medium" style={{ color: "rgba(17,34,78,0.55)" }}>
                   {offerDisplayTagline(key, t)}
                 </p>
-                <p className="text-xl font-black mt-3" style={{ color: BLUE }}>{price}</p>
+                {isQuote ? (
+                  <p className="mt-4 text-2xl font-black leading-none" style={{ color: BLUE }}>
+                    {t("centre", "abonnementsPriceQuote")}
+                  </p>
+                ) : (
+                  <div className="mt-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(17,34,78,0.45)" }}>
+                      {t("centre", "abonnementsPriceFrom")}
+                    </p>
+                    <p className="mt-0.5 text-2xl font-black leading-none tabular-nums" style={{ color: BLUE }}>
+                      {amountLabel}
+                    </p>
+                    <p className="mt-1 text-xs font-bold" style={{ color: "rgba(17,34,78,0.55)" }}>
+                      {t("centre", "abonnementsPricePerMonth")}
+                    </p>
+                  </div>
+                )}
                 <ul className="mt-5 space-y-2.5 flex-1">
                   {features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-[13px]" style={{ color: "rgba(17,34,78,0.75)" }}>
