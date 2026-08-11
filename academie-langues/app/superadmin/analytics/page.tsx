@@ -13,7 +13,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useI18n } from "@/app/i18n/I18nProvider";
-import { NEXA_OFFERS, type NexaOfferKey } from "@/app/data/nexaOffers";
+import { type NexaOfferKey } from "@/app/data/nexaOffers";
 import { superadminFetch } from "../../utils/superadmin-api-client";
 
 type Point = { date: string; visitors: number; newVisitors: number; pageViews: number };
