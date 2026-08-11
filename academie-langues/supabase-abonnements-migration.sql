@@ -1,5 +1,6 @@
 -- ============================================================
 -- Migration: 4-tier subscription system (Découverte/Croissance/Pro/Entreprise)
+-- IMPORTANT: drop old CHECK before renaming offer values
 -- ============================================================
 
 -- 1. Add billing & subscription columns
@@ -12,22 +13,24 @@ ALTER TABLE centers ADD COLUMN IF NOT EXISTS trial_ends_at timestamptz;
 ALTER TABLE centers ADD COLUMN IF NOT EXISTS quota_overrides jsonb;
 ALTER TABLE centers ADD COLUMN IF NOT EXISTS pause_reason text;
 
--- 2. Migrate existing nexa_offer values to new tier names
+-- 2. Drop OLD check first (it only allows access/lite/advance/ultra)
+ALTER TABLE centers DROP CONSTRAINT IF EXISTS centers_nexa_offer_check;
+
+-- 3. Migrate existing nexa_offer values to new tier names
 UPDATE centers SET nexa_offer = 'decouverte' WHERE nexa_offer IN ('access', 'lite');
 UPDATE centers SET nexa_offer = 'croissance' WHERE nexa_offer = 'advance';
 UPDATE centers SET nexa_offer = 'pro' WHERE nexa_offer = 'ultra';
 
--- 3. Replace nexa_offer CHECK constraint
-ALTER TABLE centers DROP CONSTRAINT IF EXISTS centers_nexa_offer_check;
+-- 4. Add NEW check (NULL allowed = offre pas encore attribuée)
 ALTER TABLE centers ADD CONSTRAINT centers_nexa_offer_check
-  CHECK (nexa_offer IN ('decouverte', 'croissance', 'pro', 'entreprise', 'custom'));
+  CHECK (nexa_offer IS NULL OR nexa_offer IN ('decouverte', 'croissance', 'pro', 'entreprise', 'custom'));
 
--- 4. Extend status CHECK constraint (add 'expired')
+-- 5. Extend status CHECK constraint (add 'expired')
 ALTER TABLE centers DROP CONSTRAINT IF EXISTS centers_status_check;
 ALTER TABLE centers ADD CONSTRAINT centers_status_check
   CHECK (status IN ('active', 'pending', 'suspended', 'rejected', 'expired'));
 
--- 5. Backfill trial_ends_at for existing pending centers (7-day trial)
+-- 6. Backfill trial_ends_at for existing pending centers (7-day trial)
 UPDATE centers
 SET trial_ends_at = created_at + interval '7 days'
 WHERE status = 'pending' AND trial_ends_at IS NULL;
