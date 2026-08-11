@@ -1,11 +1,11 @@
 /**
- * Catalogue B2B NEXA — offres Access / Lite / Advance / Ultra.
- * Pack étudiant identique sur les 4 offres (fiches produit).
+ * Catalogue B2B NEXA — offres Découverte / Croissance / Pro / Entreprise.
+ * Pack étudiant identique sur toutes les offres (quotas pédagogiques).
  */
 
 import { centerTrialRemainingMs } from "@/app/utils/center-trial";
 
-export type NexaOfferKey = "access" | "lite" | "advance" | "ultra";
+export type NexaOfferKey = "decouverte" | "croissance" | "pro" | "entreprise" | "custom";
 
 export type NexaCenterModule =
   | "dashboard"
@@ -39,16 +39,18 @@ export type NexaOfferConfig = {
   key: NexaOfferKey;
   name: string;
   tagline: string;
-  /** Frais plateforme mensuels (FCFA). */
-  monthlyFee: number;
-  /** Access uniquement : facturation par étudiant. */
-  perStudentFee: number | null;
-  maxStudents: number;
-  /** null = illimité */
-  maxClasses: number | null;
-  maxLives: number;
-  liveDurationMin: number;
-  multiCampus: boolean;
+  minStudents: number;
+  maxStudents: number | null;
+  maxCampus: number | null;
+  maxStaffAccounts: number | null;
+  tutorInteractionsPerStudent: number | null;
+  liveHoursPerStudent: number | null;
+  aiCorrectionsPerStudent: number | null;
+  courseBuilderPerMonth: number | null;
+  whiteLabel: boolean | "option";
+  monthlyFeeMin: number;
+  monthlyFeeMax: number | null;
+  supportLevel: "standard" | "priority" | "dedicated" | "account_manager";
   modules: NexaCenterModule[];
   studentQuotas: NexaStudentQuotas;
 };
@@ -66,7 +68,7 @@ export const NEXA_STUDENT_QUOTAS: NexaStudentQuotas = {
   ressources2026: true,
 };
 
-const LITE_MODULES: NexaCenterModule[] = [
+const ALL_MODULES: NexaCenterModule[] = [
   "dashboard",
   "etudiants",
   "staff",
@@ -81,80 +83,100 @@ const LITE_MODULES: NexaCenterModule[] = [
   "rapports",
 ];
 
-export const NEXA_OFFERS: Record<NexaOfferKey, NexaOfferConfig> = {
-  access: {
-    key: "access",
-    name: "Access",
-    tagline: "Formateur indépendant",
-    monthlyFee: 5000,
-    perStudentFee: 8500,
-    maxStudents: 5,
-    maxClasses: 1,
-    maxLives: 0,
-    liveDurationMin: 30,
-    multiCampus: false,
-    modules: ["etudiants", "planning", "finance", "communaute", "cours", "parametres"],
-    studentQuotas: NEXA_STUDENT_QUOTAS,
-  },
-  lite: {
-    key: "lite",
-    name: "Lite",
-    tagline: "Idéal pour démarrer la digitalisation de votre centre",
-    monthlyFee: 40000,
-    perStudentFee: null,
-    maxStudents: 15,
-    maxClasses: 2,
-    maxLives: 4,
-    liveDurationMin: 30,
-    multiCampus: false,
-    modules: LITE_MODULES,
-    studentQuotas: NEXA_STUDENT_QUOTAS,
-  },
-  advance: {
-    key: "advance",
-    name: "Advance",
-    tagline: "Des fonctionnalités plus étendues pour un meilleur environnement éducatif",
-    monthlyFee: 80000,
-    perStudentFee: null,
+export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfig> = {
+  decouverte: {
+    key: "decouverte",
+    name: "Découverte",
+    tagline: "Pour démarrer avec 5 à 40 apprenants",
+    minStudents: 5,
     maxStudents: 40,
-    /** Lite (2) + 2 classes supplémentaires */
-    maxClasses: 4,
-    maxLives: 8,
-    liveDurationMin: 30,
-    multiCampus: true,
-    modules: LITE_MODULES,
+    maxCampus: 1,
+    maxStaffAccounts: 2,
+    tutorInteractionsPerStudent: 15,
+    liveHoursPerStudent: 2,
+    aiCorrectionsPerStudent: 5,
+    courseBuilderPerMonth: 5,
+    whiteLabel: false,
+    monthlyFeeMin: 12_500,
+    monthlyFeeMax: 100_000,
+    supportLevel: "standard",
+    modules: ALL_MODULES,
     studentQuotas: NEXA_STUDENT_QUOTAS,
   },
-  ultra: {
-    key: "ultra",
-    name: "Ultra",
-    tagline: "Une expérience unique dans la digitalisation de vos formations",
-    monthlyFee: 180000,
-    perStudentFee: null,
+  croissance: {
+    key: "croissance",
+    name: "Croissance",
+    tagline: "Jusqu'à 100 apprenants, support prioritaire",
+    minStudents: 41,
     maxStudents: 100,
-    maxClasses: null,
-    maxLives: 20,
-    liveDurationMin: 30,
-    multiCampus: true,
-    modules: LITE_MODULES,
+    maxCampus: 3,
+    maxStaffAccounts: 4,
+    tutorInteractionsPerStudent: 25,
+    liveHoursPerStudent: 3,
+    aiCorrectionsPerStudent: 10,
+    courseBuilderPerMonth: 10,
+    whiteLabel: false,
+    monthlyFeeMin: 102_000,
+    monthlyFeeMax: 220_000,
+    supportLevel: "priority",
+    modules: ALL_MODULES,
+    studentQuotas: NEXA_STUDENT_QUOTAS,
+  },
+  pro: {
+    key: "pro",
+    name: "Pro",
+    tagline: "Rapports personnalisés, sessions illimitées",
+    minStudents: 101,
+    maxStudents: 250,
+    maxCampus: 10,
+    maxStaffAccounts: 10,
+    tutorInteractionsPerStudent: 30,
+    liveHoursPerStudent: 4,
+    aiCorrectionsPerStudent: 15,
+    courseBuilderPerMonth: 15,
+    whiteLabel: "option",
+    monthlyFeeMin: 221_900,
+    monthlyFeeMax: 505_000,
+    supportLevel: "dedicated",
+    modules: ALL_MODULES,
+    studentQuotas: NEXA_STUDENT_QUOTAS,
+  },
+  entreprise: {
+    key: "entreprise",
+    name: "Entreprise",
+    tagline: "Sur devis, tout illimité + SLA",
+    minStudents: 251,
+    maxStudents: null,
+    maxCampus: null,
+    maxStaffAccounts: null,
+    tutorInteractionsPerStudent: null,
+    liveHoursPerStudent: null,
+    aiCorrectionsPerStudent: null,
+    courseBuilderPerMonth: null,
+    whiteLabel: true,
+    monthlyFeeMin: 505_000,
+    monthlyFeeMax: null,
+    supportLevel: "account_manager",
+    modules: ALL_MODULES,
     studentQuotas: NEXA_STUDENT_QUOTAS,
   },
 };
 
-export const NEXA_OFFER_KEYS = Object.keys(NEXA_OFFERS) as NexaOfferKey[];
+export const NEXA_OFFER_KEYS = Object.keys(NEXA_OFFERS) as Exclude<NexaOfferKey, "custom">[];
 
 export function isNexaOfferKey(value: unknown): value is NexaOfferKey {
-  return typeof value === "string" && value in NEXA_OFFERS;
+  if (typeof value !== "string") return false;
+  return value in NEXA_OFFERS || value === "custom";
 }
 
 export function normalizeNexaOffer(value: unknown): NexaOfferKey | null {
   if (value == null || value === "" || value === "none") return null;
   const key = String(value).trim().toLowerCase();
-  return isNexaOfferKey(key) ? key : null;
+  return isNexaOfferKey(key) ? (key as NexaOfferKey) : null;
 }
 
 export function getNexaOffer(key: NexaOfferKey | null | undefined): NexaOfferConfig | null {
-  if (!key) return null;
+  if (!key || key === "custom") return null;
   return NEXA_OFFERS[key] ?? null;
 }
 
@@ -162,27 +184,43 @@ export type NexaOfferCenterInput = {
   nexa_offer?: string | null;
   status?: string | null;
   created_at?: string | null;
+  trial_ends_at?: string | null;
 };
 
 /**
  * Offre effective :
- * - si nexa_offer est posé → cette offre
- * - sinon pendant l'essai (pending + temps restant) → Ultra
- * - sinon (active sans offre, centres legacy) → Ultra jusqu'à attribution SA
+ * - si nexa_offer posé → cette offre
+ * - sinon pendant l'essai (pending + temps restant) → decouverte
+ * - sinon (active sans offre, centres legacy) → decouverte
  */
 export function resolveEffectiveNexaOfferKey(center: NexaOfferCenterInput | null | undefined): NexaOfferKey {
   const assigned = normalizeNexaOffer(center?.nexa_offer);
   if (assigned) return assigned;
 
   if (center?.status === "pending" && centerTrialRemainingMs(center.created_at) > 0) {
-    return "ultra";
+    return "decouverte";
   }
 
-  return "ultra";
+  return "decouverte";
 }
 
 export function resolveEffectiveNexaOffer(center: NexaOfferCenterInput | null | undefined): NexaOfferConfig {
-  return NEXA_OFFERS[resolveEffectiveNexaOfferKey(center)];
+  const key = resolveEffectiveNexaOfferKey(center);
+  if (key === "custom") return NEXA_OFFERS.entreprise;
+  return NEXA_OFFERS[key];
+}
+
+/**
+ * Resolve a quota value considering overrides (for entreprise/custom).
+ */
+export function getOfferQuota<K extends keyof NexaOfferConfig>(
+  offerKey: NexaOfferKey,
+  field: K,
+  overrides?: Record<string, unknown> | null,
+): NexaOfferConfig[K] | null {
+  if (overrides && field in overrides) return overrides[field] as NexaOfferConfig[K];
+  if (offerKey === "custom") return null;
+  return NEXA_OFFERS[offerKey][field];
 }
 
 /** Quotas profil étudiant dérivés du pack B2B (colonnes profiles). */
@@ -208,6 +246,7 @@ export function getNexaB2bProfileQuotas() {
 export function nexaOfferLabel(key: string | null | undefined): string {
   const normalized = normalizeNexaOffer(key);
   if (!normalized) return "Non attribuée";
+  if (normalized === "custom") return "Sur devis";
   return NEXA_OFFERS[normalized].name;
 }
 

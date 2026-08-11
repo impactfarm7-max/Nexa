@@ -664,11 +664,8 @@ export default function CreerCentrePage() {
                         >
                           <p className="text-sm font-black" style={{ color: BLUE }}>{offer.name}</p>
                           <p className="text-[11px] text-neutral-500 mt-0.5">
-                            {offer.monthlyFee.toLocaleString("fr-FR")} {t("marketing", "ouvrirCentreOfferFcfaPerMonth")}
-                            {offer.perStudentFee
-                              ? ` + ${offer.perStudentFee.toLocaleString("fr-FR")} / ${t("marketing", "ouvrirCentreOfferPerStudent")}`
-                              : ""}
-                            {" · "}{t("marketing", "ouvrirCentreOfferMax")} {offer.maxStudents} {t("marketing", "ouvrirCentreOfferStudents")}
+                            {t("marketing", "ouvrirCentreOfferFrom")} {offer.monthlyFeeMin.toLocaleString("fr-FR")} {t("marketing", "ouvrirCentreOfferFcfaPerMonth")}
+                            {" · "}{offer.maxStudents != null ? `${t("marketing", "ouvrirCentreOfferMax")} ${offer.maxStudents} ${t("marketing", "ouvrirCentreOfferStudents")}` : t("marketing", "ouvrirCentreOfferUnlimited")}
                           </p>
                         </button>
                       );

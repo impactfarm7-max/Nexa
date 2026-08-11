@@ -327,16 +327,19 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
       centerTypeRaw = centerRow?.center_type ?? null;
       const offer = resolveEffectiveNexaOffer(centerRow);
-      const { count: studentCount } = await supabaseAdmin
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("center_id", callerCenterId)
-        .eq("role", "student")
-        .neq("tag_status", "revoque");
-      if ((studentCount || 0) >= offer.maxStudents) {
-        return NextResponse.json({
-          error: `Limite d'étudiants atteinte pour l'offre ${offer.name} (${offer.maxStudents}).`,
-        }, { status: 403 });
+      const maxStudents = offer.maxStudents;
+      if (maxStudents != null) {
+        const { count: studentCount } = await supabaseAdmin
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("center_id", callerCenterId)
+          .eq("role", "student")
+          .neq("tag_status", "revoque");
+        if ((studentCount || 0) >= maxStudents) {
+          return NextResponse.json({
+            error: `Limite d'étudiants atteinte pour l'offre ${offer.name} (${maxStudents}).`,
+          }, { status: 403 });
+        }
       }
     }
 

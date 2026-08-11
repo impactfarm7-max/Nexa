@@ -292,24 +292,27 @@ export async function POST(req: Request) {
     .eq("id", ctx.centerId)
     .maybeSingle();
   const offer = resolveEffectiveNexaOffer(centerRow);
-  if (offer.maxLives <= 0 || !offer.modules.includes("lives")) {
+  if (!offer.modules.includes("lives")) {
     return NextResponse.json({
       error: msg(req,
         `Les sessions Lives ne sont pas incluses dans l'offre ${offer.name}.`,
         `Live sessions are not included in the ${offer.name} plan.`),
     }, { status: 403 });
   }
-  const { count: liveCount } = await supabaseAdmin
-    .from("schedule_slots")
-    .select("id", { count: "exact", head: true })
-    .eq("center_id", ctx.centerId)
-    .eq("session_scope", "live");
-  if ((liveCount || 0) >= offer.maxLives) {
-    return NextResponse.json({
-      error: msg(req,
-        `Limite de Lives atteinte pour l'offre ${offer.name} (${offer.maxLives} sessions).`,
-        `Live session limit reached for the ${offer.name} plan (${offer.maxLives} sessions).`),
-    }, { status: 403 });
+  const liveLimit = offer.liveHoursPerStudent;
+  if (liveLimit != null) {
+    const { count: liveCount } = await supabaseAdmin
+      .from("schedule_slots")
+      .select("id", { count: "exact", head: true })
+      .eq("center_id", ctx.centerId)
+      .eq("session_scope", "live");
+    if ((liveCount || 0) >= liveLimit * 10) {
+      return NextResponse.json({
+        error: msg(req,
+          `Limite de Lives atteinte pour l'offre ${offer.name}.`,
+          `Live session limit reached for the ${offer.name} plan.`),
+      }, { status: 403 });
+    }
   }
 
   const d = new Date(`${specificDate}T12:00:00`);
