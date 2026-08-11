@@ -19,7 +19,7 @@ import { BRAND } from "@/app/utils/brand";
 import { CenterBrandMark } from "@/app/centre/center-page-ui";
 import LanguageSwitcher from "@/app/components/LanguageSwitcher";
 import { useI18n } from "@/app/i18n/I18nProvider";
-import { nexaOfferLabel, normalizeNexaOffer } from "@/app/data/nexaOffers";
+import { normalizeNexaOffer } from "@/app/data/nexaOffers";
 import { ALL_STAFF_MODULE_PERMS, VIEW_AS_EVENT, isViewAsStaffPreview } from "@/app/utils/view-as";
 
 /* ─── Constantes ────────────────────────────────────────────────────────── */
@@ -175,12 +175,21 @@ function filterNavItemForStaff(item: NavItem, perms: string[]): NavItem | null {
   return hasPermForNavItem(item, perms) ? item : null;
 }
 
-function resolvePlanLabel(nexaOffer: string | null | undefined): string {
-  if (!normalizeNexaOffer(nexaOffer)) return "Essai";
-  return nexaOfferLabel(nexaOffer);
+function resolvePlanLabel(
+  nexaOffer: string | null | undefined,
+  t: (ns: "centre", key: string) => string,
+): string {
+  const key = normalizeNexaOffer(nexaOffer);
+  if (!key) return t("centre", "abonnementsTrial");
+  if (key === "custom") return t("centre", "offerNameCustom");
+  if (key === "decouverte") return t("centre", "offerNameDecouverte");
+  if (key === "croissance") return t("centre", "offerNameCroissance");
+  if (key === "pro") return t("centre", "offerNamePro");
+  if (key === "entreprise") return t("centre", "offerNameEntreprise");
+  return t("centre", "abonnementsTrial");
 }
 
-function readSidebarCache() {
+function readSidebarCache(t: (ns: "centre", key: string) => string) {
   const json = getCenterMeCache();
   if (!json) return null;
 
@@ -205,7 +214,7 @@ function readSidebarCache() {
     centerId: center.id,
     centerName: center.name || "Mon Établissement",
     centerType,
-    planType: resolvePlanLabel(center.nexa_offer),
+    planType: resolvePlanLabel(center.nexa_offer, t),
     userRole: role,
     staffPermissions,
     branches: [{ id: center.id, name: center.name || "Mon Établissement" }] as Branch[],
@@ -224,7 +233,7 @@ function CenterSidebarInner() {
   const [centerName,        setCenterName]        = useState("Mon Établissement");
   const [centerType,        setCenterType]        = useState<CenterTypeCode | null>(null);
   const [logoUrl,           setLogoUrl]           = useState<string | null>(null);
-  const [planType,          setPlanType]          = useState("Essai");
+  const [planType,          setPlanType]          = useState("");
   const [isCollapsed,       setIsCollapsed]       = useState(false);
   const [hydrated,          setHydrated]          = useState(false);
   const [userRole,          setUserRole]          = useState<string | null>(null);
@@ -250,7 +259,7 @@ function CenterSidebarInner() {
     if (saved === "1") setIsCollapsed(true);
     setHydrated(true);
 
-    const cached = readSidebarCache();
+    const cached = readSidebarCache(t);
     if (cached) {
       setCenterId(cached.centerId);
       setCenterName(cached.centerName);
@@ -261,7 +270,7 @@ function CenterSidebarInner() {
       setBranches(cached.branches);
       setActiveBranchId(cached.activeBranchId);
     }
-  }, []);
+  }, [t]);
 
   /* Logo + prénom en différé si le cache bootstrap suffit pour le menu */
   useEffect(() => {
@@ -358,7 +367,7 @@ function CenterSidebarInner() {
         .from("centers").select("name, center_type, nexa_offer").eq("id", profile.center_id).single();
       if (center) {
         setCenterName(center.name);
-        setPlanType(resolvePlanLabel(center.nexa_offer));
+        setPlanType(resolvePlanLabel(center.nexa_offer, t));
         setCenterType(normalizeCenterType(center.center_type));
         setBranches([{ id: profile.center_id, name: center.name }]);
         setActiveBranchId(profile.center_id);

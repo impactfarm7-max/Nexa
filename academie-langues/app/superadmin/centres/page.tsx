@@ -18,7 +18,6 @@ import {
   NEXA_OFFER_KEYS,
   NEXA_OFFERS,
   getOfferQuota,
-  nexaOfferLabel,
   normalizeNexaOffer,
   type NexaOfferKey,
 } from "../../data/nexaOffers";
@@ -441,7 +440,20 @@ function CenterRowItem({
       {/* Middle: offer & quotas */}
       <div className="min-w-0 flex-1 lg:max-w-[32%]">
         <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[9px] font-black uppercase tracking-widest ${OFFER_BADGE[offerBadgeKey] ?? OFFER_BADGE.none}`}>
-          {offerKey ? nexaOfferLabel(offerKey) : t("superadmin", "centresNoOffer")}
+          {offerKey
+            ? t(
+                "superadmin",
+                offerKey === "decouverte"
+                  ? "centresOfferDecouverte"
+                  : offerKey === "croissance"
+                    ? "centresOfferCroissance"
+                    : offerKey === "pro"
+                      ? "centresOfferPro"
+                      : offerKey === "entreprise"
+                        ? "centresOfferEntreprise"
+                        : "centresOfferCustom",
+              )
+            : t("superadmin", "centresNoOffer")}
         </span>
         {(offerCfg || offerKey === "custom") && (
           <div className="mt-2 flex flex-wrap gap-1.5">

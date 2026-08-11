@@ -157,7 +157,7 @@ const OWNER_ROLES: { value: string; labelKey: string }[] = [
 
 export default function CreerCentrePage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const welcomeCopy = (ct: CenterType) =>
     ct === "tcf_canada"
       ? t("marketing", "ouvrirCentreWelcomeTcfCanada")
@@ -651,6 +651,14 @@ export default function CreerCentrePage() {
                     {NEXA_OFFER_KEYS.map((key) => {
                       const offer = NEXA_OFFERS[key];
                       const selected = nexaOffer === key;
+                      const offerNameKey =
+                        key === "decouverte"
+                          ? "ouvrirCentreOfferNameDecouverte"
+                          : key === "croissance"
+                            ? "ouvrirCentreOfferNameCroissance"
+                            : key === "pro"
+                              ? "ouvrirCentreOfferNamePro"
+                              : "ouvrirCentreOfferNameEntreprise";
                       return (
                         <button
                           key={key}
@@ -662,9 +670,11 @@ export default function CreerCentrePage() {
                               : "border-black/10 bg-white hover:border-black/20"
                           }`}
                         >
-                          <p className="text-sm font-black" style={{ color: BLUE }}>{offer.name}</p>
+                          <p className="text-sm font-black" style={{ color: BLUE }}>
+                            {t("marketing", offerNameKey)}
+                          </p>
                           <p className="text-[11px] text-neutral-500 mt-0.5">
-                            {t("marketing", "ouvrirCentreOfferFrom")} {offer.monthlyFeeMin.toLocaleString("fr-FR")} {t("marketing", "ouvrirCentreOfferFcfaPerMonth")}
+                            {t("marketing", "ouvrirCentreOfferFrom")} {offer.monthlyFeeMin.toLocaleString(locale === "en" ? "en-US" : "fr-FR")} {t("marketing", "ouvrirCentreOfferFcfaPerMonth")}
                             {" · "}{offer.maxStudents != null ? `${t("marketing", "ouvrirCentreOfferMax")} ${offer.maxStudents} ${t("marketing", "ouvrirCentreOfferStudents")}` : t("marketing", "ouvrirCentreOfferUnlimited")}
                           </p>
                         </button>
