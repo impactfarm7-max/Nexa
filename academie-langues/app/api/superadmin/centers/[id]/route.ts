@@ -4,6 +4,36 @@ import { getSuperadminContext, logSuperadminAction, supabaseAdmin } from "@/app/
 
 const VALID_STATUSES = new Set(["active", "suspended", "rejected"]);
 
+type SubscriptionPatchFields = {
+  subscription_amount?: number | null;
+  subscription_period_months?: number | null;
+  renewal_at?: string | null;
+  renewal_alert_days?: number | null;
+  quota_overrides?: Record<string, unknown> | null;
+};
+
+function parseOptionalInt(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  return undefined;
+}
+
+function parseOptionalIsoDate(value: unknown): string | null | undefined {
+  if (value === null) return null;
+  if (typeof value !== "string" || !value.trim()) return undefined;
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return undefined;
+  return new Date(parsed).toISOString();
+}
+
+function parseQuotaOverrides(value: unknown): Record<string, unknown> | null | undefined {
+  if (value === null) return null;
+  if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return undefined;
+}
+
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { ctx, error } = await getSuperadminContext(req);
   if (!ctx) return error;
@@ -131,9 +161,22 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const body = await req.json().catch(() => ({}));
   const hasStatus = typeof body?.status === "string" && body.status.length > 0;
   const hasOffer = Object.prototype.hasOwnProperty.call(body, "nexa_offer");
+  const hasSubscriptionAmount = Object.prototype.hasOwnProperty.call(body, "subscription_amount");
+  const hasSubscriptionPeriod = Object.prototype.hasOwnProperty.call(body, "subscription_period_months");
+  const hasRenewalAt = Object.prototype.hasOwnProperty.call(body, "renewal_at");
+  const hasRenewalAlertDays = Object.prototype.hasOwnProperty.call(body, "renewal_alert_days");
+  const hasQuotaOverrides = Object.prototype.hasOwnProperty.call(body, "quota_overrides");
   const reason = typeof body?.reason === "string" ? body.reason.slice(0, 500) : undefined;
 
-  if (!hasStatus && !hasOffer) {
+  if (
+    !hasStatus &&
+    !hasOffer &&
+    !hasSubscriptionAmount &&
+    !hasSubscriptionPeriod &&
+    !hasRenewalAt &&
+    !hasRenewalAlertDays &&
+    !hasQuotaOverrides
+  ) {
     return NextResponse.json({ error: "Aucun champ à mettre à jour." }, { status: 400 });
   }
 
@@ -154,9 +197,48 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     }
   }
 
+  const subscriptionPatch: SubscriptionPatchFields = {};
+  if (hasSubscriptionAmount) {
+    const amount = parseOptionalInt(body.subscription_amount);
+    if (amount === undefined) {
+      return NextResponse.json({ error: "Montant d'abonnement invalide." }, { status: 400 });
+    }
+    subscriptionPatch.subscription_amount = amount;
+  }
+  if (hasSubscriptionPeriod) {
+    const period = parseOptionalInt(body.subscription_period_months);
+    if (period === undefined || (period !== null && period <= 0)) {
+      return NextResponse.json({ error: "Période d'abonnement invalide." }, { status: 400 });
+    }
+    subscriptionPatch.subscription_period_months = period;
+  }
+  if (hasRenewalAt) {
+    const renewalAt = parseOptionalIsoDate(body.renewal_at);
+    if (renewalAt === undefined) {
+      return NextResponse.json({ error: "Date de renouvellement invalide." }, { status: 400 });
+    }
+    subscriptionPatch.renewal_at = renewalAt;
+  }
+  if (hasRenewalAlertDays) {
+    const alertDays = parseOptionalInt(body.renewal_alert_days);
+    if (alertDays === undefined || (alertDays !== null && alertDays < 0)) {
+      return NextResponse.json({ error: "Délai d'alerte invalide." }, { status: 400 });
+    }
+    subscriptionPatch.renewal_alert_days = alertDays;
+  }
+  if (hasQuotaOverrides) {
+    const overrides = parseQuotaOverrides(body.quota_overrides);
+    if (overrides === undefined) {
+      return NextResponse.json({ error: "Quota overrides invalides." }, { status: 400 });
+    }
+    subscriptionPatch.quota_overrides = overrides;
+  }
+
   const { data: previousCenter } = await supabaseAdmin
     .from("centers")
-    .select("status, nexa_offer, name")
+    .select(
+      "status, nexa_offer, name, subscription_amount, subscription_period_months, renewal_at, renewal_alert_days, quota_overrides",
+    )
     .eq("id", id)
     .maybeSingle();
 
@@ -168,12 +250,15 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (hasStatus) patch.status = body.status;
   if (hasOffer) patch.nexa_offer = nextOffer;
+  Object.assign(patch, subscriptionPatch);
 
   const { data: center, error: updateError } = await supabaseAdmin
     .from("centers")
     .update(patch)
     .eq("id", id)
-    .select("id, name, status, nexa_offer")
+    .select(
+      "id, name, status, nexa_offer, subscription_amount, subscription_period_months, renewal_at, renewal_alert_days, quota_overrides",
+    )
     .maybeSingle();
 
   if (updateError || !center) {
@@ -194,7 +279,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       targetType: "center",
       targetId: id,
       reason,
-      metadata: { centerName: center.name },
+      metadata: { center_id: id, centerName: center.name },
       req,
     });
   }
@@ -205,9 +290,35 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       targetId: id,
       reason,
       metadata: {
+        center_id: id,
         centerName: center.name,
         previousOffer: previousCenter.nexa_offer,
         nextOffer: center.nexa_offer,
+      },
+      req,
+    });
+  }
+
+  const subscriptionFields = [
+    ["subscription_amount", hasSubscriptionAmount],
+    ["subscription_period_months", hasSubscriptionPeriod],
+    ["renewal_at", hasRenewalAt],
+    ["renewal_alert_days", hasRenewalAlertDays],
+    ["quota_overrides", hasQuotaOverrides],
+  ] as const;
+
+  for (const [field, changed] of subscriptionFields) {
+    if (!changed) continue;
+    await logSuperadminAction(ctx.user.id, "center_subscription_updated", {
+      targetType: "center",
+      targetId: id,
+      reason,
+      metadata: {
+        center_id: id,
+        centerName: center.name,
+        field,
+        previousValue: previousCenter[field],
+        nextValue: center[field],
       },
       req,
     });

@@ -37,6 +37,35 @@ function unwrapProfile(raw: unknown): ManagerProfile | null {
   return p?.id ? p : null;
 }
 
+type CenterStatusInput = {
+  status?: string | null;
+  trial_ends_at?: string | null;
+  renewal_at?: string | null;
+};
+
+export type CenterDerivedStatus =
+  | "active"
+  | "trial"
+  | "trial_expired"
+  | "subscription_expired"
+  | "paused"
+  | "revoked";
+
+export function computeCenterDerivedStatus(center: CenterStatusInput, now = Date.now()): CenterDerivedStatus {
+  const status = center.status ?? "";
+  if (status === "rejected") return "revoked";
+  if (status === "suspended") return "paused";
+  if (status === "pending") {
+    if (center.trial_ends_at && new Date(center.trial_ends_at).getTime() > now) return "trial";
+    return "trial_expired";
+  }
+  if (status === "active" || status === "expired") {
+    if (center.renewal_at && new Date(center.renewal_at).getTime() <= now) return "subscription_expired";
+    return "active";
+  }
+  return "active";
+}
+
 export async function GET(req: NextRequest) {
   const { ctx, error } = await getSuperadminContext(req);
   if (!ctx) return error;
@@ -49,7 +78,9 @@ export async function GET(req: NextRequest) {
   ] = await Promise.all([
     supabaseAdmin
       .from("centers")
-      .select("id, name, city, code, signup_slug, address, country, region, center_type, status, email, phone, created_at, nexa_offer")
+      .select(
+        "id, name, city, code, signup_slug, address, country, region, center_type, status, email, phone, created_at, nexa_offer, trial_ends_at, renewal_at, subscription_amount, quota_overrides, pause_reason",
+      )
       .order("created_at", { ascending: false }),
     supabaseAdmin
       .from("profiles")
@@ -158,6 +189,7 @@ export async function GET(req: NextRequest) {
       ...center,
       managers,
       creatorEmail,
+      derived_status: computeCenterDerivedStatus(center, now),
       stats: statsByCenter.get(center.id) ?? { actifs: 0, pauses: 0, expires: 0, termines: 0, revoques: 0, total: 0 },
     };
   });
