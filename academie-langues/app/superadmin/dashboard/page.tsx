@@ -57,7 +57,7 @@ export default function SuperadminDashboardPage() {
           <p className="mt-1 text-2xl font-black text-white">{loading ? "—" : totalActiveStudents}</p>
         </div>
         <Link
-          href="/superadmin/demandes"
+          href="/superadmin/centres?status=trial"
           className={`rounded-2xl border p-5 transition-colors ${
             urgentTrials > 0
               ? "border-red-500/20 bg-red-500/5 hover:border-red-500/40"
@@ -78,7 +78,7 @@ export default function SuperadminDashboardPage() {
 
       {pendingCenters > 0 && (
         <Link
-          href="/superadmin/demandes"
+          href="/superadmin/centres?status=trial"
           className="flex items-center justify-between gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-5 transition-colors hover:bg-orange-500/10"
         >
           <div className="flex items-center gap-3">
