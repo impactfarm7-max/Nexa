@@ -6,7 +6,10 @@ import {
   countGroupesForFiliere,
   resolveSignupGroupeId,
 } from "@/app/utils/studentClassroom.server";
-import { getNexaB2bProfileQuotas, resolveEffectiveNexaOffer } from "@/app/data/nexaOffers";
+import {
+  getNexaB2bProfileQuotas,
+} from "@/app/data/nexaOffers";
+import { assertCenterHasStudentSeat } from "@/app/utils/center-student-quota";
 import {
   catalogTotalShort,
   isShortPricingMode,
@@ -319,27 +322,26 @@ export async function POST(req: NextRequest) {
 
     // ---- 4a. Plafond étudiants + type centre selon offre NEXA ----
     let centerTypeRaw: string | null = null;
+    let centerQuotaOverrides: Record<string, unknown> | null = null;
     if (callerCenterId) {
       const { data: centerRow } = await supabaseAdmin
         .from("centers")
-        .select("nexa_offer, status, created_at, center_type")
+        .select("nexa_offer, status, created_at, center_type, quota_overrides")
         .eq("id", callerCenterId)
         .maybeSingle();
       centerTypeRaw = centerRow?.center_type ?? null;
-      const offer = resolveEffectiveNexaOffer(centerRow);
-      const maxStudents = offer.maxStudents;
-      if (maxStudents != null) {
-        const { count: studentCount } = await supabaseAdmin
-          .from("profiles")
-          .select("id", { count: "exact", head: true })
-          .eq("center_id", callerCenterId)
-          .eq("role", "student")
-          .neq("tag_status", "revoque");
-        if ((studentCount || 0) >= maxStudents) {
-          return NextResponse.json({
-            error: `Limite d'étudiants atteinte pour l'offre ${offer.name} (${maxStudents}).`,
-          }, { status: 403 });
-        }
+      centerQuotaOverrides =
+        centerRow?.quota_overrides && typeof centerRow.quota_overrides === "object"
+          ? (centerRow.quota_overrides as Record<string, unknown>)
+          : null;
+      const seatCheck = await assertCenterHasStudentSeat(callerCenterId, supabaseAdmin);
+      if (!seatCheck.ok) {
+        return NextResponse.json(
+          {
+            error: `Limite d'étudiants atteinte pour l'offre ${seatCheck.offerName} (${seatCheck.max}). Les places libérées concernent les comptes expirés, révoqués ou terminés — pause et actifs comptent toujours.`,
+          },
+          { status: 403 },
+        );
       }
     }
 
@@ -479,7 +481,7 @@ export async function POST(req: NextRequest) {
           tutor_ia_total: TUTOR_EXCHANGE_QUOTA,
           tutor_ia_used: 0,
         }
-      : getNexaB2bProfileQuotas();
+      : getNexaB2bProfileQuotas(centerQuotaOverrides);
 
     // ---- 6. Renseigner le profil ----
     // Le trigger on_auth_user_created peut pré-créer la ligne avec un tag_status

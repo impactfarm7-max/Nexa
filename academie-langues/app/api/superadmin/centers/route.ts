@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSuperadminContext, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
+import { CENTER_TRIAL_MS } from "@/app/utils/center-trial";
+import { normalizeNexaOffer } from "@/app/data/nexaOffers";
 
 type StudentStatusRow = {
   center_id: string;
@@ -39,8 +41,11 @@ function unwrapProfile(raw: unknown): ManagerProfile | null {
 
 type CenterStatusInput = {
   status?: string | null;
+  created_at?: string | null;
   trial_ends_at?: string | null;
   renewal_at?: string | null;
+  nexa_offer?: string | null;
+  subscription_starts_at?: string | null;
 };
 
 export type CenterDerivedStatus =
@@ -51,18 +56,62 @@ export type CenterDerivedStatus =
   | "paused"
   | "revoked";
 
+/** Essai encore valide : trial_ends_at, sinon created_at + 7 j. */
+function isPendingTrialActive(center: CenterStatusInput, now: number): boolean {
+  if (center.trial_ends_at) {
+    const ends = new Date(center.trial_ends_at).getTime();
+    return Number.isFinite(ends) && ends > now;
+  }
+  if (center.created_at) {
+    const created = new Date(center.created_at).getTime();
+    if (!Number.isFinite(created)) return false;
+    return created + CENTER_TRIAL_MS > now;
+  }
+  // Centre pending sans dates : encore à traiter → en demande
+  return true;
+}
+
+function hasAssignedOffer(center: CenterStatusInput): boolean {
+  return normalizeNexaOffer(center.nexa_offer) != null;
+}
+
+function trialStatusWithoutOffer(center: CenterStatusInput, now: number): CenterDerivedStatus {
+  return isPendingTrialActive(center, now) ? "trial" : "trial_expired";
+}
+
 export function computeCenterDerivedStatus(center: CenterStatusInput, now = Date.now()): CenterDerivedStatus {
-  const status = center.status ?? "";
+  const status = (center.status ?? "").trim().toLowerCase();
+
   if (status === "rejected") return "revoked";
   if (status === "suspended") return "paused";
+
+  // En demande / essai (pending)
   if (status === "pending") {
-    if (center.trial_ends_at && new Date(center.trial_ends_at).getTime() > now) return "trial";
-    return "trial_expired";
+    return isPendingTrialActive(center, now) ? "trial" : "trial_expired";
   }
-  if (status === "active" || status === "expired") {
-    if (center.renewal_at && new Date(center.renewal_at).getTime() <= now) return "subscription_expired";
+
+  if (status === "expired") return "subscription_expired";
+
+  // Actif uniquement avec une offre NEXA attribuée — sinon c'est un essai.
+  if (status === "active") {
+    if (!hasAssignedOffer(center)) {
+      return trialStatusWithoutOffer(center, now);
+    }
+    if (center.renewal_at && new Date(center.renewal_at).getTime() <= now) {
+      return "subscription_expired";
+    }
     return "active";
   }
+
+  // Statut manquant / inconnu : si pas d'offre activée, traiter comme demande
+  if (!status || status === "null" || status === "undefined") {
+    return trialStatusWithoutOffer(center, now);
+  }
+
+  if (!hasAssignedOffer(center)) {
+    return trialStatusWithoutOffer(center, now);
+  }
+
   return "active";
 }
 
@@ -79,7 +128,7 @@ export async function GET(req: NextRequest) {
     supabaseAdmin
       .from("centers")
       .select(
-        "id, name, city, code, signup_slug, address, country, region, center_type, status, email, phone, created_at, nexa_offer, trial_ends_at, renewal_at, subscription_amount, quota_overrides, pause_reason",
+        "id, name, city, code, signup_slug, address, country, region, center_type, status, email, phone, created_at, nexa_offer, trial_ends_at, renewal_at, renewal_alert_days, subscription_amount, quota_overrides, pause_reason",
       )
       .order("created_at", { ascending: false }),
     supabaseAdmin

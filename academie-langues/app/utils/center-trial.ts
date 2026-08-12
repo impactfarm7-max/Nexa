@@ -24,11 +24,16 @@ export function centerTrialRemainingMs(createdAt: string | null | undefined): nu
   return Math.max(0, CENTER_TRIAL_MS - elapsed);
 }
 
+/** Essai encore valide : trial_ends_at, sinon created_at + 7 j (legacy). */
 function isTrialActive(center: CenterOperationalInput): boolean {
   if (center.trial_ends_at) {
     return new Date(center.trial_ends_at) > new Date();
   }
-  return centerTrialRemainingMs(center.created_at) > 0;
+  if (center.created_at) {
+    return centerTrialRemainingMs(center.created_at) > 0;
+  }
+  // Pending sans dates → encore à traiter
+  return center.status === "pending";
 }
 
 /**

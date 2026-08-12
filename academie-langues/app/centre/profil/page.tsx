@@ -22,6 +22,7 @@ import {
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import DownloadAppButton from "@/app/components/DownloadAppButton";
+import { LogoutConfirmDialog } from "@/app/components/LogoutConfirmDialog";
 import type { PinSettings } from "@/app/utils/pin-crypto";
 import { canManagePinProtectedZones } from "@/app/utils/student-routes";
 import { checkPasswordStrength, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
@@ -110,6 +111,8 @@ export default function CenterProfilPage() {
   const [createPin, setCreatePin] = useState({ pin: "", confirm: "" });
   const [changePin, setChangePin] = useState({ oldPin: "", newPin: "", confirm: "" });
   const [showChangePin, setShowChangePin] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   const readJson = async (res: Response) => {
     const text = await res.text();
@@ -408,9 +411,15 @@ export default function CenterProfilPage() {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    localStorage.clear();
-    router.replace("/login");
+    setLogoutBusy(true);
+    try {
+      await supabase.auth.signOut();
+      localStorage.clear();
+      router.replace("/login");
+    } finally {
+      setLogoutBusy(false);
+      setLogoutConfirmOpen(false);
+    }
   };
 
   if (loading) {
@@ -473,7 +482,7 @@ export default function CenterProfilPage() {
                   </button>
                 </>
               )}
-              <button onClick={signOut} className="flex h-11 items-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-100">
+              <button onClick={() => setLogoutConfirmOpen(true)} className="flex h-11 items-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-100">
                 <LogOut className="h-4 w-4" />
                 <span className="hidden sm:inline">{t("centre", "profileLogout")}</span>
               </button>
@@ -596,7 +605,7 @@ export default function CenterProfilPage() {
             </section>
 
             <button
-              onClick={signOut}
+              onClick={() => setLogoutConfirmOpen(true)}
               className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-neutral-900 text-sm font-black uppercase tracking-widest text-white transition hover:bg-orange-600 lg:hidden"
             >
               <LogOut className="h-4 w-4" />
@@ -815,6 +824,20 @@ export default function CenterProfilPage() {
             )}
           </div>
         </section>
+
+      {logoutConfirmOpen && (
+        <LogoutConfirmDialog
+          title={t("centre", "profileLogoutConfirmTitle")}
+          message={t("centre", "profileLogoutConfirmMessage")}
+          confirmLabel={t("centre", "profileSignOut")}
+          cancelLabel={t("centre", "periodCancel")}
+          busy={logoutBusy}
+          onConfirm={() => void signOut()}
+          onCancel={() => {
+            if (!logoutBusy) setLogoutConfirmOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

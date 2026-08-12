@@ -34,6 +34,7 @@ import {
 } from "@/app/utils/student-profile";
 import StudentRouteSkeleton from "@/app/components/StudentRouteSkeleton";
 import DownloadAppButton from "@/app/components/DownloadAppButton";
+import { LogoutConfirmDialog } from "@/app/components/LogoutConfirmDialog";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import { AFRICA_54, findAfricaCountry, resolveAfricaCountry } from "@/app/data/africa-54";
 import { checkPasswordStrength, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
@@ -170,6 +171,8 @@ export default function CenterStudentProfil() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const financeEn = locale === "en" && !isTcfCanadaCenter(account?.center.center_type);
   const financeLocale = financeEn ? "en-US" : "fr-FR";
   const financeDate = (value?: string | null) => value
@@ -414,9 +417,15 @@ export default function CenterStudentProfil() {
   };
 
   const signOut = async () => {
-    const token = localStorage.getItem("session_token") || "";
-    await logoutAndClearSession(token);
-    router.replace("/login");
+    setLogoutBusy(true);
+    try {
+      const token = localStorage.getItem("session_token") || "";
+      await logoutAndClearSession(token);
+      router.replace("/login");
+    } finally {
+      setLogoutBusy(false);
+      setLogoutConfirmOpen(false);
+    }
   };
 
   if (loading) {
@@ -493,7 +502,7 @@ export default function CenterStudentProfil() {
               </>
             )}
             <button
-              onClick={signOut}
+              onClick={() => setLogoutConfirmOpen(true)}
               aria-label={td("profilLogout")}
               className="flex h-10 w-10 sm:h-11 sm:w-auto sm:px-4 items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-100"
             >
@@ -690,7 +699,7 @@ export default function CenterStudentProfil() {
           </section>
 
           <button
-            onClick={signOut}
+            onClick={() => setLogoutConfirmOpen(true)}
             className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-neutral-900 text-sm font-black uppercase tracking-widest text-white transition hover:bg-orange-600 lg:hidden"
           >
             <LogOut className="h-4 w-4" />
@@ -1048,6 +1057,19 @@ export default function CenterStudentProfil() {
         </div>
       </section>
 
+      {logoutConfirmOpen && (
+        <LogoutConfirmDialog
+          title={td("profilLogoutConfirmTitle")}
+          message={td("profilLogoutConfirmMessage")}
+          confirmLabel={td("profilSignOut")}
+          cancelLabel={td("profilCancel")}
+          busy={logoutBusy}
+          onConfirm={() => void signOut()}
+          onCancel={() => {
+            if (!logoutBusy) setLogoutConfirmOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

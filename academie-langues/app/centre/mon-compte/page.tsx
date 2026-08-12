@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
+import { LogoutConfirmDialog } from "@/app/components/LogoutConfirmDialog";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
 type CenterAccount = {
@@ -87,6 +88,8 @@ export default function CenterAccountPage() {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [form, setForm] = useState({ prenom: "", phone: "", ville: "", genre: "" });
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
 
   const isStudent = account?.profile?.role === "student" || (!account?.membership && Boolean(account?.profile));
   const backHref = isStudent ? "/dashboard" : "/centre/dashboard";
@@ -159,8 +162,14 @@ export default function CenterAccountPage() {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
-    router.replace("/login");
+    setLogoutBusy(true);
+    try {
+      await supabase.auth.signOut();
+      router.replace("/login");
+    } finally {
+      setLogoutBusy(false);
+      setLogoutConfirmOpen(false);
+    }
   };
 
   if (loading) {
@@ -196,7 +205,7 @@ export default function CenterAccountPage() {
             </span>
             <h1 className="mt-2 truncate text-2xl font-black tracking-tight md:text-4xl">{displayName}</h1>
           </div>
-          <button onClick={signOut} className="flex h-11 items-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-100">
+          <button onClick={() => setLogoutConfirmOpen(true)} className="flex h-11 items-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-100">
             <LogOut className="h-4 w-4" />
             <span className="hidden sm:inline">{t("centre", "accountSignOut")}</span>
           </button>
@@ -333,6 +342,20 @@ export default function CenterAccountPage() {
           </div>
         </div>
       </section>
+
+      {logoutConfirmOpen && (
+        <LogoutConfirmDialog
+          title={t("centre", "profileLogoutConfirmTitle")}
+          message={t("centre", "profileLogoutConfirmMessage")}
+          confirmLabel={t("centre", "accountSignOut")}
+          cancelLabel={t("centre", "periodCancel")}
+          busy={logoutBusy}
+          onConfirm={() => void signOut()}
+          onCancel={() => {
+            if (!logoutBusy) setLogoutConfirmOpen(false);
+          }}
+        />
+      )}
     </main>
   );
 }

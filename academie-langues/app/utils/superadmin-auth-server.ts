@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  canAccessMenu,
+  sanitizeSuperadminMenus,
+  type SuperadminAccess,
+  type SuperadminMenuKey,
+} from "@/app/data/superadminMenus";
 
 export const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "https://placeholder.supabase.co",
@@ -10,6 +16,7 @@ export const supabaseAdmin = createClient(
 export type SuperadminContext = {
   user: { id: string; email: string | null };
   accessToken: string;
+  access: SuperadminAccess;
 };
 
 type SuperadminResult =
@@ -37,6 +44,47 @@ function decodeAal(accessToken: string): "aal1" | "aal2" {
   } catch {
     return "aal1";
   }
+}
+
+async function loadOrBootstrapAccess(userId: string): Promise<SuperadminAccess> {
+  const { data: row, error } = await supabaseAdmin
+    .from("superadmin_permissions")
+    .select("is_owner, menus, disabled_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  // Table absente / pas encore migrée → accès total (compat).
+  if (error) {
+    console.warn("[superadmin] permissions lookup:", error.message);
+    return { isOwner: true, menus: [], disabled: false };
+  }
+
+  if (!row) {
+    const { count } = await supabaseAdmin
+      .from("superadmin_permissions")
+      .select("user_id", { count: "exact", head: true })
+      .eq("is_owner", true)
+      .is("disabled_at", null);
+
+    const makeOwner = !count || count === 0;
+    await supabaseAdmin.from("superadmin_permissions").upsert({
+      user_id: userId,
+      is_owner: makeOwner,
+      menus: makeOwner ? [] : ["dashboard"],
+      updated_at: new Date().toISOString(),
+    });
+    return {
+      isOwner: makeOwner,
+      menus: makeOwner ? [] : (["dashboard"] as SuperadminMenuKey[]),
+      disabled: false,
+    };
+  }
+
+  return {
+    isOwner: Boolean(row.is_owner),
+    menus: sanitizeSuperadminMenus(row.menus),
+    disabled: Boolean(row.disabled_at),
+  };
 }
 
 /**
@@ -70,10 +118,30 @@ export async function getSuperadminContext(req: Request): Promise<SuperadminResu
     return { ctx: null, error: unauthorized("Verification MFA requise.", 403) };
   }
 
+  const access = await loadOrBootstrapAccess(user.id);
+  if (access.disabled) {
+    return { ctx: null, error: unauthorized("Compte superadmin desactive.", 403) };
+  }
+
   return {
-    ctx: { user: { id: user.id, email: user.email ?? null }, accessToken },
+    ctx: { user: { id: user.id, email: user.email ?? null }, accessToken, access },
     error: null,
   };
+}
+
+/** Exige le droit sur un menu (owners toujours OK). */
+export function requireSuperadminMenu(
+  ctx: SuperadminContext,
+  menu: SuperadminMenuKey,
+): NextResponse | null {
+  if (canAccessMenu(ctx.access, menu)) return null;
+  return unauthorized("Acces menu non autorise.", 403);
+}
+
+/** Exige le statut owner (gestion d'equipe). */
+export function requireSuperadminOwner(ctx: SuperadminContext): NextResponse | null {
+  if (ctx.access.isOwner) return null;
+  return unauthorized("Reserve aux superadmins owner.", 403);
 }
 
 /** Journalise une action superadmin (non bloquant). */

@@ -397,16 +397,31 @@ export default function CenterStudentsPage() {
     setStudents((prev) => prev.map((s) => (s.id === id ? { ...s, center_status: st } : s)));
   };
 
+  const activateStudentViaApi = async (studentId: string, enrollmentId?: string) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) throw new Error("Session expiree.");
+    const res = await fetch("/api/center/students", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        studentId,
+        action: "activate",
+        ...(enrollmentId ? { enrollmentId } : {}),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Activation impossible.");
+    return data;
+  };
+
   const activateEnrollment = async (enrollmentId: string, studentId?: string) => {
-    if (!centerId) return;
+    if (!centerId || !studentId) return;
     setActivating(true);
     const result = await feedback.run(async () => {
-      const { error } = await supabase.from("enrollments").update({ status: "active" }).eq("id", enrollmentId);
-      if (error) throw new Error(error.message);
-      if (studentId) {
-        const { error: profileErr } = await supabase.from("profiles").update({ center_status: "active", tag_status: "normal" }).eq("id", studentId);
-        if (profileErr) throw new Error(profileErr.message);
-      }
+      await activateStudentViaApi(studentId, enrollmentId);
       await loadStudents(centerId, { silent: true, force: true });
       clearCenterApiCache("/api/center/enrollments-list");
     }, { successTitle: t("centre", "studentsActionActivateOk") });
@@ -422,7 +437,8 @@ export default function CenterStudentsPage() {
   };
 
   const reactivateStudent = async (studentId: string) => {
-    await setAccessStatus(studentId, "active");
+    await activateStudentViaApi(studentId);
+    setStudents((prev) => prev.map((s) => (s.id === studentId ? { ...s, center_status: "active" } : s)));
   };
 
   const runStudentConfirm = async () => {
@@ -442,7 +458,7 @@ export default function CenterStudentsPage() {
   const approvePendingStudent = async (studentId: string) => {
     setActivating(true);
     const result = await feedback.run(async () => {
-      await setAccessStatus(studentId, "active");
+      await activateStudentViaApi(studentId);
       if (centerId) await loadStudents(centerId, { silent: true, force: true });
       clearCenterApiCache("/api/center/enrollments-list");
     }, { successTitle: t("centre", "studentsActionActivateOk") });

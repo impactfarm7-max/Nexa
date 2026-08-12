@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { getTcfCenterQuotas } from "@/app/data/packOffers";
+import {
+  getNexaB2bProfileQuotas,
+  hasCustomStudentQuotaOverrides,
+  normalizeNexaOffer,
+} from "@/app/data/nexaOffers";
+import { sendStudentActivatedEmail } from "@/app/utils/activation-emails";
+import { assertCenterHasStudentSeat } from "@/app/utils/center-student-quota";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -75,6 +82,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Prenom et email sont requis." }, { status: 400 });
   }
 
+  const seatCheck = await assertCenterHasStudentSeat(centerId!, supabaseAdmin);
+  if (!seatCheck.ok) {
+    return NextResponse.json(
+      {
+        error: `Limite d'étudiants atteinte pour l'offre ${seatCheck.offerName} (${seatCheck.max}). Actifs et pause occupent une place ; expirés / révoqués / terminés la libèrent.`,
+      },
+      { status: 403 },
+    );
+  }
+
   const password = generatePassword(prenom);
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -92,7 +109,18 @@ export async function POST(req: Request) {
   const userId = authData.user.id;
   const subscriptionEndsAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString();
   const activatedAt = new Date().toISOString();
-  const quotas = getTcfCenterQuotas(3); // 90 jours ≈ 3 × Pack Ébène
+  const { data: centerRow } = await supabaseAdmin
+    .from("centers")
+    .select("nexa_offer, quota_overrides")
+    .eq("id", centerId)
+    .maybeSingle();
+  const overrides =
+    centerRow?.quota_overrides && typeof centerRow.quota_overrides === "object"
+      ? (centerRow.quota_overrides as Record<string, unknown>)
+      : null;
+  const useCustom =
+    normalizeNexaOffer(centerRow?.nexa_offer) === "custom" && hasCustomStudentQuotaOverrides(overrides);
+  const quotas = useCustom ? getNexaB2bProfileQuotas(overrides) : getTcfCenterQuotas(3); // 90 jours ≈ 3 mois
   const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
     id: userId,
     prenom: prenom.trim(),
@@ -151,14 +179,14 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ error: "Validation d'etudiant non autorisee." }, { status: 403 });
   }
 
-  const { studentId, action } = await req.json();
-  if (!studentId || !["approve", "reject", "reset_password"].includes(action)) {
+  const { studentId, action, enrollmentId } = await req.json();
+  if (!studentId || !["approve", "activate", "reject", "reset_password"].includes(action)) {
     return NextResponse.json({ error: "Action invalide." }, { status: 400 });
   }
 
   const { data: student, error: studentError } = await supabaseAdmin
     .from("profiles")
-    .select("id, prenom, email, center_id, role, tag_status")
+    .select("id, prenom, email, center_id, role, tag_status, center_status, activated_at")
     .eq("id", studentId)
     .eq("center_id", centerId)
     .eq("role", "student")
@@ -174,22 +202,70 @@ export async function PATCH(req: Request) {
     return NextResponse.json({ ok: true, studentId, email: student.email, password, prenom: student.prenom });
   }
 
-  const nextStatus = action === "approve" ? "normal" : "revoque";
+  if (action === "reject") {
+    const { error } = await supabaseAdmin
+      .from("profiles")
+      .update({
+        tag_status: "revoque",
+        center_status: "revoked",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", studentId)
+      .eq("center_id", centerId)
+      .eq("role", "student");
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    await supabaseAdmin.from("notifications").insert({
+      user_id: studentId,
+      message:
+        "Votre demande de compte centre a ete refusee. Contactez votre centre pour plus d'informations.",
+    });
+
+    return NextResponse.json({ ok: true, studentId, tag_status: "revoque", center_status: "revoked" });
+  }
+
+  // approve | activate
+  const now = new Date().toISOString();
+  const profilePatch: Record<string, unknown> = {
+    center_status: "active",
+    tag_status: "normal",
+    updated_at: now,
+  };
+  if (!student.activated_at) profilePatch.activated_at = now;
+
   const { error } = await supabaseAdmin
     .from("profiles")
-    .update({ tag_status: nextStatus, updated_at: new Date().toISOString() })
+    .update(profilePatch)
     .eq("id", studentId)
     .eq("center_id", centerId)
     .eq("role", "student");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  await supabaseAdmin.from("notifications").insert({
-    user_id: studentId,
-    message: action === "approve"
-      ? "Votre compte centre a ete valide. Vous pouvez maintenant vous connecter."
-      : "Votre demande de compte centre a ete refusee. Contactez votre centre pour plus d'informations.",
+  if (enrollmentId) {
+    const { error: enrollmentError } = await supabaseAdmin
+      .from("enrollments")
+      .update({ status: "active" })
+      .eq("id", enrollmentId)
+      .eq("student_id", studentId);
+    if (enrollmentError) {
+      return NextResponse.json({ error: enrollmentError.message }, { status: 500 });
+    }
+  }
+
+  const { data: center } = await supabaseAdmin.from("centers").select("name").eq("id", centerId).maybeSingle();
+  const emailResult = await sendStudentActivatedEmail({
+    to: student.email,
+    studentName: student.prenom || "Apprenant",
+    centerName: center?.name ?? null,
   });
 
-  return NextResponse.json({ ok: true, studentId, tag_status: nextStatus });
+  return NextResponse.json({
+    ok: true,
+    studentId,
+    tag_status: "normal",
+    center_status: "active",
+    emailSent: Boolean(emailResult.sent),
+  });
 }

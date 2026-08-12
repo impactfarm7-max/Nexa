@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   Building2,
+  CalendarClock,
   Download,
   Eye,
   RefreshCw,
@@ -24,14 +26,35 @@ type CenterDerivedStatus =
   | "subscription_expired"
   | "paused"
   | "revoked";
-type TopCenter = { id: string; name: string; student_count: number };
+type TopCenter = {
+  id: string;
+  name: string;
+  student_count: number;
+  offer?: NexaOfferKey | null;
+  status?: CenterDerivedStatus;
+};
 type NetworkCenterExport = {
   name: string;
-  offer: NexaOfferKey;
+  offer: NexaOfferKey | "none";
   status: CenterDerivedStatus;
   students: number;
   amount: number;
   renewal_at: string | null;
+};
+type UpcomingRenewal = {
+  id: string;
+  name: string;
+  amount: number;
+  renewal_at: string;
+  days_left: number;
+};
+type StudentHealth = {
+  actifs: number;
+  pauses: number;
+  expires: number;
+  termines: number;
+  revoques: number;
+  total: number;
 };
 
 type Analytics = {
@@ -42,12 +65,32 @@ type Analytics = {
   periodPageViews: number;
   previousPeriodVisitors: number;
   previousPeriodPageViews: number;
-  centersByOffer: Record<NexaOfferKey, number>;
+  centersByOffer: Record<NexaOfferKey | "none", number>;
   centersByStatus: Record<CenterDerivedStatus, number>;
+  centersByType: { tcf: number; native: number };
+  totalCenters: number;
+  activeCenters: number;
   totalStudents: number;
+  studentHealth: StudentHealth;
   mrr: number;
+  arpu: number;
+  avgStudentsPerCenter: number;
+  revenueAtRisk: number;
+  newCentersInPeriod: number;
+  newStudentsInPeriod: number;
+  renewalsNext30Days: number;
+  upcomingRenewals: UpcomingRenewal[];
   topCenters: TopCenter[];
   networkCenters: NetworkCenterExport[];
+};
+
+const EMPTY_HEALTH: StudentHealth = {
+  actifs: 0,
+  pauses: 0,
+  expires: 0,
+  termines: 0,
+  revoques: 0,
+  total: 0,
 };
 
 const EMPTY: Analytics = {
@@ -58,7 +101,7 @@ const EMPTY: Analytics = {
   periodPageViews: 0,
   previousPeriodVisitors: 0,
   previousPeriodPageViews: 0,
-  centersByOffer: { decouverte: 0, croissance: 0, pro: 0, entreprise: 0, custom: 0 },
+  centersByOffer: { decouverte: 0, croissance: 0, pro: 0, entreprise: 0, custom: 0, none: 0 },
   centersByStatus: {
     active: 0,
     trial: 0,
@@ -67,8 +110,19 @@ const EMPTY: Analytics = {
     paused: 0,
     revoked: 0,
   },
+  centersByType: { tcf: 0, native: 0 },
+  totalCenters: 0,
+  activeCenters: 0,
   totalStudents: 0,
+  studentHealth: EMPTY_HEALTH,
   mrr: 0,
+  arpu: 0,
+  avgStudentsPerCenter: 0,
+  revenueAtRisk: 0,
+  newCentersInPeriod: 0,
+  newStudentsInPeriod: 0,
+  renewalsNext30Days: 0,
+  upcomingRenewals: [],
   topCenters: [],
   networkCenters: [],
 };
@@ -82,6 +136,15 @@ const STATUS_KEYS: CenterDerivedStatus[] = [
   "revoked",
 ];
 
+const STATUS_BAR: Record<CenterDerivedStatus, string> = {
+  active: "bg-emerald-400",
+  trial: "bg-amber-400",
+  trial_expired: "bg-orange-400",
+  subscription_expired: "bg-red-400",
+  paused: "bg-slate-400",
+  revoked: "bg-rose-500",
+};
+
 const STATUS_BADGE: Record<CenterDerivedStatus, string> = {
   active: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
   trial: "bg-amber-500/15 text-amber-300 border-amber-500/25",
@@ -91,18 +154,54 @@ const STATUS_BADGE: Record<CenterDerivedStatus, string> = {
   revoked: "bg-rose-500/15 text-rose-300 border-rose-500/25",
 };
 
-const OFFER_BADGE: Record<NexaOfferKey, string> = {
+const OFFER_BADGE: Record<NexaOfferKey | "none", string> = {
   decouverte: "bg-blue-500/15 text-blue-300 border-blue-500/25",
   croissance: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
   pro: "bg-violet-500/15 text-violet-300 border-violet-500/25",
   entreprise: "bg-orange-500/15 text-orange-300 border-orange-500/25",
   custom: "bg-slate-500/15 text-slate-300 border-slate-500/25",
+  none: "bg-white/5 text-slate-400 border-white/10",
 };
 
 type Tab = "audience" | "network";
 
 function formatFcfa(value: number, locale: string) {
   return `${new Intl.NumberFormat(locale === "en" ? "en-US" : "fr-FR").format(value)} FCFA`;
+}
+
+function formatShortDate(value: string, locale: string) {
+  return new Date(value).toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function BarRow({
+  label,
+  value,
+  max,
+  colorClass,
+}: {
+  label: string;
+  value: number;
+  max: number;
+  colorClass: string;
+}) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <li className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2 text-sm">
+        <span className="truncate text-slate-400">{label}</span>
+        <span className="font-black text-white">
+          {value}
+          <span className="ml-1.5 text-[10px] font-bold text-slate-600">{pct}%</span>
+        </span>
+      </div>
+      <div className="h-1.5 overflow-hidden rounded-full bg-white/[0.06]">
+        <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${pct}%` }} />
+      </div>
+    </li>
+  );
 }
 
 export default function SuperadminAnalyticsPage() {
@@ -118,8 +217,18 @@ export default function SuperadminAnalyticsPage() {
     setLoading(true);
     setError("");
     try {
-      const json = await superadminFetch<Analytics>(`/api/superadmin/analytics?days=${days}`);
-      setData({ ...EMPTY, ...json });
+      const json = await superadminFetch<Partial<Analytics>>(`/api/superadmin/analytics?days=${days}`);
+      setData({
+        ...EMPTY,
+        ...json,
+        centersByOffer: { ...EMPTY.centersByOffer, ...(json.centersByOffer || {}) },
+        centersByStatus: { ...EMPTY.centersByStatus, ...(json.centersByStatus || {}) },
+        centersByType: { ...EMPTY.centersByType, ...(json.centersByType || {}) },
+        studentHealth: { ...EMPTY_HEALTH, ...(json.studentHealth || {}) },
+        upcomingRenewals: json.upcomingRenewals || [],
+        topCenters: json.topCenters || [],
+        networkCenters: json.networkCenters || [],
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : t("superadmin", "analyticsLoadError"));
     } finally {
@@ -142,6 +251,9 @@ export default function SuperadminAnalyticsPage() {
   );
   const change = (now: number, before: number) =>
     before ? Math.round(((now - before) / before) * 100) : now ? 100 : 0;
+
+  const pagesPerVisitor =
+    data.periodVisitors > 0 ? Math.round((data.periodPageViews / data.periodVisitors) * 10) / 10 : 0;
 
   const exportAudienceCsv = () => {
     const rows = [
@@ -192,16 +304,18 @@ export default function SuperadminAnalyticsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const offerLabel = (key: NexaOfferKey) =>
-    key === "custom"
-      ? t("superadmin", "centresOfferCustom")
-      : key === "decouverte"
-        ? t("superadmin", "centresOfferDecouverte")
-        : key === "croissance"
-          ? t("superadmin", "centresOfferCroissance")
-          : key === "pro"
-            ? t("superadmin", "centresOfferPro")
-            : t("superadmin", "centresOfferEntreprise");
+  const offerLabel = (key: NexaOfferKey | "none") =>
+    key === "none"
+      ? t("superadmin", "centresNoOffer")
+      : key === "custom"
+        ? t("superadmin", "centresOfferCustom")
+        : key === "decouverte"
+          ? t("superadmin", "centresOfferDecouverte")
+          : key === "croissance"
+            ? t("superadmin", "centresOfferCroissance")
+            : key === "pro"
+              ? t("superadmin", "centresOfferPro")
+              : t("superadmin", "centresOfferEntreprise");
 
   const statusLabel = (key: CenterDerivedStatus) =>
     t("superadmin", `centresDerivedStatus_${key}` as "centresDerivedStatus_active");
@@ -210,23 +324,34 @@ export default function SuperadminAnalyticsPage() {
     { label: t("superadmin", "analyticsVisitorsToday"), value: today.visitors, icon: Users },
     { label: t("superadmin", "analyticsNewVisitorsToday"), value: today.newVisitors, icon: UserPlus },
     {
-      label: t("superadmin", "analyticsVisitorsOverDays", { days }),
+      label: t("superadmin", "analyticsVisitorsOverDays").replace("{days}", String(days)),
       value: data.periodVisitors,
       icon: TrendingUp,
     },
     {
-      label: t("superadmin", "analyticsPageViewsOverDays", { days }),
+      label: t("superadmin", "analyticsPageViewsOverDays").replace("{days}", String(days)),
       value: data.periodPageViews,
       icon: Eye,
     },
   ];
 
-  const mainOfferKeys: Exclude<NexaOfferKey, "custom">[] = [
+  const mainOfferKeys: (NexaOfferKey | "none")[] = [
     "decouverte",
     "croissance",
     "pro",
     "entreprise",
+    "custom",
+    "none",
   ];
+  const offerMax = Math.max(1, ...mainOfferKeys.map((k) => data.centersByOffer[k] || 0));
+  const statusMax = Math.max(1, ...STATUS_KEYS.map((k) => data.centersByStatus[k] || 0));
+  const healthMax = Math.max(
+    1,
+    data.studentHealth.actifs,
+    data.studentHealth.pauses,
+    data.studentHealth.expires,
+    data.studentHealth.revoques,
+  );
 
   return (
     <div className="space-y-6">
@@ -238,7 +363,7 @@ export default function SuperadminAnalyticsPage() {
           <p className="mt-1 text-sm text-slate-400">
             {tab === "audience"
               ? t("superadmin", "analyticsSubtitle")
-              : t("superadmin", "analyticsCentersByOffer")}
+              : t("superadmin", "analyticsNetworkSubtitle")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -255,21 +380,21 @@ export default function SuperadminAnalyticsPage() {
               </button>
             ))}
           </div>
+          {[7, 30, 90].map((period) => (
+            <button
+              key={period}
+              onClick={() => setDays(period)}
+              className={`rounded-lg px-3 py-2 text-xs font-black ${
+                days === period
+                  ? "bg-orange-500 text-white"
+                  : "border border-white/10 bg-white/5 text-slate-400"
+              }`}
+            >
+              {period} {t("superadmin", "analyticsDays")}
+            </button>
+          ))}
           {tab === "audience" && (
             <>
-              {[7, 30, 90].map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setDays(period)}
-                  className={`rounded-lg px-3 py-2 text-xs font-black ${
-                    days === period
-                      ? "bg-orange-500 text-white"
-                      : "border border-white/10 bg-white/5 text-slate-400"
-                  }`}
-                >
-                  {period} {t("superadmin", "analyticsDays")}
-                </button>
-              ))}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -333,9 +458,7 @@ export default function SuperadminAnalyticsPage() {
             {audienceCards.map(({ label, value, icon: Icon }) => (
               <div key={label} className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
                 <Icon className="h-5 w-5 text-orange-400" />
-                <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                  {label}
-                </p>
+                <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</p>
                 {loading ? (
                   <div className="mt-2 h-8 w-20 animate-pulse rounded-lg bg-white/5" />
                 ) : (
@@ -345,7 +468,7 @@ export default function SuperadminAnalyticsPage() {
             ))}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             {[
               { label: t("superadmin", "analyticsVisitorsTooltip"), value: change(data.periodVisitors, data.previousPeriodVisitors) },
               { label: t("superadmin", "analyticsViews"), value: change(data.periodPageViews, data.previousPeriodPageViews) },
@@ -371,6 +494,10 @@ export default function SuperadminAnalyticsPage() {
                 </span>
               </div>
             ))}
+            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <p className="text-xs font-bold text-slate-400">{t("superadmin", "analyticsPagesPerVisitor")}</p>
+              <p className="mt-2 text-2xl font-black text-white">{loading ? "—" : pagesPerVisitor}</p>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
@@ -429,115 +556,281 @@ export default function SuperadminAnalyticsPage() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {mainOfferKeys.map((key) => (
-              <div key={key} className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
-                <span
-                  className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${OFFER_BADGE[key]}`}
-                >
-                  {offerLabel(key)}
-                </span>
-                {loading ? (
-                  <div className="mt-3 h-8 w-16 animate-pulse rounded-lg bg-white/5" />
-                ) : (
-                  <p className="mt-3 text-3xl font-black text-white">
-                    {data.centersByOffer[key].toLocaleString(locale)}
-                  </p>
+            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <Building2 className="h-5 w-5 text-orange-400" />
+              <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                {t("superadmin", "analyticsTotalCenters")}
+              </p>
+              <p className="mt-1 text-3xl font-black text-white">
+                {loading ? "—" : data.totalCenters.toLocaleString(locale)}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {t("superadmin", "analyticsActiveCenters").replace(
+                  "{count}",
+                  String(data.activeCenters),
                 )}
-              </div>
-            ))}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
+              </p>
+            </div>
             <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
               <Users className="h-5 w-5 text-orange-400" />
               <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-slate-500">
                 {t("superadmin", "analyticsTotalStudents")}
               </p>
-              {loading ? (
-                <div className="mt-2 h-8 w-24 animate-pulse rounded-lg bg-white/5" />
-              ) : (
-                <p className="mt-1 text-3xl font-black text-white">
-                  {data.totalStudents.toLocaleString(locale)}
-                </p>
-              )}
+              <p className="mt-1 text-3xl font-black text-white">
+                {loading ? "—" : data.totalStudents.toLocaleString(locale)}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {t("superadmin", "analyticsAvgStudents").replace(
+                  "{avg}",
+                  String(data.avgStudentsPerCenter),
+                )}
+              </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
               <Wallet className="h-5 w-5 text-orange-400" />
               <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-slate-500">
                 {t("superadmin", "analyticsMrr")}
               </p>
-              {loading ? (
-                <div className="mt-2 h-8 w-32 animate-pulse rounded-lg bg-white/5" />
-              ) : (
-                <p className="mt-1 text-2xl font-black text-white">{formatFcfa(data.mrr, locale)}</p>
+              <p className="mt-1 text-2xl font-black text-white">
+                {loading ? "—" : formatFcfa(data.mrr, locale)}
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                {t("superadmin", "analyticsArpu").replace("{amount}", formatFcfa(data.arpu, locale))}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <CalendarClock className="h-5 w-5 text-amber-400" />
+              <p className="mt-3 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                {t("superadmin", "analyticsRenewals30")}
+              </p>
+              <p className="mt-1 text-3xl font-black text-white">
+                {loading ? "—" : data.renewalsNext30Days}
+              </p>
+              {!loading && data.revenueAtRisk > 0 && (
+                <p className="mt-1 text-[11px] text-amber-400/90">
+                  {t("superadmin", "analyticsRevenueAtRisk").replace(
+                    "{amount}",
+                    formatFcfa(data.revenueAtRisk, locale),
+                  )}
+                </p>
               )}
             </div>
           </div>
 
-          {data.centersByOffer.custom > 0 && (
-            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-4">
-              <span
-                className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${OFFER_BADGE.custom}`}
-              >
-                {offerLabel("custom")}
-              </span>
-              <span className="ml-3 text-sm font-black text-white">
-                {loading ? "—" : data.centersByOffer.custom.toLocaleString(locale)}
-              </span>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {t("superadmin", "analyticsNewCenters")}
+              </p>
+              <p className="mt-1 text-xl font-black text-white">
+                {loading ? "—" : `+${data.newCentersInPeriod}`}
+              </p>
+              <p className="text-[10px] text-slate-600">
+                {t("superadmin", "analyticsOverDays").replace("{days}", String(days))}
+              </p>
             </div>
-          )}
-
-          <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
-            <h3 className="font-black text-white">{t("superadmin", "analyticsCentersByStatus")}</h3>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {STATUS_KEYS.map((key) => (
-                <span
-                  key={key}
-                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${STATUS_BADGE[key]}`}
-                >
-                  {statusLabel(key)}
-                  <span className="font-black">
-                    {loading ? "—" : data.centersByStatus[key].toLocaleString(locale)}
-                  </span>
-                </span>
-              ))}
+            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {t("superadmin", "analyticsNewStudents")}
+              </p>
+              <p className="mt-1 text-xl font-black text-white">
+                {loading ? "—" : `+${data.newStudentsInPeriod}`}
+              </p>
+              <p className="text-[10px] text-slate-600">
+                {t("superadmin", "analyticsOverDays").replace("{days}", String(days))}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {t("superadmin", "analyticsTypeMix")}
+              </p>
+              <p className="mt-1 text-sm font-black text-white">
+                {loading
+                  ? "—"
+                  : t("superadmin", "analyticsTypeMixValue")
+                      .replace("{tcf}", String(data.centersByType.tcf))
+                      .replace("{native}", String(data.centersByType.native))}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {t("superadmin", "analyticsTrialsOpen")}
+              </p>
+              <p className="mt-1 text-xl font-black text-amber-300">
+                {loading
+                  ? "—"
+                  : data.centersByStatus.trial + data.centersByStatus.trial_expired}
+              </p>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-orange-400" />
-              <h3 className="font-black text-white">{t("superadmin", "analyticsTopCenters")}</h3>
-            </div>
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full min-w-[320px] text-left text-sm">
-                <thead>
-                  <tr className="border-b border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-500">
-                    <th className="py-3 pr-4">{t("superadmin", "analyticsRank")}</th>
-                    <th className="py-3 pr-4">{t("superadmin", "analyticsCenterName")}</th>
-                    <th className="py-3 text-right">{t("superadmin", "analyticsHeadcount")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/[0.07]">
-                  {data.topCenters.length === 0 && !loading && (
-                    <tr>
-                      <td colSpan={3} className="py-8 text-center text-slate-500">
-                        —
-                      </td>
-                    </tr>
-                  )}
-                  {data.topCenters.map((center, index) => (
-                    <tr key={center.id}>
-                      <td className="py-3 pr-4 text-xs font-black text-slate-600">{index + 1}</td>
-                      <td className="py-3 pr-4 font-bold text-slate-200">{center.name}</td>
-                      <td className="py-3 text-right font-black text-white">
-                        {center.student_count.toLocaleString(locale)}
-                      </td>
-                    </tr>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <section className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <h3 className="mb-4 font-black text-white">{t("superadmin", "analyticsCentersByOffer")}</h3>
+              <ul className="space-y-3">
+                {mainOfferKeys
+                  .filter((key) => key !== "none" || data.centersByOffer.none > 0)
+                  .map((key) => (
+                    <BarRow
+                      key={key}
+                      label={offerLabel(key)}
+                      value={loading ? 0 : data.centersByOffer[key]}
+                      max={offerMax}
+                      colorClass={
+                        key === "decouverte"
+                          ? "bg-sky-400"
+                          : key === "croissance"
+                            ? "bg-emerald-400"
+                            : key === "pro"
+                              ? "bg-violet-400"
+                              : key === "entreprise"
+                                ? "bg-orange-400"
+                                : "bg-slate-400"
+                      }
+                    />
                   ))}
-                </tbody>
-              </table>
-            </div>
+              </ul>
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <h3 className="mb-4 font-black text-white">{t("superadmin", "analyticsCentersByStatus")}</h3>
+              <ul className="space-y-3">
+                {STATUS_KEYS.map((key) => (
+                  <BarRow
+                    key={key}
+                    label={statusLabel(key)}
+                    value={loading ? 0 : data.centersByStatus[key]}
+                    max={statusMax}
+                    colorClass={STATUS_BAR[key]}
+                  />
+                ))}
+              </ul>
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <h3 className="mb-4 font-black text-white">{t("superadmin", "analyticsStudentHealth")}</h3>
+              <ul className="space-y-3">
+                {(
+                  [
+                    ["actifs", "effectifsColActive", "bg-emerald-400"],
+                    ["pauses", "effectifsColPaused", "bg-slate-400"],
+                    ["expires", "effectifsColExpired", "bg-amber-400"],
+                    ["revoques", "effectifsColRevoked", "bg-rose-400"],
+                  ] as const
+                ).map(([key, labelKey, color]) => (
+                  <BarRow
+                    key={key}
+                    label={t("superadmin", labelKey)}
+                    value={loading ? 0 : data.studentHealth[key]}
+                    max={healthMax}
+                    colorClass={color}
+                  />
+                ))}
+              </ul>
+            </section>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <section className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="h-5 w-5 text-amber-400" />
+                  <h3 className="font-black text-white">{t("superadmin", "analyticsUpcomingRenewals")}</h3>
+                </div>
+                <Link href="/superadmin/alertes" className="text-[11px] font-bold text-orange-400 hover:text-orange-300">
+                  {t("superadmin", "dashboardSeeAll")}
+                </Link>
+              </div>
+              {loading ? (
+                <p className="text-sm text-slate-500">…</p>
+              ) : data.upcomingRenewals.length === 0 ? (
+                <p className="text-sm text-slate-500">{t("superadmin", "analyticsNoRenewals")}</p>
+              ) : (
+                <ul className="custom-scrollbar max-h-72 space-y-2 overflow-y-auto pr-1">
+                  {data.upcomingRenewals.map((item) => (
+                    <li key={item.id}>
+                      <Link
+                        href={`/superadmin/centres?focus=${item.id}`}
+                        className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-3 hover:border-amber-500/20"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-bold text-white">{item.name}</p>
+                          <p className="text-[11px] text-slate-400">
+                            J-{item.days_left}
+                            {item.amount > 0 ? ` · ${formatFcfa(item.amount, locale)}` : ""}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs font-bold text-amber-300">
+                          {formatShortDate(item.renewal_at, locale)}
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <div className="mb-3 flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-orange-400" />
+                <h3 className="font-black text-white">{t("superadmin", "analyticsTopCenters")}</h3>
+              </div>
+              <div className="custom-scrollbar max-h-72 overflow-x-auto overflow-y-auto">
+                <table className="w-full min-w-[360px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                      <th className="py-3 pr-4">{t("superadmin", "analyticsRank")}</th>
+                      <th className="py-3 pr-4">{t("superadmin", "analyticsCenterName")}</th>
+                      <th className="py-3 pr-4">{t("superadmin", "analyticsCsvNetworkOffer")}</th>
+                      <th className="py-3 text-right">{t("superadmin", "analyticsHeadcount")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.07]">
+                    {data.topCenters.length === 0 && !loading && (
+                      <tr>
+                        <td colSpan={4} className="py-8 text-center text-slate-500">
+                          —
+                        </td>
+                      </tr>
+                    )}
+                    {data.topCenters.map((center, index) => (
+                      <tr key={center.id}>
+                        <td className="py-3 pr-4 text-xs font-black text-slate-600">{index + 1}</td>
+                        <td className="py-3 pr-4">
+                          <Link
+                            href={`/superadmin/centres?focus=${center.id}`}
+                            className="font-bold text-slate-200 hover:text-orange-300"
+                          >
+                            {center.name}
+                          </Link>
+                          {center.status && (
+                            <span
+                              className={`ml-2 inline-flex rounded-full border px-1.5 py-0.5 text-[8px] font-black uppercase ${
+                                STATUS_BADGE[center.status]
+                              }`}
+                            >
+                              {statusLabel(center.status)}
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-3 pr-4 text-xs text-slate-400">
+                          {center.offer ? (
+                            <span className={`rounded-full border px-2 py-0.5 ${OFFER_BADGE[center.offer]}`}>
+                              {offerLabel(center.offer)}
+                            </span>
+                          ) : (
+                            offerLabel("none")
+                          )}
+                        </td>
+                        <td className="py-3 text-right font-black text-white">
+                          {center.student_count.toLocaleString(locale)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         </>
       )}

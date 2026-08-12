@@ -23,6 +23,8 @@ const ACTION_KEYS: Record<string, string> = {
   application_contacted: "auditActionApplicationContacted", center_suspended: "auditActionCenterSuspended",
   center_reactivated: "auditActionCenterReactivated", center_rejected: "auditActionCenterRejected",
   center_pending_approved: "auditActionCenterApproved", student_password_reset: "auditActionPasswordReset",
+  student_paused: "auditActionStudentPaused", student_resumed: "auditActionStudentResumed",
+  student_revoked: "auditActionStudentRevoked", student_reactivated: "auditActionStudentReactivated",
 };
 
 function actionTone(action: string) {

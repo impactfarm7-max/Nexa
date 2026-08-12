@@ -36,6 +36,7 @@ import { useI18n } from "@/app/i18n/I18nProvider";
 import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
 import StudentRouteSkeleton from "@/app/components/StudentRouteSkeleton";
 import DownloadAppButton from "@/app/components/DownloadAppButton";
+import { LogoutConfirmDialog } from "@/app/components/LogoutConfirmDialog";
 import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
 
 type Profile = {
@@ -94,6 +95,8 @@ export default function ProfilPage() {
 
   // 📸 GESTION DE L'AVATAR
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 🟢 IMPORT DU VIGILE DES PACKS
@@ -404,9 +407,15 @@ export default function ProfilPage() {
   };
 
   const handleLogout = async () => {
-    const token = localStorage.getItem("session_token") || "";
-    await logoutAndClearSession(token);
-    router.replace("/login");
+    setLogoutBusy(true);
+    try {
+      const token = localStorage.getItem("session_token") || "";
+      await logoutAndClearSession(token);
+      router.replace("/login");
+    } finally {
+      setLogoutBusy(false);
+      setLogoutConfirmOpen(false);
+    }
   };
 
   const handleDeleteAccount = async () => {
@@ -633,7 +642,7 @@ export default function ProfilPage() {
               </div>
 
               <button
-                onClick={handleLogout}
+                onClick={() => setLogoutConfirmOpen(true)}
                 className="hidden lg:flex w-full mt-6 rounded-2xl px-5 py-4 font-extrabold text-sm text-white shadow-lg transition bg-neutral-900 hover:bg-orange-600 items-center justify-center gap-2 group"
               >
                 <LogOut className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform" />
@@ -847,7 +856,7 @@ export default function ProfilPage() {
             </section>
 
             <button
-              onClick={handleLogout}
+              onClick={() => setLogoutConfirmOpen(true)}
               className="lg:hidden w-full rounded-[2rem] px-5 py-5 font-black text-base text-white shadow-xl transition bg-neutral-900 active:scale-95 inline-flex items-center justify-center gap-3"
             >
               <LogOut className="w-5 h-5 text-white stroke-[2]" />
@@ -867,6 +876,20 @@ export default function ProfilPage() {
           NEXA • Système Synchronisé v2.6
         </p>
       </div>
+
+      {logoutConfirmOpen && (
+        <LogoutConfirmDialog
+          title={t("dashboard", "profilLogoutConfirmTitle")}
+          message={t("dashboard", "profilLogoutConfirmMessage")}
+          confirmLabel={t("dashboard", "profilSignOut")}
+          cancelLabel={t("dashboard", "profilCancel")}
+          busy={logoutBusy}
+          onConfirm={() => void handleLogout()}
+          onCancel={() => {
+            if (!logoutBusy) setLogoutConfirmOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

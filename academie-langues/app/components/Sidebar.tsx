@@ -326,20 +326,6 @@ export default function Sidebar() {
 
     >
 
-      <style>{`
-
-        .nexa-student-sidebar-nav::-webkit-scrollbar { width: 6px; }
-
-        .nexa-student-sidebar-nav::-webkit-scrollbar-track { background: rgba(0,0,0,0.10); border-radius: 9999px; }
-
-        .nexa-student-sidebar-nav::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.18); border-radius: 9999px; }
-
-        .nexa-student-sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.28); }
-
-      `}</style>
-
-
-
       {/* Header */}
 
       <div

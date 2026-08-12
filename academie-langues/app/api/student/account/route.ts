@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { computeTutorUnlockAt, getTutorUnlockState } from "@/app/utils/tutor-unlock";
 import { resolveAfricaCountry, resolveStudentRegion } from "@/app/data/africa-54";
-import { NEXA_STUDENT_QUOTAS, resolveEffectiveNexaOffer } from "@/app/data/nexaOffers";
+import { resolveEffectiveNexaOffer, resolveNexaStudentQuotas } from "@/app/data/nexaOffers";
 import { isPluriannualCenter } from "@/app/data/center-types";
 
 const supabaseAdmin = createClient(
@@ -55,7 +55,7 @@ async function getStudentAccount(req: Request) {
   const [{ data: center, error: centerError }, { data: enrollment }, { data: details }] = await Promise.all([
     supabaseAdmin
       .from("centers")
-      .select("id, name, code, city, status, created_at, nexa_offer, center_type")
+      .select("id, name, code, city, status, created_at, nexa_offer, center_type, quota_overrides")
       .eq("id", profile.center_id)
       .maybeSingle(),
     supabaseAdmin
@@ -241,7 +241,9 @@ async function getStudentAccount(req: Request) {
     tutor: getTutorUnlockState(tutorUnlockAt),
     nexaQuotas: isPluriannualCenter((center as { center_type?: string } | null)?.center_type)
       ? null
-      : NEXA_STUDENT_QUOTAS,
+      : resolveNexaStudentQuotas(
+          (center as { quota_overrides?: Record<string, unknown> | null } | null)?.quota_overrides,
+        ),
     nexaOffer: resolveEffectiveNexaOffer(center).key,
     isPluriannual: isPluriannualCenter((center as { center_type?: string } | null)?.center_type),
     response: null,

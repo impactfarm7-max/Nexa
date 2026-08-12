@@ -23,6 +23,7 @@ type PendingAuthProfile = {
   center_status?: string | null;
   role?: string | null;
   center_id?: string | null;
+  must_change_password?: boolean | null;
 };
 
 type LinkedCenter = {
@@ -397,7 +398,7 @@ function LoginPageContent() {
     try {
       const { data: profile, error: profileError } = await supabase
         .from("profiles")
-        .select("pin_hash, tag_status, center_status, role, center_id")
+        .select("pin_hash, tag_status, center_status, role, center_id, must_change_password")
         .eq("id", user.id)
         .single();
 
@@ -424,6 +425,13 @@ function LoginPageContent() {
         setLoading(false);
         await supabase.auth.signOut();
         showInfo(t("auth", "loginAccountPendingValidation"));
+        return;
+      }
+
+      // Mot de passe temporaire : forcer le changement avant MFA / dashboard.
+      if (isSuperAdmin(profile) && profile.must_change_password) {
+        setLoading(false);
+        router.replace("/superadmin/change-password");
         return;
       }
 
@@ -558,6 +566,11 @@ function LoginPageContent() {
 
     if (!profile?.pin_hash && !isCenterStaff(profile) && !isSuperAdmin(profile)) {
       window.location.assign("/pin/setup");
+      return;
+    }
+
+    if (isSuperAdmin(profile) && profile.must_change_password) {
+      window.location.assign("/superadmin/change-password");
       return;
     }
 

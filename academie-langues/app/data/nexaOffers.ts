@@ -223,22 +223,65 @@ export function getOfferQuota<K extends keyof NexaOfferConfig>(
   return NEXA_OFFERS[offerKey][field];
 }
 
-/** Quotas profil étudiant dérivés du pack B2B (colonnes profiles). */
-export function getNexaB2bProfileQuotas() {
-  const q = NEXA_STUDENT_QUOTAS;
+function asNonNegInt(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0) return Math.trunc(value);
+  if (typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) {
+    const n = Math.trunc(Number(value));
+    return n >= 0 ? n : fallback;
+  }
+  return fallback;
+}
+
+/** Quotas pédagogiques effectifs (Sur devis via `quota_overrides.studentQuotas`). */
+export function resolveNexaStudentQuotas(
+  overrides?: Record<string, unknown> | null,
+): NexaStudentQuotas {
+  const nested =
+    overrides?.studentQuotas && typeof overrides.studentQuotas === "object"
+      ? (overrides.studentQuotas as Record<string, unknown>)
+      : null;
+  if (!nested) return { ...NEXA_STUDENT_QUOTAS };
   return {
-    pack_name: "nexa_b2b",
-    ee_total: q.expressionEcrite,
+    comprehensionEcrite: asNonNegInt(nested.comprehensionEcrite, NEXA_STUDENT_QUOTAS.comprehensionEcrite),
+    comprehensionOrale: asNonNegInt(nested.comprehensionOrale, NEXA_STUDENT_QUOTAS.comprehensionOrale),
+    expressionEcrite: asNonNegInt(nested.expressionEcrite, NEXA_STUDENT_QUOTAS.expressionEcrite),
+    modesExamensEe: asNonNegInt(nested.modesExamensEe, NEXA_STUDENT_QUOTAS.modesExamensEe),
+    expressionOrale: asNonNegInt(nested.expressionOrale, NEXA_STUDENT_QUOTAS.expressionOrale),
+    examenBlanc: asNonNegInt(nested.examenBlanc, NEXA_STUDENT_QUOTAS.examenBlanc),
+    modulesCoursQuiz: asNonNegInt(nested.modulesCoursQuiz, NEXA_STUDENT_QUOTAS.modulesCoursQuiz),
+    devoirsPratiques: asNonNegInt(nested.devoirsPratiques, NEXA_STUDENT_QUOTAS.devoirsPratiques),
+    sessionsTuteurIa: asNonNegInt(nested.sessionsTuteurIa, NEXA_STUDENT_QUOTAS.sessionsTuteurIa),
+    ressources2026: nested.ressources2026 !== false,
+  };
+}
+
+export function hasCustomStudentQuotaOverrides(
+  overrides?: Record<string, unknown> | null,
+): boolean {
+  return Boolean(overrides?.studentQuotas && typeof overrides.studentQuotas === "object");
+}
+
+/** Quotas profil étudiant dérivés du pack B2B (colonnes profiles). */
+export function getNexaB2bProfileQuotas(
+  overrides?: Record<string, unknown> | null,
+  monthUnits = 1,
+) {
+  const q = resolveNexaStudentQuotas(overrides);
+  const months = Math.max(1, Math.ceil(monthUnits));
+  const custom = hasCustomStudentQuotaOverrides(overrides);
+  return {
+    pack_name: custom ? "nexa_custom" : "nexa_b2b",
+    ee_total: q.expressionEcrite * months,
     ee_used: 0,
-    exam_total: q.modesExamensEe,
+    exam_total: q.modesExamensEe * months,
     exam_used: 0,
-    exam_4m_total: q.examenBlanc,
+    exam_4m_total: q.examenBlanc * months,
     exam_4m_used: 0,
-    eo_total: q.expressionOrale,
+    eo_total: q.expressionOrale * months,
     eo_used: 0,
     coaching_total: 0,
     coaching_used: 0,
-    tutor_ia_total: q.sessionsTuteurIa,
+    tutor_ia_total: q.sessionsTuteurIa * months,
     tutor_ia_used: 0,
   };
 }

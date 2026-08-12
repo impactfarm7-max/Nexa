@@ -7,6 +7,10 @@
     {
       "path": "/api/coaching/reminders",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/superadmin/subscription-alerts",
+      "schedule": "0 8 * * *"
     }
   ]
 }

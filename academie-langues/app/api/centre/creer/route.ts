@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
       : baseSlug;
 
     // ── 3. Centre (status: pending = en attente d'approbation NEXA) ───────────
+    const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data: center, error: centerErr } = await supabaseAdmin
       .from("centers")
       .insert({
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
         plan_type: null,
         nexa_offer: offer,
         email: ownerEmail.trim().toLowerCase(),
+        trial_ends_at: trialEndsAt,
       })
       .select("id, slug")
       .single();

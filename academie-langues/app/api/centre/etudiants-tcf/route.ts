@@ -23,6 +23,12 @@ import {
   type TcfDurationUnit,
 } from "@/app/utils/tcf-access";
 import { getTcfCenterQuotas } from "@/app/data/packOffers";
+import {
+  getNexaB2bProfileQuotas,
+  hasCustomStudentQuotaOverrides,
+  normalizeNexaOffer,
+} from "@/app/data/nexaOffers";
+import { assertCenterHasStudentSeat } from "@/app/utils/center-student-quota";
 import { sumNamedExtraFees } from "@/app/utils/short-pricing";
 
 const supabaseAdmin = createClient(
@@ -428,6 +434,16 @@ export async function POST(req: NextRequest) {
   const access = await assertCenterAccess(user.id, centerId);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
+  const seatCheck = await assertCenterHasStudentSeat(centerId, supabaseAdmin);
+  if (!seatCheck.ok) {
+    return NextResponse.json(
+      {
+        error: `Limite d'étudiants atteinte pour l'offre ${seatCheck.offerName} (${seatCheck.max}). Actifs et pause occupent une place ; expirés / révoqués / terminés la libèrent.`,
+      },
+      { status: 403 },
+    );
+  }
+
   const password = generatePassword();
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -576,7 +592,20 @@ async function activateTcfStudent(params: {
   const finalTotal = Math.max(0, baseTotal - discount);
   const endsAt = addDays(new Date(), days);
   const activatedAt = new Date();
-  const quotas = getTcfCenterQuotas(monthEquivalent(dVal, durationUnit));
+  const months = monthEquivalent(dVal, durationUnit);
+  const { data: centerOffer } = await supabaseAdmin
+    .from("centers")
+    .select("nexa_offer, quota_overrides")
+    .eq("id", centerId)
+    .maybeSingle();
+  const overrides =
+    centerOffer?.quota_overrides && typeof centerOffer.quota_overrides === "object"
+      ? (centerOffer.quota_overrides as Record<string, unknown>)
+      : null;
+  const useCustom =
+    normalizeNexaOffer(centerOffer?.nexa_offer) === "custom" && hasCustomStudentQuotaOverrides(overrides);
+  // Sur devis : montants saisis = pack absolu. Pack Ébène standard : scale durée.
+  const quotas = useCustom ? getNexaB2bProfileQuotas(overrides) : getTcfCenterQuotas(months);
 
   const campusId = await resolveCampusForFiliere(centerId, filiere.id);
   if (!campusId) {

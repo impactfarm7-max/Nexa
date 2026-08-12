@@ -19,6 +19,7 @@ import { BRAND } from "@/app/utils/brand";
 import { initPwaInstallCapture } from "@/app/utils/pwa-install";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { isViewAsStudentPreview } from "@/app/utils/view-as";
+import SaViewAsBanner from "./SaViewAsBanner";
 
 const EXAM_PASSAGE_KEY = "nexa_exam_passage";
 
@@ -153,10 +154,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   }, [isPublic, pathname]);
 
   if (isPublic) {
-    return <>
-      <SiteAnalyticsTracker />
-      {children}
-    </>;
+    return (
+      <>
+        <SaViewAsBanner />
+        <SiteAnalyticsTracker />
+        {children}
+      </>
+    );
   }
 
   const presenceTracker = <PresenceTracker />;
@@ -218,10 +222,13 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   if (shouldHideSidebar) {
     return (
-      <main className="w-full relative" style={{ minHeight: "100dvh" }}>
-        {presenceTracker}
-        {mainContent}
-      </main>
+      <>
+        <SaViewAsBanner />
+        <main className="w-full relative" style={{ minHeight: "100dvh" }}>
+          {presenceTracker}
+          {mainContent}
+        </main>
+      </>
     );
   }
 
@@ -229,6 +236,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
   return (
     <>
+      <SaViewAsBanner />
       <SiteAnalyticsTracker />
       {presenceTracker}
       <div className="flex w-full overflow-x-hidden" style={{ minHeight: "100dvh" }}>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeNexaOffer } from "@/app/data/nexaOffers";
 import { getSuperadminContext, logSuperadminAction, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
+import { computeCenterDerivedStatus } from "@/app/api/superadmin/centers/route";
 
 const VALID_STATUSES = new Set(["active", "suspended", "rejected"]);
 
@@ -43,7 +44,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   const [{ data: center, error: centerError }, { data: centerUsers }, { data: managerProfiles }, { data: students }] = await Promise.all([
     supabaseAdmin
       .from("centers")
-      .select("id, name, city, code, signup_slug, address, country, region, center_type, phone, email, status, application_id, created_at, updated_at, nexa_offer")
+      .select(
+        "id, name, city, code, signup_slug, address, country, region, center_type, phone, email, status, application_id, created_at, updated_at, nexa_offer, trial_ends_at, renewal_at, subscription_amount, subscription_period_months, renewal_alert_days, quota_overrides, pause_reason, subscription_starts_at",
+      )
       .eq("id", id)
       .maybeSingle(),
     supabaseAdmin
@@ -144,10 +147,25 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     else stats.actifs++;
   }
 
+  let application: Record<string, unknown> | null = null;
+  if (center.application_id) {
+    const { data: appRow } = await supabaseAdmin
+      .from("center_applications")
+      .select(
+        "id, center_name, center_type, country, city, address, manager_name, manager_role, email, phone, student_volume, needs, message, status, created_at",
+      )
+      .eq("id", center.application_id)
+      .maybeSingle();
+    application = appRow ?? null;
+  }
+
+  const derived_status = computeCenterDerivedStatus(center);
+
   return NextResponse.json({
-    center,
+    center: { ...center, derived_status },
     managers,
     creatorEmail: resolvedCreatorEmail,
+    application,
     students: students ?? [],
     stats,
   });

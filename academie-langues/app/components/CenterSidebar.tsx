@@ -677,12 +677,6 @@ function CenterSidebarInner() {
       )}
 
       {/* ══ NAVIGATION ══════════════════════════════════════════════════ */}
-      <style>{`
-        .nexa-sidebar-nav::-webkit-scrollbar { width: 6px; }
-        .nexa-sidebar-nav::-webkit-scrollbar-track { background: rgba(17,34,78,0.04); border-radius: 9999px; }
-        .nexa-sidebar-nav::-webkit-scrollbar-thumb { background: rgba(17,34,78,0.18); border-radius: 9999px; }
-        .nexa-sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(17,34,78,0.28); }
-      `}</style>
       <nav className="nexa-sidebar-nav flex-1 px-2.5 py-2 space-y-0.5 overflow-y-auto">
 
         {/* — VUE MANAGER / STAFF — */}
