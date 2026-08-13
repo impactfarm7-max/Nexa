@@ -51,7 +51,7 @@ type FiliereOption = {
   payment_plan: unknown;
 };
 type NiveauOption = { id: string; annee: number; tuition_fee: number | null; payment_plan?: unknown };
-type GroupeOption = { id: string; nom: string };
+type GroupeOption = { id: string; nom: string; is_default_signup?: boolean | null };
 type CampusOption = { id: string; name: string; city: string | null };
 
 type Props = {
@@ -232,27 +232,32 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
           extraFees: initialExtras,
         })));
       } else {
-        // Formation courte : salles via filiere_id (et niveau fantôme si présent)
-        const { data: phantom } = await supabase
+        // Formation courte : salles liées au niveau fantôme et/ou à la filière
+        const { data: nivRows } = await supabase
           .from("niveaux")
           .select("id")
-          .eq("filiere_id", filiereId)
-          .is("annee", null)
-          .maybeSingle();
-
-        let query = supabase.from("groupes").select("id, nom, is_default_signup");
-        if (phantom?.id) {
-          query = query.or(`filiere_id.eq.${filiereId},niveau_id.eq.${phantom.id}`);
+          .eq("filiere_id", filiereId);
+        const niveauIds = (nivRows || []).map((n) => n.id);
+        let rows: GroupeOption[] = [];
+        if (niveauIds.length > 0) {
+          const { data } = await supabase
+            .from("groupes")
+            .select("id, nom, is_default_signup")
+            .or(`filiere_id.eq.${filiereId},niveau_id.in.(${niveauIds.join(",")})`);
+          rows = data || [];
         } else {
-          query = query.eq("filiere_id", filiereId);
+          const { data } = await supabase
+            .from("groupes")
+            .select("id, nom, is_default_signup")
+            .eq("filiere_id", filiereId);
+          rows = data || [];
         }
-        const { data } = await query;
-        setGroupes(data || []);
+        setGroupes(rows);
         setNiveaux([]);
         setNiveauId("");
         setGroupeId(
-          data?.find((g) => g.is_default_signup)?.id
-          || (data && data.length === 1 ? data[0].id : ""),
+          rows.find((g) => g.is_default_signup)?.id
+          || (rows.length === 1 ? rows[0].id : ""),
         );
 
         const mode = isShortPricingMode(selectedFiliere?.pricing_mode)
@@ -293,9 +298,10 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   }, [isShort, shortMode, shortCatalogTotal]);
 
   // ============================================================
-  // QUAND LE NIVEAU CHANGE → groupes + prix du niveau
+  // QUAND LE NIVEAU CHANGE → groupes + prix du niveau (cursus uniquement)
   // ============================================================
   useEffect(() => {
+    if (selectedFiliere?.type !== "cursus") return;
     if (!niveauId) { setGroupes([]); setGroupeId(""); return; }
 
     (async () => {
@@ -340,6 +346,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   const canSubmit = canGoStep2 && filiereId
     && (selectedFiliere?.type !== "cursus" || niveauId)
     && (campuses.length <= 1 || campusId)
+    && (groupes.length <= 1 || Boolean(groupeId))
     && (!isShort || shortMode !== "mensuel" || durationMonths >= 1);
 
   // ============================================================
@@ -756,7 +763,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             {groupes.length > 1 && (
               <div>
-                <label className={FIELD_LABEL}>{t("centre", "createStudentClassroom")}</label>
+                <label className={FIELD_LABEL}>{t("centre", "createStudentClassroom")} *</label>
                 <CenterSelect
                   size="lg"
                   value={groupeId}
@@ -773,6 +780,14 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
             {groupes.length === 1 && (
               <div className="flex items-center gap-2 bg-neutral-50 border border-black/[0.08] rounded-lg px-3 py-2.5">
                 <span className="text-sm font-medium text-neutral-600">{t("centre", "createStudentAutoClassroom", { name: groupes[0].nom })}</span>
+              </div>
+            )}
+
+            {filiereId && groupes.length === 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
+                {locale === "en"
+                  ? "No classroom on this program. Open the program and add at least one classroom, then try again."
+                  : "Aucune salle de classe sur ce programme. Ouvre le programme, ajoute au moins une salle, puis réessaie."}
               </div>
             )}
 

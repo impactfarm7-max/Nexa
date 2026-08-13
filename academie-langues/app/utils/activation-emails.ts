@@ -1,9 +1,9 @@
 import { sendEmail } from "@/app/utils/email-server";
 import { nexaOfferLabel } from "@/app/data/nexaOffers";
+import { getPublicSiteUrl } from "@/app/utils/public-site-url";
 
 function siteLoginUrl(locale: "fr" | "en" = "fr") {
-  const base = (process.env.NEXT_PUBLIC_SITE_URL || "https://nexa.fr").replace(/\/$/, "");
-  return `${base}/login?lang=${locale}`;
+  return `${getPublicSiteUrl()}/login?lang=${locale}`;
 }
 
 function formatDate(value: string | null | undefined, locale: "fr" | "en") {

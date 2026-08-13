@@ -389,43 +389,33 @@ body {
   font-family: var(--font-display);
 }
 
-/* Profils centre, staff et étudiant : même langage visuel que les pages métier. */
+/* Profils centre / staff / étudiant : alignés fond crème Nexa + typo pages métier. */
 .platform-profile-page {
-  background: #fbfaf8 !important;
-  color: #11224e;
+  background: #FFFBF7 !important;
+  color: #11224E;
 }
 
 .platform-profile-page .font-black {
-  font-weight: 700 !important;
+  font-weight: 800 !important;
 }
 
 .platform-profile-page .font-extrabold {
-  font-weight: 600 !important;
-}
-
-.platform-profile-page .uppercase {
-  text-transform: none !important;
-  letter-spacing: 0.01em !important;
-}
-
-.platform-profile-page .tracking-widest,
-.platform-profile-page .tracking-wider {
-  letter-spacing: 0.01em !important;
+  font-weight: 800 !important;
 }
 
 .platform-profile-page section.bg-white,
 .platform-profile-page aside > section.bg-white,
 .platform-profile-page main section.bg-white {
-  border-color: #e5e7eb !important;
-  border-radius: 0.875rem !important;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.04) !important;
+  border-color: rgb(0 0 0 / 0.08) !important;
+  border-radius: 0.75rem !important;
+  box-shadow: none !important;
 }
 
 .platform-profile-page button,
 .platform-profile-page a,
 .platform-profile-page input,
 .platform-profile-page select {
-  border-radius: 0.625rem !important;
+  border-radius: 0.5rem !important;
 }
 
 .platform-profile-page [class*="rounded-[2rem]"],
@@ -436,7 +426,7 @@ body {
 }
 
 .platform-profile-page header {
-  background-color: rgb(255 255 255 / 0.96) !important;
+  background-color: #FFFBF7 !important;
 }
 
 .platform-profile-page header button,
@@ -446,20 +436,17 @@ body {
 }
 
 .platform-profile-page header h1 {
-  font-size: 1.75rem !important;
-  line-height: 2rem !important;
-  font-weight: 700 !important;
-}
-
-.platform-profile-page header h1,
-.platform-profile-page header [class*="pageTitle"] {
-  font-family: var(--font-display);
+  font-size: 1.5rem !important;
+  line-height: 1.75rem !important;
+  font-weight: 800 !important;
   letter-spacing: -0.025em;
+  color: #11224E !important;
 }
 
-@media (min-width: 768px) {
-  .platform-profile-page header > div {
-    min-height: 72px;
+@media (min-width: 640px) {
+  .platform-profile-page header h1 {
+    font-size: 1.875rem !important;
+    line-height: 2.25rem !important;
   }
 }
 

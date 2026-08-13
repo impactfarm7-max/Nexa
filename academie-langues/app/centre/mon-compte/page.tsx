@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ArrowLeft,
   BadgeCheck,
   Building2,
   Calendar,
@@ -24,6 +22,16 @@ import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { LogoutConfirmDialog } from "@/app/components/LogoutConfirmDialog";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import {
+  BLUE,
+  ORANGE,
+  SURFACE,
+  CenterBrandMark,
+  CenterPageHeader,
+  CenterPageLayout,
+  OutlineHeaderButton,
+  BackButton,
+} from "@/app/centre/center-page-ui";
 
 type CenterAccount = {
   user: { id: string; email: string | null; created_at: string | null };
@@ -68,7 +76,7 @@ const permissionKeys: Record<string, string> = {
 };
 
 function formatDate(value?: string | null, locale = "fr") {
-  if (!value) return "-";
+  if (!value) return locale === "en" ? "Not set" : "Non renseigné";
   return new Date(value).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "long", year: "numeric" });
 }
 
@@ -178,105 +186,120 @@ export default function CenterAccountPage() {
 
   if (loadError) {
     return (
-      <main className="flex min-h-[100dvh] items-center justify-center bg-[#FAFAFA] px-4 text-slate-950">
-        <div className="w-full max-w-md rounded-[2rem] border border-red-100 bg-white p-6 text-center shadow-sm">
-          <p className="text-xl font-black">{t("centre", "accountUnavailable")}</p>
-          <p className="mt-2 text-sm font-bold text-slate-500">{loadError}</p>
-          <Link href="/dashboard" className="mt-5 inline-flex h-12 items-center justify-center rounded-2xl bg-orange-600 px-5 text-xs font-black uppercase tracking-widest text-white hover:bg-orange-500">
-            {t("centre", "accountBackDashboard")}
-          </Link>
+      <CenterPageLayout
+        header={
+          <CenterPageHeader
+            title={t("centre", "accountUnavailable")}
+            backButton={<BackButton onClick={() => router.push(dashboardHref)} />}
+          />
+        }
+      >
+        <div className="nexa-center-shell py-10 flex items-center justify-center">
+          <div className="w-full max-w-md rounded-xl border border-red-100 bg-white p-6 text-center">
+            <p className="text-lg font-extrabold" style={{ color: BLUE }}>{t("centre", "accountUnavailable")}</p>
+            <p className="mt-2 text-sm font-medium text-neutral-500">{loadError}</p>
+            <button
+              type="button"
+              onClick={() => router.push(dashboardHref)}
+              className="mt-5 inline-flex h-10 items-center justify-center rounded-lg px-5 text-sm font-semibold text-white"
+              style={{ backgroundColor: ORANGE }}
+            >
+              {t("centre", "accountBackDashboard")}
+            </button>
+          </div>
         </div>
-      </main>
+      </CenterPageLayout>
     );
   }
 
   if (!account) return null;
 
-  return (
-    <main className="platform-profile-page min-h-[100dvh] bg-[#FAFAFA] text-slate-950">
-      <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 md:px-8">
-          <Link href={backHref} className="flex h-11 w-11 items-center justify-center rounded-full border border-neutral-200 bg-white text-slate-600 shadow-sm hover:bg-neutral-50">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-          <div className="min-w-0 flex-1">
-            <span className="rounded-full bg-orange-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-orange-600">
-              {t("centre", "accountCenterAccount")}
-            </span>
-            <h1 className="mt-2 truncate text-2xl font-black tracking-tight md:text-4xl">{displayName}</h1>
-          </div>
-          <button onClick={() => setLogoutConfirmOpen(true)} className="flex h-11 items-center gap-2 rounded-full border border-red-100 bg-red-50 px-4 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-100">
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">{t("centre", "accountSignOut")}</span>
-          </button>
-        </div>
-      </header>
+  const emptyValue = t("centre", "accountNotProvided");
 
-      <section className="mx-auto grid max-w-6xl gap-6 px-4 py-8 md:px-8 lg:grid-cols-[0.9fr_1.4fr]">
-        <aside className="space-y-5">
-          <section className="rounded-[2rem] border border-neutral-200 bg-white p-6 shadow-sm">
+  return (
+    <CenterPageLayout
+      header={
+        <CenterPageHeader
+          title={t("centre", "accountMyAccount")}
+          backButton={<BackButton onClick={() => router.push(backHref)} />}
+          actions={
+            <button
+              type="button"
+              onClick={() => setLogoutConfirmOpen(true)}
+              className="flex h-9 sm:h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3.5 text-xs font-semibold text-red-600 hover:bg-red-100"
+            >
+              <LogOut size={14} />
+              <span className="hidden sm:inline">{t("centre", "accountSignOut")}</span>
+            </button>
+          }
+        />
+      }
+    >
+      <section className="nexa-center-shell grid gap-5 py-6 lg:grid-cols-[0.9fr_1.4fr]">
+        <aside className="space-y-4">
+          <section className="rounded-xl border border-black/[0.08] bg-white p-5">
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-orange-600 text-2xl font-black text-white shadow-xl shadow-orange-500/25">
+              <div
+                className="flex h-14 w-14 items-center justify-center rounded-lg text-xl font-extrabold text-white"
+                style={{ backgroundColor: BLUE }}
+              >
                 {initials}
               </div>
               <div className="min-w-0">
-                <p className="truncate text-xl font-black">{displayName}</p>
-                <p className="mt-1 text-xs font-black uppercase tracking-widest text-orange-600">
+                <p className="truncate text-lg font-extrabold" style={{ color: BLUE }}>{displayName}</p>
+                <p className="mt-1 text-[13px] font-semibold" style={{ color: ORANGE }}>
                   {roleLabel(account.profile?.role, account.membership?.role)}
                 </p>
               </div>
             </div>
 
-            <div className="mt-6 grid gap-3 text-sm font-semibold text-slate-500">
-              <InfoLine icon={Mail} label={t("centre", "accountEmail")} value={account.profile?.email || account.user.email || "-"} />
-              <InfoLine icon={Phone} label={t("centre", "accountPhone")} value={account.profile?.phone || "-"} />
-              <InfoLine icon={MapPin} label={t("centre", "settingsCity")} value={account.profile?.ville || "-"} />
+            <div className="mt-5 grid gap-3 text-sm font-medium text-neutral-600">
+              <InfoLine icon={Mail} label={t("centre", "accountEmail")} value={account.profile?.email || account.user.email || emptyValue} />
+              <InfoLine icon={Phone} label={t("centre", "accountPhone")} value={account.profile?.phone || emptyValue} />
+              <InfoLine icon={MapPin} label={t("centre", "settingsCity")} value={account.profile?.ville || emptyValue} />
               <InfoLine icon={Calendar} label={t("centre", "accountRegistration")} value={formatDate(account.profile?.created_at || account.user.created_at, locale)} />
             </div>
           </section>
 
-          <section className="rounded-[2rem] border border-neutral-200 bg-white p-6 shadow-sm">
+          <section className="rounded-xl border border-black/[0.08] bg-white p-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white">
-                <Building2 className="h-5 w-5" />
-              </div>
+              <CenterBrandMark icon={Building2} size={40} />
               <div>
-                <p className="text-sm font-black">{t("centre", "accountLinkedCenter")}</p>
-                <p className="text-xs font-bold text-slate-400">{account.center.status === "active" ? t("centre", "accountActiveCenter") : t("centre", "accountSuspendedCenter")}</p>
+                <p className="text-[15px] font-extrabold" style={{ color: BLUE }}>{t("centre", "accountLinkedCenter")}</p>
+                <p className="text-[13px] font-medium text-neutral-400">{account.center.status === "active" ? t("centre", "accountActiveCenter") : t("centre", "accountSuspendedCenter")}</p>
               </div>
             </div>
-            <div className="mt-5 rounded-2xl border border-orange-100 bg-orange-50 p-4">
-              <p className="text-lg font-black text-slate-950">{account.center.name}</p>
-              <p className="mt-1 text-xs font-bold text-slate-500">{account.center.city || t("centre", "accountCityMissing")}</p>
+            <div className="mt-4 rounded-xl border border-orange-100 p-4" style={{ backgroundColor: SURFACE }}>
+              <p className="text-base font-extrabold" style={{ color: BLUE }}>{account.center.name}</p>
+              <p className="mt-1 text-[13px] font-medium text-neutral-500">{account.center.city || t("centre", "accountCityMissing")}</p>
               {account.center.code && (
                 <button
+                  type="button"
                   onClick={async () => {
                     await navigator.clipboard.writeText(account.center.code || "");
                     setCopied(true);
                     window.setTimeout(() => setCopied(false), 1500);
                   }}
-                  className="mt-4 flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 text-left"
+                  className="mt-4 flex w-full items-center justify-between rounded-lg bg-white border border-black/[0.06] px-4 py-3 text-left"
                 >
                   <span>
-                    <span className="block text-[10px] font-black uppercase tracking-widest text-orange-600">{t("centre", "accountCenterCode")}</span>
-                    <span className="font-mono text-xl font-black tracking-widest">{account.center.code}</span>
+                    <span className="block text-[12px] font-medium text-neutral-500">{t("centre", "accountCenterCode")}</span>
+                    <span className="font-mono text-lg font-extrabold tracking-wide" style={{ color: BLUE }}>{account.center.code}</span>
                   </span>
-                  {copied ? <CheckCircle className="h-5 w-5 text-emerald-600" /> : <Copy className="h-5 w-5 text-slate-400" />}
+                  {copied ? <CheckCircle className="h-5 w-5 text-emerald-600" /> : <Copy className="h-5 w-5 text-neutral-400" />}
                 </button>
               )}
             </div>
           </section>
         </aside>
 
-        <div className="space-y-5">
-          <section className="rounded-[2rem] border border-neutral-200 bg-white p-6 shadow-sm">
-            <div className="mb-6 flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-600 text-white">
-                <User className="h-5 w-5" />
-              </div>
+        <div className="space-y-4">
+          <section className="rounded-xl border border-black/[0.08] bg-white p-5">
+            <div className="mb-5 flex items-center gap-3">
+              <CenterBrandMark icon={User} size={40} />
               <div>
-                <p className="text-xl font-black">{t("centre", "accountPersonalInfo")}</p>
-                <p className="text-xs font-bold text-slate-400">{t("centre", "accountPersonalInfoHelp")}</p>
+                <p className="text-[15px] font-extrabold" style={{ color: BLUE }}>{t("centre", "accountPersonalInfo")}</p>
+                <p className="text-[13px] font-medium text-neutral-400">{t("centre", "accountPersonalInfoHelp")}</p>
               </div>
             </div>
 
@@ -285,11 +308,11 @@ export default function CenterAccountPage() {
               <Field label={t("centre", "accountPhoneWhatsapp")} value={form.phone} onChange={(value) => setForm((current) => ({ ...current, phone: value }))} />
               <Field label={t("centre", "settingsCity")} value={form.ville} onChange={(value) => setForm((current) => ({ ...current, ville: value }))} />
               <label className="md:col-span-2">
-                <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">{t("centre", "accountGender")}</span>
+                <span className="mb-1.5 block text-[12px] font-medium text-neutral-500">{t("centre", "accountGender")}</span>
                 <select
                   value={form.genre}
                   onChange={(event) => setForm((current) => ({ ...current, genre: event.target.value }))}
-                  className="h-12 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 text-sm font-bold text-slate-900 outline-none focus:border-orange-500"
+                  className="h-11 w-full rounded-lg border border-black/[0.08] bg-white px-3.5 text-sm font-semibold text-neutral-900 outline-none focus:border-[#11224E]"
                 >
                   <option value="">{t("centre", "accountNotProvided")}</option>
                   <option value="Homme">{t("centre", "accountMale")}</option>
@@ -299,35 +322,35 @@ export default function CenterAccountPage() {
             </div>
 
             <button
+              type="button"
               onClick={saveProfile}
               disabled={saving}
-              className="mt-6 flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 text-sm font-black uppercase tracking-widest text-white transition hover:bg-orange-600 disabled:opacity-50 md:w-auto md:px-6"
+              className="mt-5 flex h-10 w-full items-center justify-center gap-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50 md:w-auto md:px-5"
+              style={{ backgroundColor: BLUE }}
             >
-              <Save className="h-4 w-4" />
+              <Save size={14} />
               {saving ? t("centre", "accountSaving") : t("centre", "accountSave")}
             </button>
           </section>
 
-          <section className="grid gap-4 md:grid-cols-3">
+          <section className="grid gap-3 md:grid-cols-3">
             <MiniCard icon={ShieldCheck} label={t("centre", "accountRole")} value={roleLabel(account.profile?.role, account.membership?.role)} />
             <MiniCard icon={BadgeCheck} label={t("centre", "settingsStatus")} value={account.profile?.tag_status || account.center.status || t("centre", "campusActiveLower")} />
             <MiniCard icon={GraduationCap} label={t("centre", "accountSimulations")} value={String(account.profile?.simulations_completed || 0)} />
           </section>
 
           {permissions.length > 0 && (
-            <section className="rounded-[2rem] border border-neutral-200 bg-white p-6 shadow-sm">
+            <section className="rounded-xl border border-black/[0.08] bg-white p-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white">
-                  <Users className="h-5 w-5" />
-                </div>
+                <CenterBrandMark icon={Users} size={40} />
                 <div>
-                  <p className="text-xl font-black">{t("centre", "accountAuthorizedAccess")}</p>
-                  <p className="text-xs font-bold text-slate-400">{t("centre", "accountVisibleModules")}</p>
+                  <p className="text-[15px] font-extrabold" style={{ color: BLUE }}>{t("centre", "accountAuthorizedAccess")}</p>
+                  <p className="text-[13px] font-medium text-neutral-400">{t("centre", "accountVisibleModules")}</p>
                 </div>
               </div>
-              <div className="mt-5 flex flex-wrap gap-2">
+              <div className="mt-4 flex flex-wrap gap-2">
                 {permissions.map((permission) => (
-                  <span key={permission} className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-blue-600">
+                  <span key={permission} className="rounded-lg border border-black/[0.08] px-2.5 py-1.5 text-[12px] font-semibold text-neutral-700" style={{ backgroundColor: SURFACE }}>
                     {permissionKeys[permission] ? t("centre", permissionKeys[permission]) : permission}
                   </span>
                 ))}
@@ -336,9 +359,9 @@ export default function CenterAccountPage() {
           )}
 
           <div className="flex flex-wrap gap-3">
-            <Link href={dashboardHref} className="flex h-12 items-center justify-center rounded-2xl bg-orange-600 px-5 text-xs font-black uppercase tracking-widest text-white hover:bg-orange-500">
+            <OutlineHeaderButton onClick={() => router.push(dashboardHref)}>
               {t("centre", "accountBackDashboardShort")}
-            </Link>
+            </OutlineHeaderButton>
           </div>
         </div>
       </section>
@@ -356,17 +379,17 @@ export default function CenterAccountPage() {
           }}
         />
       )}
-    </main>
+    </CenterPageLayout>
   );
 }
 
 function InfoLine({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-neutral-100 bg-neutral-50 px-4 py-3">
-      <Icon className="h-4 w-4 text-orange-600" />
+    <div className="flex items-center gap-3 rounded-lg border border-black/[0.06] px-3.5 py-3" style={{ backgroundColor: SURFACE }}>
+      <Icon className="h-4 w-4 shrink-0" style={{ color: BLUE }} strokeWidth={1.75} />
       <span className="min-w-0">
-        <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
-        <span className="block truncate text-sm font-black text-slate-900">{value}</span>
+        <span className="block text-[12px] font-medium text-neutral-500">{label}</span>
+        <span className="block truncate text-sm font-semibold text-neutral-900">{value}</span>
       </span>
     </div>
   );
@@ -375,11 +398,11 @@ function InfoLine({ icon: Icon, label, value }: { icon: any; label: string; valu
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <label>
-      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
+      <span className="mb-1.5 block text-[12px] font-medium text-neutral-500">{label}</span>
       <input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="h-12 w-full rounded-2xl border border-neutral-200 bg-neutral-50 px-4 text-sm font-bold text-slate-900 outline-none focus:border-orange-500"
+        className="h-11 w-full rounded-lg border border-black/[0.08] bg-white px-3.5 text-sm font-semibold text-neutral-900 outline-none focus:border-[#11224E]"
       />
     </label>
   );
@@ -387,10 +410,10 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
 
 function MiniCard({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
   return (
-    <div className="rounded-[1.5rem] border border-neutral-200 bg-white p-5 shadow-sm">
-      <Icon className="h-5 w-5 text-orange-600" />
-      <p className="mt-4 text-lg font-black text-slate-950">{value}</p>
-      <p className="mt-1 text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
+    <div className="rounded-xl border border-black/[0.08] bg-white p-4">
+      <CenterBrandMark icon={Icon} size={36} />
+      <p className="mt-3 text-base font-extrabold" style={{ color: BLUE }}>{value}</p>
+      <p className="mt-1 text-[12px] font-medium text-neutral-500">{label}</p>
     </div>
   );
 }

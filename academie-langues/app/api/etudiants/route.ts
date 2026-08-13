@@ -29,6 +29,7 @@ import {
   fetchValidCoupon,
   incrementCouponUse,
 } from "@/app/utils/coupon.server";
+import { getPublicSiteUrl } from "@/app/utils/public-site-url";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -624,7 +625,7 @@ export async function POST(req: NextRequest) {
     // ---- 8. Envoyer les accès ----
     let emailResult = { sent: false };
     try {
-      const loginBase = (process.env.NEXT_PUBLIC_SITE_URL || "https://nexa.fr").replace(/\/$/, "");
+      const loginBase = getPublicSiteUrl();
       const loginUrl = `${loginBase}/login?lang=${emailLocale}`;
       emailResult = await sendEmail({
         to: normalizedEmail,

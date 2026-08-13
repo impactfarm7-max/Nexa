@@ -178,8 +178,8 @@ export default function AbonnementsPage() {
               return (
                 <div
                   key={key}
-                  className={`rounded-2xl border p-6 flex flex-col bg-white transition-all ${
-                    highlighted ? "border-2 shadow-lg" : "border-black/[0.08]"
+                  className={`group rounded-2xl border p-6 flex flex-col bg-white transition-all duration-300 ease-out will-change-transform hover:-translate-y-1.5 hover:shadow-[0_16px_40px_-12px_rgba(17,34,78,0.22)] ${
+                    highlighted ? "border-2 shadow-lg" : "border-black/[0.08] hover:border-[#11224E]/25"
                   }`}
                   style={
                     highlighted
@@ -206,7 +206,7 @@ export default function AbonnementsPage() {
                       <Sparkles size={11} /> {t("centre", "abonnementsRecommended")}
                     </span>
                   )}
-                  <h3 className="text-lg font-black" style={{ color: BLUE }}>{name}</h3>
+                  <h3 className="text-lg font-black transition-colors duration-300 group-hover:text-[#eb670e]" style={{ color: BLUE }}>{name}</h3>
                   <p className="mt-4 text-2xl font-black leading-none" style={{ color: BLUE }}>
                     {price}
                   </p>
@@ -220,7 +220,7 @@ export default function AbonnementsPage() {
                   </ul>
                   <button
                     onClick={contact}
-                    className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-colors"
+                    className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-all duration-300 group-hover:brightness-110 group-hover:scale-[1.02]"
                     style={{ backgroundColor: highlighted ? ORANGE : BLUE }}
                   >
                     <MessageCircle size={16} />
@@ -238,14 +238,16 @@ export default function AbonnementsPage() {
               const isRecommended = !currentOfferKey && key === "pro";
               const highlighted = isCurrent || isRecommended;
               const features = buildOfferFeatures(offer, t);
-              const isQuote = offer.monthlyFeeMax == null && offer.key === "entreprise";
-              const amountLabel = offer.monthlyFeeMin.toLocaleString(en ? "en-US" : "fr-FR");
+              const isQuote = offer.pricePerUser == null;
+              const perUserLabel = offer.pricePerUser != null
+                ? offer.pricePerUser.toLocaleString(en ? "en-US" : "fr-FR")
+                : null;
 
               return (
                 <div
                   key={key}
-                  className={`rounded-2xl border p-6 flex flex-col bg-white transition-all ${
-                    highlighted ? "border-2 shadow-lg" : "border-black/[0.08]"
+                  className={`group rounded-2xl border p-6 flex flex-col bg-white transition-all duration-300 ease-out will-change-transform hover:-translate-y-1.5 hover:shadow-[0_16px_40px_-12px_rgba(17,34,78,0.22)] ${
+                    highlighted ? "border-2 shadow-lg" : "border-black/[0.08] hover:border-[#11224E]/25"
                   }`}
                   style={
                     highlighted
@@ -272,7 +274,7 @@ export default function AbonnementsPage() {
                       <Sparkles size={11} /> {t("centre", "abonnementsRecommended")}
                     </span>
                   )}
-                  <h3 className="text-lg font-black" style={{ color: BLUE }}>
+                  <h3 className="text-lg font-black transition-colors duration-300 group-hover:text-[#eb670e]" style={{ color: BLUE }}>
                     {offerDisplayName(key, t)}
                   </h3>
                   <p className="text-[12px] mt-1 font-medium" style={{ color: "rgba(17,34,78,0.55)" }}>
@@ -285,13 +287,13 @@ export default function AbonnementsPage() {
                   ) : (
                     <div className="mt-4">
                       <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(17,34,78,0.45)" }}>
-                        {t("centre", "abonnementsPriceFrom")}
+                        {t("centre", "abonnementsPricePerUserLabel")}
                       </p>
-                      <p className="mt-0.5 text-2xl font-black leading-none tabular-nums" style={{ color: BLUE }}>
-                        {amountLabel}
+                      <p className="mt-0.5 text-2xl font-black leading-none tabular-nums transition-transform duration-300 group-hover:scale-[1.03] origin-left" style={{ color: BLUE }}>
+                        {perUserLabel}
                       </p>
                       <p className="mt-1 text-xs font-bold" style={{ color: "rgba(17,34,78,0.55)" }}>
-                        {t("centre", "abonnementsPricePerMonth")}
+                        {t("centre", "abonnementsPricePerUser")}
                       </p>
                     </div>
                   )}
@@ -318,7 +320,7 @@ export default function AbonnementsPage() {
                   </div>
                   <button
                     onClick={contact}
-                    className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-colors"
+                    className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-all duration-300 group-hover:brightness-110 group-hover:scale-[1.02]"
                     style={{ backgroundColor: highlighted ? ORANGE : BLUE }}
                   >
                     <MessageCircle size={16} />

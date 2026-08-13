@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/app/utils/email-server";
 import { filterModulePermissions, TCF_SUBJECT_KEYS, ensureTcfCommunautePermission, ensureDefaultLivesPermission, TRAINER_DEFAULT_MODULE_PERMISSIONS } from "@/app/data/tcf-teaching-subjects";
 import { assertCenterHasUserSeat } from "@/app/utils/center-student-quota";
+import { getPublicSiteUrl } from "@/app/utils/public-site-url";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -479,7 +480,7 @@ export async function POST(req: NextRequest) {
 
     // Envoi synchrone (comme /api/etudiants) : `after()` + void ne garde pas
     // le runtime assez longtemps pour finir le SMTP Gmail.
-    const loginBase = (process.env.NEXT_PUBLIC_SITE_URL || "https://nexa.fr").replace(/\/$/, "");
+    const loginBase = getPublicSiteUrl();
     const loginUrl = `${loginBase}/login?lang=${emailLocale}`;
     let emailResult = { sent: false, skipped: false };
     try {

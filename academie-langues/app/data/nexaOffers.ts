@@ -48,6 +48,8 @@ export type NexaOfferConfig = {
   aiCorrectionsPerStudent: number | null;
   courseBuilderPerMonth: number | null;
   whiteLabel: boolean | "option";
+  /** Prix unitaire mensuel par utilisateur (null = sur devis). */
+  pricePerUser: number | null;
   monthlyFeeMin: number;
   monthlyFeeMax: number | null;
   supportLevel: "standard" | "priority" | "dedicated" | "account_manager";
@@ -97,8 +99,9 @@ export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfi
     aiCorrectionsPerStudent: 5,
     courseBuilderPerMonth: 5,
     whiteLabel: false,
-    monthlyFeeMin: 12_500,
-    monthlyFeeMax: 100_000,
+    pricePerUser: 2_500,
+    monthlyFeeMin: 5 * 2_500,
+    monthlyFeeMax: 40 * 2_500,
     supportLevel: "standard",
     modules: ALL_MODULES,
     studentQuotas: NEXA_STUDENT_QUOTAS,
@@ -116,8 +119,9 @@ export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfi
     aiCorrectionsPerStudent: 10,
     courseBuilderPerMonth: 10,
     whiteLabel: false,
-    monthlyFeeMin: 102_000,
-    monthlyFeeMax: 220_000,
+    pricePerUser: 2_000,
+    monthlyFeeMin: 41 * 2_000,
+    monthlyFeeMax: 100 * 2_000,
     supportLevel: "priority",
     modules: ALL_MODULES,
     studentQuotas: NEXA_STUDENT_QUOTAS,
@@ -135,8 +139,9 @@ export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfi
     aiCorrectionsPerStudent: 15,
     courseBuilderPerMonth: 15,
     whiteLabel: "option",
-    monthlyFeeMin: 221_900,
-    monthlyFeeMax: 505_000,
+    pricePerUser: 1_900,
+    monthlyFeeMin: 101 * 1_900,
+    monthlyFeeMax: 250 * 1_900,
     supportLevel: "dedicated",
     modules: ALL_MODULES,
     studentQuotas: NEXA_STUDENT_QUOTAS,
@@ -154,7 +159,8 @@ export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfi
     aiCorrectionsPerStudent: null,
     courseBuilderPerMonth: null,
     whiteLabel: true,
-    monthlyFeeMin: 505_000,
+    pricePerUser: null,
+    monthlyFeeMin: 250 * 1_900,
     monthlyFeeMax: null,
     supportLevel: "account_manager",
     modules: ALL_MODULES,

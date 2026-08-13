@@ -451,25 +451,22 @@ export default function CenterStudentProfil() {
   }
 
   return (
-    <div className="platform-profile-page min-h-[100dvh] bg-[#FFFBF7] text-neutral-900 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-10 overflow-x-hidden">
-      <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/85 backdrop-blur-xl pt-[env(safe-area-inset-top,0px)]">
-        <div className="nexa-student-shell flex items-center gap-2 sm:gap-3 py-2.5 sm:py-3 md:py-4">
+    <div className="platform-profile-page min-h-[100dvh] bg-[#FFFBF7] text-[#11224E] pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-10 overflow-x-hidden">
+      <header className="sticky top-0 z-30 border-b border-black/[0.06] bg-[#FFFBF7] pt-[env(safe-area-inset-top,0px)]">
+        <div className="nexa-student-shell flex items-center gap-2 sm:gap-3 h-[68px]">
           <Link
             href="/dashboard"
             aria-label={td("profilBackAria")}
-            className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-slate-600 shadow-sm hover:bg-neutral-50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-black/[0.08] text-neutral-600 hover:bg-black/[0.03]"
           >
-            <ArrowLeft className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4" />
           </Link>
           <div className="min-w-0 flex-1">
-            <span className="inline-flex rounded-full bg-orange-50 px-2.5 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-orange-600">
-              {td("profilMyProfile")}
-            </span>
             <h1
-              className={`mt-1 truncate text-base sm:text-lg md:text-xl font-black leading-tight ${STUDENT_TEXT.pageTitle}`}
+              className="truncate text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight"
               style={{ color: BRAND.blue }}
             >
-              {displayName}
+              {td("profilMyProfile")}
             </h1>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -477,26 +474,27 @@ export default function CenterStudentProfil() {
             {!isEditing ? (
               <button
                 onClick={startEditing}
-                className="hidden h-11 items-center gap-2 rounded-full border border-orange-100 bg-orange-50 px-4 text-xs font-black uppercase tracking-widest text-orange-600 hover:bg-orange-100 lg:flex"
+                className="hidden h-9 sm:h-10 items-center gap-2 rounded-lg border px-3.5 text-xs font-semibold lg:flex"
+                style={{ color: BRAND.blue, border: `1.5px solid ${BRAND.blue}` }}
               >
-                <Edit2 className="h-4 w-4" />
+                <Edit2 className="h-3.5 w-3.5" />
                 {td("profilEdit")}
               </button>
             ) : (
               <>
                 <button
                   onClick={cancelEditing}
-                  className="hidden h-11 items-center rounded-full border border-neutral-200 bg-neutral-50 px-4 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-neutral-100 lg:flex"
+                  className="hidden h-9 sm:h-10 items-center rounded-lg border border-black/[0.08] px-3.5 text-xs font-semibold text-neutral-600 lg:flex"
                 >
                   {td("profilCancel")}
                 </button>
                 <button
                   onClick={saveProfile}
                   disabled={saving}
-                  className="hidden h-11 items-center gap-2 rounded-full px-4 text-xs font-black uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50 lg:flex"
+                  className="hidden h-9 sm:h-10 items-center gap-2 rounded-lg px-3.5 text-xs font-semibold text-white disabled:opacity-50 lg:flex"
                   style={{ backgroundColor: BRAND.blue }}
                 >
-                  <Save className="h-4 w-4" />
+                  <Save className="h-3.5 w-3.5" />
                   {saving ? td("profilSaving") : td("profilSave")}
                 </button>
               </>
@@ -504,9 +502,9 @@ export default function CenterStudentProfil() {
             <button
               onClick={() => setLogoutConfirmOpen(true)}
               aria-label={td("profilLogout")}
-              className="flex h-10 w-10 sm:h-11 sm:w-auto sm:px-4 items-center justify-center gap-2 rounded-full border border-red-100 bg-red-50 text-xs font-black uppercase tracking-widest text-red-500 hover:bg-red-100"
+              className="flex h-9 sm:h-10 sm:w-auto sm:px-3.5 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 text-xs font-semibold text-red-600 hover:bg-red-100 w-9"
             >
-              <LogOut className="h-4 w-4 shrink-0" />
+              <LogOut className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden sm:inline">{td("profilLogout")}</span>
             </button>
           </div>

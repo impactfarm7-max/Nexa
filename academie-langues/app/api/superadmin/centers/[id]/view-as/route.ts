@@ -6,6 +6,7 @@ import {
 } from "@/app/utils/superadmin-auth-server";
 import { CENTER_HOME, STUDENT_HOME } from "@/app/utils/student-routes";
 import type { ViewAsMode } from "@/app/utils/view-as";
+import { getPublicSiteUrl } from "@/app/utils/public-site-url";
 
 type TargetRow = {
   id: string;
@@ -259,7 +260,7 @@ export async function POST(
     return NextResponse.json({ error: msg }, { status: 404 });
   }
 
-  const site = (process.env.NEXT_PUBLIC_SITE_URL || "https://nexa.fr").replace(/\/$/, "");
+  const site = getPublicSiteUrl();
   const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
     type: "magiclink",
     email: target.email,
