@@ -52,7 +52,7 @@ function evaluateCenterAccess(
   // L'onboarding centre (entreprise / setup) concerne uniquement le compte PDG.
   // Formateurs, staff et campus managers ne doivent jamais être bloqués ici.
   const mustCompleteCenterOnboarding =
-    role === "center_manager" || role === "manager" || role === "admin";
+    role === "center_manager" || role === "manager";
   if (
     mustCompleteCenterOnboarding &&
     !isOnboardingPath &&

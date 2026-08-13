@@ -33,7 +33,7 @@ async function getCallerCenter(userId: string) {
     .eq("id", userId)
     .single();
   if (!profile?.center_id) return null;
-  if (!["admin", "center_manager", "campus_manager", "trainer", "staff"].includes(profile.role)) {
+  if (!["center_manager", "campus_manager", "trainer", "staff"].includes(profile.role)) {
     return null;
   }
   const { data: center } = await supabaseAdmin

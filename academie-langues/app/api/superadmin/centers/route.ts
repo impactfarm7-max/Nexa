@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSuperadminContext, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
 import { CENTER_TRIAL_MS } from "@/app/utils/center-trial";
 import { normalizeNexaOffer } from "@/app/data/nexaOffers";
+import { buildCenterUsage } from "@/app/utils/center-usage";
+import type { QuotaStudentRow } from "@/app/utils/center-student-quota";
 
 type StudentStatusRow = {
   center_id: string;
@@ -119,21 +121,33 @@ export async function GET(req: NextRequest) {
   const { ctx, error } = await getSuperadminContext(req);
   if (!ctx) return error;
 
-  const [
-    { data: centers, error: centersError },
-    { data: students, error: studentsError },
-    { data: centerUsers, error: centerUsersError },
-    { data: managerProfiles, error: managerProfilesError },
-  ] = await Promise.all([
-    supabaseAdmin
+  let centersQuery = await supabaseAdmin
+    .from("centers")
+    .select(
+      "id, name, city, code, signup_slug, address, country, region, center_type, status, email, phone, created_at, nexa_offer, trial_ends_at, renewal_at, renewal_alert_days, subscription_amount, quota_overrides, pause_reason, billing_status, last_payment_at, commercial_intent, commercial_note, upgrade_requested_at",
+    )
+    .order("created_at", { ascending: false });
+
+  // Colonnes billing absentes tant que la migration SQL n'est pas appliquée.
+  if (centersQuery.error && /billing_status|commercial_intent|upgrade_requested_at|last_payment_at/i.test(centersQuery.error.message)) {
+    centersQuery = (await supabaseAdmin
       .from("centers")
       .select(
         "id, name, city, code, signup_slug, address, country, region, center_type, status, email, phone, created_at, nexa_offer, trial_ends_at, renewal_at, renewal_alert_days, subscription_amount, quota_overrides, pause_reason",
       )
-      .order("created_at", { ascending: false }),
+      .order("created_at", { ascending: false })) as typeof centersQuery;
+  }
+
+  const [
+    { data: students, error: studentsError },
+    { data: centerUsers, error: centerUsersError },
+    { data: managerProfiles, error: managerProfilesError },
+    { data: staffRows, error: staffError },
+    { data: campusRows, error: campusError },
+  ] = await Promise.all([
     supabaseAdmin
       .from("profiles")
-      .select("center_id, tag_status, subscription_ends_at, subscription_paused_at")
+      .select("center_id, tag_status, center_status, subscription_ends_at, subscription_paused_at")
       .not("center_id", "is", null)
       .eq("role", "student"),
     supabaseAdmin
@@ -145,7 +159,16 @@ export async function GET(req: NextRequest) {
       .select("id, prenom, nom, email, phone, job_title, center_id, role")
       .not("center_id", "is", null)
       .in("role", ["center_manager", "campus_manager"]),
+    supabaseAdmin
+      .from("profiles")
+      .select("center_id")
+      .not("center_id", "is", null)
+      .in("role", ["center_manager", "campus_manager", "trainer", "staff"]),
+    supabaseAdmin.from("campuses").select("center_id"),
   ]);
+
+  const centers = centersQuery.data;
+  const centersError = centersQuery.error;
 
   if (centersError) {
     return NextResponse.json({ error: centersError.message }, { status: 500 });
@@ -158,6 +181,12 @@ export async function GET(req: NextRequest) {
   }
   if (managerProfilesError) {
     return NextResponse.json({ error: managerProfilesError.message }, { status: 500 });
+  }
+  if (staffError) {
+    return NextResponse.json({ error: staffError.message }, { status: 500 });
+  }
+  if (campusError) {
+    return NextResponse.json({ error: campusError.message }, { status: 500 });
   }
 
   const managersByCenter = new Map<string, ManagerEntry[]>();
@@ -219,6 +248,9 @@ export async function GET(req: NextRequest) {
 
   const now = Date.now();
   const statsByCenter = new Map<string, { actifs: number; pauses: number; expires: number; termines: number; revoques: number; total: number }>();
+  const studentsByCenter = new Map<string, QuotaStudentRow[]>();
+  const staffCountByCenter = new Map<string, number>();
+  const campusCountByCenter = new Map<string, number>();
 
   for (const row of students ?? []) {
     if (!row.center_id) continue;
@@ -226,6 +258,19 @@ export async function GET(req: NextRequest) {
     bucket[classifyStudent(row as StudentStatusRow, now)]++;
     bucket.total++;
     statsByCenter.set(row.center_id, bucket);
+    const list = studentsByCenter.get(row.center_id) ?? [];
+    list.push(row as QuotaStudentRow);
+    studentsByCenter.set(row.center_id, list);
+  }
+
+  for (const row of staffRows ?? []) {
+    if (!row.center_id) continue;
+    staffCountByCenter.set(row.center_id, (staffCountByCenter.get(row.center_id) ?? 0) + 1);
+  }
+
+  for (const row of campusRows ?? []) {
+    if (!row.center_id) continue;
+    campusCountByCenter.set(row.center_id, (campusCountByCenter.get(row.center_id) ?? 0) + 1);
   }
 
   const result = (centers ?? []).map((center) => {
@@ -234,12 +279,25 @@ export async function GET(req: NextRequest) {
       managers.find((m) => m.profiles?.email)?.profiles?.email ||
       (typeof center.email === "string" && center.email.trim() ? center.email.trim() : null);
 
+    const usage = buildCenterUsage({
+      nexa_offer: center.nexa_offer,
+      quota_overrides:
+        center.quota_overrides && typeof center.quota_overrides === "object"
+          ? (center.quota_overrides as Record<string, unknown>)
+          : null,
+      students: studentsByCenter.get(center.id) ?? [],
+      staffCount: staffCountByCenter.get(center.id) ?? 0,
+      campusCount: campusCountByCenter.get(center.id) ?? 0,
+      now,
+    });
+
     return {
       ...center,
       managers,
       creatorEmail,
       derived_status: computeCenterDerivedStatus(center, now),
       stats: statsByCenter.get(center.id) ?? { actifs: 0, pauses: 0, expires: 0, termines: 0, revoques: 0, total: 0 },
+      usage,
     };
   });
 

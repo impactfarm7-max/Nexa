@@ -14,6 +14,16 @@ function isAgentRole(role?: string | null) {
   return role === "admin" || role === "superadmin";
 }
 
+function isNetworkUserRole(role?: string | null) {
+  return (
+    role === "student" ||
+    role === "center_manager" ||
+    role === "campus_manager" ||
+    role === "trainer" ||
+    role === "staff"
+  );
+}
+
 async function assertSuperadmin(userId: string) {
   const { data: profile } = await supabaseAdmin.from("profiles").select("role").eq("id", userId).single();
   return profile?.role === "superadmin";
@@ -23,6 +33,7 @@ type ConversationRow = {
   student_id: string;
   prenom: string;
   email: string | null;
+  role: string | null;
   center_id: string | null;
   center_name: string | null;
   last_message: string;
@@ -47,7 +58,7 @@ export async function GET(req: Request) {
       .eq("id", studentId)
       .maybeSingle();
 
-    if (!student?.center_id) {
+    if (!student?.center_id || !isNetworkUserRole(student.role)) {
       return NextResponse.json({ error: "Conversation hors périmètre réseau." }, { status: 404 });
     }
 
@@ -110,13 +121,14 @@ export async function GET(req: Request) {
     const toProfile = profileMap.get(msg.to_user_id);
     if (!fromProfile && !toProfile) continue;
 
-    const sid = !isAgentRole(fromProfile?.role)
+    const sid = !isAgentRole(fromProfile?.role) && isNetworkUserRole(fromProfile?.role)
       ? msg.from_user_id
-      : !isAgentRole(toProfile?.role)
+      : !isAgentRole(toProfile?.role) && isNetworkUserRole(toProfile?.role)
         ? msg.to_user_id
-        : msg.from_user_id;
+        : null;
+    if (!sid) continue;
     const profile = profileMap.get(sid);
-    if (!profile?.center_id) continue;
+    if (!profile?.center_id || !isNetworkUserRole(profile.role)) continue;
 
     const plain = decryptServer(msg.message, { kind: "support", studentId: sid });
     const preview = (plain.startsWith(BOT_MARKER) ? plain.slice(BOT_MARKER.length) : plain)
@@ -129,6 +141,7 @@ export async function GET(req: Request) {
         student_id: sid,
         prenom: profile.prenom || profile.email || sid,
         email: profile.email || null,
+        role: profile.role || null,
         center_id: profile.center_id,
         center_name: profile.centers?.name || null,
         last_message: preview || "(pièce jointe)",
@@ -167,12 +180,12 @@ export async function POST(req: Request) {
 
   const { data: student } = await supabaseAdmin
     .from("profiles")
-    .select("id, center_id")
+    .select("id, center_id, role")
     .eq("id", studentId)
     .maybeSingle();
 
-  if (!student?.center_id) {
-    return NextResponse.json({ error: "Étudiant hors périmètre réseau." }, { status: 404 });
+  if (!student?.center_id || !isNetworkUserRole(student.role)) {
+    return NextResponse.json({ error: "Utilisateur hors périmètre réseau." }, { status: 404 });
   }
 
   const messageWithFallback = imageUrl

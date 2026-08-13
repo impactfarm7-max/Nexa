@@ -17,6 +17,7 @@ type Conversation = {
   student_id: string;
   prenom: string;
   email: string | null;
+  role?: string | null;
   center_id: string | null;
   center_name: string | null;
   last_message: string;
@@ -249,7 +250,12 @@ export default function SuperadminSupportPage() {
                             )}
                           </div>
                           <p className="truncate text-[10px] font-semibold text-orange-300/80">
-                            {convo.center_name || t("superadmin", "supportUnknownCenter")}
+                            <p className="truncate text-[11px] text-slate-500">
+                              {convo.center_name || t("superadmin", "supportUnknownCenter")}
+                              {convo.role && convo.role !== "student"
+                                ? ` · ${convo.role}`
+                                : ""}
+                            </p>
                           </p>
                           <p className="mt-0.5 truncate text-xs text-slate-500">{convo.last_message}</p>
                         </div>

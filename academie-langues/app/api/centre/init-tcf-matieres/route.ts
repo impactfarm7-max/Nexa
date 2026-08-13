@@ -17,7 +17,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const STAFF_ROLES = ["admin", "center_manager", "campus_manager", "trainer", "staff"];
+const STAFF_ROLES = ["center_manager", "campus_manager", "trainer", "staff"];
 
 export async function POST(req: Request) {
   const user = await getAuthUser(req);

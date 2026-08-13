@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, BookOpen, Shield, CreditCard, Users, AlertTriangle, FileText, Mail, Scale, RefreshCw } from "lucide-react";
+import { ChevronDown, BookOpen, Shield, CreditCard, Users, AlertTriangle, FileText, Mail, Scale, RefreshCw, Building2, Zap } from "lucide-react";
 import Link from "next/link";
 import MarketingChrome from "@/app/components/landing/MarketingChrome";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -110,6 +110,10 @@ export default function CGUPage() {
         { term: t("marketing", "cguDefTerm4"), def: t("marketing", "cguDefDef4") },
         { term: t("marketing", "cguDefTerm5"), def: t("marketing", "cguDefDef5") },
         { term: t("marketing", "cguDefTerm6"), def: t("marketing", "cguDefDef6") },
+        { term: t("marketing", "cguDefTerm7"), def: t("marketing", "cguDefDef7") },
+        { term: t("marketing", "cguDefTerm8"), def: t("marketing", "cguDefDef8") },
+        { term: t("marketing", "cguDefTerm9"), def: t("marketing", "cguDefDef9") },
+        { term: t("marketing", "cguDefTerm10"), def: t("marketing", "cguDefDef10") },
       ],
     },
     {
@@ -124,6 +128,7 @@ export default function CGUPage() {
             t("marketing", "cguAcces21Bullet1"),
             t("marketing", "cguAcces21Bullet2"),
             t("marketing", "cguAcces21Bullet3"),
+            t("marketing", "cguAcces21Bullet4"),
           ],
         },
         {
@@ -133,6 +138,10 @@ export default function CGUPage() {
         {
           title: t("marketing", "cguAcces23Title"),
           content: t("marketing", "cguAcces23Content"),
+        },
+        {
+          title: t("marketing", "cguAcces24Title"),
+          content: t("marketing", "cguAcces24Content"),
         },
       ],
     },
@@ -146,8 +155,39 @@ export default function CGUPage() {
         t("marketing", "cguServicesBullet2"),
         t("marketing", "cguServicesBullet3"),
         t("marketing", "cguServicesBullet4"),
+        t("marketing", "cguServicesBullet5"),
+        t("marketing", "cguServicesBullet6"),
+        t("marketing", "cguServicesBullet7"),
       ],
       extra: t("marketing", "cguServicesExtra"),
+    },
+    {
+      id: "espaces",
+      icon: Users,
+      title: t("marketing", "cguEspacesTitle"),
+      content: t("marketing", "cguEspacesIntro"),
+      bullets: [
+        t("marketing", "cguEspacesBullet1"),
+        t("marketing", "cguEspacesBullet2"),
+        t("marketing", "cguEspacesBullet3"),
+        t("marketing", "cguEspacesBullet4"),
+        t("marketing", "cguEspacesBullet5"),
+      ],
+      extra: t("marketing", "cguEspacesExtra"),
+    },
+    {
+      id: "centres",
+      icon: Building2,
+      title: t("marketing", "cguCentresTitle"),
+      content: t("marketing", "cguCentresIntro"),
+      bullets: [
+        t("marketing", "cguCentresBullet1"),
+        t("marketing", "cguCentresBullet2"),
+        t("marketing", "cguCentresBullet3"),
+        t("marketing", "cguCentresBullet4"),
+        t("marketing", "cguCentresBullet5"),
+      ],
+      extra: t("marketing", "cguCentresExtra"),
     },
     {
       id: "obligations",
@@ -162,6 +202,7 @@ export default function CGUPage() {
         t("marketing", "cguObligationsBullet5"),
         t("marketing", "cguObligationsBullet6"),
         t("marketing", "cguObligationsBullet7"),
+        t("marketing", "cguObligationsBullet8"),
       ],
     },
     {
@@ -175,7 +216,6 @@ export default function CGUPage() {
         t("marketing", "cguMineursBullet3"),
         t("marketing", "cguMineursBullet4"),
         t("marketing", "cguMineursBullet5"),
-        t("marketing", "cguMineursBullet6"),
       ],
     },
     {
@@ -188,6 +228,22 @@ export default function CGUPage() {
           title: t("marketing", "cguPaiements61Title"),
           content: t("marketing", "cguPaiements61Content"),
         },
+        {
+          title: t("marketing", "cguPaiements62Title"),
+          content: t("marketing", "cguPaiements62Content"),
+        },
+      ],
+    },
+    {
+      id: "ia",
+      icon: Zap,
+      title: t("marketing", "cguIaTitle"),
+      content: t("marketing", "cguIaIntro"),
+      bullets: [
+        t("marketing", "cguIaBullet1"),
+        t("marketing", "cguIaBullet2"),
+        t("marketing", "cguIaBullet3"),
+        t("marketing", "cguIaBullet4"),
       ],
     },
     {
@@ -226,6 +282,7 @@ export default function CGUPage() {
         t("marketing", "cguResiliationBullet2"),
         t("marketing", "cguResiliationBullet3"),
         t("marketing", "cguResiliationBullet4"),
+        t("marketing", "cguResiliationBullet5"),
       ],
       extra: t("marketing", "cguResiliationExtra"),
     },

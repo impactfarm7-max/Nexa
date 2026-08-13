@@ -8,7 +8,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const MANAGER_ROLES = ["admin", "center_manager", "campus_manager"];
+const MANAGER_ROLES = ["center_manager", "campus_manager"];
 
 async function assertLibreCenterManager(userId: string) {
   const { data: profile } = await supabaseAdmin

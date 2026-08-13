@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-server";
 import { parseReportFilters } from "@/app/utils/reports-period";
 
-const FULL_ACCESS_ROLES = new Set(["admin", "center_manager", "campus_manager", "manager"]);
+const FULL_ACCESS_ROLES = new Set(["center_manager", "campus_manager", "manager"]);
 
 type ReportLocale = "fr" | "en";
 

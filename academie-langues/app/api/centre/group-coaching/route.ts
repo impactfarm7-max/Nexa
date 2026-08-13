@@ -16,7 +16,7 @@ const supabaseAdmin = createClient(
 
 const UNLIMITED = 9999;
 const TIME_ZONE = "Africa/Douala";
-const STAFF_ROLES = ["admin", "center_manager", "campus_manager", "trainer", "staff"];
+const STAFF_ROLES = ["center_manager", "campus_manager", "trainer", "staff"];
 
 async function getStaffProfile(userId: string) {
   const { data: profile } = await supabaseAdmin

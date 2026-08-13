@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { normalizeNexaOffer } from "@/app/data/nexaOffers";
 import { getSuperadminContext, logSuperadminAction, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
 import { computeCenterDerivedStatus } from "@/app/api/superadmin/centers/route";
+import { buildCenterUsage } from "@/app/utils/center-usage";
+import type { QuotaStudentRow } from "@/app/utils/center-student-quota";
 
 const VALID_STATUSES = new Set(["active", "suspended", "rejected"]);
+const VALID_BILLING = new Set(["current", "unpaid", "grace"]);
+const VALID_COMMERCIAL_INTENT = new Set(["upgrade", "renewal", "custom_quote", "trial_convert"]);
 
 type SubscriptionPatchFields = {
   subscription_amount?: number | null;
@@ -11,6 +15,11 @@ type SubscriptionPatchFields = {
   renewal_at?: string | null;
   renewal_alert_days?: number | null;
   quota_overrides?: Record<string, unknown> | null;
+  billing_status?: string | null;
+  last_payment_at?: string | null;
+  commercial_intent?: string | null;
+  commercial_note?: string | null;
+  upgrade_requested_at?: string | null;
 };
 
 function parseOptionalInt(value: unknown): number | null | undefined {
@@ -41,11 +50,11 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
   const { id } = await context.params;
 
-  const [{ data: center, error: centerError }, { data: centerUsers }, { data: managerProfiles }, { data: students }] = await Promise.all([
+  const [{ data: center, error: centerError }, { data: centerUsers }, { data: managerProfiles }, { data: students }, { data: staffRows }, { count: campusCount }] = await Promise.all([
     supabaseAdmin
       .from("centers")
       .select(
-        "id, name, city, code, signup_slug, address, country, region, center_type, phone, email, status, application_id, created_at, updated_at, nexa_offer, trial_ends_at, renewal_at, subscription_amount, subscription_period_months, renewal_alert_days, quota_overrides, pause_reason, subscription_starts_at",
+        "id, name, city, code, signup_slug, address, country, region, center_type, phone, email, status, application_id, created_at, updated_at, nexa_offer, trial_ends_at, renewal_at, subscription_amount, subscription_period_months, renewal_alert_days, quota_overrides, pause_reason, subscription_starts_at, billing_status, last_payment_at, commercial_intent, commercial_note, upgrade_requested_at",
       )
       .eq("id", id)
       .maybeSingle(),
@@ -54,8 +63,6 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       .select("role, role_label, user_id, profiles:user_id ( id, prenom, nom, email, phone, job_title, last_sign_in_at )")
       .eq("center_id", id)
       .in("role", ["owner", "manager"]),
-    // Le créateur/responsable est un profil de rôle manager rattaché au centre —
-    // il n'est pas toujours présent dans center_users (d'où l'email manquant).
     supabaseAdmin
       .from("profiles")
       .select("id, prenom, nom, email, phone, job_title, last_sign_in_at")
@@ -63,11 +70,20 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       .in("role", ["center_manager", "campus_manager"]),
     supabaseAdmin
       .from("profiles")
-      .select("id, prenom, email, tag_status, subscription_ends_at, subscription_paused_at, pack_name, created_at")
+      .select("id, prenom, email, tag_status, center_status, subscription_ends_at, subscription_paused_at, pack_name, created_at")
       .eq("center_id", id)
       .eq("role", "student")
       .order("created_at", { ascending: false })
-      .limit(50),
+      .limit(200),
+    supabaseAdmin
+      .from("profiles")
+      .select("id")
+      .eq("center_id", id)
+      .in("role", ["center_manager", "campus_manager", "trainer", "staff"]),
+    supabaseAdmin
+      .from("campuses")
+      .select("id", { count: "exact", head: true })
+      .eq("center_id", id),
   ]);
 
   if (centerError || !center) {
@@ -160,6 +176,17 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   }
 
   const derived_status = computeCenterDerivedStatus(center);
+  const usage = buildCenterUsage({
+    nexa_offer: center.nexa_offer,
+    quota_overrides:
+      center.quota_overrides && typeof center.quota_overrides === "object"
+        ? (center.quota_overrides as Record<string, unknown>)
+        : null,
+    students: (students ?? []) as QuotaStudentRow[],
+    staffCount: staffRows?.length ?? 0,
+    campusCount: campusCount ?? 0,
+    now,
+  });
 
   return NextResponse.json({
     center: { ...center, derived_status },
@@ -168,6 +195,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     application,
     students: students ?? [],
     stats,
+    usage,
   });
 }
 
@@ -184,6 +212,12 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const hasRenewalAt = Object.prototype.hasOwnProperty.call(body, "renewal_at");
   const hasRenewalAlertDays = Object.prototype.hasOwnProperty.call(body, "renewal_alert_days");
   const hasQuotaOverrides = Object.prototype.hasOwnProperty.call(body, "quota_overrides");
+  const hasBillingStatus = Object.prototype.hasOwnProperty.call(body, "billing_status");
+  const hasLastPaymentAt = Object.prototype.hasOwnProperty.call(body, "last_payment_at");
+  const hasCommercialIntent = Object.prototype.hasOwnProperty.call(body, "commercial_intent");
+  const hasCommercialNote = Object.prototype.hasOwnProperty.call(body, "commercial_note");
+  const hasUpgradeRequestedAt = Object.prototype.hasOwnProperty.call(body, "upgrade_requested_at");
+  const markPaid = body?.markPaid === true;
   const reason = typeof body?.reason === "string" ? body.reason.slice(0, 500) : undefined;
 
   if (
@@ -193,7 +227,13 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     !hasSubscriptionPeriod &&
     !hasRenewalAt &&
     !hasRenewalAlertDays &&
-    !hasQuotaOverrides
+    !hasQuotaOverrides &&
+    !hasBillingStatus &&
+    !hasLastPaymentAt &&
+    !hasCommercialIntent &&
+    !hasCommercialNote &&
+    !hasUpgradeRequestedAt &&
+    !markPaid
   ) {
     return NextResponse.json({ error: "Aucun champ à mettre à jour." }, { status: 400 });
   }
@@ -251,11 +291,55 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     }
     subscriptionPatch.quota_overrides = overrides;
   }
+  if (markPaid) {
+    subscriptionPatch.billing_status = "current";
+    subscriptionPatch.last_payment_at = new Date().toISOString();
+  }
+  if (hasBillingStatus) {
+    if (body.billing_status === null || body.billing_status === "") {
+      subscriptionPatch.billing_status = null;
+    } else if (typeof body.billing_status === "string" && VALID_BILLING.has(body.billing_status)) {
+      subscriptionPatch.billing_status = body.billing_status;
+    } else {
+      return NextResponse.json({ error: "Statut de facturation invalide." }, { status: 400 });
+    }
+  }
+  if (hasLastPaymentAt) {
+    const paidAt = parseOptionalIsoDate(body.last_payment_at);
+    if (paidAt === undefined) {
+      return NextResponse.json({ error: "Date de paiement invalide." }, { status: 400 });
+    }
+    subscriptionPatch.last_payment_at = paidAt;
+  }
+  if (hasCommercialIntent) {
+    if (body.commercial_intent === null || body.commercial_intent === "") {
+      subscriptionPatch.commercial_intent = null;
+    } else if (typeof body.commercial_intent === "string" && VALID_COMMERCIAL_INTENT.has(body.commercial_intent)) {
+      subscriptionPatch.commercial_intent = body.commercial_intent;
+    } else {
+      return NextResponse.json({ error: "Intention commerciale invalide." }, { status: 400 });
+    }
+  }
+  if (hasCommercialNote) {
+    if (body.commercial_note === null) subscriptionPatch.commercial_note = null;
+    else if (typeof body.commercial_note === "string") {
+      subscriptionPatch.commercial_note = body.commercial_note.slice(0, 2000);
+    } else {
+      return NextResponse.json({ error: "Note commerciale invalide." }, { status: 400 });
+    }
+  }
+  if (hasUpgradeRequestedAt) {
+    const at = parseOptionalIsoDate(body.upgrade_requested_at);
+    if (at === undefined) {
+      return NextResponse.json({ error: "Date de demande invalide." }, { status: 400 });
+    }
+    subscriptionPatch.upgrade_requested_at = at;
+  }
 
   const { data: previousCenter } = await supabaseAdmin
     .from("centers")
     .select(
-      "status, nexa_offer, name, subscription_amount, subscription_period_months, renewal_at, renewal_alert_days, quota_overrides",
+      "status, nexa_offer, name, subscription_amount, subscription_period_months, renewal_at, renewal_alert_days, quota_overrides, billing_status",
     )
     .eq("id", id)
     .maybeSingle();
@@ -275,7 +359,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     .update(patch)
     .eq("id", id)
     .select(
-      "id, name, status, nexa_offer, subscription_amount, subscription_period_months, renewal_at, renewal_alert_days, quota_overrides",
+      "id, name, status, nexa_offer, subscription_amount, subscription_period_months, renewal_at, renewal_alert_days, quota_overrides, billing_status, last_payment_at, commercial_intent, commercial_note, upgrade_requested_at",
     )
     .maybeSingle();
 

@@ -29,7 +29,7 @@ const BLUE           = BRAND.blue;
 const ORANGE         = BRAND.orange;
 const CREAM          = BRAND.bg;
 
-const FULL_ACCESS_ROLES  = ["admin", "center_manager", "campus_manager", "manager"];
+const FULL_ACCESS_ROLES  = ["center_manager", "campus_manager", "manager"];
 const TRAINER_DEFAULT_PATHS = [
   "/centre/cours",
   "/centre/examens",
@@ -400,7 +400,7 @@ function CenterSidebarInner() {
     setUploadingLogo(false);
   };
 
-  const canManage = !previewStaff && (userRole === "admin" || userRole === "center_manager");
+  const canManage = !previewStaff && userRole === "center_manager";
   const isTrainer = !previewStaff && userRole === "trainer";
   const isManager = !previewStaff && FULL_ACCESS_ROLES.includes(userRole || "");
   const navPerms = previewStaff ? [...ALL_STAFF_MODULE_PERMS] : staffPermissions;

@@ -454,6 +454,18 @@ function LoginPageContent() {
         }
       }
 
+      // Admin B2C : MFA optionnelle — challenge si déjà enrôlé.
+      if (profile.role === "admin") {
+        const mfaOutcome = await evaluateSuperadminMfa();
+        if (mfaOutcome.outcome === "challenge_required") {
+          setPendingAuth({ user, profile });
+          setMfaFactorId(mfaOutcome.factorId);
+          setStep("SUPERADMIN_MFA");
+          setLoading(false);
+          return;
+        }
+      }
+
       await finalizeLogin(user, profile);
     } catch (error) {
       console.error("❌ Login error:", error);

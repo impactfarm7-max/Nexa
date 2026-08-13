@@ -22,7 +22,7 @@ export const ALL_STAFF_MODULE_PERMS = [
   "bibliotheque",
 ] as const;
 
-const CENTER_ACTORS = new Set(["admin", "center_manager", "campus_manager", "manager"]);
+const CENTER_ACTORS = new Set(["center_manager", "campus_manager", "manager"]);
 const STAFF_ACTORS = new Set(["staff", "trainer"]);
 
 export function isCenterViewActor(role?: string | null): boolean {

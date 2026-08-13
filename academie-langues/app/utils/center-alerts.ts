@@ -11,7 +11,15 @@ export type AlertCenter = {
   renewal_alert_days?: number | null;
   subscription_amount?: number | null;
   nexa_offer?: string | null;
+  billing_status?: string | null;
   stats?: { actifs?: number; total?: number };
+  usage?: {
+    seatsOver?: boolean;
+    staffOver?: boolean;
+    campusOver?: boolean;
+    seatsOccupied?: number;
+    seatsMax?: number | null;
+  };
 };
 
 export type CenterAlertKind =
@@ -19,7 +27,9 @@ export type CenterAlertKind =
   | "trial_pending"
   | "trial_expired"
   | "renewal_soon"
-  | "subscription_expired";
+  | "subscription_expired"
+  | "billing_unpaid"
+  | "quota_breach";
 
 export type CenterAlert = {
   kind: CenterAlertKind;
@@ -114,14 +124,34 @@ export function collectCenterAlerts(centers: AlertCenter[], now = Date.now()): C
         }
       }
     }
+
+    if (center.billing_status === "unpaid" || center.billing_status === "grace") {
+      alerts.push({
+        kind: "billing_unpaid",
+        center,
+        dueAt: now,
+        daysLeft: 0,
+      });
+    }
+
+    if (center.usage?.seatsOver || center.usage?.staffOver || center.usage?.campusOver) {
+      alerts.push({
+        kind: "quota_breach",
+        center,
+        dueAt: now,
+        daysLeft: 0,
+      });
+    }
   }
 
   const priority: Record<CenterAlertKind, number> = {
     trial_urgent: 0,
-    subscription_expired: 1,
-    trial_expired: 2,
-    renewal_soon: 3,
-    trial_pending: 4,
+    billing_unpaid: 1,
+    quota_breach: 2,
+    subscription_expired: 3,
+    trial_expired: 4,
+    renewal_soon: 5,
+    trial_pending: 6,
   };
 
   return alerts.sort((a, b) => {
@@ -138,6 +168,8 @@ export function summarizeAlerts(alerts: CenterAlert[]) {
     trialExpired: alerts.filter((a) => a.kind === "trial_expired").length,
     renewalSoon: alerts.filter((a) => a.kind === "renewal_soon").length,
     subscriptionExpired: alerts.filter((a) => a.kind === "subscription_expired").length,
+    billingUnpaid: alerts.filter((a) => a.kind === "billing_unpaid").length,
+    quotaBreach: alerts.filter((a) => a.kind === "quota_breach").length,
     total: alerts.length,
   };
 }

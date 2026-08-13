@@ -24,6 +24,15 @@ type CenterRow = {
   nexa_offer: NexaOfferKey | null;
   derived_status: string;
   stats: CenterStats;
+  usage?: {
+    seatsOccupied: number;
+    seatsMax: number | null;
+    seatsOver: boolean;
+    staffCount: number;
+    staffMax: number | null;
+    campusCount: number;
+    campusMax: number | null;
+  };
 };
 
 type SortKey = "name" | "actifs" | "total" | "pauses" | "expires" | "revoques";
@@ -210,6 +219,9 @@ export default function SuperadminEffectifsPage() {
                     </th>
                   ))}
                   <th className="px-4 py-3">{t("superadmin", "effectifsColOffer")}</th>
+                  <th className="px-4 py-3">{t("superadmin", "usageSeats")}</th>
+                  <th className="px-4 py-3">{t("superadmin", "usageStaff")}</th>
+                  <th className="px-4 py-3">{t("superadmin", "usageCampus")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -228,6 +240,15 @@ export default function SuperadminEffectifsPage() {
                     <td className="px-4 py-3 font-black text-white">{center.stats.total}</td>
                     <td className="px-4 py-3 text-xs text-slate-400">
                       {nexaOfferLabel(center.nexa_offer, locale === "en" ? "en" : "fr")}
+                    </td>
+                    <td className={`px-4 py-3 text-xs font-bold ${center.usage?.seatsOver ? "text-red-300" : "text-slate-300"}`}>
+                      {center.usage ? `${center.usage.seatsOccupied}/${center.usage.seatsMax ?? "∞"}` : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-300">
+                      {center.usage ? `${center.usage.staffCount}/${center.usage.staffMax ?? "∞"}` : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-300">
+                      {center.usage ? `${center.usage.campusCount}/${center.usage.campusMax ?? "∞"}` : "—"}
                     </td>
                   </tr>
                 ))}

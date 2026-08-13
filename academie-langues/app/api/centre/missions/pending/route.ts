@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const STAFF_ROLES = ["admin", "center_manager", "campus_manager", "trainer", "staff"];
+const STAFF_ROLES = ["center_manager", "campus_manager", "trainer", "staff"];
 
 async function getStaffProfile(userId: string) {
   const { data: profile } = await supabaseAdmin

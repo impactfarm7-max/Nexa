@@ -59,6 +59,11 @@ type CenterDetail = {
   quota_overrides: Record<string, unknown> | null;
   created_at: string;
   derived_status: DerivedStatus;
+  billing_status?: string | null;
+  last_payment_at?: string | null;
+  commercial_intent?: string | null;
+  commercial_note?: string | null;
+  upgrade_requested_at?: string | null;
 };
 
 type ManagerRow = {
@@ -73,11 +78,25 @@ type ManagerRow = {
   };
 };
 
+type CenterUsage = {
+  seatsOccupied: number;
+  seatsMax: number | null;
+  seatsPct: number | null;
+  seatsOver: boolean;
+  staffCount: number;
+  staffMax: number | null;
+  staffOver: boolean;
+  campusCount: number;
+  campusMax: number | null;
+  campusOver: boolean;
+};
+
 type DetailResponse = {
   center: CenterDetail;
   managers: ManagerRow[];
   creatorEmail: string | null;
   stats: { actifs: number; pauses: number; expires: number; termines: number; revoques: number; total: number };
+  usage?: CenterUsage;
 };
 
 const DERIVED_STATUS_BADGE: Record<DerivedStatus, string> = {
@@ -153,6 +172,7 @@ export function CenterDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [viewAsOpen, setViewAsOpen] = useState(false);
+  const [billingBusy, setBillingBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!centerId) return;
@@ -176,6 +196,38 @@ export function CenterDetailPanel({
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
+
+  const markPaid = async () => {
+    if (!centerId) return;
+    setBillingBusy(true);
+    try {
+      await superadminFetch(`/api/superadmin/centers/${centerId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ markPaid: true }),
+      });
+      await load();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("superadmin", "centersDetailLoadError"));
+    } finally {
+      setBillingBusy(false);
+    }
+  };
+
+  const setBillingStatus = async (billing_status: "current" | "unpaid" | "grace") => {
+    if (!centerId) return;
+    setBillingBusy(true);
+    try {
+      await superadminFetch(`/api/superadmin/centers/${centerId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ billing_status }),
+      });
+      await load();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("superadmin", "centersDetailLoadError"));
+    } finally {
+      setBillingBusy(false);
+    }
+  };
 
   if (!centerId || !listRow) {
     return (
@@ -392,6 +444,119 @@ export function CenterDetailPanel({
             <CreditCard className="h-4 w-4" />
             {offerKey ? t("superadmin", "centresEditOffer") : t("superadmin", "centresAssignOffer")}
           </button>
+        </div>
+      </div>
+
+      {detail?.usage && (
+        <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+            {t("superadmin", "usageTitle")}
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            {(
+              [
+                {
+                  label: t("superadmin", "usageSeats"),
+                  used: detail.usage.seatsOccupied,
+                  max: detail.usage.seatsMax,
+                  over: detail.usage.seatsOver,
+                  pct: detail.usage.seatsPct,
+                },
+                {
+                  label: t("superadmin", "usageStaff"),
+                  used: detail.usage.staffCount,
+                  max: detail.usage.staffMax,
+                  over: detail.usage.staffOver,
+                  pct:
+                    detail.usage.staffMax && detail.usage.staffMax > 0
+                      ? Math.round((detail.usage.staffCount / detail.usage.staffMax) * 100)
+                      : null,
+                },
+                {
+                  label: t("superadmin", "usageCampus"),
+                  used: detail.usage.campusCount,
+                  max: detail.usage.campusMax,
+                  over: detail.usage.campusOver,
+                  pct:
+                    detail.usage.campusMax && detail.usage.campusMax > 0
+                      ? Math.round((detail.usage.campusCount / detail.usage.campusMax) * 100)
+                      : null,
+                },
+              ] as const
+            ).map((row) => (
+              <div
+                key={row.label}
+                className={`rounded-xl border px-3 py-3 ${row.over ? "border-red-500/40 bg-red-500/10" : "border-white/5 bg-white/[0.03]"}`}
+              >
+                <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">{row.label}</p>
+                <p className={`mt-1 text-lg font-black ${row.over ? "text-red-300" : "text-white"}`}>
+                  {row.used}
+                  <span className="text-sm font-bold text-slate-500"> / {row.max == null ? "∞" : row.max}</span>
+                </p>
+                {row.pct != null && (
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <div
+                      className={`h-full rounded-full ${row.over ? "bg-red-400" : row.pct >= 85 ? "bg-amber-400" : "bg-emerald-400"}`}
+                      style={{ width: `${Math.min(100, row.pct)}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+              {t("superadmin", "billingTitle")}
+            </p>
+            <p className="mt-2 text-sm font-bold text-white">
+              {t(
+                "superadmin",
+                center?.billing_status === "unpaid"
+                  ? "billingStatusUnpaid"
+                  : center?.billing_status === "grace"
+                    ? "billingStatusGrace"
+                    : center?.billing_status === "current"
+                      ? "billingStatusCurrent"
+                      : "billingStatusUnknown",
+              )}
+            </p>
+            {center?.last_payment_at && (
+              <p className="mt-1 text-xs text-slate-400">
+                {t("superadmin", "billingLastPayment")}: {formatDate(center.last_payment_at, locale)}
+              </p>
+            )}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={billingBusy || actionBusy}
+              onClick={() => void markPaid()}
+              className={`${btnBase} border-emerald-500/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25`}
+            >
+              {t("superadmin", "billingMarkPaid")}
+            </button>
+            <button
+              type="button"
+              disabled={billingBusy || actionBusy}
+              onClick={() => void setBillingStatus("unpaid")}
+              className={`${btnBase} border-red-500/30 text-red-300 hover:bg-red-500/10`}
+            >
+              {t("superadmin", "billingMarkUnpaid")}
+            </button>
+            <button
+              type="button"
+              disabled={billingBusy || actionBusy}
+              onClick={() => void setBillingStatus("grace")}
+              className={`${btnBase} border-amber-500/30 text-amber-300 hover:bg-amber-500/10`}
+            >
+              {t("superadmin", "billingMarkGrace")}
+            </button>
+          </div>
         </div>
       </div>
 

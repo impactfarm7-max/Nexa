@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  AlertTriangle, BarChart3, Bell, Building2, ChevronRight, Command, Headphones, LayoutDashboard,
+  AlertTriangle, BarChart3, Bell, Building2, ChevronRight, Command, Headphones, Handshake, Inbox, LayoutDashboard,
   Layers, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck,
   Star, Sun, ScrollText, Users, UsersRound, UserCog, X, LibraryBig,
 } from "lucide-react";
@@ -28,6 +28,8 @@ const NAV_CONFIG = [
   { href: "/superadmin/dashboard", menuKey: "dashboard", labelKey: "navDashboardLabel", descKey: "navDashboardDesc", icon: LayoutDashboard, groupKey: "groupPiloting" },
   { href: "/superadmin/analytics", menuKey: "analytics", labelKey: "navAnalyticsLabel", descKey: "navAnalyticsDesc", icon: BarChart3, groupKey: "groupPiloting" },
   { href: "/superadmin/alertes", menuKey: "alertes", labelKey: "navAlertsLabel", descKey: "navAlertsDesc", icon: AlertTriangle, groupKey: "groupPiloting" },
+  { href: "/superadmin/commercial", menuKey: "commercial", labelKey: "navCommercialLabel", descKey: "navCommercialDesc", icon: Handshake, groupKey: "groupPiloting" },
+  { href: "/superadmin/demandes", menuKey: "centres", labelKey: "navDemandesLabel", descKey: "navDemandesDesc", icon: Inbox, groupKey: "groupPiloting" },
   { href: "/superadmin/centres", menuKey: "centres", labelKey: "navCentersLabel", descKey: "navCentersDesc", icon: Building2, groupKey: "groupNetwork" },
   { href: "/superadmin/effectifs", menuKey: "effectifs", labelKey: "navHeadcountLabel", descKey: "navHeadcountDesc", icon: UsersRound, groupKey: "groupNetwork" },
   { href: "/superadmin/etudiants", menuKey: "etudiants", labelKey: "navStudentsLabel", descKey: "navStudentsDesc", icon: Users, groupKey: "groupNetwork" },
@@ -279,19 +281,19 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   ].filter(Boolean) as { href: string; label: string; tone: string }[];
 
   return (
-    <div className={`superadmin-shell flex min-h-screen ${theme === "light" ? "superadmin-light bg-slate-100 text-slate-900" : "bg-[#05070d] text-slate-100"}`}>
+    <div className={`superadmin-shell flex h-dvh overflow-hidden ${theme === "light" ? "superadmin-light bg-slate-100 text-slate-900" : "bg-[#05070d] text-slate-100"}`}>
       {mobileOpen && <button aria-label={t("superadmin", "closeMenu")} className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
-      <aside className={`superadmin-sidebar fixed inset-y-0 left-0 z-50 flex flex-col border-r border-white/[0.08] bg-[#080d18] shadow-2xl transition-[width,transform] duration-300 lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${collapsed ? "lg:w-20" : "lg:w-72"} w-[min(88vw,18rem)] ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex h-20 items-center gap-3 border-b border-white/[0.07] px-5">
+      <aside className={`superadmin-sidebar fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.08] bg-[#080d18] shadow-2xl transition-[width,transform] duration-300 lg:static lg:z-auto lg:h-full lg:shrink-0 lg:translate-x-0 ${collapsed ? "lg:w-20" : "lg:w-72"} w-[min(88vw,18rem)] ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <div className="flex h-20 shrink-0 items-center gap-3 border-b border-white/[0.07] px-5">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg shadow-orange-950/40"><ShieldCheck className="h-5 w-5 text-white" /></div>
           {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-sm font-black uppercase tracking-wider text-white">{t("superadmin", "brandName")}</p><p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600">{t("superadmin", "brandSubtitle")}</p></div>}
           <button onClick={() => setMobileOpen(false)} className="rounded-xl p-2 text-slate-500 hover:text-white lg:hidden"><X className="h-5 w-5" /></button>
         </div>
-        <nav className="custom-scrollbar flex-1 overflow-y-auto px-3 py-4" aria-label={t("superadmin", "navAriaLabel")}>
+        <nav className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label={t("superadmin", "navAriaLabel")}>
           {!collapsed && favorites.length > 0 && <div className="mb-5 rounded-2xl border border-amber-500/10 bg-amber-500/[0.04] p-1.5"><p className="px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-500/60">{t("superadmin", "favorites")}</p>{favorites.map((href) => { const item = NAV_ITEMS.find((entry) => entry.href === href); if (!item) return null; return <Link key={href} href={href} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-amber-200/70 hover:bg-amber-500/10"><Star className="h-3.5 w-3.5 fill-current" />{item.label}</Link>; })}</div>}
           {groups.map((group) => <div key={group} className="mb-5">{!collapsed && <p className="mb-1.5 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-slate-600">{group}</p>}{NAV_ITEMS.filter((item) => item.group === group).map(({ href, label, description, icon: Icon }) => { const active = pathname === href || pathname.startsWith(`${href}/`); const count = href === "/superadmin/centres" ? pendingCenters.length : href === "/superadmin/dashboard" ? alertCounts.badge : 0; return <Link key={href} href={href} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)} className={`mb-1 flex min-h-12 items-center rounded-xl transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${active ? "bg-orange-500 text-white shadow-lg shadow-orange-950/30" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}><Icon className="h-4.5 w-4.5 shrink-0" />{!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{label}</p><p className={`truncate text-[9px] ${active ? "text-orange-100/70" : "text-slate-600"}`}>{description}</p></div>}{count > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">{count}</span>}</Link>; })}</div>)}
         </nav>
-        <div className="border-t border-white/[0.07] p-3">
+        <div className="shrink-0 border-t border-white/[0.07] p-3">
           <div className={`flex items-center ${collapsed ? "flex-col gap-1" : "gap-1"}`}>
             <button onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")} title={t("superadmin", "changeTheme")} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-white/5 hover:text-white">{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{!collapsed && t("superadmin", "theme")}</button>
             <button onClick={() => setCollapsed((value) => !value)} title={t("superadmin", "reduceSidebar")} className="hidden h-10 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-white/5 hover:text-white lg:flex">{collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}{!collapsed && t("superadmin", "reduce")}</button>
@@ -300,8 +302,8 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
         </div>
       </aside>
 
-      <div className="min-w-0 flex-1">
-        <header className="sticky top-0 z-30 flex h-20 items-center gap-3 border-b border-white/[0.07] bg-[#05070d]/90 px-4 backdrop-blur-xl sm:px-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="sticky top-0 z-30 flex h-20 shrink-0 items-center gap-3 border-b border-white/[0.07] bg-[#05070d]/90 px-4 backdrop-blur-xl sm:px-6">
           <button onClick={() => setMobileOpen(true)} aria-label={t("superadmin", "openMenu")} className="rounded-xl border border-white/[0.07] p-2.5 text-slate-400 lg:hidden"><Menu className="h-5 w-5" /></button>
           <div className="min-w-0 flex-1"><p className="text-[9px] font-black uppercase tracking-[0.22em] text-orange-400">{activeItem.group}</p><h1 className="truncate text-base font-black text-white">{activeItem.label}</h1></div>
           <LanguageSwitcher compact dark />
@@ -348,7 +350,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
           </div>
           {email && <span className="hidden max-w-40 truncate text-[10px] font-medium text-slate-500 2xl:block">{email}</span>}
         </header>
-        <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        <main className="custom-scrollbar mx-auto w-full max-w-[1600px] flex-1 overflow-x-hidden overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">{children}</main>
       </div>
 
       {commandOpen && <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/75 px-4 pt-[10vh] backdrop-blur-sm" onClick={() => setCommandOpen(false)}><div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-[#0b1120] shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex h-16 items-center gap-3 border-b border-white/[0.07] px-5"><Command className="h-5 w-5 text-orange-400" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("superadmin", "searchPlaceholder")} className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-slate-600" /><kbd className="rounded border border-white/10 px-2 py-1 text-[9px] text-slate-500">ESC</kbd></div><div className="custom-scrollbar max-h-[55vh] overflow-y-auto p-2">{query.trim().length < 2 && <p className="px-4 py-10 text-center text-sm text-slate-500">{t("superadmin", "searchNetworkPrompt")}</p>}{searching && <div className="space-y-2 p-2">{[1,2,3].map((item) => <div key={item} className="h-14 animate-pulse rounded-xl bg-white/5" />)}</div>}{!searching && query.trim().length >= 2 && results.length === 0 && <p className="px-4 py-10 text-center text-sm text-slate-500">{t("superadmin", "noResults")}</p>}{!searching && results.map((result) => <Link key={`${result.type}-${result.id}`} href={result.href} onClick={() => { setCommandOpen(false); setQuery(""); }} className="flex items-center gap-3 rounded-2xl px-4 py-3 hover:bg-white/5"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-xs font-black text-orange-400">{result.type[0]}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-white">{result.title}</p><p className="truncate text-xs text-slate-500">{result.type} · {result.detail}</p></div><ChevronRight className="h-4 w-4 text-slate-700" /></Link>)}</div></div></div>}

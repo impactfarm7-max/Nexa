@@ -4,7 +4,7 @@ import type { CenterBootstrap } from "@/app/utils/center-me-cache";
 
 function mayLoad(role: string | null, permissions: string[], module: string): boolean {
   if (!role) return false;
-  if (role === "admin" || role === "center_manager" || role === "campus_manager" || role === "manager") {
+  if (role === "center_manager" || role === "campus_manager" || role === "manager") {
     return true;
   }
   if (module === "dashboard") {

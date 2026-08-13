@@ -79,26 +79,6 @@ type SupportConversation = {
   unread: number;
 };
 
-type CenterApplication = {
-  id: string;
-  center_name: string;
-  center_type: string | null;
-  country: string | null;
-  city: string;
-  address: string | null;
-  manager_name: string;
-  manager_role: string | null;
-  email: string;
-  phone: string;
-  student_volume: string | null;
-  needs: string[] | null;
-  message: string | null;
-  status: "new" | "contacted" | "approved" | "rejected";
-  center_code: string | null;
-  created_at: string;
-  updated_at: string | null;
-};
-
 type CoachingAppointment = {
   id: string;
   user_id: string;
@@ -181,11 +161,6 @@ export default function RealAdminDashboard() {
   const [feedbackLoading, setFeedbackLoading] = useState(false);
   const [ratingFilter, setRatingFilter] = useState(0);
   const [pinnedOnly, setPinnedOnly] = useState(false);
-  const [centerApplications, setCenterApplications] = useState<CenterApplication[]>([]);
-  const [centersLoading, setCentersLoading] = useState(false);
-  const [centerActionId, setCenterActionId] = useState<string | null>(null);
-  const [centerCredentials, setCenterCredentials] = useState<{ email: string; password: string; name: string; centerName: string; centerCode?: string } | null>(null);
-  
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentProfile | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -489,44 +464,6 @@ export default function RealAdminDashboard() {
     setFeedbackLoading(false);
   };
 
-  const fetchCenterApplications = async () => {
-    setCentersLoading(true);
-    const { data, error } = await supabase
-      .from("center_applications")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (!error && data) setCenterApplications(data as CenterApplication[]);
-    setCentersLoading(false);
-  };
-
-  const updateCenterApplicationStatus = async (id: string, status: CenterApplication["status"]) => {
-    setCenterActionId(id);
-    if (status === "approved") {
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch("/api/admin/centers/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
-        body: JSON.stringify({ applicationId: id }),
-      });
-      const json = await res.json();
-      setCenterActionId(null);
-      if (!res.ok) {
-        alert(json.error || "Impossible d'approuver le centre.");
-        return;
-      }
-      setCenterCredentials(json.credentials);
-      fetchCenterApplications();
-      return;
-    }
-
-    const { error } = await supabase
-      .from("center_applications")
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq("id", id);
-    setCenterActionId(null);
-    if (!error) fetchCenterApplications();
-  };
-
   const fetchCommunityMessages = async (channelId: string) => {
     const { data, error } = await supabase.from('community_messages').select('*, profiles:user_id ( prenom, role )').eq('channel', channelId).is('center_id', null).order('created_at', { ascending: true });
     if (!error && data) {
@@ -602,14 +539,13 @@ export default function RealAdminDashboard() {
 
   useEffect(() => {
     if (activeTab === "feedbacks") fetchFeedbacks();
-    if (activeTab === "missions" || activeTab === "soumissions") fetchSubmissions();
+    if (activeTab === "missions") fetchSubmissions();
     if (activeTab === "examens") fetchSimHistory();
     if (activeTab === "coaching") fetchCoachingAppointments();
     if (activeTab === "coaching") fetchGroupSessions();
     if (activeTab === "actions" || activeTab === "overview") fetchClientActivities();
     if (activeTab === "messages") fetchConversations();
     if (activeTab === "support") fetchSupportConversations();
-    if (activeTab === "centres") fetchCenterApplications();
   }, [activeTab]);
 
   useEffect(() => {
@@ -1986,44 +1922,6 @@ export default function RealAdminDashboard() {
 
   return (
     <div className="min-h-screen bg-[#0a0f1a] text-slate-200 font-sans flex overflow-x-hidden md:overflow-hidden">
-      {centerCredentials && (
-        <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-[2rem] border border-emerald-500/30 bg-slate-900 p-8 text-center shadow-2xl">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-emerald-500/40 bg-emerald-500/10">
-              <Building2 className="h-8 w-8 text-emerald-400" />
-            </div>
-            <h3 className="text-2xl font-black text-white">Centre approuve</h3>
-            <p className="mt-2 text-sm font-semibold text-slate-400">
-              Transmettez ces acces a {centerCredentials.name} pour {centerCredentials.centerName}.
-            </p>
-            <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-950 p-4 text-left">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Email</p>
-              <p className="font-mono text-sm font-bold text-white">{centerCredentials.email}</p>
-              <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Mot de passe</p>
-              <p className="font-mono text-lg font-black tracking-widest text-orange-400">{centerCredentials.password}</p>
-              <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Code centre</p>
-              <p className="font-mono text-lg font-black tracking-widest text-emerald-400">{centerCredentials.centerCode || "-"}</p>
-              <p className="mt-4 text-[10px] font-black uppercase tracking-widest text-slate-500">Connexion</p>
-              <p className="font-mono text-sm font-bold text-white">/login</p>
-            </div>
-            <div className="mt-5 grid gap-2">
-              <button
-                onClick={() => navigator.clipboard.writeText(`Centre : ${centerCredentials.centerName}\nCode centre : ${centerCredentials.centerCode || "-"}\nEmail : ${centerCredentials.email}\nMot de passe : ${centerCredentials.password}\nLien connexion : ${window.location.origin}/login`)}
-                className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black uppercase tracking-widest text-white hover:bg-emerald-500"
-              >
-                Copier les acces
-              </button>
-              <button
-                onClick={() => setCenterCredentials(null)}
-                className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm font-black uppercase tracking-widest text-slate-300 hover:bg-slate-700"
-              >
-                Fermer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <AnimatePresence>
         {coachingDecisionToast && (
           <motion.div
@@ -2706,10 +2604,7 @@ export default function RealAdminDashboard() {
             )}
           </button>
           <button onClick={() => setActiveTab("centres")} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "centres" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
-            <div className="flex items-center gap-3"><Building2 className="w-4 h-4" /> Centres B2B</div>
-            {centerApplications.filter(c => c.status === "new").length > 0 && (
-              <span className="text-[9px] font-black bg-red-500 text-white px-1.5 py-0.5 rounded-full">{centerApplications.filter(c => c.status === "new").length}</span>
-            )}
+            <div className="flex items-center gap-3"><Building2 className="w-4 h-4" /> Centres (Superadmin)</div>
           </button>
           <button onClick={() => setActiveTab("messages")} className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm font-bold transition-all ${activeTab === "messages" ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "text-slate-400 hover:bg-slate-900"}`}>
             <div className="flex items-center gap-3"><MessageCircle className="w-4 h-4" /> Messages Privés</div>
@@ -2738,20 +2633,22 @@ export default function RealAdminDashboard() {
         </nav>
       </aside>
 
-      <main className="flex-1 flex flex-col min-h-screen md:h-screen md:overflow-y-auto">
-        <header className="min-h-[4rem] md:h-20 px-4 md:px-8 py-3 md:py-0 flex items-center gap-3 border-b border-slate-800 bg-slate-950/50 backdrop-blur-md sticky top-0 z-40">
-          <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-1 text-slate-400 hover:text-white transition-colors shrink-0">
-            <Menu className="w-5 h-5" />
-          </button>
-          <div className="relative flex-1 md:w-96 md:flex-none">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input type="text" placeholder="Chercher un étudiant..." className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:border-orange-500 text-white" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-          </div>
-          <div className="flex items-center gap-2 md:gap-4 ml-auto">
-            <button onClick={exportToCSV} className="px-3 md:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Download className="w-4 h-4" /><span className="hidden sm:inline">Exporter CSV</span></button>
-            <button onClick={exportToPDF} className="px-3 md:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Download className="w-4 h-4" /><span className="hidden sm:inline">Exporter PDF</span></button>
-            <button onClick={broadcastMessage} className="px-3 md:px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageSquare className="w-4 h-4" /><span className="hidden sm:inline">Annonce</span></button>
-            <div className="font-mono font-bold text-orange-400 flex items-center gap-1.5 border-l border-slate-800 pl-3 md:pl-4 text-xs md:text-sm"><Activity className="w-4 h-4 animate-pulse" />{currentTime}</div>
+      <main className="flex-1 flex flex-col min-h-screen min-w-0 md:h-screen md:overflow-y-auto">
+        <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/50 px-3 py-3 backdrop-blur-md sm:px-4 md:px-8 md:py-0 md:h-20">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:h-full md:flex-nowrap">
+            <button onClick={() => setSidebarOpen(true)} className="md:hidden p-2 -ml-1 text-slate-400 hover:text-white transition-colors shrink-0" aria-label="Ouvrir le menu">
+              <Menu className="w-5 h-5" />
+            </button>
+            <div className="relative min-w-0 flex-1 basis-[min(100%,12rem)] md:w-96 md:flex-none md:basis-auto">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <input type="text" placeholder="Chercher un étudiant..." className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm outline-none focus:border-orange-500 text-white" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+            </div>
+            <div className="flex w-full items-center justify-end gap-1.5 sm:ml-auto sm:w-auto sm:gap-2 md:gap-4">
+              <button onClick={exportToCSV} title="Exporter CSV" className="px-2.5 sm:px-3 md:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Download className="w-4 h-4" /><span className="hidden sm:inline">Exporter CSV</span></button>
+              <button onClick={exportToPDF} title="Exporter PDF" className="px-2.5 sm:px-3 md:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5"><Download className="w-4 h-4" /><span className="hidden sm:inline">Exporter PDF</span></button>
+              <button onClick={broadcastMessage} title="Annonce" className="px-2.5 sm:px-3 md:px-4 py-2 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500 hover:text-white border border-indigo-500/20 rounded-xl text-xs font-bold flex items-center gap-1.5"><MessageSquare className="w-4 h-4" /><span className="hidden sm:inline">Annonce</span></button>
+              <div className="hidden font-mono font-bold text-orange-400 items-center gap-1.5 border-l border-slate-800 pl-3 text-xs sm:flex md:pl-4 md:text-sm"><Activity className="w-4 h-4 animate-pulse" />{currentTime}</div>
+            </div>
           </div>
         </header>
 
@@ -3135,36 +3032,36 @@ export default function RealAdminDashboard() {
                 <h2 className="text-2xl font-black text-white flex items-center gap-3 mb-6"><Zap className="text-orange-500 w-7 h-7" /> Vue d'ensemble</h2>
 
                 {/* KPIs principaux */}
-                <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-8">
-                  <div className="bg-slate-900 border border-orange-500/30 p-5 rounded-[1.5rem] relative overflow-hidden">
+                <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4 mb-8">
+                  <div className="bg-slate-900 border border-orange-500/30 p-4 sm:p-5 rounded-[1.5rem] relative overflow-hidden">
                     <div className="absolute top-3 right-3 w-2.5 h-2.5 bg-orange-500 rounded-full animate-pulse" />
                     <p className="text-[10px] font-black uppercase text-orange-400 tracking-widest mb-3">En ligne maintenant</p>
-                    <p className="text-4xl font-black text-orange-500">{onlineUsers.length}</p>
+                    <p className="text-3xl sm:text-4xl font-black text-orange-500">{onlineUsers.length}</p>
                     <p className="text-xs text-slate-500 mt-1">sur la plateforme</p>
                   </div>
-                  <div className="bg-slate-900 border border-slate-800 p-5 rounded-[1.5rem]">
+                  <div className="bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-[1.5rem]">
                     <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest mb-3">Total étudiants</p>
-                    <p className="text-4xl font-black text-white">{students.length}</p>
+                    <p className="text-3xl sm:text-4xl font-black text-white">{students.length}</p>
                     <p className="text-xs text-slate-500 mt-1">{students.filter(s => { const d = new Date(s.created_at); return (now - d.getTime()) < 7*24*3600*1000; }).length} cette semaine</p>
                   </div>
-                  <div className="bg-slate-900 border border-emerald-500/20 p-5 rounded-[1.5rem]">
+                  <div className="bg-slate-900 border border-emerald-500/20 p-4 sm:p-5 rounded-[1.5rem]">
                     <p className="text-[10px] font-black uppercase text-emerald-400 tracking-widest mb-3">Premium actifs</p>
-                    <p className="text-4xl font-black text-emerald-400">{students.filter(s => !s.subscription_paused_at && s.subscription_ends_at && new Date(s.subscription_ends_at).getTime() > now).length}</p>
+                    <p className="text-3xl sm:text-4xl font-black text-emerald-400">{students.filter(s => !s.subscription_paused_at && s.subscription_ends_at && new Date(s.subscription_ends_at).getTime() > now).length}</p>
                     <p className="text-xs text-slate-500 mt-1">abonnements en cours</p>
                   </div>
-                  <div className="bg-slate-900 border border-amber-500/20 p-5 rounded-[1.5rem]">
+                  <div className="bg-slate-900 border border-amber-500/20 p-4 sm:p-5 rounded-[1.5rem]">
                     <p className="text-[10px] font-black uppercase text-amber-400 tracking-widest mb-3">Packs en pause</p>
-                    <p className="text-4xl font-black text-amber-400">{students.filter(s => !!s.subscription_paused_at).length}</p>
+                    <p className="text-3xl sm:text-4xl font-black text-amber-400">{students.filter(s => !!s.subscription_paused_at).length}</p>
                     <p className="text-xs text-slate-500 mt-1">jours conservés</p>
                   </div>
-                  <div className="bg-slate-900 border border-amber-500/20 p-5 rounded-[1.5rem]">
+                  <div className="bg-slate-900 border border-amber-500/20 p-4 sm:p-5 rounded-[1.5rem]">
                     <p className="text-[10px] font-black uppercase text-amber-400 tracking-widest mb-3">En essai</p>
-                    <p className="text-4xl font-black text-amber-400">{students.filter(s => { if (s.subscription_paused_at || (s.subscription_ends_at && new Date(s.subscription_ends_at).getTime() > now)) return false; const age = now - new Date(s.created_at).getTime(); return age < 3*24*3600*1000; }).length}</p>
+                    <p className="text-3xl sm:text-4xl font-black text-amber-400">{students.filter(s => { if (s.subscription_paused_at || (s.subscription_ends_at && new Date(s.subscription_ends_at).getTime() > now)) return false; const age = now - new Date(s.created_at).getTime(); return age < 3*24*3600*1000; }).length}</p>
                     <p className="text-xs text-slate-500 mt-1">période gratuite</p>
                   </div>
-                  <div className="bg-slate-900 border border-red-500/20 p-5 rounded-[1.5rem]">
+                  <div className="bg-slate-900 border border-red-500/20 p-4 sm:p-5 rounded-[1.5rem]">
                     <p className="text-[10px] font-black uppercase text-red-400 tracking-widest mb-3">Expirés</p>
-                    <p className="text-4xl font-black text-red-400">{students.filter(s => { if (s.subscription_paused_at || (s.subscription_ends_at && new Date(s.subscription_ends_at).getTime() > now)) return false; const age = now - new Date(s.created_at).getTime(); return age >= 3*24*3600*1000; }).length}</p>
+                    <p className="text-3xl sm:text-4xl font-black text-red-400">{students.filter(s => { if (s.subscription_paused_at || (s.subscription_ends_at && new Date(s.subscription_ends_at).getTime() > now)) return false; const age = now - new Date(s.created_at).getTime(); return age >= 3*24*3600*1000; }).length}</p>
                     <p className="text-xs text-slate-500 mt-1">à convertir</p>
                   </div>
                 </div>
@@ -3721,7 +3618,7 @@ export default function RealAdminDashboard() {
               </div>
 
               {/* Sélecteur de canal */}
-              <div className="flex gap-2 mb-5">
+              <div className="flex flex-wrap gap-2 mb-5">
                 {CHANNELS.map(ch => (
                   <button key={ch.id} onClick={() => { setActiveChannel(ch.id); fetchCommunityMessages(ch.id); }} className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeChannel === ch.id ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20" : "bg-slate-900 border border-slate-800 text-slate-400 hover:border-orange-500/40"}`}>
                     {ch.name}
@@ -3765,209 +3662,30 @@ export default function RealAdminDashboard() {
             </motion.div>
           )}
 
-          {/* 📥 SOUMISSIONS */}
-          {activeTab === "soumissions" && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-4xl mx-auto">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-                  <FileDown className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-black text-white">Soumissions</h2>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Devoirs rendus par les étudiants</p>
-                </div>
-              </div>
-
-              {/* Filtres */}
-              <div className="flex gap-2 mb-6">
-                {[["all", "Toutes"], ["done", "Corrigées IA"], ["pending_review", "En attente"]].map(([val, label]) => (
-                  <button key={val} onClick={() => setSubmissionFilter(val as any)}
-                    className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${submissionFilter === val ? "bg-orange-500 text-white" : "bg-slate-900 border border-slate-800 text-slate-400 hover:border-orange-500/40"}`}>
-                    {label}
-                    <span className="ml-2 opacity-60">
-                      {val === "all" ? submissions.length : submissions.filter(s => s.status === val).length}
-                    </span>
-                  </button>
-                ))}
-              </div>
-
-              {submissionsLoading && <p className="text-slate-500 text-sm text-center py-10 animate-pulse">Chargement...</p>}
-
-              <div className="space-y-4">
-                {submissions
-                  .filter(s => submissionFilter === "all" || s.status === submissionFilter)
-                  .map((sub) => {
-                    const corr = sub.correction;
-                    const scoreColor = corr ? (corr.note >= 16 ? "text-emerald-400" : corr.note >= 12 ? "text-blue-400" : corr.note >= 8 ? "text-amber-400" : "text-red-400") : "";
-
-                    return (
-                      <div key={sub.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-                        {/* Header */}
-                        <div className="p-5 flex items-start justify-between gap-4">
-                          <div className="flex items-start gap-3">
-                            <div className="w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center font-black text-orange-500 text-sm shrink-0">
-                              {sub.profiles?.prenom?.charAt(0) || "?"}
-                            </div>
-                            <div>
-                              <p className="font-bold text-white text-sm">{sub.profiles?.prenom || "Inconnu"}</p>
-                              <p className="text-[10px] text-slate-500">{sub.profiles?.email}</p>
-                              <p className="text-xs text-orange-400 font-bold mt-1">{sub.missions?.title}</p>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2 shrink-0">
-                            {corr ? (
-                              <div className="flex items-center gap-2">
-                                <span className={`text-2xl font-black ${scoreColor}`}>{corr.note}</span>
-                                <span className="text-slate-500 text-sm">/20</span>
-                                <span className={`text-xs font-black ${scoreColor}`}>{corr.niveau}</span>
-                              </div>
-                            ) : (
-                              <span className={`text-[9px] font-black uppercase px-2 py-1 rounded border ${sub.status === "pending_review" ? "text-amber-400 border-amber-500/30 bg-amber-500/10" : "text-slate-500 border-slate-700"}`}>
-                                {sub.status === "pending_review" ? "En attente" : sub.status}
-                              </span>
-                            )}
-                            <span className="text-[9px] text-slate-600">{new Date(sub.created_at).toLocaleDateString("fr-FR")}</span>
-                          </div>
-                        </div>
-
-                        {/* Réponse de l'étudiant */}
-                        {sub.answer_text && (
-                          <div className="px-5 pb-4 border-t border-slate-800 pt-4">
-                            <p className="text-[9px] font-black uppercase text-slate-500 mb-2">Réponse</p>
-                            <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">{sub.answer_text}</p>
-                          </div>
-                        )}
-
-                        {/* Fichier */}
-                        {sub.file_url && (
-                          <div className="px-5 pb-4">
-                            <a href={sub.file_url} target="_blank" rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 text-xs font-bold text-orange-400 hover:text-orange-300 transition-colors">
-                              <FileText className="w-3.5 h-3.5" /> {sub.file_name || "Fichier joint"}
-                            </a>
-                          </div>
-                        )}
-
-                        {/* Correction IA */}
-                        {corr && (
-                          <div className="border-t border-slate-800 px-5 py-4 bg-slate-950/40">
-                            <p className="text-[9px] font-black uppercase text-emerald-400 mb-2">Correction IA</p>
-                            <p className="text-xs text-slate-400 italic leading-relaxed">{corr.commentaire_global}</p>
-                            {corr.conseil_coach && (
-                              <p className="text-xs text-orange-300 mt-2">💡 {corr.conseil_coach}</p>
-                            )}
-                          </div>
-                        )}
-
-                        {sub.admin_comment && (
-                          <div className="border-t border-slate-800 px-5 py-4 bg-orange-500/5">
-                            <p className="text-[9px] font-black uppercase text-orange-400 mb-2">Commentaire admin</p>
-                            <p className="text-sm text-slate-200 leading-relaxed">{sub.admin_comment}</p>
-                            {sub.admin_comment_at && (
-                              <p className="text-[9px] text-slate-600 mt-2">
-                                Envoyé le {new Date(sub.admin_comment_at).toLocaleDateString("fr-FR")}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        <div className="border-t border-slate-800 px-5 py-4">
-                          <button
-                            onClick={() => {
-                              const opening = commentOpenId !== sub.id;
-                              setCommentOpenId(opening ? sub.id : null);
-                              if (opening && !submissionComments[sub.id]) {
-                                setSubmissionComments((prev) => ({ ...prev, [sub.id]: sub.admin_comment || "" }));
-                              }
-                            }}
-                            className={`flex items-center gap-2 text-sm font-black transition-colors ${
-                              commentOpenId === sub.id ? "text-orange-400" : "text-slate-400 hover:text-orange-400"
-                            }`}
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                            Faire un commentaire
-                            {commentSentId === sub.id && (
-                              <span className="ml-2 text-[10px] text-emerald-400 uppercase tracking-widest">Envoyé</span>
-                            )}
-                          </button>
-
-                          <AnimatePresence>
-                            {commentOpenId === sub.id && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0, y: -8 }}
-                                animate={{ opacity: 1, height: "auto", y: 0 }}
-                                exit={{ opacity: 0, height: 0, y: -8 }}
-                                className="overflow-hidden"
-                              >
-                                <div className="pt-4 space-y-4">
-                                  <textarea
-                                    value={submissionComments[sub.id] || ""}
-                                    onChange={(e) => setSubmissionComments((prev) => ({ ...prev, [sub.id]: e.target.value }))}
-                                    placeholder="Écrivez votre commentaire à l'étudiant..."
-                                    rows={4}
-                                    className="w-full bg-slate-800 border border-slate-700 rounded-2xl px-4 py-3 text-slate-100 text-sm outline-none focus:border-orange-500 transition-colors resize-none placeholder:text-slate-500"
-                                  />
-                                  <div className="flex items-center gap-3">
-                                    <button
-                                      onClick={() => sendSubmissionComment(sub.id)}
-                                      disabled={commentSendingId === sub.id || !submissionComments[sub.id]?.trim()}
-                                      className="px-5 py-3 rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 active:scale-95"
-                                    >
-                                      {commentSendingId === sub.id ? (
-                                        <Activity className="w-4 h-4 animate-spin" />
-                                      ) : (
-                                        <Send className="w-4 h-4" />
-                                      )}
-                                      Envoyer
-                                    </button>
-                                    <button
-                                      onClick={() => setCommentOpenId(null)}
-                                      disabled={commentSendingId === sub.id}
-                                      className="px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-colors disabled:opacity-50"
-                                    >
-                                      Annuler
-                                    </button>
-                                  </div>
-                                </div>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                {!submissionsLoading && submissions.filter(s => submissionFilter === "all" || s.status === submissionFilter).length === 0 && (
-                  <p className="text-slate-600 text-sm italic text-center py-10">Aucune soumission pour ce filtre.</p>
-                )}
-              </div>
-            </motion.div>
-          )}
-
           {/* COACHING */}
           {activeTab === "coaching" && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-4xl mx-auto">
-              <div className="flex items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-6">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 shrink-0">
                     <CalendarCheck className="w-5 h-5 text-white" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <h2 className="text-2xl font-black text-white">Coaching</h2>
                     <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Gestion des rendez-vous</p>
                   </div>
                 </div>
                 <button
                   onClick={fetchCoachingAppointments}
-                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:border-orange-500/40 text-xs font-black uppercase tracking-widest flex items-center gap-2"
+                  className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:border-orange-500/40 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 shrink-0"
                 >
                   <RefreshCcw className="w-3.5 h-3.5" /> Actualiser
                 </button>
               </div>
 
               {/* Group coaching card */}
-              <div className="mb-8 bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-                <div className="flex items-center justify-between mb-4">
+              <div className="mb-8 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-700">Programmer une session groupe</h3>
                   <span className="text-[11px] font-bold text-slate-400">{groupEligibleCount} étudiant(s) éligible(s)</span>
                 </div>
@@ -3984,23 +3702,23 @@ export default function RealAdminDashboard() {
                     maxLength={120}
                     className="bg-slate-50 border border-slate-200 focus:border-orange-400 outline-none rounded-xl px-3 py-2.5 text-sm text-slate-800"
                   />
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <input
                       type="date"
                       value={groupForm.date}
                       onChange={(e) => setGroupForm({ ...groupForm, date: e.target.value })}
-                      className="bg-slate-50 border border-slate-200 focus:border-orange-400 outline-none rounded-xl px-2 py-2.5 text-sm text-slate-800"
+                      className="bg-slate-50 border border-slate-200 focus:border-orange-400 outline-none rounded-xl px-2 py-2.5 text-sm text-slate-800 min-w-0"
                     />
                     <input
                       type="time"
                       value={groupForm.time}
                       onChange={(e) => setGroupForm({ ...groupForm, time: e.target.value })}
-                      className="bg-slate-50 border border-slate-200 focus:border-orange-400 outline-none rounded-xl px-2 py-2.5 text-sm text-slate-800"
+                      className="bg-slate-50 border border-slate-200 focus:border-orange-400 outline-none rounded-xl px-2 py-2.5 text-sm text-slate-800 min-w-0"
                     />
                     <select
                       value={groupForm.duration_min}
                       onChange={(e) => setGroupForm({ ...groupForm, duration_min: Number(e.target.value) })}
-                      className="bg-slate-50 border border-slate-200 focus:border-orange-400 outline-none rounded-xl px-2 py-2.5 text-sm text-slate-800"
+                      className="bg-slate-50 border border-slate-200 focus:border-orange-400 outline-none rounded-xl px-2 py-2.5 text-sm text-slate-800 min-w-0"
                     >
                       <option value={30}>30 min</option>
                       <option value={60}>60 min</option>
@@ -4055,18 +3773,18 @@ export default function RealAdminDashboard() {
 
               {/* Stats banner */}
               {!coachingLoading && (
-                <div className="grid grid-cols-3 gap-3 mb-8">
-                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-center">
-                    <p className="text-3xl font-black text-amber-400">{coachingStats.pending}</p>
-                    <p className="text-[10px] font-black text-amber-500/70 uppercase tracking-widest mt-1">En attente</p>
+                <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-8">
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 sm:p-4 text-center">
+                    <p className="text-2xl sm:text-3xl font-black text-amber-400">{coachingStats.pending}</p>
+                    <p className="text-[9px] sm:text-[10px] font-black text-amber-500/70 uppercase tracking-widest mt-1">En attente</p>
                   </div>
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-center">
-                    <p className="text-3xl font-black text-emerald-400">{coachingStats.confirmed}</p>
-                    <p className="text-[10px] font-black text-emerald-500/70 uppercase tracking-widest mt-1">Confirmés</p>
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-3 sm:p-4 text-center">
+                    <p className="text-2xl sm:text-3xl font-black text-emerald-400">{coachingStats.confirmed}</p>
+                    <p className="text-[9px] sm:text-[10px] font-black text-emerald-500/70 uppercase tracking-widest mt-1">Confirmés</p>
                   </div>
-                  <div className="bg-slate-800 border border-slate-700 rounded-2xl p-4 text-center">
-                    <p className="text-3xl font-black text-slate-300">{coachingStats.effectue}</p>
-                    <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Effectués (30j)</p>
+                  <div className="bg-slate-800 border border-slate-700 rounded-2xl p-3 sm:p-4 text-center">
+                    <p className="text-2xl sm:text-3xl font-black text-slate-300">{coachingStats.effectue}</p>
+                    <p className="text-[9px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">Effectués (30j)</p>
                   </div>
                 </div>
               )}
@@ -4315,99 +4033,25 @@ export default function RealAdminDashboard() {
             </motion.div>
           )}
 
-          {/* CENTRES B2B */}
+          {/* CENTRES B2B — géré dans Superadmin */}
           {activeTab === "centres" && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-5xl mx-auto">
-              <div className="flex flex-col gap-4 mb-8 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
-                    <Building2 className="w-5 h-5 text-white" />
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-3xl mx-auto">
+              <div className="rounded-[2rem] border border-orange-500/30 bg-orange-500/10 p-8 sm:p-10">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 shrink-0 bg-orange-500 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20">
+                    <Building2 className="w-6 h-6 text-white" />
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-black text-white">Centres B2B</h2>
-                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Demandes d'ouverture de centre</p>
+                  <div className="min-w-0">
+                    <h2 className="text-2xl font-black text-white">Demandes centres</h2>
+                    <p className="mt-2 text-sm font-semibold text-slate-300 leading-relaxed">
+                      Les candidatures d&apos;ouverture de centres sont désormais traitées dans le Superadmin réseau
+                      (menu <span className="text-orange-300">Demandes centres</span>), avec un compte{" "}
+                      <span className="text-orange-300">superadmin</span>. Cet espace Admin reste dédié au B2C
+                      (packs, support invités, coaching…).
+                    </p>
                   </div>
                 </div>
-                <button onClick={fetchCenterApplications} className="flex items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-4 py-2 text-xs font-bold text-slate-300 hover:border-orange-500/40 hover:text-orange-400">
-                  <RefreshCcw className={`w-4 h-4 ${centersLoading ? "animate-spin" : ""}`} />
-                  Actualiser
-                </button>
               </div>
-
-              {centersLoading ? (
-                <p className="text-slate-500 text-sm text-center py-10 animate-pulse">Chargement des demandes centres...</p>
-              ) : centerApplications.length === 0 ? (
-                <div className="bg-slate-900 border border-slate-800 rounded-[2rem] p-12 text-center">
-                  <Building2 className="w-12 h-12 text-slate-700 mx-auto mb-4" />
-                  <p className="text-slate-400 font-bold">Aucune demande de centre pour l'instant</p>
-                  <p className="text-sm text-slate-600 mt-1">Les demandes envoyees depuis "Creer un centre" apparaitront ici.</p>
-                </div>
-              ) : (
-                <div className="grid gap-4">
-                  {centerApplications.map((application) => {
-                    const statusConfig = {
-                      new: { label: "Nouveau", className: "bg-blue-500/10 text-blue-300 border-blue-500/20" },
-                      contacted: { label: "Contacte", className: "bg-amber-500/10 text-amber-300 border-amber-500/20" },
-                      approved: { label: "Approuve", className: "bg-emerald-500/10 text-emerald-300 border-emerald-500/20" },
-                      rejected: { label: "Rejete", className: "bg-red-500/10 text-red-300 border-red-500/20" },
-                    }[application.status];
-
-                    return (
-                      <div key={application.id} className="rounded-[1.5rem] border border-slate-800 bg-slate-900 p-5">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                          <div>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-lg font-black text-white">{application.center_name}</h3>
-                              <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${statusConfig.className}`}>
-                                {statusConfig.label}
-                              </span>
-                            </div>
-                            <p className="mt-1 text-xs font-bold text-slate-500">
-                              Demande du {new Date(application.created_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
-                            </p>
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            <button onClick={() => updateCenterApplicationStatus(application.id, "contacted")} disabled={centerActionId === application.id} className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-amber-300 hover:bg-amber-500 hover:text-white disabled:opacity-50">Contacte</button>
-                            <button onClick={() => updateCenterApplicationStatus(application.id, "approved")} disabled={centerActionId === application.id} className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-emerald-300 hover:bg-emerald-500 hover:text-white disabled:opacity-50">Approuver</button>
-                            <button onClick={() => updateCenterApplicationStatus(application.id, "rejected")} disabled={centerActionId === application.id} className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-red-300 hover:bg-red-500 hover:text-white disabled:opacity-50">Rejeter</button>
-                          </div>
-                        </div>
-
-                        <div className="mt-5 grid gap-3 md:grid-cols-2">
-                          <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Responsable</p>
-                            <p className="mt-2 font-bold text-white">{application.manager_name}</p>
-                            {application.manager_role && <p className="text-xs font-semibold text-slate-500">{application.manager_role}</p>}
-                            <div className="mt-3 space-y-1 text-xs font-semibold text-slate-400">
-                              <p className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-orange-400" /> {application.email}</p>
-                              <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-orange-400" /> {application.phone}</p>
-                            </div>
-                          </div>
-                          <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Centre</p>
-                            <p className="mt-2 text-sm font-bold text-white">{application.city}</p>
-                            {application.address && <p className="text-xs font-semibold text-slate-500">{application.address}</p>}
-                            {application.student_volume && <p className="mt-3 text-xs font-semibold text-slate-400">Volume: {application.student_volume}</p>}
-                            {application.center_code && (
-                              <div className="mt-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-emerald-300">Code centre</p>
-                                <p className="font-mono text-lg font-black tracking-widest text-white">{application.center_code}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {application.message && (
-                          <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Message</p>
-                            <p className="mt-2 whitespace-pre-wrap text-sm font-medium leading-relaxed text-slate-300">{application.message}</p>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </motion.div>
           )}
 

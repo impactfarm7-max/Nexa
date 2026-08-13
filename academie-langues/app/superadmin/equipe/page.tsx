@@ -26,6 +26,7 @@ const MENU_LABEL_KEYS: Record<SuperadminMenuKey, string> = {
   dashboard: "navDashboardLabel",
   analytics: "navAnalyticsLabel",
   alertes: "navAlertsLabel",
+  commercial: "navCommercialLabel",
   centres: "navCentersLabel",
   effectifs: "navHeadcountLabel",
   etudiants: "navStudentsLabel",
@@ -45,6 +46,7 @@ export default function SuperadminEquipePage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Member | null>(null);
   const [createdCreds, setCreatedCreds] = useState<{ email: string; password: string } | null>(null);
+  const [credsCopied, setCredsCopied] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -183,7 +185,13 @@ export default function SuperadminEquipePage() {
       )}
 
       {createdCreds && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4" onClick={() => setCreatedCreds(null)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4"
+          onClick={() => {
+            setCreatedCreds(null);
+            setCredsCopied(false);
+          }}
+        >
           <div
             className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0a0f1c] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -195,7 +203,14 @@ export default function SuperadminEquipePage() {
                 </p>
                 <p className="mt-2 text-sm text-slate-400">{t("superadmin", "equipeCreatedHint")}</p>
               </div>
-              <button type="button" onClick={() => setCreatedCreds(null)} className="text-slate-500 hover:text-white">
+              <button
+                type="button"
+                onClick={() => {
+                  setCreatedCreds(null);
+                  setCredsCopied(false);
+                }}
+                className="text-slate-500 hover:text-white"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -211,14 +226,34 @@ export default function SuperadminEquipePage() {
             </div>
             <button
               type="button"
-              onClick={() => {
-                void navigator.clipboard.writeText(
-                  `${createdCreds.email}\n${createdCreds.password}`,
-                );
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(
+                    `${createdCreds.email}\n${createdCreds.password}`,
+                  );
+                  setCredsCopied(true);
+                  window.setTimeout(() => setCredsCopied(false), 2000);
+                } catch {
+                  feedback.show({
+                    status: "error",
+                    title: t("superadmin", "studentsCopy"),
+                  });
+                }
               }}
-              className="mt-4 w-full rounded-xl bg-orange-500 py-2.5 text-sm font-black text-white hover:opacity-90"
+              className={`mt-4 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-black text-white transition-all duration-300 active:scale-[0.97] ${
+                credsCopied
+                  ? "scale-[1.02] bg-emerald-500 shadow-lg shadow-emerald-500/30"
+                  : "bg-orange-500 hover:opacity-90"
+              }`}
             >
-              {t("superadmin", "studentsCopy")}
+              {credsCopied ? (
+                <>
+                  <Check className="h-4 w-4 scale-110 transition-transform duration-200" strokeWidth={3} />
+                  {t("superadmin", "studentsCopied")}
+                </>
+              ) : (
+                t("superadmin", "studentsCopy")
+              )}
             </button>
           </div>
         </div>

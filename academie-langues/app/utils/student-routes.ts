@@ -104,7 +104,7 @@ export function canAccessCenterPath(
   permissions: string[],
 ): boolean {
   if (!role) return false;
-  if (role === "admin" || role === "center_manager" || role === "campus_manager" || role === "manager") return true;
+  if (role === "center_manager" || role === "campus_manager" || role === "manager") return true;
   if (role === "trainer") {
     const trainerDefaults = [
       "/centre/dashboard",

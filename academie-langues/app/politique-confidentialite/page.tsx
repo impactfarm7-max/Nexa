@@ -133,6 +133,10 @@ export default function PolitiqueConfidentialitePage() {
           title: t("marketing", "confidentialiteDonnees23Title"),
           content: t("marketing", "confidentialiteDonnees23Content"),
         },
+        {
+          title: t("marketing", "confidentialiteDonnees24Title"),
+          content: t("marketing", "confidentialiteDonnees24Content"),
+        },
       ],
     },
     {
@@ -161,6 +165,7 @@ export default function PolitiqueConfidentialitePage() {
         t("marketing", "confidentialiteFinalitesBullet6"),
         t("marketing", "confidentialiteFinalitesBullet7"),
         t("marketing", "confidentialiteFinalitesBullet8"),
+        t("marketing", "confidentialiteFinalitesBullet9"),
       ],
     },
     {
@@ -194,6 +199,7 @@ export default function PolitiqueConfidentialitePage() {
             t("marketing", "confidentialitePartage62Bullet1"),
             t("marketing", "confidentialitePartage62Bullet2"),
             t("marketing", "confidentialitePartage62Bullet3"),
+            t("marketing", "confidentialitePartage62Bullet4"),
           ],
         },
         {
@@ -216,6 +222,7 @@ export default function PolitiqueConfidentialitePage() {
         t("marketing", "confidentialiteConservationBullet3"),
         t("marketing", "confidentialiteConservationBullet4"),
         t("marketing", "confidentialiteConservationBullet5"),
+        t("marketing", "confidentialiteConservationBullet6"),
       ],
     },
     {

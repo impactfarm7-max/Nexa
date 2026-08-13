@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const STAFF_ROLES = ["admin", "center_manager", "campus_manager", "trainer", "staff"];
+const STAFF_ROLES = ["center_manager", "campus_manager", "trainer", "staff"];
 const MAX_EXAMEN_ID = 25;
 
 export async function POST(req: Request) {

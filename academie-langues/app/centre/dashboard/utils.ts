@@ -5,7 +5,6 @@ import {
 } from "@/app/data/tcf-teaching-subjects";
 
 const DASHBOARD_FULL_ACCESS_ROLES = new Set([
-  "admin",
   "center_manager",
   "campus_manager",
   "manager",

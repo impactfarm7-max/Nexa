@@ -18,14 +18,13 @@ function msg(req: Request, fr: string, en: string): string {
   return reqLocale(req) === "en" ? en : fr;
 }
 
-const STAFF_ROLES = ["admin", "center_manager", "campus_manager", "trainer", "staff"];
+const STAFF_ROLES = ["center_manager", "campus_manager", "trainer", "staff"];
 const PARTICIPANT_ROLES = [
   "student",
   "trainer",
   "staff",
   "campus_manager",
   "center_manager",
-  "admin",
 ];
 
 async function getCallerCenter(userId: string) {

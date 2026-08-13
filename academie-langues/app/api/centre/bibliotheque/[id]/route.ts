@@ -7,7 +7,7 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const MANAGER_ROLES = ["admin", "center_manager", "campus_manager"];
+const MANAGER_ROLES = ["center_manager", "campus_manager"];
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
