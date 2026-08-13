@@ -107,6 +107,35 @@ function nextUpdatedAt(previous: string | null): string {
   return new Date(Math.max(Date.now(), Number.isNaN(previousTime) ? 0 : previousTime + 1)).toISOString();
 }
 
+async function restoreWalletAfterPurchaseFailure(
+  centerId: string,
+  previousRow: WalletRow | null,
+  storedRow: WalletRow,
+): Promise<boolean> {
+  if (!previousRow) {
+    const { data, error } = await supabaseAdmin
+      .from("center_ai_credit_wallets")
+      .delete()
+      .eq("center_id", centerId)
+      .eq("updated_at", storedRow.updated_at)
+      .select("center_id")
+      .maybeSingle();
+    return !error && Boolean(data);
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("center_ai_credit_wallets")
+    .update({
+      ...walletFromRow(previousRow),
+      updated_at: nextUpdatedAt(storedRow.updated_at),
+    })
+    .eq("center_id", centerId)
+    .eq("updated_at", storedRow.updated_at)
+    .select("center_id")
+    .maybeSingle();
+  return !error && Boolean(data);
+}
+
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { ctx, error } = await getSuperadminContext(req);
   if (!ctx) return error;
@@ -233,6 +262,17 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       .single();
 
     if (purchaseError || !purchase) {
+      const restored = await restoreWalletAfterPurchaseFailure(
+        id,
+        currentRow as WalletRow | null,
+        storedRow,
+      );
+      if (!restored) {
+        console.error("[superadmin credits] purchase insert and wallet compensation failed", {
+          centerId: id,
+          purchaseError: purchaseError?.message ?? null,
+        });
+      }
       return NextResponse.json(
         { error: purchaseError?.message || "Impossible d'enregistrer l'achat de crédits IA." },
         { status: 500 },
