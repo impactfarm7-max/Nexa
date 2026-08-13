@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { normalizeCenterType } from "@/app/data/center-types";
 import { normalizeNexaOffer } from "@/app/data/nexaOffers";
+import { normalizeTcfPlan } from "@/app/data/tcfOffers";
 import { checkPasswordStrength, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
 
 const supabaseAdmin = createClient(
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
       ownerPrenom, ownerNom, ownerEmail, ownerPassword, ownerRole,
       centerType,
       nexaOffer,
+      planType,
     } = await req.json();
 
     if (!centerName?.trim()) return NextResponse.json({ error: "Le nom du centre est requis." }, { status: 400 });
@@ -29,8 +31,9 @@ export async function POST(req: NextRequest) {
 
     // tcf_canada | formation_courte | generic — jamais de collapse silencieux vers un autre type
     const type = normalizeCenterType(centerType);
-    // Offre B2B optionnelle (null = le centre choisira / SA attribuera plus tard)
-    const offer = normalizeNexaOffer(nexaOffer);
+    // Libre → nexa_offer ; TCF → plan_type (Starter/Pro/Ultra/custom sur devis)
+    const offer = type === "tcf_canada" ? null : normalizeNexaOffer(nexaOffer);
+    const tcfPlan = type === "tcf_canada" ? normalizeTcfPlan(planType) : null;
 
     // ── 1. Compte auth ────────────────────────────────────────────────────────
     const { data: authData, error: authErr } = await supabaseAdmin.auth.admin.createUser({
@@ -72,7 +75,7 @@ export async function POST(req: NextRequest) {
         slug,
         signup_slug: slug,
         status: "pending",
-        plan_type: null,
+        plan_type: tcfPlan,
         nexa_offer: offer,
         email: ownerEmail.trim().toLowerCase(),
         trial_ends_at: trialEndsAt,

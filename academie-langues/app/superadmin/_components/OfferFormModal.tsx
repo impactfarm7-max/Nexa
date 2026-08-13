@@ -14,12 +14,19 @@ import {
   type NexaOfferKey,
   type NexaStudentQuotas,
 } from "@/app/data/nexaOffers";
+import {
+  TCF_OFFERS,
+  TCF_PLAN_KEYS,
+  normalizeTcfPlan,
+  type TcfPlanKey,
+} from "@/app/data/tcfOffers";
 
 type OfferModalCenter = {
   id: string;
   name: string;
   center_type?: string | null;
   nexa_offer?: string | null;
+  plan_type?: string | null;
   subscription_amount?: number | null;
   subscription_period_months?: number | null;
   quota_overrides?: Record<string, unknown> | null;
@@ -202,11 +209,13 @@ export function OfferFormModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const feedback = useActionFeedback();
-  const initialOffer = normalizeNexaOffer(center.nexa_offer) ?? "decouverte";
   const isTcf = center.center_type === "tcf_canada";
-  const [offer, setOffer] = useState<NexaOfferKey>(initialOffer);
+  const initialNexaOffer = normalizeNexaOffer(center.nexa_offer) ?? "decouverte";
+  const initialTcfPlan = normalizeTcfPlan(center.plan_type) ?? "pro";
+  const [offer, setOffer] = useState<NexaOfferKey>(initialNexaOffer);
+  const [tcfPlan, setTcfPlan] = useState<TcfPlanKey>(initialTcfPlan);
   const [amount, setAmount] = useState("");
   const [periodMonths, setPeriodMonths] = useState(String(center.subscription_period_months ?? 1));
   const [centerQuotas, setCenterQuotas] = useState<CenterQuotaFields>(() =>
@@ -217,9 +226,14 @@ export function OfferFormModal({
   );
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const isCustom = offer === "custom";
+  const isCustom = !isTcf && offer === "custom";
+  const en = locale === "en";
 
   useEffect(() => {
+    if (isTcf) {
+      setAmount(center.subscription_amount != null ? String(center.subscription_amount) : "");
+      return;
+    }
     const cfg = offer !== "custom" ? NEXA_OFFERS[offer as Exclude<NexaOfferKey, "custom">] : null;
     if (center.subscription_amount != null && mode === "change" && normalizeNexaOffer(center.nexa_offer) === offer) {
       setAmount(String(center.subscription_amount));
@@ -235,12 +249,14 @@ export function OfferFormModal({
       setCenterQuotas(defaultCenterQuotas(center.quota_overrides));
       setStudentQuotas(defaultStudentQuotas(center.quota_overrides));
     }
-  }, [offer, center.subscription_amount, center.nexa_offer, center.quota_overrides, mode]);
+  }, [offer, isTcf, center.subscription_amount, center.nexa_offer, center.quota_overrides, mode]);
 
-  const offerLabel = t("superadmin", offerI18nKey(offer));
+  const offerLabel = isTcf
+    ? (en ? TCF_OFFERS[tcfPlan].nameEn : TCF_OFFERS[tcfPlan].nameFr)
+    : t("superadmin", offerI18nKey(offer));
   const period = Math.max(1, parseInt(periodMonths, 10) || 1);
   const parsedAmount = parseInt(amount.replace(/\s/g, ""), 10);
-  const amountLabel = Number.isFinite(parsedAmount) ? parsedAmount.toLocaleString() : "—";
+  const amountLabel = Number.isFinite(parsedAmount) ? parsedAmount.toLocaleString() : (en ? "Custom quote" : "Sur devis");
 
   const centerQuotaLabels = useMemo(
     () =>
@@ -275,14 +291,18 @@ export function OfferFormModal({
   const execute = async () => {
     setConfirmOpen(false);
     const body: Record<string, unknown> = {
-      nexa_offer: offer,
       subscription_period_months: period,
     };
+    if (isTcf) {
+      body.plan_type = tcfPlan;
+      body.nexa_offer = null;
+    } else {
+      body.nexa_offer = offer;
+    }
     if (Number.isFinite(parsedAmount)) body.subscription_amount = parsedAmount;
     if (isCustom) {
       body.quota_overrides = buildQuotaOverrides(centerQuotas, studentQuotas, isTcf);
-    } else if (mode === "change") {
-      // Quitter le sur-devis : nettoyer les overrides
+    } else if (mode === "change" && !isTcf) {
       body.quota_overrides = null;
     }
 
@@ -335,7 +355,13 @@ export function OfferFormModal({
                 : t("superadmin", "centresModalChangeOfferTitle")}
             </p>
             <h2 className="mt-1 text-lg font-black text-white">{center.name}</h2>
-            <p className="mt-1 text-xs text-slate-500">{t("superadmin", "centresOfferSelectHint")}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {isTcf
+                ? (en
+                  ? "TCF plans are quote-based: Starter, Pro, Ultra or custom quote."
+                  : "Offres TCF sur devis : Starter, Pro, Ultra ou Sur devis.")
+                : t("superadmin", "centresOfferSelectHint")}
+            </p>
           </div>
           <button
             type="button"
@@ -347,7 +373,31 @@ export function OfferFormModal({
         </div>
 
         <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {selectableKeys.map((key) => {
+          {isTcf
+            ? TCF_PLAN_KEYS.map((key) => {
+                const cfg = TCF_OFFERS[key];
+                const selected = tcfPlan === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setTcfPlan(key)}
+                    className={`rounded-2xl border p-3 text-left transition-colors ${
+                      selected
+                        ? "border-orange-500/60 bg-orange-500/15 ring-1 ring-orange-500/40"
+                        : "border-white/10 bg-black/20 hover:border-white/20"
+                    }`}
+                  >
+                    <p className={`text-xs font-black uppercase tracking-wide ${selected ? "text-orange-300" : "text-white"}`}>
+                      {en ? cfg.nameEn : cfg.nameFr}
+                    </p>
+                    <p className="mt-1 text-[10px] text-slate-500">
+                      {en ? cfg.priceEn : cfg.priceFr}
+                    </p>
+                  </button>
+                );
+              })
+            : selectableKeys.map((key) => {
             const cfg = key !== "custom" ? NEXA_OFFERS[key] : null;
             const selected = offer === key;
             return (

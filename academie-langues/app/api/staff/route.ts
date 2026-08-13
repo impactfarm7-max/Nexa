@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/app/utils/email-server";
 import { filterModulePermissions, TCF_SUBJECT_KEYS, ensureTcfCommunautePermission, ensureDefaultLivesPermission, TRAINER_DEFAULT_MODULE_PERMISSIONS } from "@/app/data/tcf-teaching-subjects";
+import { assertCenterHasUserSeat } from "@/app/utils/center-student-quota";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -310,6 +311,18 @@ export async function POST(req: NextRequest) {
     const validRoles = ["campus_manager", "trainer", "staff"];
     if (!validRoles.includes(role)) {
       return NextResponse.json({ error: "Rôle invalide." }, { status: 400 });
+    }
+
+    if (callerProfile.center_id) {
+      const seatCheck = await assertCenterHasUserSeat(callerProfile.center_id, supabaseAdmin);
+      if (!seatCheck.ok) {
+        return NextResponse.json(
+          {
+            error: `Quota utilisateurs atteint (${seatCheck.occupied}/${seatCheck.max} — offre ${seatCheck.offerName}). Staff et étudiants partagent le même plafond.`,
+          },
+          { status: 403 },
+        );
+      }
     }
 
     // Vérifier que les campus appartiennent bien au centre de l'appelant

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeNexaOffer } from "@/app/data/nexaOffers";
+import { normalizeTcfPlan } from "@/app/data/tcfOffers";
 import { sendCenterActivatedEmail } from "@/app/utils/activation-emails";
 import { getSuperadminContext, logSuperadminAction, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
 
@@ -52,23 +53,25 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   const { id } = await context.params;
   const body = await req.json().catch(() => ({}));
 
-  if (!body?.nexa_offer) {
-    return NextResponse.json({ error: "Offre NEXA requise." }, { status: 400 });
-  }
-
-  const normalized = normalizeNexaOffer(body.nexa_offer);
-  if (!normalized) {
-    return NextResponse.json({ error: "Offre NEXA invalide." }, { status: 400 });
-  }
-
   const { data: previousCenter } = await supabaseAdmin
     .from("centers")
-    .select("id, name, status, nexa_offer, subscription_period_months, subscription_amount, email")
+    .select("id, name, status, center_type, nexa_offer, plan_type, subscription_period_months, subscription_amount, email")
     .eq("id", id)
     .maybeSingle();
 
   if (!previousCenter) {
     return NextResponse.json({ error: "Centre introuvable." }, { status: 404 });
+  }
+
+  const isTcf = previousCenter.center_type === "tcf_canada";
+  const nexaOffer = isTcf ? null : normalizeNexaOffer(body?.nexa_offer);
+  const tcfPlan = isTcf ? normalizeTcfPlan(body?.plan_type ?? body?.nexa_offer) : null;
+
+  if (isTcf && !tcfPlan) {
+    return NextResponse.json({ error: "Offre TCF requise (Starter, Pro, Ultra ou Sur devis)." }, { status: 400 });
+  }
+  if (!isTcf && !nexaOffer) {
+    return NextResponse.json({ error: "Offre NEXA requise." }, { status: 400 });
   }
 
   const now = new Date();
@@ -79,7 +82,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
 
   const patch: Record<string, unknown> = {
     status: "active",
-    nexa_offer: normalized,
+    nexa_offer: nexaOffer,
+    plan_type: isTcf ? tcfPlan : null,
     subscription_starts_at: now.toISOString(),
     renewal_at: addMonths(now, periodMonths).toISOString(),
     subscription_period_months: periodMonths,
@@ -97,7 +101,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     } else if (typeof body.quota_overrides === "object" && !Array.isArray(body.quota_overrides)) {
       patch.quota_overrides = body.quota_overrides;
     }
-  } else if (normalized !== "custom") {
+  } else if (!isTcf && nexaOffer !== "custom") {
     patch.quota_overrides = null;
   }
 
@@ -106,7 +110,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     .update(patch)
     .eq("id", id)
     .select(
-      "id, name, status, nexa_offer, subscription_amount, subscription_period_months, subscription_starts_at, renewal_at, trial_ends_at, email, quota_overrides",
+      "id, name, status, nexa_offer, plan_type, subscription_amount, subscription_period_months, subscription_starts_at, renewal_at, trial_ends_at, email, quota_overrides",
     )
     .maybeSingle();
 
@@ -121,8 +125,9 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       center_id: id,
       centerName: center.name,
       previousStatus: previousCenter.status,
-      previousOffer: previousCenter.nexa_offer,
+      previousOffer: previousCenter.nexa_offer ?? previousCenter.plan_type,
       nexa_offer: center.nexa_offer,
+      plan_type: center.plan_type,
       subscription_amount: center.subscription_amount,
       subscription_period_months: center.subscription_period_months,
       renewal_at: center.renewal_at,
@@ -135,7 +140,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   const emailResult = await sendCenterActivatedEmail({
     to: managerEmail,
     centerName: center.name,
-    offerKey: center.nexa_offer,
+    offerKey: center.nexa_offer ?? center.plan_type,
     amount: center.subscription_amount,
     periodMonths: center.subscription_period_months,
     renewalAt: center.renewal_at,

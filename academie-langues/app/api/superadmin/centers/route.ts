@@ -47,6 +47,8 @@ type CenterStatusInput = {
   trial_ends_at?: string | null;
   renewal_at?: string | null;
   nexa_offer?: string | null;
+  plan_type?: string | null;
+  center_type?: string | null;
   subscription_starts_at?: string | null;
 };
 
@@ -74,6 +76,9 @@ function isPendingTrialActive(center: CenterStatusInput, now: number): boolean {
 }
 
 function hasAssignedOffer(center: CenterStatusInput): boolean {
+  if (center.center_type === "tcf_canada") {
+    return typeof center.plan_type === "string" && center.plan_type.trim().length > 0;
+  }
   return normalizeNexaOffer(center.nexa_offer) != null;
 }
 
@@ -124,7 +129,7 @@ export async function GET(req: NextRequest) {
   let centersQuery = await supabaseAdmin
     .from("centers")
     .select(
-      "id, name, city, code, signup_slug, address, country, region, center_type, status, email, phone, created_at, nexa_offer, trial_ends_at, renewal_at, renewal_alert_days, subscription_amount, quota_overrides, pause_reason, billing_status, last_payment_at, commercial_intent, commercial_note, upgrade_requested_at",
+      "id, name, city, code, signup_slug, address, country, region, center_type, status, email, phone, created_at, nexa_offer, plan_type, trial_ends_at, renewal_at, renewal_alert_days, subscription_amount, quota_overrides, pause_reason, billing_status, last_payment_at, commercial_intent, commercial_note, upgrade_requested_at",
     )
     .order("created_at", { ascending: false });
 
@@ -133,7 +138,7 @@ export async function GET(req: NextRequest) {
     centersQuery = (await supabaseAdmin
       .from("centers")
       .select(
-        "id, name, city, code, signup_slug, address, country, region, center_type, status, email, phone, created_at, nexa_offer, trial_ends_at, renewal_at, renewal_alert_days, subscription_amount, quota_overrides, pause_reason",
+        "id, name, city, code, signup_slug, address, country, region, center_type, status, email, phone, created_at, nexa_offer, plan_type, trial_ends_at, renewal_at, renewal_alert_days, subscription_amount, quota_overrides, pause_reason",
       )
       .order("created_at", { ascending: false })) as typeof centersQuery;
   }

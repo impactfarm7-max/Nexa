@@ -157,6 +157,25 @@ function sumFees(fees: FeeDraft[]) {
 function computeTotal(tuition: string, fees: FeeDraft[]) {
   return String(parseAmount(tuition) + sumFees(fees));
 }
+/** Durée catalogue → mois facturables (arrondi au supérieur). */
+function durationToBillableMonths(valeur: number, unite: DureeUnite): number {
+  if (!valeur || valeur < 1) return 1;
+  if (unite === "mois") return valeur;
+  if (unite === "semaines") return Math.max(1, Math.ceil(valeur / 4));
+  return Math.max(1, Math.ceil(valeur / 30));
+}
+/** Total catalogue formation courte : forfait = prix + frais ; mensuel = prix/mois × durée + frais. */
+function computeShortCatalogTotal(
+  tuition: string,
+  fees: FeeDraft[],
+  mode: ShortPricingMode,
+  dureeValeur: number,
+  dureeUnite: DureeUnite,
+) {
+  const base = parseAmount(tuition);
+  const months = mode === "mensuel" ? durationToBillableMonths(dureeValeur, dureeUnite) : 1;
+  return String(base * months + sumFees(fees));
+}
 function parsePaymentPlan(plan: unknown): { fees: FeeDraft[]; installments: PaymentInstallment[] } {
   if (Array.isArray(plan)) {
     return {
@@ -1462,8 +1481,8 @@ function NouveauProgrammeForm() {
         if (n.classes.some((c) => !c.nom.trim())) return `Le niveau ${n.numero} a une salle sans nom.`;
       }
     } else {
-      if (pricingMode === "forfaitaire" && (!dureeValeur || dureeValeur < 1)) {
-        return en ? "Enter the course duration for flat-rate pricing." : "Indique la durée de la formation (tarif forfaitaire).";
+      if (!dureeValeurStr.trim() || !dureeValeur || dureeValeur < 1) {
+        return en ? "Enter the course duration." : "Indique la durée de la formation.";
       }
       if (classesCourtes.length === 0) return "Ajoutez au moins une salle de classe.";
       if (classesCourtes.some((c) => !c.nom.trim())) return "Une salle de classe n'a pas de nom.";
@@ -1473,10 +1492,7 @@ function NouveauProgrammeForm() {
 
   /** Niveau technique unique (annee null) pour lier matières / salles / inscriptions courtes. */
   async function ensureShortPhantomNiveau(filiereId: string): Promise<string> {
-    const dur =
-      pricingMode === "forfaitaire"
-        ? shortDureeToNiveauFields(dureeValeur, dureeUnite)
-        : { mois: 0, semaines: 0, jours: 0 };
+    const dur = shortDureeToNiveauFields(dureeValeur, dureeUnite);
 
     const { data: existing } = await supabase
       .from("niveaux")
@@ -1511,7 +1527,7 @@ function NouveauProgrammeForm() {
       description: description.trim() || null,
       default_tuition_fee: tuitionFee.trim() ? Number(tuitionFee) : null,
       nb_niveaux: type === "cursus" ? nbNiveaux : null,
-      duree_valeur: type === "formation_courte" ? (pricingMode === "forfaitaire" ? dureeValeur : (dureeValeurStr.trim() ? dureeValeur : null)) : null,
+      duree_valeur: type === "formation_courte" ? dureeValeur : null,
       duree_unite: type === "formation_courte" ? dureeUnite : null,
       pricing_mode: type === "formation_courte" ? pricingMode : null,
       cursus_fee_mode: type === "cursus" ? cursusFeeMode : null,
@@ -1744,9 +1760,7 @@ function NouveauProgrammeForm() {
           type,
           mode,
           nb_niveaux: type === "cursus" ? nbNiveaux : null,
-          duree_valeur: type === "formation_courte"
-            ? (pricingMode === "forfaitaire" ? dureeValeur : (dureeValeurStr.trim() ? dureeValeur : null))
-            : null,
+          duree_valeur: type === "formation_courte" ? dureeValeur : null,
           duree_unite: type === "formation_courte" ? dureeUnite : null,
           pricing_mode: type === "formation_courte" ? pricingMode : null,
           cursus_fee_mode: type === "cursus" ? cursusFeeMode : null,
@@ -1945,9 +1959,16 @@ function NouveauProgrammeForm() {
     const isUniforme = isCursus && cursusFeeMode === "uniforme";
     const globalTuition = parseAmount(tuitionFee);
     const globalFees = (!isCursus || isUniforme) ? feeRows(shortFees) : [];
+    const shortCatalogTotal = parseAmount(
+      computeShortCatalogTotal(tuitionFee, shortFees, pricingMode, dureeValeur, dureeUnite),
+    );
     const globalTotal = (!isCursus || isUniforme)
-      ? parseAmount(computeTotal(tuitionFee, shortFees))
+      ? (isCursus ? parseAmount(computeTotal(tuitionFee, shortFees)) : shortCatalogTotal)
       : globalTuition;
+    const shortTuitionForPdf =
+      !isCursus && pricingMode === "mensuel"
+        ? globalTuition * durationToBillableMonths(dureeValeur, dureeUnite)
+        : globalTuition;
 
     const niveauxPdf = isCursus
       ? (isUniforme
@@ -1979,7 +2000,7 @@ function NouveauProgrammeForm() {
       : [
           {
             label: en ? "Program" : "Programme",
-            tuition: globalTuition,
+            tuition: shortTuitionForPdf,
             fees: globalFees,
             total: globalTotal,
             totalWords: amountInWordsFr(globalTotal),
@@ -2076,7 +2097,12 @@ function NouveauProgrammeForm() {
   }
 
   const niveauActuel = niveaux.find((n) => n.numero === expandedNiveau);
-  const shortTotal = computeTotal(tuitionFee, shortFees);
+  const shortTotal =
+    type === "formation_courte"
+      ? computeShortCatalogTotal(tuitionFee, shortFees, pricingMode, dureeValeur, dureeUnite)
+      : computeTotal(tuitionFee, shortFees);
+  const billableMonths =
+    pricingMode === "mensuel" ? durationToBillableMonths(dureeValeur, dureeUnite) : 1;
   const niveauTotal = niveauActuel
     ? computeTotal(niveauActuel.tuition_fee.trim() ? niveauActuel.tuition_fee : tuitionFee, niveauActuel.fees)
     : "0";
@@ -2274,14 +2300,24 @@ function NouveauProgrammeForm() {
               <div className="space-y-3">
                 <div>
                   <label className={FIELD_LABEL}>
-                    {en ? "Catalog duration" : "Durée catalogue"}{pricingMode === "mensuel" ? (en ? " (indicative)" : " (indicative)") : " *"}
+                    {en ? "Catalog duration" : "Durée catalogue"} *
                   </label>
                   <div className="flex gap-3 items-end flex-wrap">
                     <input
                       type="text"
                       inputMode="numeric"
                       value={dureeValeurStr}
-                      onChange={(e) => setDureeValeurStr(e.target.value.replace(/[^0-9]/g, ""))}
+                      onChange={(e) => {
+                        const next = e.target.value.replace(/[^0-9]/g, "");
+                        setDureeValeurStr(next);
+                        const nextVal = Math.max(1, parseInt(next) || 1);
+                        const nextTotal = parseAmount(
+                          computeShortCatalogTotal(tuitionFee, shortFees, pricingMode, nextVal, dureeUnite),
+                        );
+                        if (shortInstallmentsLocked && sumInstallments(shortInstallments) > nextTotal) {
+                          setShortInstallmentsLocked(false);
+                        }
+                      }}
                       className={`${FIELD_INPUT_SM} w-24 text-center`}
                     />
                     <div className="flex gap-1.5">
@@ -2289,7 +2325,15 @@ function NouveauProgrammeForm() {
                         <button
                           key={u}
                           type="button"
-                          onClick={() => setDureeUnite(u)}
+                          onClick={() => {
+                            setDureeUnite(u);
+                            const nextTotal = parseAmount(
+                              computeShortCatalogTotal(tuitionFee, shortFees, pricingMode, dureeValeur, u),
+                            );
+                            if (shortInstallmentsLocked && sumInstallments(shortInstallments) > nextTotal) {
+                              setShortInstallmentsLocked(false);
+                            }
+                          }}
                           className={`h-12 px-4 rounded-lg border text-sm font-semibold capitalize ${
                             dureeUnite === u
                               ? "border-[#11224E] text-[#11224E] bg-white"
@@ -2303,7 +2347,9 @@ function NouveauProgrammeForm() {
                   </div>
                   {pricingMode === "mensuel" && (
                     <p className={FIELD_HINT}>
-                      {en ? "With monthly pricing, the billed duration is selected for each enrolment in months." : "En tarif mensuel, la durée facturée se choisit à chaque inscription (en mois)."}
+                      {en
+                        ? "With monthly pricing, catalog total = price/month × this duration (rounded up to months). Enrolment can still adjust the billed months."
+                        : "En tarif mensuel, le total catalogue = prix/mois × cette durée (arrondie en mois). L’inscription peut encore ajuster le nombre de mois facturés."}
                     </p>
                   )}
                 </div>
@@ -2442,7 +2488,9 @@ function NouveauProgrammeForm() {
                 </div>
                 <p className={FIELD_HINT}>
                   {pricingMode === "mensuel"
-                    ? en ? "Monthly price multiplied by the duration selected at enrolment in whole months." : "Prix par mois × durée choisie à l'inscription (mois entiers)."
+                    ? en
+                      ? "Monthly price × catalog duration (+ fees) = catalog total. Enrolment can override the number of months."
+                      : "Prix par mois × durée catalogue (+ frais) = total catalogue. L’inscription peut modifier le nombre de mois."
                     : en ? "One fixed amount for the entire program." : "Montant unique pour tout le programme, durée fixe."}
                 </p>
               </div>
@@ -2450,7 +2498,10 @@ function NouveauProgrammeForm() {
                 value={tuitionFee}
                 onChange={(v) => {
                   setTuitionFee(v);
-                  if (shortInstallmentsLocked && sumInstallments(shortInstallments) > parseAmount(computeTotal(v, shortFees))) {
+                  const nextTotal = parseAmount(
+                    computeShortCatalogTotal(v, shortFees, pricingMode, dureeValeur, dureeUnite),
+                  );
+                  if (shortInstallmentsLocked && sumInstallments(shortInstallments) > nextTotal) {
                     setShortInstallmentsLocked(false);
                   }
                 }}
@@ -2470,11 +2521,19 @@ function NouveauProgrammeForm() {
               />
               <TotalDisplay
                 total={shortTotal}
-                label={pricingMode === "mensuel" ? (en ? "Catalog total (1 month + fees)" : "Total catalogue (1 mois + frais)") : undefined}
+                label={
+                  pricingMode === "mensuel"
+                    ? en
+                      ? `Catalog total (${billableMonths} mo. × price/mo. + fees)`
+                      : `Total catalogue (${billableMonths} mois × prix/mois + frais)`
+                    : undefined
+                }
               />
               {pricingMode === "mensuel" && (
                 <p className="text-sm text-neutral-400 font-medium -mt-2">
-                  {en ? "At enrolment, the total is the monthly price multiplied by the number of months, plus fees." : "À l’inscription : total = prix/mois × nombre de mois (+ frais)."}
+                  {en
+                    ? `Stored unit price stays monthly (${parseAmount(tuitionFee).toLocaleString("en-GB")} / mo). At enrolment you can change the billed months.`
+                    : `Le prix unitaire enregistré reste mensuel (${parseAmount(tuitionFee).toLocaleString("fr-FR")} / mois). À l’inscription, tu peux changer le nombre de mois facturés.`}
                 </p>
               )}
               <InstallmentsBlock

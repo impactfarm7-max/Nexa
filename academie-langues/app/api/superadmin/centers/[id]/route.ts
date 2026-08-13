@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeNexaOffer } from "@/app/data/nexaOffers";
+import { normalizeTcfPlan } from "@/app/data/tcfOffers";
 import { getSuperadminContext, logSuperadminAction, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
 import { computeCenterDerivedStatus } from "@/app/api/superadmin/centers/route";
 import { buildCenterUsage } from "@/app/utils/center-usage";
@@ -54,8 +55,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     supabaseAdmin
       .from("centers")
       .select(
-        "id, name, city, code, signup_slug, address, country, region, center_type, phone, email, status, application_id, created_at, updated_at, nexa_offer, trial_ends_at, renewal_at, subscription_amount, subscription_period_months, renewal_alert_days, quota_overrides, pause_reason, subscription_starts_at, billing_status, last_payment_at, commercial_intent, commercial_note, upgrade_requested_at",
-      )
+        "id, name, city, code, signup_slug, address, country, region, center_type, phone, email, status, application_id, created_at, updated_at, nexa_offer, plan_type, trial_ends_at, renewal_at, subscription_amount, subscription_period_months, renewal_alert_days, quota_overrides, pause_reason, subscription_starts_at, billing_status, last_payment_at, commercial_intent, commercial_note, upgrade_requested_at",
+    )
       .eq("id", id)
       .maybeSingle(),
     supabaseAdmin
@@ -207,6 +208,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   const body = await req.json().catch(() => ({}));
   const hasStatus = typeof body?.status === "string" && body.status.length > 0;
   const hasOffer = Object.prototype.hasOwnProperty.call(body, "nexa_offer");
+  const hasPlanType = Object.prototype.hasOwnProperty.call(body, "plan_type");
   const hasSubscriptionAmount = Object.prototype.hasOwnProperty.call(body, "subscription_amount");
   const hasSubscriptionPeriod = Object.prototype.hasOwnProperty.call(body, "subscription_period_months");
   const hasRenewalAt = Object.prototype.hasOwnProperty.call(body, "renewal_at");
@@ -223,6 +225,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
   if (
     !hasStatus &&
     !hasOffer &&
+    !hasPlanType &&
     !hasSubscriptionAmount &&
     !hasSubscriptionPeriod &&
     !hasRenewalAt &&
@@ -242,8 +245,36 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     return NextResponse.json({ error: "Statut invalide." }, { status: 400 });
   }
 
+  const { data: previousCenter } = await supabaseAdmin
+    .from("centers")
+    .select(
+      "status, nexa_offer, plan_type, center_type, name, subscription_amount, subscription_period_months, renewal_at, renewal_alert_days, quota_overrides, billing_status",
+    )
+    .eq("id", id)
+    .maybeSingle();
+
+  if (!previousCenter) {
+    return NextResponse.json({ error: "Centre introuvable." }, { status: 404 });
+  }
+
+  const isTcf = previousCenter.center_type === "tcf_canada";
+
   let nextOffer: string | null | undefined;
-  if (hasOffer) {
+  let nextPlanType: string | null | undefined;
+  if (isTcf && (hasPlanType || hasOffer)) {
+    const rawPlan = hasPlanType ? body.plan_type : body.nexa_offer;
+    if (rawPlan === null || rawPlan === "" || rawPlan === "none") {
+      nextPlanType = null;
+      nextOffer = null;
+    } else {
+      const normalized = normalizeTcfPlan(rawPlan);
+      if (!normalized) {
+        return NextResponse.json({ error: "Offre TCF invalide (Starter, Pro, Ultra ou Sur devis)." }, { status: 400 });
+      }
+      nextPlanType = normalized;
+      nextOffer = null;
+    }
+  } else if (hasOffer) {
     if (body.nexa_offer === null || body.nexa_offer === "" || body.nexa_offer === "none") {
       nextOffer = null;
     } else {
@@ -336,22 +367,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     subscriptionPatch.upgrade_requested_at = at;
   }
 
-  const { data: previousCenter } = await supabaseAdmin
-    .from("centers")
-    .select(
-      "status, nexa_offer, name, subscription_amount, subscription_period_months, renewal_at, renewal_alert_days, quota_overrides, billing_status",
-    )
-    .eq("id", id)
-    .maybeSingle();
-
-  if (!previousCenter) {
-    return NextResponse.json({ error: "Centre introuvable." }, { status: 404 });
-  }
-
   const wasPending = previousCenter.status === "pending";
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (hasStatus) patch.status = body.status;
-  if (hasOffer) patch.nexa_offer = nextOffer;
+  if (nextOffer !== undefined) patch.nexa_offer = nextOffer;
+  if (nextPlanType !== undefined) patch.plan_type = nextPlanType;
   Object.assign(patch, subscriptionPatch);
 
   const { data: center, error: updateError } = await supabaseAdmin
@@ -359,7 +379,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     .update(patch)
     .eq("id", id)
     .select(
-      "id, name, status, nexa_offer, subscription_amount, subscription_period_months, renewal_at, renewal_alert_days, quota_overrides, billing_status, last_payment_at, commercial_intent, commercial_note, upgrade_requested_at",
+      "id, name, status, nexa_offer, plan_type, subscription_amount, subscription_period_months, renewal_at, renewal_alert_days, quota_overrides, billing_status, last_payment_at, commercial_intent, commercial_note, upgrade_requested_at",
     )
     .maybeSingle();
 

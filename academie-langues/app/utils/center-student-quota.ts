@@ -1,7 +1,7 @@
 /**
- * Plafond étudiants NEXA :
- * - Occupent une place : actifs + pause (+ en attente d'activation)
- * - Libèrent une place : expirés, révoqués, terminés
+ * Plafond utilisateurs NEXA (staff + étudiants) :
+ * - Occupent une place : étudiants actifs/pause + staff actif
+ * - Libèrent une place : étudiants expirés / révoqués / terminés ; staff révoqué
  */
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -10,6 +10,7 @@ import {
   resolveEffectiveNexaOffer,
   resolveEffectiveNexaOfferKey,
 } from "@/app/data/nexaOffers";
+import { CENTER_STAFF_ROLES } from "@/app/utils/student-routes";
 
 export type QuotaStudentRow = {
   tag_status?: string | null;
@@ -37,6 +38,17 @@ export function studentOccupiesQuotaSeat(row: QuotaStudentRow, now = Date.now())
   return true;
 }
 
+function staffOccupiesQuotaSeat(row: {
+  tag_status?: string | null;
+  center_status?: string | null;
+}): boolean {
+  const tag = (row.tag_status || "").toLowerCase();
+  const centerStatus = (row.center_status || "").toLowerCase();
+  if (tag === "revoque" || tag === "supprime") return false;
+  if (centerStatus === "revoked") return false;
+  return true;
+}
+
 type AdminClient = SupabaseClient;
 
 function defaultAdmin(): AdminClient {
@@ -46,7 +58,9 @@ function defaultAdmin(): AdminClient {
   );
 }
 
-/** Nombre de places déjà prises pour le plafond offre. */
+const STAFF_ROLE_LIST = Array.from(CENTER_STAFF_ROLES);
+
+/** Étudiants qui occupent encore une place. */
 export async function countOccupiedStudentSeats(
   centerId: string,
   client: AdminClient = defaultAdmin(),
@@ -66,12 +80,46 @@ export async function countOccupiedStudentSeats(
   return (data || []).filter((row) => studentOccupiesQuotaSeat(row, now)).length;
 }
 
+/** Staff actif du centre (occupe une place du plafond utilisateurs). */
+export async function countOccupiedStaffSeats(
+  centerId: string,
+  client: AdminClient = defaultAdmin(),
+): Promise<number> {
+  const { data, error } = await client
+    .from("profiles")
+    .select("tag_status, center_status, role")
+    .eq("center_id", centerId)
+    .in("role", STAFF_ROLE_LIST);
+
+  if (error) {
+    console.warn("[quota] countOccupiedStaffSeats:", error.message);
+    return 0;
+  }
+
+  return (data || []).filter((row) => staffOccupiesQuotaSeat(row)).length;
+}
+
+/** Places prises = staff + étudiants. */
+export async function countOccupiedUserSeats(
+  centerId: string,
+  client: AdminClient = defaultAdmin(),
+): Promise<number> {
+  const [students, staff] = await Promise.all([
+    countOccupiedStudentSeats(centerId, client),
+    countOccupiedStaffSeats(centerId, client),
+  ]);
+  return students + staff;
+}
+
 export type CenterSeatLimitResult =
   | { ok: true; occupied: number; max: number | null }
   | { ok: false; occupied: number; max: number; offerName: string };
 
-/** Vérifie si le centre peut encore accueillir un étudiant selon l'offre. */
-export async function assertCenterHasStudentSeat(
+/**
+ * Vérifie si le centre peut encore accueillir un utilisateur (staff ou étudiant)
+ * selon le plafond offre (maxStudents = pool combiné).
+ */
+export async function assertCenterHasUserSeat(
   centerId: string,
   client: AdminClient = defaultAdmin(),
 ): Promise<CenterSeatLimitResult> {
@@ -86,18 +134,21 @@ export async function assertCenterHasStudentSeat(
       ? (centerRow.quota_overrides as Record<string, unknown>)
       : null;
   const offerKey = resolveEffectiveNexaOfferKey(centerRow);
-  const maxStudents = getOfferQuota(offerKey, "maxStudents", overrides);
+  const maxUsers = getOfferQuota(offerKey, "maxStudents", overrides);
 
-  const occupied = await countOccupiedStudentSeats(centerId, client);
+  const occupied = await countOccupiedUserSeats(centerId, client);
 
-  if (typeof maxStudents !== "number" || maxStudents < 0) {
+  if (typeof maxUsers !== "number" || maxUsers < 0) {
     return { ok: true, occupied, max: null };
   }
 
-  if (occupied >= maxStudents) {
+  if (occupied >= maxUsers) {
     const offer = resolveEffectiveNexaOffer(centerRow);
-    return { ok: false, occupied, max: maxStudents, offerName: offer.name };
+    return { ok: false, occupied, max: maxUsers, offerName: offer.name };
   }
 
-  return { ok: true, occupied, max: maxStudents };
+  return { ok: true, occupied, max: maxUsers };
 }
+
+/** @deprecated alias — le plafond est désormais staff + étudiants. */
+export const assertCenterHasStudentSeat = assertCenterHasUserSeat;

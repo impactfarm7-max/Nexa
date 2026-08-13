@@ -65,7 +65,7 @@ export default function BibliothequePubliquePage() {
     void load();
   }, [router]);
 
-  const openDocument = async (storagePath: string, doc: any) => {
+  const openDocument = async (_storagePath: string, doc: any) => {
     if (doc.is_paid) {
       const price = Number(doc.price || 0).toLocaleString(dateLocale);
       alert(t("dashboard", "bibliothequePublicPaidAlert", { price }));
@@ -76,17 +76,17 @@ export default function BibliothequePubliquePage() {
     setNumPages(null);
 
     try {
-      const { data, error } = await supabase
-        .storage
-        .from("ressources_iag")
-        .createSignedUrl(storagePath, 60);
-
-      if (error || !data) {
-        alert(t("dashboard", "bibliothequePublicLoadError"));
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/bibliotheque/document/${doc.id}`, {
+        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.url) {
+        alert(json?.error || t("dashboard", "bibliothequePublicLoadError"));
         return;
       }
 
-      setViewingDoc(data.signedUrl);
+      setViewingDoc(json.url);
     } catch {
       alert(t("dashboard", "bibliothequePublicNetworkError"));
     } finally {

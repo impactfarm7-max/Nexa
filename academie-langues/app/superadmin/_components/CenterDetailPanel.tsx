@@ -21,6 +21,7 @@ import {
   normalizeNexaOffer,
   NEXA_OFFERS,
 } from "@/app/data/nexaOffers";
+import { normalizeTcfPlan, tcfPlanLabel } from "@/app/data/tcfOffers";
 import { FicheField, FicheRow, FicheSection } from "./fiche";
 import { ViewAsModal } from "./ViewAsModal";
 
@@ -51,6 +52,7 @@ type CenterDetail = {
   email: string | null;
   status: string;
   nexa_offer: string | null;
+  plan_type?: string | null;
   trial_ends_at: string | null;
   renewal_at: string | null;
   subscription_amount: number | null;
@@ -113,12 +115,23 @@ const OFFER_BADGE: Record<string, string> = {
   croissance: "bg-emerald-500/15 text-emerald-300 border-emerald-500/25",
   pro: "bg-orange-500/15 text-orange-300 border-orange-500/25",
   entreprise: "bg-purple-500/15 text-purple-300 border-purple-500/25",
+  starter: "bg-blue-500/15 text-blue-300 border-blue-500/25",
+  ultra: "bg-violet-500/15 text-violet-300 border-violet-500/25",
   custom: "bg-purple-500/15 text-purple-300 border-purple-500/25",
   none: "bg-slate-700/40 text-slate-400 border-slate-600/40",
 };
 
-function offerLabel(t: (ns: "superadmin", key: string) => string, key: string | null | undefined) {
-  const normalized = normalizeNexaOffer(key);
+function offerLabel(
+  t: (ns: "superadmin", key: string) => string,
+  center: { center_type?: string | null; nexa_offer?: string | null; plan_type?: string | null },
+  locale: string,
+) {
+  if (center.center_type === "tcf_canada") {
+    const plan = normalizeTcfPlan(center.plan_type);
+    if (!plan) return t("superadmin", "centresNoOffer");
+    return tcfPlanLabel(plan, locale === "en" ? "en" : "fr");
+  }
+  const normalized = normalizeNexaOffer(center.nexa_offer);
   if (!normalized) return t("superadmin", "centresNoOffer");
   const map: Record<string, string> = {
     decouverte: "centresOfferDecouverte",
@@ -249,8 +262,11 @@ export function CenterDetailPanel({
   const center = detail?.center;
   const derived = center?.derived_status ?? listRow.derived_status;
   const derivedKey = `centresDerivedStatus_${derived}` as keyof typeof import("@/app/i18n/messages/superadmin").superadmin.fr;
-  const offerKey = normalizeNexaOffer(center?.nexa_offer);
-  const offerBadgeKey = offerKey ?? "none";
+  const isTcf = center?.center_type === "tcf_canada";
+  const tcfPlan = isTcf ? normalizeTcfPlan(center?.plan_type) : null;
+  const offerKey = isTcf ? null : normalizeNexaOffer(center?.nexa_offer);
+  const hasOffer = isTcf ? Boolean(tcfPlan) : Boolean(offerKey);
+  const offerBadgeKey = (isTcf ? tcfPlan : offerKey) ?? "none";
   const offerCfg = offerKey && offerKey !== "custom" ? NEXA_OFFERS[offerKey] : null;
   const overrides = center?.quota_overrides;
   const maxStudents = offerKey ? getOfferQuota(offerKey, "maxStudents", overrides) : null;
@@ -379,7 +395,7 @@ export function CenterDetailPanel({
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${OFFER_BADGE[offerBadgeKey] ?? OFFER_BADGE.none}`}>
-                {offerLabel(t, center?.nexa_offer)}
+                {offerLabel(t, center || {}, locale)}
               </span>
               {center?.subscription_amount != null && (
                 <span className="text-sm font-bold text-white">
@@ -432,17 +448,17 @@ export function CenterDetailPanel({
             {center?.pause_reason && (
               <p className="mt-2 text-xs text-amber-300/80">{center.pause_reason}</p>
             )}
-            {!offerKey && (
+            {!hasOffer && (
               <p className="mt-2 text-xs text-slate-400">{t("superadmin", "centresNoOfferHint")}</p>
             )}
           </div>
           <button
             type="button"
-            onClick={offerKey ? onChangeOffer : onActivate}
+            onClick={hasOffer ? onChangeOffer : onActivate}
             className="flex shrink-0 items-center gap-2 rounded-xl bg-orange-500 px-4 py-3 text-xs font-black uppercase tracking-widest text-white hover:opacity-90"
           >
             <CreditCard className="h-4 w-4" />
-            {offerKey ? t("superadmin", "centresEditOffer") : t("superadmin", "centresAssignOffer")}
+            {hasOffer ? t("superadmin", "centresEditOffer") : t("superadmin", "centresAssignOffer")}
           </button>
         </div>
       </div>
@@ -565,7 +581,7 @@ export function CenterDetailPanel({
           <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-4 sm:p-5">
             <FicheSection label={t("superadmin", "requestsCenterForm")}>
               <FicheField label={t("superadmin", "requestsType")} value={centerTypeLabel(center.center_type)} />
-              <FicheField label={t("superadmin", "requestsOffer")} value={offerLabel(t, center.nexa_offer)} />
+              <FicheField label={t("superadmin", "requestsOffer")} value={offerLabel(t, center, locale)} />
               <FicheField
                 label={t("superadmin", "requestsCityShort")}
                 value={center.city}

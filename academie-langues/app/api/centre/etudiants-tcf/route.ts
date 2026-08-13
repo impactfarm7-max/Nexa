@@ -438,7 +438,7 @@ export async function POST(req: NextRequest) {
   if (!seatCheck.ok) {
     return NextResponse.json(
       {
-        error: `Limite d'étudiants atteinte pour l'offre ${seatCheck.offerName} (${seatCheck.max}). Actifs et pause occupent une place ; expirés / révoqués / terminés la libèrent.`,
+        error: `Quota utilisateurs atteint pour l'offre ${seatCheck.offerName} (${seatCheck.occupied}/${seatCheck.max}). Staff et étudiants partagent le même plafond ; expirés / révoqués / terminés libèrent une place.`,
       },
       { status: 403 },
     );

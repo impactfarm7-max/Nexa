@@ -36,16 +36,16 @@ export function buildCenterUsage(input: {
   const overrides = input.quota_overrides ?? null;
   const now = input.now ?? Date.now();
 
-  const seatsOccupied = (input.students || []).filter((row) => studentOccupiesQuotaSeat(row, now)).length;
-  const seatsMax =
-    offerKey != null ? (getOfferQuota(offerKey, "maxStudents", overrides) as number | null) : null;
-  const staffMax =
-    offerKey != null ? (getOfferQuota(offerKey, "maxStaffAccounts", overrides) as number | null) : null;
-  const campusMax =
-    offerKey != null ? (getOfferQuota(offerKey, "maxCampus", overrides) as number | null) : null;
-
+  const studentSeats = (input.students || []).filter((row) => studentOccupiesQuotaSeat(row, now)).length;
   const staffCount = Math.max(0, input.staffCount ?? 0);
   const campusCount = Math.max(0, input.campusCount ?? 0);
+
+  // Un seul pool utilisateurs : staff + étudiants.
+  const seatsOccupied = studentSeats + staffCount;
+  const seatsMax =
+    offerKey != null ? (getOfferQuota(offerKey, "maxStudents", overrides) as number | null) : null;
+  const campusMax =
+    offerKey != null ? (getOfferQuota(offerKey, "maxCampus", overrides) as number | null) : null;
 
   const seatsPct =
     typeof seatsMax === "number" && seatsMax > 0
@@ -58,8 +58,8 @@ export function buildCenterUsage(input: {
     seatsPct,
     seatsOver: typeof seatsMax === "number" && seatsOccupied > seatsMax,
     staffCount,
-    staffMax: typeof staffMax === "number" ? staffMax : null,
-    staffOver: typeof staffMax === "number" && staffCount > staffMax,
+    staffMax: null,
+    staffOver: false,
     campusCount,
     campusMax: typeof campusMax === "number" ? campusMax : null,
     campusOver: typeof campusMax === "number" && campusCount > campusMax,

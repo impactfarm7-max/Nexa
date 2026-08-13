@@ -27,6 +27,7 @@ type CenterRow = {
   code: string | null;
   center_type: string | null;
   nexa_offer?: string | null;
+  plan_type?: string | null;
   status: string;
   email: string | null;
   created_at: string;

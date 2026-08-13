@@ -20,6 +20,7 @@ import { CenterBrandMark } from "@/app/centre/center-page-ui";
 import LanguageSwitcher from "@/app/components/LanguageSwitcher";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { normalizeNexaOffer } from "@/app/data/nexaOffers";
+import { tcfPlanLabel } from "@/app/data/tcfOffers";
 import { ALL_STAFF_MODULE_PERMS, VIEW_AS_EVENT, isViewAsStaffPreview } from "@/app/utils/view-as";
 
 /* ─── Constantes ────────────────────────────────────────────────────────── */
@@ -176,10 +177,14 @@ function filterNavItemForStaff(item: NavItem, perms: string[]): NavItem | null {
 }
 
 function resolvePlanLabel(
-  nexaOffer: string | null | undefined,
+  center: { nexa_offer?: string | null; plan_type?: string | null; center_type?: string | null },
   t: (ns: "centre", key: string) => string,
+  locale: "fr" | "en",
 ): string {
-  const key = normalizeNexaOffer(nexaOffer);
+  if (normalizeCenterType(center.center_type) === "tcf_canada") {
+    return tcfPlanLabel(center.plan_type, locale);
+  }
+  const key = normalizeNexaOffer(center.nexa_offer);
   if (!key) return t("centre", "abonnementsTrial");
   if (key === "custom") return t("centre", "offerNameCustom");
   if (key === "decouverte") return t("centre", "offerNameDecouverte");
@@ -189,7 +194,7 @@ function resolvePlanLabel(
   return t("centre", "abonnementsTrial");
 }
 
-function readSidebarCache(t: (ns: "centre", key: string) => string) {
+function readSidebarCache(t: (ns: "centre", key: string) => string, locale: "fr" | "en") {
   const json = getCenterMeCache();
   if (!json) return null;
 
@@ -198,6 +203,7 @@ function readSidebarCache(t: (ns: "centre", key: string) => string) {
     name?: string;
     center_type?: string;
     nexa_offer?: string | null;
+    plan_type?: string | null;
   } | null;
   const role = json.role as string | null;
   const permissions = filterModulePermissions((json.permissions || []) as string[]);
@@ -214,7 +220,7 @@ function readSidebarCache(t: (ns: "centre", key: string) => string) {
     centerId: center.id,
     centerName: center.name || "Mon Établissement",
     centerType,
-    planType: resolvePlanLabel(center.nexa_offer, t),
+    planType: resolvePlanLabel(center, t, locale),
     userRole: role,
     staffPermissions,
     branches: [{ id: center.id, name: center.name || "Mon Établissement" }] as Branch[],
@@ -227,7 +233,8 @@ function CenterSidebarInner() {
   const pathname    = usePathname();
   const router      = useRouter();
   const searchParams = useSearchParams();
-  const { t }        = useI18n();
+  const { t, locale } = useI18n();
+  const lang = locale === "en" ? "en" : "fr";
 
   const [centerId,          setCenterId]          = useState<string | null>(null);
   const [centerName,        setCenterName]        = useState("Mon Établissement");
@@ -259,7 +266,7 @@ function CenterSidebarInner() {
     if (saved === "1") setIsCollapsed(true);
     setHydrated(true);
 
-    const cached = readSidebarCache(t);
+    const cached = readSidebarCache(t, lang);
     if (cached) {
       setCenterId(cached.centerId);
       setCenterName(cached.centerName);
@@ -364,10 +371,10 @@ function CenterSidebarInner() {
     if (profile.center_id) {
       setCenterId(profile.center_id);
       const { data: center } = await supabase
-        .from("centers").select("name, center_type, nexa_offer").eq("id", profile.center_id).single();
+        .from("centers").select("name, center_type, nexa_offer, plan_type").eq("id", profile.center_id).single();
       if (center) {
         setCenterName(center.name);
-        setPlanType(resolvePlanLabel(center.nexa_offer, t));
+        setPlanType(resolvePlanLabel(center, t, lang));
         setCenterType(normalizeCenterType(center.center_type));
         setBranches([{ id: profile.center_id, name: center.name }]);
         setActiveBranchId(profile.center_id);

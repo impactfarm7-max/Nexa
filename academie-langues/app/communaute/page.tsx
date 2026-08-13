@@ -310,30 +310,50 @@ function CommunauteContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || !user || !activeRoom || isSending) return;
+    const msg = newMessage.trim();
+    if (!msg || !user || !activeRoom || isSending) return;
+
+    const wasEditingId = editingId;
+    const replyId = repliedToMessage?.id || null;
+
+    // Réinitialiser tout de suite la zone (comme les MP) pour éviter le texte collé.
     setIsSending(true);
+    setNewMessage("");
+    setRepliedToMessage(null);
+    setEditingId(null);
+    if (inputRef.current) inputRef.current.style.height = "auto";
+
     try {
-      if (editingId) {
-        const { error } = await supabase.from("community_messages").update({ message: newMessage.trim(), edited: true }).eq("id", editingId);
+      if (wasEditingId) {
+        const { error } = await supabase
+          .from("community_messages")
+          .update({ message: msg, edited: true })
+          .eq("id", wasEditingId);
         if (!error) {
-          setMessages((prev) => prev.map((m) => (m.id === editingId ? { ...m, message: newMessage.trim(), edited: true } : m)));
+          setMessages((prev) =>
+            prev.map((m) => (m.id === wasEditingId ? { ...m, message: msg, edited: true } : m)),
+          );
           logClientActivity("Message communaute modifie");
-        } else alert(t("dashboard", "communauteEditError"));
-        setEditingId(null);
+        } else {
+          alert(t("dashboard", "communauteEditError"));
+          setNewMessage(msg);
+          setEditingId(wasEditingId);
+        }
       } else {
         const { error } = await supabase.from("community_messages").insert([{
           user_id: user.id,
-          message: newMessage.trim(),
+          message: msg,
           room_id: activeRoom.id,
           center_id: activeRoom.center_id,
-          replied_to_id: repliedToMessage?.id || null,
+          replied_to_id: replyId,
         }]);
-    if (error) alert(`${t("dashboard", "communauteSendError")} : ${error.message}`);
-        else logClientActivity("Message communaute envoye");
+        if (error) {
+          alert(`${t("dashboard", "communauteSendError")} : ${error.message}`);
+          setNewMessage(msg);
+        } else {
+          logClientActivity("Message communaute envoye");
+        }
       }
-      setNewMessage("");
-      setRepliedToMessage(null);
-      if (inputRef.current) inputRef.current.style.height = "auto";
     } finally {
       setIsSending(false);
     }
@@ -1031,6 +1051,12 @@ function CommunauteContent() {
                     style={{ maxHeight: "200px", minHeight: "44px" }}
                     value={newMessage}
                     onChange={(e) => { setNewMessage(e.target.value); autoExpandTextarea(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void handleSubmit(e as unknown as React.FormEvent);
+                      }
+                    }}
                   />
                   <button
                     type="submit"

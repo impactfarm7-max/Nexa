@@ -17,6 +17,20 @@ type Conversation = {
 
 type MessageableUser = { id: string; prenom: string; role: string };
 
+/** Staff contactable en MP côté étudiant (TCF + libre). */
+const STAFF_DM_ROLES = [
+  "admin",
+  "center_manager",
+  "campus_manager",
+  "staff",
+  "trainer",
+  "manager",
+] as const;
+
+function isStaffRole(role: string | null | undefined) {
+  return !!role && (STAFF_DM_ROLES as readonly string[]).includes(role);
+}
+
 export default function ConversationsInbox({
   userId,
   centerId,
@@ -168,27 +182,38 @@ export default function ConversationsInbox({
 
   const openPicker = async () => {
     setPickerOpen(true);
-    const { data: myRooms } = await supabase.from("community_room_members").select("room_id").eq("user_id", userId);
-    const roomIds = (myRooms || []).map((r: any) => r.room_id);
-    if (!roomIds.length) {
+    setSearch("");
+    if (!centerId) {
       setMessageableUsers([]);
       return;
     }
-    const { data: members } = await supabase
-      .from("community_room_members")
-      .select("user_id, profiles:user_id(prenom, role)")
-      .in("room_id", roomIds)
-      .neq("user_id", userId);
-    const map = new Map<string, MessageableUser>();
-    for (const m of members || []) {
-      const p: any = m.profiles;
-      if (p) map.set(m.user_id, { id: m.user_id, prenom: p.prenom || t("dashboard", "communauteDefaultUser"), role: p.role });
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/communaute/staff-contacts", {
+        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessageableUsers([]);
+        return;
+      }
+      setMessageableUsers(
+        ((json.staff || []) as MessageableUser[]).filter((u) => isStaffRole(u.role)),
+      );
+    } catch {
+      setMessageableUsers([]);
     }
-    setMessageableUsers(Array.from(map.values()).sort((a, b) => a.prenom.localeCompare(b.prenom)));
   };
 
   const filteredUsers = messageableUsers.filter((u) => u.prenom.toLowerCase().includes(search.toLowerCase()));
-  const isProfessor = (role: string) => ["admin", "trainer", "center_manager"].includes(role);
+  const staffRoleLabel = (role: string) => {
+    if (role === "trainer") return t("dashboard", "communauteProfessor");
+    if (role === "center_manager" || role === "campus_manager" || role === "manager") {
+      return t("dashboard", "communauteStaffDirector");
+    }
+    return t("dashboard", "communauteStaffMember");
+  };
 
   // ===================== VUE FIL (thread actif) =====================
   if (activeOtherId) {
@@ -203,8 +228,10 @@ export default function ConversationsInbox({
           </div>
           <div>
             <p className="font-bold text-slate-900 text-sm">{activeOtherInfo?.prenom || t("dashboard", "communauteConversation")}</p>
-            {activeOtherInfo && isProfessor(activeOtherInfo.role) && (
-              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">{t("dashboard", "communauteProfessor")}</p>
+            {activeOtherInfo && isStaffRole(activeOtherInfo.role) && (
+              <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">
+                {staffRoleLabel(activeOtherInfo.role)}
+              </p>
             )}
           </div>
         </div>
@@ -265,17 +292,17 @@ export default function ConversationsInbox({
           <button onClick={() => setPickerOpen(false)} className="p-2 -ml-2 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100">
             <ChevronLeft size={18} />
           </button>
-          <p className="font-bold text-slate-900 text-sm">{t("dashboard", "communauteNewConversation")}</p>
+          <p className="font-bold text-slate-900 text-sm">{t("dashboard", "communauteNewStaffConversation")}</p>
         </div>
         <div className="px-4 py-3 border-b border-slate-100">
           <div className="flex items-center gap-2 bg-slate-100 rounded-2xl px-3 py-2">
             <Search size={14} className="text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("dashboard", "communauteSearchEllipsis")} className="flex-1 bg-transparent outline-none text-sm" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("dashboard", "communauteSearchStaff")} className="flex-1 bg-transparent outline-none text-sm" />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto">
           {filteredUsers.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-10 font-medium px-6">{t("dashboard", "communauteNoSharedContacts")}</p>
+            <p className="text-sm text-slate-400 text-center py-10 font-medium px-6">{t("dashboard", "communauteNoStaffContacts")}</p>
           ) : (
             filteredUsers.map((u) => (
               <button key={u.id} onClick={() => openConversation(u.id, u)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 text-left border-b border-slate-50">
@@ -284,7 +311,7 @@ export default function ConversationsInbox({
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-slate-800 truncate">{u.prenom}</p>
-                  {isProfessor(u.role) && <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">{t("dashboard", "communauteProfessor")}</p>}
+                  <p className="text-[10px] font-bold text-orange-500 uppercase tracking-widest">{staffRoleLabel(u.role)}</p>
                 </div>
               </button>
             ))

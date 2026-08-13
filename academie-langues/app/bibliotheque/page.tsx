@@ -74,18 +74,47 @@ export default function BibliothequePage() {
 
       await supabase.from('profiles').update({ current_activity: 'Dans la Bibliothèque 📚' }).eq('id', session.user.id);
 
-      const { data: profile } = await supabase.from('profiles').select('subscription_ends_at').eq('id', session.user.id).single();
-      
-      if (profile?.subscription_ends_at) {
-        const endDate = new Date(profile.subscription_ends_at).getTime();
-        const now = new Date().getTime();
-        if (endDate > now) setIsPremium(true);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("subscription_ends_at, role, center_id, center_status, tag_status")
+        .eq("id", session.user.id)
+        .single();
+
+      const now = Date.now();
+      const subActive =
+        !!profile?.subscription_ends_at &&
+        new Date(profile.subscription_ends_at).getTime() > now;
+      const centerStudentOk =
+        profile?.role === "student" &&
+        !!profile?.center_id &&
+        profile?.center_status !== "revoked" &&
+        profile?.tag_status !== "revoque" &&
+        profile?.tag_status !== "pending_center_approval" &&
+        profile?.tag_status !== "termine";
+      if (subActive || centerStudentOk || profile?.role === "admin") {
+        setIsPremium(true);
       }
-      
-      // ✅ MODIFICATION 3/3 : On télécharge les documents depuis la BDD au démarrage
-      const { data: docsData } = await supabase.from('bibliotheque_documents').select('*').order('id', { ascending: true });
+
+      // Catalogue NEXA (+ docs publics approuvés) — filtre côté client pour TCF
+      const { data: docsData } = await supabase
+        .from("bibliotheque_documents")
+        .select("*")
+        .order("id", { ascending: true });
       if (docsData) {
-        setDocuments(docsData);
+        setDocuments(
+          docsData.filter((doc: any) => {
+            if (doc.is_paid) return false;
+            const status = doc.status || "approved";
+            if (status !== "approved") return false;
+            if (!doc.center_id) return true;
+            if (doc.visibility === "public") return true;
+            return (
+              doc.visibility === "center" &&
+              profile?.center_id &&
+              doc.center_id === profile.center_id
+            );
+          }),
+        );
       }
 
       setLoading(false);
@@ -94,25 +123,24 @@ export default function BibliothequePage() {
     checkPremiumStatus();
   }, [router]);
 
-  const openSecureDocument = async (storagePath: string) => {
+  const openSecureDocument = async (docId: number) => {
     setIsLoadingPdf(true);
-    setPageNumber(1); // On remet à la page 1 à chaque ouverture
+    setPageNumber(1);
     setNumPages(null);
-    
-    try {
-      const { data, error } = await supabase
-        .storage
-        .from('ressources_iag')
-        .createSignedUrl(storagePath, 60);
 
-      if (error || !data) {
-        console.error("Erreur de sécurisation du document:", error?.message);
-        alert("Impossible de charger le document sécurisé.");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`/api/bibliotheque/document/${docId}`, {
+        headers: { Authorization: `Bearer ${session?.access_token ?? ""}` },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.url) {
+        console.error("Erreur de sécurisation du document:", json?.error || res.status);
+        alert(json?.error || "Impossible de charger le document sécurisé.");
         return;
       }
 
-      setViewingDoc(data.signedUrl);
-      
+      setViewingDoc(json.url);
     } catch (err) {
       console.error("Erreur inattendue:", err);
       alert("Une erreur de connexion est survenue.");
@@ -451,7 +479,7 @@ export default function BibliothequePage() {
               return (
                 <article key={doc.id}>
                   <button
-                    onClick={() => handleAction(() => openSecureDocument(doc.storage_path))}
+                    onClick={() => handleAction(() => openSecureDocument(doc.id))}
                     disabled={isLoadingPdf}
                     className={`w-full bg-white rounded-xl border border-orange-200 transition-colors text-left group relative overflow-hidden ${
                       isLoadingPdf ? "opacity-50 cursor-wait" : "hover:border-orange-400"

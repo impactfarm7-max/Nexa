@@ -1,5 +1,128 @@
 export type AfricaCountry = { code: string; name: string; flag: string; dial: string; regions: string[]; };
 
+/**
+ * Type de subdivision administrative affiché dans les formulaires.
+ * La colonne DB reste `region` ; seul le libellé UI change.
+ * - zone : liste = villes / zones principales (pas une vraie région admin)
+ */
+export type SubdivisionKind =
+  | "region"
+  | "province"
+  | "department"
+  | "governorate"
+  | "state"
+  | "wilaya"
+  | "district"
+  | "zone";
+
+/** Vocabulaire local par pays (ISO). Défaut : zone (villes / zones principales). */
+const SUBDIVISION_KIND_BY_CODE: Record<string, SubdivisionKind> = {
+  CM: "region",
+  GA: "province",
+  CG: "department",
+  CD: "province",
+  CF: "department",
+  TD: "region",
+  GQ: "province",
+  ST: "district",
+  SN: "region",
+  CI: "district",
+  BF: "region",
+  ML: "region",
+  NE: "region",
+  BJ: "department",
+  TG: "region",
+  GN: "region",
+  GW: "region",
+  MR: "region",
+  SL: "district",
+  LR: "district",
+  GH: "region",
+  NG: "state",
+  GM: "region",
+  CV: "zone",
+  MA: "region",
+  DZ: "wilaya",
+  TN: "governorate",
+  LY: "district",
+  EG: "governorate",
+  SD: "state",
+  SS: "state",
+  ET: "region",
+  ER: "region",
+  DJ: "region",
+  SO: "region",
+  KE: "district",
+  UG: "district",
+  TZ: "region",
+  RW: "province",
+  BI: "province",
+  MZ: "province",
+  AO: "province",
+  ZM: "province",
+  ZW: "province",
+  MW: "district",
+  NA: "region",
+  BW: "district",
+  ZA: "province",
+  LS: "district",
+  SZ: "region",
+  MG: "province",
+  MU: "district",
+  SC: "district",
+  KM: "zone",
+};
+
+export function getSubdivisionKind(countryCode?: string | null): SubdivisionKind {
+  if (!countryCode) return "zone";
+  return SUBDIVISION_KIND_BY_CODE[countryCode.toUpperCase()] || "zone";
+}
+
+/** Clé i18n marketing pour le libellé du champ subdivision. */
+export function subdivisionLabelKey(kind: SubdivisionKind): string {
+  switch (kind) {
+    case "region":
+      return "ouvrirCentreFieldSubdivisionRegion";
+    case "province":
+      return "ouvrirCentreFieldSubdivisionProvince";
+    case "department":
+      return "ouvrirCentreFieldSubdivisionDepartment";
+    case "governorate":
+      return "ouvrirCentreFieldSubdivisionGovernorate";
+    case "state":
+      return "ouvrirCentreFieldSubdivisionState";
+    case "wilaya":
+      return "ouvrirCentreFieldSubdivisionWilaya";
+    case "district":
+      return "ouvrirCentreFieldSubdivisionDistrict";
+    case "zone":
+    default:
+      return "ouvrirCentreFieldSubdivisionZone";
+  }
+}
+
+export function subdivisionPlaceholderKey(kind: SubdivisionKind): string {
+  switch (kind) {
+    case "region":
+      return "ouvrirCentreFieldSubdivisionRegionPh";
+    case "province":
+      return "ouvrirCentreFieldSubdivisionProvincePh";
+    case "department":
+      return "ouvrirCentreFieldSubdivisionDepartmentPh";
+    case "governorate":
+      return "ouvrirCentreFieldSubdivisionGovernoratePh";
+    case "state":
+      return "ouvrirCentreFieldSubdivisionStatePh";
+    case "wilaya":
+      return "ouvrirCentreFieldSubdivisionWilayaPh";
+    case "district":
+      return "ouvrirCentreFieldSubdivisionDistrictPh";
+    case "zone":
+    default:
+      return "ouvrirCentreFieldSubdivisionZonePh";
+  }
+}
+
 export const AFRICA_54 = [
   { code: "DZ", name: "Algérie",             flag: "🇩🇿", dial: "+213", regions: ["Alger", "Oran", "Constantine", "Annaba", "Sétif", "Blida", "Batna", "Tlemcen", "Tizi Ouzou"] },
   { code: "AO", name: "Angola",              flag: "🇦🇴", dial: "+244", regions: ["Luanda", "Benguela", "Huíla", "Huambo", "Cabinda"] },

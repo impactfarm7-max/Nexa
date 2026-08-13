@@ -11,6 +11,12 @@ import {
   type NexaOfferConfig,
   type NexaOfferKey,
 } from "@/app/data/nexaOffers";
+import {
+  TCF_OFFERS,
+  TCF_PLAN_KEYS,
+  normalizeTcfPlan,
+  type TcfPlanKey,
+} from "@/app/data/tcfOffers";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { BLUE, ORANGE, CenterPageLayout, CenterPageHeader, CenterPageBody } from "../center-page-ui";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -84,7 +90,7 @@ function buildOfferFeatures(
     offer.maxCampus === 1
       ? t("centre", "abonnementsCampusOne")
       : t("centre", "abonnementsCampus", { count: fmtLimit(offer.maxCampus, unlimited) }),
-    t("centre", "abonnementsStaff", { count: fmtLimit(offer.maxStaffAccounts, unlimited) }),
+    t("centre", "abonnementsStaffUnlimited"),
     t("centre", "abonnementsTutor", { count: fmtLimit(offer.tutorInteractionsPerStudent, unlimited) }),
     t("centre", "abonnementsLive", { count: fmtLimit(offer.liveHoursPerStudent, unlimited) }),
     t("centre", "abonnementsCorrections", { count: fmtLimit(offer.aiCorrectionsPerStudent, unlimited) }),
@@ -95,25 +101,46 @@ function buildOfferFeatures(
 
 export default function AbonnementsPage() {
   const { t, locale } = useI18n();
+  const en = locale === "en";
   const [loading, setLoading] = useState(true);
   const [centerType, setCenterType] = useState<CenterTypeCode | null>(null);
   const [currentOfferKey, setCurrentOfferKey] = useState<NexaOfferKey | null>(null);
+  const [currentTcfPlan, setCurrentTcfPlan] = useState<TcfPlanKey | null>(null);
 
   useEffect(() => {
     (async () => {
       const bootstrap = await loadCenterBootstrap();
-      const center = (bootstrap?.me as { center?: { center_type?: string; nexa_offer?: string | null } } | undefined)?.center;
-      setCenterType(normalizeCenterType(center?.center_type));
-      setCurrentOfferKey(normalizeNexaOffer(center?.nexa_offer));
+      const center = (
+        bootstrap?.me as {
+          center?: {
+            center_type?: string;
+            nexa_offer?: string | null;
+            plan_type?: string | null;
+          };
+        } | undefined
+      )?.center;
+      const type = normalizeCenterType(center?.center_type);
+      setCenterType(type);
+      if (type === "tcf_canada") {
+        setCurrentTcfPlan(normalizeTcfPlan(center?.plan_type));
+        setCurrentOfferKey(null);
+      } else {
+        setCurrentOfferKey(normalizeNexaOffer(center?.nexa_offer));
+        setCurrentTcfPlan(null);
+      }
       setLoading(false);
     })();
   }, []);
 
   const currentPlanLabel = useMemo(() => {
+    if (centerType === "tcf_canada") {
+      if (!currentTcfPlan) return t("centre", "abonnementsTrial");
+      return en ? TCF_OFFERS[currentTcfPlan].nameEn : TCF_OFFERS[currentTcfPlan].nameFr;
+    }
     if (!currentOfferKey) return t("centre", "abonnementsTrial");
     if (currentOfferKey === "custom") return t("centre", "offerNameCustom");
     return offerDisplayName(currentOfferKey, t);
-  }, [currentOfferKey, t]);
+  }, [centerType, currentOfferKey, currentTcfPlan, en, t]);
 
   if (loading) return <CenterPageLoading />;
 
@@ -137,96 +164,171 @@ export default function AbonnementsPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 max-w-6xl mx-auto pb-4">
-          {NEXA_OFFER_KEYS.map((key) => {
-            const offer = NEXA_OFFERS[key];
-            const isCurrent = currentOfferKey === key;
-            const isRecommended = !currentOfferKey && key === "pro";
-            const highlighted = isCurrent || isRecommended;
-            const features = buildOfferFeatures(offer, t);
-            const isQuote = offer.monthlyFeeMax == null && offer.key === "entreprise";
-            const amountLabel = offer.monthlyFeeMin.toLocaleString(locale === "en" ? "en-US" : "fr-FR");
+        {isTCF ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 max-w-6xl mx-auto pb-8">
+            {TCF_PLAN_KEYS.map((key) => {
+              const offer = TCF_OFFERS[key];
+              const isCurrent = currentTcfPlan === key;
+              const isRecommended = !currentTcfPlan && key === "pro";
+              const highlighted = isCurrent || Boolean(offer.highlight && isRecommended);
+              const features = en ? offer.featuresEn : offer.featuresFr;
+              const name = en ? offer.nameEn : offer.nameFr;
+              const price = en ? offer.priceEn : offer.priceFr;
 
-            return (
-              <div
-                key={key}
-                className={`rounded-2xl border p-6 flex flex-col bg-white transition-all ${
-                  highlighted ? "border-2 shadow-lg" : "border-black/[0.08]"
-                }`}
-                style={highlighted ? { borderColor: isCurrent ? BLUE : ORANGE, boxShadow: `0 8px 24px ${isCurrent ? BLUE : ORANGE}22` } : undefined}
-              >
-                {isCurrent && (
-                  <span
-                    className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white"
-                    style={{ backgroundColor: BLUE }}
-                  >
-                    {t("centre", "abonnementsCurrentBadge")}
-                  </span>
-                )}
-                {!isCurrent && isRecommended && (
-                  <span
-                    className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
-                    style={{ backgroundColor: ORANGE }}
-                  >
-                    <Sparkles size={11} /> {t("centre", "abonnementsRecommended")}
-                  </span>
-                )}
-                <h3 className="text-lg font-black" style={{ color: BLUE }}>
-                  {offerDisplayName(key, t)}
-                </h3>
-                <p className="text-[12px] mt-1 font-medium" style={{ color: "rgba(17,34,78,0.55)" }}>
-                  {offerDisplayTagline(key, t)}
-                </p>
-                {isQuote ? (
+              return (
+                <div
+                  key={key}
+                  className={`rounded-2xl border p-6 flex flex-col bg-white transition-all ${
+                    highlighted ? "border-2 shadow-lg" : "border-black/[0.08]"
+                  }`}
+                  style={
+                    highlighted
+                      ? {
+                          borderColor: isCurrent ? BLUE : ORANGE,
+                          boxShadow: `0 8px 24px ${isCurrent ? BLUE : ORANGE}22`,
+                        }
+                      : undefined
+                  }
+                >
+                  {isCurrent && (
+                    <span
+                      className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white"
+                      style={{ backgroundColor: BLUE }}
+                    >
+                      {t("centre", "abonnementsCurrentBadge")}
+                    </span>
+                  )}
+                  {!isCurrent && isRecommended && (
+                    <span
+                      className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
+                      style={{ backgroundColor: ORANGE }}
+                    >
+                      <Sparkles size={11} /> {t("centre", "abonnementsRecommended")}
+                    </span>
+                  )}
+                  <h3 className="text-lg font-black" style={{ color: BLUE }}>{name}</h3>
                   <p className="mt-4 text-2xl font-black leading-none" style={{ color: BLUE }}>
-                    {t("centre", "abonnementsPriceQuote")}
+                    {price}
                   </p>
-                ) : (
-                  <div className="mt-4">
-                    <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(17,34,78,0.45)" }}>
-                      {t("centre", "abonnementsPriceFrom")}
-                    </p>
-                    <p className="mt-0.5 text-2xl font-black leading-none tabular-nums" style={{ color: BLUE }}>
-                      {amountLabel}
-                    </p>
-                    <p className="mt-1 text-xs font-bold" style={{ color: "rgba(17,34,78,0.55)" }}>
-                      {t("centre", "abonnementsPricePerMonth")}
-                    </p>
-                  </div>
-                )}
-                <ul className="mt-5 space-y-2.5 flex-1">
-                  {features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-[13px]" style={{ color: "rgba(17,34,78,0.75)" }}>
-                      <Check size={15} className="shrink-0 mt-0.5" style={{ color: ORANGE }} />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-4 pt-4 border-t border-black/[0.06]">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2.5">
-                    {t("centre", "abonnementsIncludedTitle")}
-                  </p>
-                  <ul className="space-y-1.5">
-                    {CORE_FEATURE_KEYS.map((keyName) => (
-                      <li key={keyName} className="flex items-start gap-2 text-[11px]" style={{ color: "rgba(17,34,78,0.6)" }}>
-                        <Check size={12} className="shrink-0 mt-0.5" style={{ color: BLUE }} />
-                        {t("centre", keyName)}
+                  <ul className="mt-5 space-y-2.5 flex-1">
+                    {features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-[13px]" style={{ color: "rgba(17,34,78,0.75)" }}>
+                        <Check size={15} className="shrink-0 mt-0.5" style={{ color: ORANGE }} />
+                        {f}
                       </li>
                     ))}
                   </ul>
+                  <button
+                    onClick={contact}
+                    className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-colors"
+                    style={{ backgroundColor: highlighted ? ORANGE : BLUE }}
+                  >
+                    <MessageCircle size={16} />
+                    {t("centre", "abonnementsContact")}
+                  </button>
                 </div>
-                <button
-                  onClick={contact}
-                  className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-colors"
-                  style={{ backgroundColor: highlighted ? ORANGE : BLUE }}
+              );
+            })}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 max-w-6xl mx-auto pb-4">
+            {NEXA_OFFER_KEYS.map((key) => {
+              const offer = NEXA_OFFERS[key];
+              const isCurrent = currentOfferKey === key;
+              const isRecommended = !currentOfferKey && key === "pro";
+              const highlighted = isCurrent || isRecommended;
+              const features = buildOfferFeatures(offer, t);
+              const isQuote = offer.monthlyFeeMax == null && offer.key === "entreprise";
+              const amountLabel = offer.monthlyFeeMin.toLocaleString(en ? "en-US" : "fr-FR");
+
+              return (
+                <div
+                  key={key}
+                  className={`rounded-2xl border p-6 flex flex-col bg-white transition-all ${
+                    highlighted ? "border-2 shadow-lg" : "border-black/[0.08]"
+                  }`}
+                  style={
+                    highlighted
+                      ? {
+                          borderColor: isCurrent ? BLUE : ORANGE,
+                          boxShadow: `0 8px 24px ${isCurrent ? BLUE : ORANGE}22`,
+                        }
+                      : undefined
+                  }
                 >
-                  <MessageCircle size={16} />
-                  {t("centre", "abonnementsContact")}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+                  {isCurrent && (
+                    <span
+                      className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white"
+                      style={{ backgroundColor: BLUE }}
+                    >
+                      {t("centre", "abonnementsCurrentBadge")}
+                    </span>
+                  )}
+                  {!isCurrent && isRecommended && (
+                    <span
+                      className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
+                      style={{ backgroundColor: ORANGE }}
+                    >
+                      <Sparkles size={11} /> {t("centre", "abonnementsRecommended")}
+                    </span>
+                  )}
+                  <h3 className="text-lg font-black" style={{ color: BLUE }}>
+                    {offerDisplayName(key, t)}
+                  </h3>
+                  <p className="text-[12px] mt-1 font-medium" style={{ color: "rgba(17,34,78,0.55)" }}>
+                    {offerDisplayTagline(key, t)}
+                  </p>
+                  {isQuote ? (
+                    <p className="mt-4 text-2xl font-black leading-none" style={{ color: BLUE }}>
+                      {t("centre", "abonnementsPriceQuote")}
+                    </p>
+                  ) : (
+                    <div className="mt-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(17,34,78,0.45)" }}>
+                        {t("centre", "abonnementsPriceFrom")}
+                      </p>
+                      <p className="mt-0.5 text-2xl font-black leading-none tabular-nums" style={{ color: BLUE }}>
+                        {amountLabel}
+                      </p>
+                      <p className="mt-1 text-xs font-bold" style={{ color: "rgba(17,34,78,0.55)" }}>
+                        {t("centre", "abonnementsPricePerMonth")}
+                      </p>
+                    </div>
+                  )}
+                  <ul className="mt-5 space-y-2.5 flex-1">
+                    {features.map((f) => (
+                      <li key={f} className="flex items-start gap-2 text-[13px]" style={{ color: "rgba(17,34,78,0.75)" }}>
+                        <Check size={15} className="shrink-0 mt-0.5" style={{ color: ORANGE }} />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="mt-4 pt-4 border-t border-black/[0.06]">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2.5">
+                      {t("centre", "abonnementsIncludedTitle")}
+                    </p>
+                    <ul className="space-y-1.5">
+                      {CORE_FEATURE_KEYS.map((keyName) => (
+                        <li key={keyName} className="flex items-start gap-2 text-[11px]" style={{ color: "rgba(17,34,78,0.6)" }}>
+                          <Check size={12} className="shrink-0 mt-0.5" style={{ color: BLUE }} />
+                          {t("centre", keyName)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <button
+                    onClick={contact}
+                    className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-colors"
+                    style={{ backgroundColor: highlighted ? ORANGE : BLUE }}
+                  >
+                    <MessageCircle size={16} />
+                    {t("centre", "abonnementsContact")}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </CenterPageBody>
     </CenterPageLayout>
   );

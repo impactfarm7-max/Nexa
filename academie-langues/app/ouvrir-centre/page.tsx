@@ -18,6 +18,16 @@ import {
   NEXA_OFFER_KEYS,
   type NexaOfferKey,
 } from "@/app/data/nexaOffers";
+import {
+  TCF_OFFERS,
+  TCF_PLAN_KEYS,
+  type TcfPlanKey,
+} from "@/app/data/tcfOffers";
+import {
+  getSubdivisionKind,
+  subdivisionLabelKey,
+  subdivisionPlaceholderKey,
+} from "@/app/data/africa-54";
 import MarketingChrome from "@/app/components/landing/MarketingChrome";
 import { checkPasswordStrength, isPasswordStrong } from "@/app/utils/password-policy";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -172,6 +182,7 @@ export default function CreerCentrePage() {
   const [programFamily, setProgramFamily] = useState<ProgramFamily>(null);
   const [centerType, setCenterType] = useState<CenterType>(null);
   const [nexaOffer, setNexaOffer] = useState<NexaOfferKey | null>(null);
+  const [tcfPlan, setTcfPlan] = useState<TcfPlanKey | null>(null);
 
   const [centerName, setCenterName] = useState("");
   const [country, setCountry] = useState("");
@@ -191,12 +202,23 @@ export default function CreerCentrePage() {
   const [error, setError] = useState("");
 
   const selectedCountry = AFRICA_54.find(c => c.code === country);
+  const subdivisionKind = getSubdivisionKind(country);
+  const subdivisionLabel = t("marketing", subdivisionLabelKey(subdivisionKind));
+  const subdivisionPlaceholder = t("marketing", subdivisionPlaceholderKey(subdivisionKind));
 
   const handleCountryChange = (code: string) => {
     setCountry(code);
     setRegion("");
     const c = AFRICA_54.find(x => x.code === code);
     if (c) setPhone(c.dial + " ");
+  };
+
+  const handleSubdivisionChange = (value: string) => {
+    setRegion(value);
+    // Si la liste est une zone / ville principale et la ville est vide → préremplir.
+    if (value && !city.trim() && (subdivisionKind === "zone" || subdivisionKind === "district")) {
+      setCity(value);
+    }
   };
 
   /** Continuer uniquement si un center_type métier est choisi (TCF sous native, ou libre → generic). */
@@ -214,11 +236,13 @@ export default function CreerCentrePage() {
       return;
     }
     setCenterType(type);
+    setTcfPlan(null);
   };
 
   const selectNativeDiscipline = (id: Extract<CenterTypeCode, "tcf_canada">) => {
     setProgramFamily("native");
     setCenterType(id);
+    setNexaOffer(null);
   };
 
   const handleConfigureCentre = async () => {
@@ -256,7 +280,8 @@ export default function CreerCentrePage() {
           ownerPassword,
           ownerRole: ownerRole || null,
           centerType,
-          nexaOffer,
+          nexaOffer: centerType === "tcf_canada" ? null : nexaOffer,
+          planType: centerType === "tcf_canada" ? tcfPlan : null,
         }),
       });
       const data = await res.json();
@@ -584,14 +609,14 @@ export default function CreerCentrePage() {
                 </Field>
 
                 {selectedCountry && selectedCountry.regions.length > 0 && (
-                  <Field label={t("marketing", "ouvrirCentreFieldRegionLabel")}>
+                  <Field label={subdivisionLabel}>
                     <div className="relative">
                       <select
                         value={region}
-                        onChange={e => setRegion(e.target.value)}
+                        onChange={e => handleSubdivisionChange(e.target.value)}
                         className="input-nexa appearance-none pr-10 cursor-pointer"
                       >
-                        <option value="">{t("marketing", "ouvrirCentreFieldRegionPlaceholder")}</option>
+                        <option value="">{subdivisionPlaceholder}</option>
                         {selectedCountry.regions.map(r => (
                           <option key={r} value={r}>{r}</option>
                         ))}
@@ -633,14 +658,21 @@ export default function CreerCentrePage() {
                     {t("marketing", "ouvrirCentreOfferLabel")} <span className="font-medium normal-case tracking-normal text-neutral-400">({t("marketing", "ouvrirCentreOfferOptional")})</span>
                   </p>
                   <p className="text-[12px] text-neutral-500 font-medium leading-relaxed">
-                    {t("marketing", "ouvrirCentreOfferHint")}
+                    {centerType === "tcf_canada"
+                      ? (locale === "en"
+                        ? "TCF plans are quote-based (Starter, Pro, Ultra or custom)."
+                        : "Les offres TCF sont sur devis (Starter, Pro, Ultra ou Sur devis).")
+                      : t("marketing", "ouvrirCentreOfferHint")}
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <button
                       type="button"
-                      onClick={() => setNexaOffer(null)}
+                      onClick={() => {
+                        setNexaOffer(null);
+                        setTcfPlan(null);
+                      }}
                       className={`rounded-xl border px-3 py-3 text-left transition-colors ${
-                        nexaOffer === null
+                        (centerType === "tcf_canada" ? tcfPlan === null : nexaOffer === null)
                           ? "border-orange-400 bg-orange-50"
                           : "border-black/10 bg-white hover:border-black/20"
                       }`}
@@ -648,38 +680,70 @@ export default function CreerCentrePage() {
                       <p className="text-sm font-black" style={{ color: BLUE }}>{t("marketing", "ouvrirCentreOfferUnknown")}</p>
                       <p className="text-[11px] text-neutral-500 mt-0.5">{t("marketing", "ouvrirCentreOfferUnknownHint")}</p>
                     </button>
-                    {NEXA_OFFER_KEYS.map((key) => {
-                      const offer = NEXA_OFFERS[key];
-                      const selected = nexaOffer === key;
-                      const offerNameKey =
-                        key === "decouverte"
-                          ? "ouvrirCentreOfferNameDecouverte"
-                          : key === "croissance"
-                            ? "ouvrirCentreOfferNameCroissance"
-                            : key === "pro"
-                              ? "ouvrirCentreOfferNamePro"
-                              : "ouvrirCentreOfferNameEntreprise";
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setNexaOffer(key)}
-                          className={`rounded-xl border px-3 py-3 text-left transition-colors ${
-                            selected
-                              ? "border-orange-400 bg-orange-50"
-                              : "border-black/10 bg-white hover:border-black/20"
-                          }`}
-                        >
-                          <p className="text-sm font-black" style={{ color: BLUE }}>
-                            {t("marketing", offerNameKey)}
-                          </p>
-                          <p className="text-[11px] text-neutral-500 mt-0.5">
-                            {t("marketing", "ouvrirCentreOfferFrom")} {offer.monthlyFeeMin.toLocaleString(locale === "en" ? "en-US" : "fr-FR")} {t("marketing", "ouvrirCentreOfferFcfaPerMonth")}
-                            {" · "}{offer.maxStudents != null ? `${t("marketing", "ouvrirCentreOfferMax")} ${offer.maxStudents} ${t("marketing", "ouvrirCentreOfferStudents")}` : t("marketing", "ouvrirCentreOfferUnlimited")}
-                          </p>
-                        </button>
-                      );
-                    })}
+                    {centerType === "tcf_canada"
+                      ? TCF_PLAN_KEYS.map((key) => {
+                          const offer = TCF_OFFERS[key];
+                          const selected = tcfPlan === key;
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                setTcfPlan(key);
+                                setNexaOffer(null);
+                              }}
+                              className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                                selected
+                                  ? "border-orange-400 bg-orange-50"
+                                  : "border-black/10 bg-white hover:border-black/20"
+                              }`}
+                            >
+                              <p className="text-sm font-black" style={{ color: BLUE }}>
+                                {locale === "en" ? offer.nameEn : offer.nameFr}
+                              </p>
+                              <p className="text-[11px] text-neutral-500 mt-0.5">
+                                {locale === "en" ? offer.priceEn : offer.priceFr}
+                                {" · "}
+                                {(locale === "en" ? offer.featuresEn : offer.featuresFr)[0]}
+                              </p>
+                            </button>
+                          );
+                        })
+                      : NEXA_OFFER_KEYS.map((key) => {
+                          const offer = NEXA_OFFERS[key];
+                          const selected = nexaOffer === key;
+                          const offerNameKey =
+                            key === "decouverte"
+                              ? "ouvrirCentreOfferNameDecouverte"
+                              : key === "croissance"
+                                ? "ouvrirCentreOfferNameCroissance"
+                                : key === "pro"
+                                  ? "ouvrirCentreOfferNamePro"
+                                  : "ouvrirCentreOfferNameEntreprise";
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                setNexaOffer(key);
+                                setTcfPlan(null);
+                              }}
+                              className={`rounded-xl border px-3 py-3 text-left transition-colors ${
+                                selected
+                                  ? "border-orange-400 bg-orange-50"
+                                  : "border-black/10 bg-white hover:border-black/20"
+                              }`}
+                            >
+                              <p className="text-sm font-black" style={{ color: BLUE }}>
+                                {t("marketing", offerNameKey)}
+                              </p>
+                              <p className="text-[11px] text-neutral-500 mt-0.5">
+                                {t("marketing", "ouvrirCentreOfferFrom")} {offer.monthlyFeeMin.toLocaleString(locale === "en" ? "en-US" : "fr-FR")} {t("marketing", "ouvrirCentreOfferFcfaPerMonth")}
+                                {" · "}{offer.maxStudents != null ? `${t("marketing", "ouvrirCentreOfferMax")} ${offer.maxStudents} ${t("marketing", "ouvrirCentreOfferStudents")}` : t("marketing", "ouvrirCentreOfferUnlimited")}
+                              </p>
+                            </button>
+                          );
+                        })}
                   </div>
                 </div>
               </div>

@@ -258,10 +258,17 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         const mode = isShortPricingMode(selectedFiliere?.pricing_mode)
           ? selectedFiliere!.pricing_mode!
           : "forfaitaire";
-        const monthsDefault =
-          selectedFiliere?.duree_unite === "mois" && selectedFiliere?.duree_valeur
-            ? selectedFiliere.duree_valeur
-            : 3;
+        const monthsDefault = selectedFiliere?.duree_valeur
+          ? (
+              selectedFiliere.duree_unite === "mois"
+                ? selectedFiliere.duree_valeur
+                : selectedFiliere.duree_unite === "semaines"
+                  ? Math.max(1, Math.ceil(selectedFiliere.duree_valeur / 4))
+                  : selectedFiliere.duree_unite === "jours"
+                    ? Math.max(1, Math.ceil(selectedFiliere.duree_valeur / 30))
+                    : 3
+            )
+          : 3;
         setDurationMonths(monthsDefault);
         setCustomMonths("");
 

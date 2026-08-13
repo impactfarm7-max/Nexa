@@ -69,6 +69,15 @@ const MODE_LABEL: Record<string, string> = {
   hybride: "Hybride",
 };
 
+function durationToBillableMonths(valeur: number | null | undefined, unite: string | null | undefined): number {
+  const v = Number(valeur) || 0;
+  if (v < 1) return 1;
+  if (unite === "mois") return v;
+  if (unite === "semaines") return Math.max(1, Math.ceil(v / 4));
+  if (unite === "jours") return Math.max(1, Math.ceil(v / 30));
+  return 1;
+}
+
 function structureLabel(p: ProgrammeCard, locale: "fr" | "en" = "fr", t?: (namespace: "centre", key: string, params?: Record<string, string | number>) => string) {
   if (p.type === "cursus") {
     const count = p.nb_niveaux || 1;
@@ -1010,8 +1019,16 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
   const showFilierePlan =
     prog.type === "formation_courte" || isUniforme;
   const filiereExtrasTotal = filiereFees.reduce((a, f) => a + f.montant, 0);
-  const displayPrice = showFilierePlan && filiereExtrasTotal > 0
-    ? fcfa((Number(prog.default_tuition_fee) || 0) + filiereExtrasTotal, locale)
+  const mensuelMonths =
+    prog.type === "formation_courte" && prog.pricing_mode === "mensuel"
+      ? durationToBillableMonths(prog.duree_valeur, prog.duree_unite)
+      : 1;
+  const catalogTuitionBase =
+    prog.type === "formation_courte" && prog.pricing_mode === "mensuel"
+      ? (Number(prog.default_tuition_fee) || 0) * mensuelMonths
+      : (Number(prog.default_tuition_fee) || 0);
+  const displayPrice = showFilierePlan && (filiereExtrasTotal > 0 || (prog.pricing_mode === "mensuel" && mensuelMonths > 1))
+    ? fcfa(catalogTuitionBase + filiereExtrasTotal, locale)
     : priceLabel(prog, locale, t);
 
   return (
@@ -1052,10 +1069,16 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
             icon={Tag}
             label={
               prog.type === "formation_courte" && prog.pricing_mode === "mensuel"
-                ? (filiereExtrasTotal > 0 ? t("centre", "programsCatalogTotalMonth") : t("centre", "programsPriceMonth"))
+                ? (filiereExtrasTotal > 0 || mensuelMonths > 1
+                  ? t("centre", "programsTotalProgram")
+                  : t("centre", "programsPriceMonth"))
                 : (filiereExtrasTotal > 0 && showFilierePlan ? t("centre", "programsTotalProgram") : t("centre", "programsProgramPrice"))
             }
-            value={displayPrice}
+            value={
+              prog.type === "formation_courte" && prog.pricing_mode === "mensuel" && mensuelMonths === 1 && filiereExtrasTotal === 0
+                ? priceLabel(prog, locale, t)
+                : displayPrice
+            }
           />
           <InfoBox icon={Clock} label={t("centre", "programsStructure")} value={structureLabel(prog, locale, t)} />
         </div>
@@ -1103,12 +1126,20 @@ function ViewModal({ prog, onClose, onTogglePublish }: { prog: ProgrammeCard; on
                   </span>
                   <span className="font-black text-neutral-700">{fcfa(prog.default_tuition_fee, locale)}</span>
                 </div>
+                {prog.type === "formation_courte" && prog.pricing_mode === "mensuel" && mensuelMonths > 1 && (
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-bold text-neutral-700">
+                      {locale === "en" ? `Tuition (${mensuelMonths} mo.)` : `Scolarité (${mensuelMonths} mois)`}
+                    </span>
+                    <span className="font-black text-neutral-700">{fcfa(catalogTuitionBase, locale)}</span>
+                  </div>
+                )}
                 <FeesPreviewList fees={filiereFees} />
-                {filiereFees.length > 0 && (
+                {(filiereFees.length > 0 || (prog.pricing_mode === "mensuel" && mensuelMonths > 1)) && (
                   <div className="flex items-center justify-between text-xs mt-2 pt-2 border-t border-neutral-100">
                     <span className="font-black text-neutral-800">{t("centre", "programsTotal")}</span>
                     <span className="font-black" style={{ color: BLUE }}>
-                      {fcfa((Number(prog.default_tuition_fee) || 0) + filiereExtrasTotal, locale)}
+                      {fcfa(catalogTuitionBase + filiereExtrasTotal, locale)}
                     </span>
                   </div>
                 )}
