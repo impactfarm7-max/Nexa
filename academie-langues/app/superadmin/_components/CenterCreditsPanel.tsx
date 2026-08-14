@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import { Coins, Loader2, Plus } from "lucide-react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Coins, Loader2, Plus, RotateCcw } from "lucide-react";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { superadminFetch } from "@/app/utils/superadmin-api-client";
 
@@ -58,47 +58,77 @@ export function CenterCreditsPanel({ centerId }: { centerId: string }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [loadedCenterId, setLoadedCenterId] = useState<string | null>(null);
+  const activeCenterIdRef = useRef(centerId);
+  const loadRequestIdRef = useRef(0);
 
-  useEffect(() => {
-    let cancelled = false;
+  activeCenterIdRef.current = centerId;
+  const ready = loadedCenterId === centerId;
+
+  const loadCredits = useCallback(async () => {
+    const requestedCenterId = centerId;
+    const requestId = ++loadRequestIdRef.current;
 
     setLoading(true);
     setError(null);
     setSuccess(false);
-    setWallet(EMPTY_WALLET);
-    setPurchases([]);
+    setSubmitting(false);
 
-    void superadminFetch<CreditsResponse>(`/api/superadmin/centers/${centerId}/credits`)
-      .then((response) => {
-        if (cancelled) return;
-        setWallet(response.wallet);
-        setPurchases(response.purchases);
-      })
-      .catch((loadError: unknown) => {
-        if (cancelled) return;
-        setError(loadError instanceof Error ? loadError.message : t("superadmin", "creditsLoadError"));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
+    try {
+      const response = await superadminFetch<CreditsResponse>(
+        `/api/superadmin/centers/${requestedCenterId}/credits`,
+      );
+      if (
+        activeCenterIdRef.current !== requestedCenterId ||
+        loadRequestIdRef.current !== requestId
+      ) {
+        return;
+      }
+      setWallet(response.wallet);
+      setPurchases(response.purchases);
+      setLoadedCenterId(requestedCenterId);
+    } catch (loadError: unknown) {
+      if (
+        activeCenterIdRef.current !== requestedCenterId ||
+        loadRequestIdRef.current !== requestId
+      ) {
+        return;
+      }
+      console.error("Unable to load center AI credits", loadError);
+      setLoadedCenterId(null);
+      setError(t("superadmin", "creditsLoadError"));
+    } finally {
+      if (
+        activeCenterIdRef.current === requestedCenterId &&
+        loadRequestIdRef.current === requestId
+      ) {
+        setLoading(false);
+      }
+    }
   }, [centerId, t]);
+
+  useEffect(() => {
+    void loadCredits();
+    return () => {
+      loadRequestIdRef.current += 1;
+    };
+  }, [loadCredits]);
 
   const typeLabel = (type: CreditType) =>
     t("superadmin", `creditsType_${type}` as "creditsType_tutor_ia");
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (!ready) return;
+    const requestedCenterId = centerId;
+
     setSubmitting(true);
     setError(null);
     setSuccess(false);
 
     try {
       const response = await superadminFetch<PurchaseResponse>(
-        `/api/superadmin/centers/${centerId}/credits`,
+        `/api/superadmin/centers/${requestedCenterId}/credits`,
         {
           method: "POST",
           body: JSON.stringify({
@@ -111,6 +141,7 @@ export function CenterCreditsPanel({ centerId }: { centerId: string }) {
         },
       );
 
+      if (activeCenterIdRef.current !== requestedCenterId) return;
       setWallet(response.wallet);
       setPurchases((current) => [response.purchase, ...current]);
       setQuantity("1");
@@ -118,11 +149,13 @@ export function CenterCreditsPanel({ centerId }: { centerId: string }) {
       setNote("");
       setSuccess(true);
     } catch (submitError: unknown) {
-      setError(
-        submitError instanceof Error ? submitError.message : t("superadmin", "creditsSubmitError"),
-      );
+      if (activeCenterIdRef.current !== requestedCenterId) return;
+      console.error("Unable to add center AI credits", submitError);
+      setError(t("superadmin", "creditsActionError"));
     } finally {
-      setSubmitting(false);
+      if (activeCenterIdRef.current === requestedCenterId) {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -151,9 +184,23 @@ export function CenterCreditsPanel({ centerId }: { centerId: string }) {
         </div>
       </div>
 
-      {loading ? (
+      {loading && !ready ? (
         <div className="flex justify-center py-8">
           <Loader2 className="h-5 w-5 animate-spin text-orange-400" />
+        </div>
+      ) : !ready ? (
+        <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/[0.06] px-4 py-4">
+          <p className="text-xs font-bold text-red-300">
+            {error ?? t("superadmin", "creditsLoadError")}
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadCredits()}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg border border-red-500/25 px-3 py-2 text-[10px] font-black uppercase tracking-wider text-red-200 transition-colors hover:bg-red-500/10"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            {t("superadmin", "creditsRetry")}
+          </button>
         </div>
       ) : (
         <>
