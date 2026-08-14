@@ -22,6 +22,7 @@ import {
   NEXA_OFFERS,
 } from "@/app/data/nexaOffers";
 import { normalizeTcfPlan, tcfPlanLabel } from "@/app/data/tcfOffers";
+import { CenterCreditsPanel } from "./CenterCreditsPanel";
 import { FicheField, FicheRow, FicheSection } from "./fiche";
 import { ViewAsModal } from "./ViewAsModal";
 
@@ -462,6 +463,8 @@ export function CenterDetailPanel({
           </button>
         </div>
       </div>
+
+      <CenterCreditsPanel centerId={center?.id ?? listRow.id} />
 
       {detail?.usage && (
         <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
