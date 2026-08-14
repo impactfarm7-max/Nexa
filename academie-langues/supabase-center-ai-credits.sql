@@ -58,3 +58,133 @@ CREATE INDEX IF NOT EXISTS idx_center_ai_credit_grants_beneficiary
 ALTER TABLE public.center_ai_credit_wallets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.center_ai_credit_purchases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.center_ai_credit_grants ENABLE ROW LEVEL SECURITY;
+
+CREATE OR REPLACE FUNCTION public.purchase_center_ai_credits(
+  p_center_id uuid,
+  p_mode text,
+  p_credit_type text,
+  p_quantity integer,
+  p_amount_fcfa integer,
+  p_note text,
+  p_created_by uuid
+)
+RETURNS TABLE (
+  wallet_generic integer,
+  wallet_tutor_ia integer,
+  wallet_exam_sim integer,
+  wallet_ai_corrections integer,
+  wallet_course_builder integer,
+  purchase_id uuid,
+  purchase_created_at timestamptz
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_wallet public.center_ai_credit_wallets%ROWTYPE;
+  v_purchase public.center_ai_credit_purchases%ROWTYPE;
+BEGIN
+  IF p_quantity IS NULL OR p_quantity < 1 THEN
+    RAISE EXCEPTION 'INVALID_QUANTITY' USING ERRCODE = '22023';
+  END IF;
+
+  IF p_mode = 'generic' THEN
+    IF p_credit_type IS NOT NULL THEN
+      RAISE EXCEPTION 'INVALID_PURCHASE' USING ERRCODE = '22023';
+    END IF;
+  ELSIF p_mode = 'typed' THEN
+    IF p_credit_type IS NULL OR p_credit_type NOT IN (
+      'tutor_ia',
+      'exam_sim',
+      'ai_corrections',
+      'course_builder'
+    ) THEN
+      RAISE EXCEPTION 'INVALID_PURCHASE' USING ERRCODE = '22023';
+    END IF;
+  ELSE
+    RAISE EXCEPTION 'INVALID_PURCHASE' USING ERRCODE = '22023';
+  END IF;
+
+  IF p_amount_fcfa IS NOT NULL AND p_amount_fcfa < 0 THEN
+    RAISE EXCEPTION 'INVALID_AMOUNT' USING ERRCODE = '22023';
+  END IF;
+
+  INSERT INTO public.center_ai_credit_wallets (
+    center_id,
+    generic,
+    tutor_ia,
+    exam_sim,
+    ai_corrections,
+    course_builder,
+    updated_at
+  )
+  VALUES (
+    p_center_id,
+    CASE WHEN p_mode = 'generic' THEN p_quantity ELSE 0 END,
+    CASE WHEN p_credit_type = 'tutor_ia' THEN p_quantity ELSE 0 END,
+    CASE WHEN p_credit_type = 'exam_sim' THEN p_quantity ELSE 0 END,
+    CASE WHEN p_credit_type = 'ai_corrections' THEN p_quantity ELSE 0 END,
+    CASE WHEN p_credit_type = 'course_builder' THEN p_quantity ELSE 0 END,
+    now()
+  )
+  ON CONFLICT (center_id) DO UPDATE
+  SET
+    generic = center_ai_credit_wallets.generic + EXCLUDED.generic,
+    tutor_ia = center_ai_credit_wallets.tutor_ia + EXCLUDED.tutor_ia,
+    exam_sim = center_ai_credit_wallets.exam_sim + EXCLUDED.exam_sim,
+    ai_corrections = center_ai_credit_wallets.ai_corrections + EXCLUDED.ai_corrections,
+    course_builder = center_ai_credit_wallets.course_builder + EXCLUDED.course_builder,
+    updated_at = now()
+  RETURNING * INTO v_wallet;
+
+  INSERT INTO public.center_ai_credit_purchases (
+    center_id,
+    mode,
+    credit_type,
+    quantity,
+    amount_fcfa,
+    note,
+    created_by
+  )
+  VALUES (
+    p_center_id,
+    p_mode,
+    p_credit_type,
+    p_quantity,
+    p_amount_fcfa,
+    p_note,
+    p_created_by
+  )
+  RETURNING * INTO v_purchase;
+
+  RETURN QUERY
+  SELECT
+    v_wallet.generic,
+    v_wallet.tutor_ia,
+    v_wallet.exam_sim,
+    v_wallet.ai_corrections,
+    v_wallet.course_builder,
+    v_purchase.id,
+    v_purchase.created_at;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.purchase_center_ai_credits(
+  uuid,
+  text,
+  text,
+  integer,
+  integer,
+  text,
+  uuid
+) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.purchase_center_ai_credits(
+  uuid,
+  text,
+  text,
+  integer,
+  integer,
+  text,
+  uuid
+) TO service_role;

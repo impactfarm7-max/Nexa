@@ -24,6 +24,16 @@ type WalletRow = AiCreditWallet & {
   updated_at: string;
 };
 
+type PurchaseRpcRow = {
+  wallet_generic: number;
+  wallet_tutor_ia: number;
+  wallet_exam_sim: number;
+  wallet_ai_corrections: number;
+  wallet_course_builder: number;
+  purchase_id: string;
+  purchase_created_at: string;
+};
+
 type PurchaseInput =
   | {
       mode: "generic";
@@ -102,40 +112,6 @@ function parsePurchaseInput(body: unknown): PurchaseInput | null {
   return null;
 }
 
-function nextUpdatedAt(previous: string | null): string {
-  const previousTime = previous ? Date.parse(previous) : Number.NaN;
-  return new Date(Math.max(Date.now(), Number.isNaN(previousTime) ? 0 : previousTime + 1)).toISOString();
-}
-
-async function restoreWalletAfterPurchaseFailure(
-  centerId: string,
-  previousRow: WalletRow | null,
-  storedRow: WalletRow,
-): Promise<boolean> {
-  if (!previousRow) {
-    const { data, error } = await supabaseAdmin
-      .from("center_ai_credit_wallets")
-      .delete()
-      .eq("center_id", centerId)
-      .eq("updated_at", storedRow.updated_at)
-      .select("center_id")
-      .maybeSingle();
-    return !error && Boolean(data);
-  }
-
-  const { data, error } = await supabaseAdmin
-    .from("center_ai_credit_wallets")
-    .update({
-      ...walletFromRow(previousRow),
-      updated_at: nextUpdatedAt(storedRow.updated_at),
-    })
-    .eq("center_id", centerId)
-    .eq("updated_at", storedRow.updated_at)
-    .select("center_id")
-    .maybeSingle();
-  return !error && Boolean(data);
-}
-
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { ctx, error } = await getSuperadminContext(req);
   if (!ctx) return error;
@@ -192,101 +168,42 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     return NextResponse.json({ error: "Centre introuvable." }, { status: 404 });
   }
 
-  // The migration defines no transactional RPC. Use updated_at as an optimistic
-  // row lock and retry once if another stock update wins the compare-and-swap.
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const { data: currentRow, error: readError } = await supabaseAdmin
-      .from("center_ai_credit_wallets")
-      .select(WALLET_COLUMNS)
-      .eq("center_id", id)
-      .maybeSingle();
+  const { data, error: purchaseError } = await supabaseAdmin.rpc("purchase_center_ai_credits", {
+    p_center_id: id,
+    p_mode: input.mode,
+    p_credit_type: input.creditType,
+    p_quantity: input.quantity,
+    p_amount_fcfa: input.amountFcfa,
+    p_note: input.note,
+    p_created_by: ctx.user.id,
+  });
+  const result = (Array.isArray(data) ? data[0] : data) as PurchaseRpcRow | null;
 
-    if (readError) {
-      return NextResponse.json({ error: readError.message }, { status: 500 });
-    }
-
-    const currentWallet = walletFromRow(currentRow as WalletRow | null);
-    const nextWallet =
-      input.mode === "generic"
-        ? applyPurchase(currentWallet, { mode: "generic", type: undefined, quantity: input.quantity })
-        : applyPurchase(currentWallet, {
-            mode: "typed",
-            type: input.creditType,
-            quantity: input.quantity,
-          });
-    const updatedAt = nextUpdatedAt((currentRow as WalletRow | null)?.updated_at ?? null);
-
-    let storedRow: WalletRow | null = null;
-    if (currentRow) {
-      const { data, error: updateError } = await supabaseAdmin
-        .from("center_ai_credit_wallets")
-        .update({ ...nextWallet, updated_at: updatedAt })
-        .eq("center_id", id)
-        .eq("updated_at", (currentRow as WalletRow).updated_at)
-        .select(WALLET_COLUMNS)
-        .maybeSingle();
-
-      if (updateError) {
-        return NextResponse.json({ error: updateError.message }, { status: 500 });
-      }
-      storedRow = data as WalletRow | null;
-    } else {
-      const { data, error: insertError } = await supabaseAdmin
-        .from("center_ai_credit_wallets")
-        .insert({ center_id: id, ...nextWallet, updated_at: updatedAt })
-        .select(WALLET_COLUMNS)
-        .single();
-
-      if (insertError?.code !== "23505") {
-        if (insertError) {
-          return NextResponse.json({ error: insertError.message }, { status: 500 });
-        }
-        storedRow = data as WalletRow;
-      }
-    }
-
-    if (!storedRow) continue;
-
-    const { data: purchase, error: purchaseError } = await supabaseAdmin
-      .from("center_ai_credit_purchases")
-      .insert({
-        center_id: id,
-        mode: input.mode,
-        credit_type: input.creditType,
-        quantity: input.quantity,
-        amount_fcfa: input.amountFcfa,
-        note: input.note,
-        created_by: ctx.user.id,
-      })
-      .select(PURCHASE_COLUMNS)
-      .single();
-
-    if (purchaseError || !purchase) {
-      const restored = await restoreWalletAfterPurchaseFailure(
-        id,
-        currentRow as WalletRow | null,
-        storedRow,
-      );
-      if (!restored) {
-        console.error("[superadmin credits] purchase insert and wallet compensation failed", {
-          centerId: id,
-          purchaseError: purchaseError?.message ?? null,
-        });
-      }
-      return NextResponse.json(
-        { error: purchaseError?.message || "Impossible d'enregistrer l'achat de crédits IA." },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({
-      wallet: walletFromRow(storedRow),
-      purchase,
-    });
+  if (purchaseError || !result) {
+    return NextResponse.json(
+      { error: purchaseError?.message || "Impossible d'enregistrer l'achat de crédits IA." },
+      { status: 500 },
+    );
   }
 
-  return NextResponse.json(
-    { error: "Le stock de crédits IA a été modifié simultanément. Réessayez." },
-    { status: 409 },
-  );
+  return NextResponse.json({
+    wallet: {
+      generic: result.wallet_generic,
+      tutor_ia: result.wallet_tutor_ia,
+      exam_sim: result.wallet_exam_sim,
+      ai_corrections: result.wallet_ai_corrections,
+      course_builder: result.wallet_course_builder,
+    },
+    purchase: {
+      id: result.purchase_id,
+      center_id: id,
+      mode: input.mode,
+      credit_type: input.creditType,
+      quantity: input.quantity,
+      amount_fcfa: input.amountFcfa,
+      note: input.note,
+      created_by: ctx.user.id,
+      created_at: result.purchase_created_at,
+    },
+  });
 }
