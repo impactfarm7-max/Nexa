@@ -3,12 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  BookOpenCheck,
   Check,
+  ChevronDown,
+  ClipboardCheck,
   Coins,
   Loader2,
+  MessagesSquare,
   Search,
   Sparkles,
   UserRound,
+  Wand2,
 } from "lucide-react";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { supabase } from "@/app/utils/supabase";
@@ -68,6 +73,13 @@ const CREDIT_TYPES: CreditType[] = [
   "course_builder",
 ];
 
+const CREDIT_TYPE_ICON: Record<CreditType, React.ElementType> = {
+  tutor_ia: MessagesSquare,
+  exam_sim: ClipboardCheck,
+  ai_corrections: Wand2,
+  course_builder: BookOpenCheck,
+};
+
 const BENEFICIARY_ROLES = [
   "student",
   "trainer",
@@ -91,6 +103,7 @@ export default function CreditsIaPage() {
   const feedback = useActionFeedback();
   const requestIdRef = useRef(0);
   const queryAppliedRef = useRef(false);
+  const typeMenuRef = useRef<HTMLDivElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [wallet, setWallet] = useState<Wallet | null>(null);
@@ -102,6 +115,7 @@ export default function CreditsIaPage() {
   const [search, setSearch] = useState("");
   const [beneficiaryId, setBeneficiaryId] = useState("");
   const [creditType, setCreditType] = useState<CreditType>("tutor_ia");
+  const [typeMenuOpen, setTypeMenuOpen] = useState(false);
   const [quantity, setQuantity] = useState("1");
   const [recordPayment, setRecordPayment] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
@@ -218,6 +232,17 @@ export default function CreditsIaPage() {
       setSearch(beneficiaryName(match));
     }
   }, [beneficiaries]);
+
+  useEffect(() => {
+    if (!typeMenuOpen) return;
+    const onClickOutside = (event: MouseEvent) => {
+      if (typeMenuRef.current && !typeMenuRef.current.contains(event.target as Node)) {
+        setTypeMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [typeMenuOpen]);
 
   const selectedBeneficiary = beneficiaries.find((person) => person.id === beneficiaryId) || null;
   const source = chooseGrantSource(wallet, creditType) as CreditSource;
@@ -442,20 +467,82 @@ export default function CreditsIaPage() {
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-[12px] font-bold text-neutral-600">
-                  {t("centre", "creditsIaType")}
-                  <select
-                    value={creditType}
-                    onChange={(event) => setCreditType(event.target.value as CreditType)}
-                    className="mt-1.5 h-10 w-full rounded-lg border border-black/[0.08] bg-[#F7F7F6] px-3 text-[13px] font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
+                <div ref={typeMenuRef} className="relative">
+                  <span className="text-[12px] font-bold text-neutral-600">{t("centre", "creditsIaType")}</span>
+                  <button
+                    type="button"
+                    onClick={() => setTypeMenuOpen((v) => !v)}
+                    aria-haspopup="listbox"
+                    aria-expanded={typeMenuOpen}
+                    className="mt-1.5 flex h-10 w-full items-center gap-2 rounded-lg border border-black/[0.08] bg-[#F7F7F6] px-2.5 text-left outline-none transition focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
                   >
-                    {CREDIT_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {typeLabel(type)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    <span
+                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md"
+                      style={{ backgroundColor: `${ORANGE}1A` }}
+                    >
+                      {(() => {
+                        const SelectedIcon = CREDIT_TYPE_ICON[creditType];
+                        return <SelectedIcon size={13} style={{ color: ORANGE }} />;
+                      })()}
+                    </span>
+                    <span className="flex-1 truncate text-[13px] font-semibold text-neutral-800">
+                      {typeLabel(creditType)}
+                    </span>
+                    <ChevronDown
+                      size={14}
+                      className={`shrink-0 transition-transform ${typeMenuOpen ? "rotate-180" : ""}`}
+                      style={{ color: "rgba(17,34,78,0.35)" }}
+                    />
+                  </button>
+
+                  {typeMenuOpen ? (
+                    <div
+                      role="listbox"
+                      className="absolute left-0 right-0 top-full z-20 mt-1.5 overflow-hidden rounded-lg border border-black/[0.08] bg-white shadow-lg"
+                    >
+                      {CREDIT_TYPES.map((type) => {
+                        const Icon = CREDIT_TYPE_ICON[type];
+                        const isSelected = type === creditType;
+                        const stock = wallet ? wallet[type] : null;
+                        return (
+                          <button
+                            key={type}
+                            type="button"
+                            role="option"
+                            aria-selected={isSelected}
+                            onClick={() => {
+                              setCreditType(type);
+                              setTypeMenuOpen(false);
+                            }}
+                            className={`flex w-full items-center gap-2.5 border-b border-black/[0.05] px-3 py-2.5 text-left last:border-0 transition-colors hover:bg-black/[0.025] ${
+                              isSelected ? "bg-blue-50/60" : "bg-white"
+                            }`}
+                          >
+                            <span
+                              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
+                              style={{ backgroundColor: isSelected ? `${BLUE}1A` : "rgba(17,34,78,0.05)" }}
+                            >
+                              <Icon size={14} style={{ color: isSelected ? BLUE : "rgba(17,34,78,0.45)" }} />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate text-[12px] font-bold text-neutral-700">
+                                {typeLabel(type)}
+                              </span>
+                              {stock != null ? (
+                                <span className="block truncate text-[10px] font-medium text-neutral-400">
+                                  {t("centre", "creditsIaTypeStock", {
+                                    count: stock.toLocaleString(locale === "en" ? "en-US" : "fr-FR"),
+                                  })}
+                                </span>
+                              ) : null}
+                            </span>
+                            {isSelected ? <Check size={14} className="shrink-0" style={{ color: BLUE }} /> : null}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
                 <label className="text-[12px] font-bold text-neutral-600">
                   {t("centre", "creditsIaQuantity")}
                   <input

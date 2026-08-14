@@ -173,11 +173,9 @@ export default function CreerCentrePage() {
       ? t("marketing", "ouvrirCentreWelcomeTcfCanada")
       : t("marketing", "ouvrirCentreWelcomeDefault");
   const localizedCenterTypeLabel = (ct: CenterType) =>
-    ct === "tcf_canada"
-      ? centerTypeLabel(ct)
-      : ct === "generic"
-        ? t("marketing", "ouvrirCentreGenericCenterLabel")
-        : centerTypeLabel(ct);
+    ct === "generic"
+      ? t("marketing", "ouvrirCentreGenericCenterLabel")
+      : centerTypeLabel(ct, locale);
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [programFamily, setProgramFamily] = useState<ProgramFamily>(null);
   const [centerType, setCenterType] = useState<CenterType>(null);

@@ -235,45 +235,43 @@ export default function AbonnementsPage() {
             {NEXA_OFFER_KEYS.map((key) => {
               const offer = NEXA_OFFERS[key];
               const isCurrent = currentOfferKey === key;
-              const isRecommended = !currentOfferKey && key === "pro";
-              const highlighted = isCurrent || isRecommended;
+              const isMostChosen = key === "croissance";
               const features = buildOfferFeatures(offer, t);
               const isQuote = offer.pricePerUser == null;
               const perUserLabel = offer.pricePerUser != null
                 ? offer.pricePerUser.toLocaleString(en ? "en-US" : "fr-FR")
                 : null;
+              const entryPriceLabel = offer.entryPrice != null
+                ? offer.entryPrice.toLocaleString(en ? "en-US" : "fr-FR")
+                : null;
 
               return (
                 <div
                   key={key}
-                  className={`group rounded-2xl border p-6 flex flex-col bg-white transition-all duration-300 ease-out will-change-transform hover:-translate-y-1.5 hover:shadow-[0_16px_40px_-12px_rgba(17,34,78,0.22)] ${
-                    highlighted ? "border-2 shadow-lg" : "border-black/[0.08] hover:border-[#11224E]/25"
-                  }`}
-                  style={
-                    highlighted
-                      ? {
-                          borderColor: isCurrent ? BLUE : ORANGE,
-                          boxShadow: `0 8px 24px ${isCurrent ? BLUE : ORANGE}22`,
-                        }
-                      : undefined
-                  }
+                  className="group relative rounded-2xl border-2 p-6 flex flex-col bg-white shadow-lg transition-all duration-300 ease-out will-change-transform hover:-translate-y-1.5 hover:shadow-[0_16px_40px_-12px_rgba(235,103,14,0.28)]"
+                  style={{
+                    borderColor: ORANGE,
+                    boxShadow: `0 8px 24px ${ORANGE}22`,
+                  }}
                 >
-                  {isCurrent && (
-                    <span
-                      className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white"
-                      style={{ backgroundColor: BLUE }}
-                    >
-                      {t("centre", "abonnementsCurrentBadge")}
-                    </span>
-                  )}
-                  {!isCurrent && isRecommended && (
-                    <span
-                      className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
-                      style={{ backgroundColor: ORANGE }}
-                    >
-                      <Sparkles size={11} /> {t("centre", "abonnementsRecommended")}
-                    </span>
-                  )}
+                  <div className="mb-3 flex min-h-[26px] flex-wrap gap-2">
+                    {isCurrent && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white"
+                        style={{ backgroundColor: BLUE }}
+                      >
+                        {t("centre", "abonnementsCurrentBadge")}
+                      </span>
+                    )}
+                    {isMostChosen && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white"
+                        style={{ backgroundColor: ORANGE }}
+                      >
+                        <Sparkles size={11} /> {t("centre", "abonnementsMostChosen")}
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-lg font-black transition-colors duration-300 group-hover:text-[#eb670e]" style={{ color: BLUE }}>
                     {offerDisplayName(key, t)}
                   </h3>
@@ -296,6 +294,11 @@ export default function AbonnementsPage() {
                         {t("centre", "abonnementsPricePerUser")}
                       </p>
                     </div>
+                  )}
+                  {entryPriceLabel && (
+                    <p className="mt-1.5 text-xs font-bold tabular-nums" style={{ color: "rgba(17,34,78,0.55)" }}>
+                      {t("centre", "abonnementsPriceFrom")} {entryPriceLabel} {t("centre", "abonnementsPricePerMonth")}
+                    </p>
                   )}
                   <ul className="mt-5 space-y-2.5 flex-1">
                     {features.map((f) => (
@@ -321,7 +324,7 @@ export default function AbonnementsPage() {
                   <button
                     onClick={contact}
                     className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-all duration-300 group-hover:brightness-110 group-hover:scale-[1.02]"
-                    style={{ backgroundColor: highlighted ? ORANGE : BLUE }}
+                    style={{ backgroundColor: ORANGE }}
                   >
                     <MessageCircle size={16} />
                     {t("centre", "abonnementsContact")}

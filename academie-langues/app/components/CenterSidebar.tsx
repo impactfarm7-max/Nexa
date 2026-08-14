@@ -256,6 +256,7 @@ function CenterSidebarInner() {
   const [activeBranchId,    setActiveBranchId]    = useState<string | null>(null);
   const [coursOpen,         setCoursOpen]         = useState(false);
   const [previewStaff,      setPreviewStaff]      = useState(false);
+  const [hasAiCredits,      setHasAiCredits]      = useState(false);
 
   useEffect(() => {
     const sync = () => setPreviewStaff(isViewAsStaffPreview());
@@ -320,6 +321,31 @@ function CenterSidebarInner() {
         .maybeSingle();
       setLogoUrl(branding?.logo_url || null);
     })();
+  }, [centerId]);
+
+  /* Visibilité "Crédits IA" — masqué tant que le centre n'a aucun stock */
+  useEffect(() => {
+    if (!centerId) return;
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || cancelled) return;
+      try {
+        const res = await fetch("/api/centre/credits", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        const wallet = json?.wallet as Record<string, number> | undefined;
+        const total = wallet
+          ? Object.values(wallet).reduce((sum, n) => sum + (Number(n) || 0), 0)
+          : 0;
+        if (!cancelled) setHasAiCredits(total > 0);
+      } catch {
+        if (!cancelled) setHasAiCredits(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [centerId]);
 
   /* Auto-ouvrir sous-menu Cours */
@@ -698,11 +724,13 @@ function CenterSidebarInner() {
                 ? (isTCF ? t("centre", "sidebarSectionCentreTcfCanada") : isShort ? t("centre", "sidebarSectionFormationCourte") : t("centre", "sidebarSectionGestionCentre"))
                 : t("centre", "sidebarSectionMonEspace")
             } />
-            {buildManagerNav().map(item =>
-              item.children
-                ? <CoursExpandable key={item.path} item={item} />
-                : <NavLink key={item.path} item={item} />
-            )}
+            {buildManagerNav()
+              .filter(item => item.path !== "/centre/credits-ia" || hasAiCredits)
+              .map(item =>
+                item.children
+                  ? <CoursExpandable key={item.path} item={item} />
+                  : <NavLink key={item.path} item={item} />
+              )}
           </>
         )}
 

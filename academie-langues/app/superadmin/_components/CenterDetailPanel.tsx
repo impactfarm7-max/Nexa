@@ -351,7 +351,7 @@ export function CenterDetailPanel({
             </div>
             {center && (
               <p className="mt-2 text-xs text-slate-500">
-                {t("superadmin", "requestsCreatedOn")} {formatDate(center.created_at, locale)} · {centerTypeLabel(center.center_type)}
+                {t("superadmin", "requestsCreatedOn")} {formatDate(center.created_at, locale)} · {centerTypeLabel(center.center_type, locale)}
               </p>
             )}
           </div>
@@ -583,7 +583,7 @@ export function CenterDetailPanel({
         <div className="grid gap-4 xl:grid-cols-2">
           <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-4 sm:p-5">
             <FicheSection label={t("superadmin", "requestsCenterForm")}>
-              <FicheField label={t("superadmin", "requestsType")} value={centerTypeLabel(center.center_type)} />
+              <FicheField label={t("superadmin", "requestsType")} value={centerTypeLabel(center.center_type, locale)} />
               <FicheField label={t("superadmin", "requestsOffer")} value={offerLabel(t, center, locale)} />
               <FicheField
                 label={t("superadmin", "requestsCityShort")}

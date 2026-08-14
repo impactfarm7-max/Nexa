@@ -19,7 +19,6 @@ type PendingDoc = {
 
 export default function SuperadminBibliothequePage() {
   const { t, locale } = useI18n();
-  const en = locale === "en";
 
   const [docs, setDocs] = useState<PendingDoc[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,22 +34,22 @@ export default function SuperadminBibliothequePage() {
     try {
       const json = await superadminFetch<{ documents: PendingDoc[] }>("/api/superadmin/bibliotheque");
       setDocs(json.documents || []);
-    } catch (e: any) {
-      setError(e.message || (en ? "Loading error." : "Erreur de chargement."));
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("superadmin", "libraryLoadError"));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [en]);
+  }, [t]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const preview = async (id: number) => {
     try {
       const json = await superadminFetch<{ url: string }>(`/api/superadmin/bibliotheque/${id}`);
       window.open(json.url, "_blank");
-    } catch (e: any) {
-      alert(e.message);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : t("superadmin", "libraryLoadError"));
     }
   };
 
@@ -62,8 +61,8 @@ export default function SuperadminBibliothequePage() {
         body: JSON.stringify({ status: "approved" }),
       });
       setDocs((prev) => prev.filter((d) => d.id !== id));
-    } catch (e: any) {
-      alert(e.message);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : t("superadmin", "libraryLoadError"));
     } finally {
       setActionId(null);
     }
@@ -79,8 +78,8 @@ export default function SuperadminBibliothequePage() {
       setDocs((prev) => prev.filter((d) => d.id !== id));
       setRejectingId(null);
       setRejectReason("");
-    } catch (e: any) {
-      alert(e.message);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : t("superadmin", "libraryLoadError"));
     } finally {
       setActionId(null);
     }
@@ -92,11 +91,11 @@ export default function SuperadminBibliothequePage() {
         <div>
           <h1 className="text-2xl font-black text-white">{t("superadmin", "navLibraryLabel")}</h1>
           <p className="mt-1 text-sm text-slate-400">
-            {en ? `${docs.length} document(s) pending review.` : `${docs.length} document(s) en attente de validation.`}
+            {t("superadmin", "libraryPendingCount", { count: docs.length })}
           </p>
         </div>
         <button
-          onClick={() => load(true)}
+          onClick={() => void load(true)}
           className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0a0f1c] px-4 py-2 text-xs font-bold text-slate-300 hover:border-orange-500/40 hover:text-orange-400"
         >
           <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -109,11 +108,11 @@ export default function SuperadminBibliothequePage() {
       )}
 
       {loading ? (
-        <p className="py-10 text-center text-sm text-slate-500">{en ? "Loading…" : "Chargement…"}</p>
+        <p className="py-10 text-center text-sm text-slate-500">{t("superadmin", "libraryLoading")}</p>
       ) : docs.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-12 text-center">
           <BookOpen className="mx-auto mb-4 h-10 w-10 text-slate-700" />
-          <p className="font-bold text-slate-400">{en ? "Nothing to review right now." : "Rien à valider pour l'instant."}</p>
+          <p className="font-bold text-slate-400">{t("superadmin", "libraryEmpty")}</p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -123,31 +122,31 @@ export default function SuperadminBibliothequePage() {
                 <div>
                   <h3 className="text-lg font-black text-white">{doc.titre}</h3>
                   <p className="mt-1 text-xs font-bold text-slate-500">
-                    {doc.centers?.name || (en ? "Unknown center" : "Centre inconnu")}
+                    {doc.centers?.name || t("superadmin", "libraryUnknownCenter")}
                     {doc.categorie && ` · ${doc.categorie}`}
-                    {doc.is_paid && ` · ${doc.price?.toLocaleString(en ? "en-GB" : "fr-FR")} FCFA`}
+                    {doc.is_paid && ` · ${doc.price?.toLocaleString(locale === "en" ? "en-GB" : "fr-FR")} FCFA`}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => preview(doc.id)}
+                    onClick={() => void preview(doc.id)}
                     className="flex items-center gap-1.5 rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-slate-200 hover:border-orange-500/40 hover:text-orange-300"
                   >
-                    <Eye className="h-3.5 w-3.5" /> {en ? "Preview" : "Aperçu"}
+                    <Eye className="h-3.5 w-3.5" /> {t("superadmin", "libraryPreview")}
                   </button>
                   <button
-                    onClick={() => approve(doc.id)}
+                    onClick={() => void approve(doc.id)}
                     disabled={actionId === doc.id}
                     className="flex items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-emerald-300 hover:bg-emerald-500 hover:text-white disabled:opacity-50"
                   >
-                    <ShieldCheck className="h-3.5 w-3.5" /> {en ? "Approve" : "Approuver"}
+                    <ShieldCheck className="h-3.5 w-3.5" /> {t("superadmin", "libraryApprove")}
                   </button>
                   <button
                     onClick={() => setRejectingId(rejectingId === doc.id ? null : doc.id)}
                     disabled={actionId === doc.id}
                     className="flex items-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-red-300 hover:bg-red-500 hover:text-white disabled:opacity-50"
                   >
-                    <ShieldOff className="h-3.5 w-3.5" /> {en ? "Reject" : "Rejeter"}
+                    <ShieldOff className="h-3.5 w-3.5" /> {t("superadmin", "libraryReject")}
                   </button>
                 </div>
               </div>
@@ -158,15 +157,15 @@ export default function SuperadminBibliothequePage() {
                     type="text"
                     value={rejectReason}
                     onChange={(e) => setRejectReason(e.target.value)}
-                    placeholder={en ? "Reason (optional)" : "Motif (optionnel)"}
+                    placeholder={t("superadmin", "libraryRejectReason")}
                     className="flex-1 bg-transparent text-sm text-white outline-none placeholder:text-slate-600"
                   />
                   <button
-                    onClick={() => reject(doc.id)}
+                    onClick={() => void reject(doc.id)}
                     disabled={actionId === doc.id}
                     className="rounded-lg bg-red-500 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-white disabled:opacity-50"
                   >
-                    {en ? "Confirm" : "Confirmer"}
+                    {t("superadmin", "libraryConfirm")}
                   </button>
                   <button onClick={() => setRejectingId(null)} className="rounded-lg p-1.5 text-slate-500 hover:text-white">
                     <X className="h-4 w-4" />

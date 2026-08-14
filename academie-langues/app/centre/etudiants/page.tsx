@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useLayoutEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   Users, Wallet, AlertTriangle, GraduationCap,
   Plus, X, Loader2, Edit3, Check, Download, FileText,
-  Share2, Printer, Calendar, BookOpen, Upload,
+  Share2, Printer, Calendar, BookOpen, Upload, Sparkles,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -253,6 +254,7 @@ function openWhatsApp(text: string, phone?: string) {
 export default function CenterStudentsPage() {
   const { t, locale } = useI18n();
   const feedback = useActionFeedback();
+  const router = useRouter();
   const exportLabels: StudentExportLabels = {
     title: t("centre", "studentsTitle"), lastName: t("centre", "enrollmentLastName"), firstName: t("centre", "enrollmentFirstName"),
     email: t("centre", "accountEmail"), phone: t("centre", "accountPhone"), program: t("centre", "enrollmentProgram"), status: t("centre", "settingsStatus"),
@@ -777,6 +779,14 @@ export default function CenterStudentsPage() {
                           <span className="print:hidden inline-flex items-center gap-1">
                             <TableBtnPreview onClick={() => setViewingStudent(s)} label={locale === "en" ? "Preview" : "Aperçu"} />
                             <TableBtnModify onClick={() => selectStudent(s)} label={locale === "en" ? "Edit" : "Modifier"} />
+                            <button
+                              type="button"
+                              onClick={() => router.push(`/centre/credits-ia?beneficiary=${s.id}`)}
+                              title={t("centre", "creditsIaAddShortcut")}
+                              className="h-7 w-7 inline-flex items-center justify-center rounded-md text-neutral-600 border border-black/[0.08] bg-white hover:bg-black/[0.03] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                            >
+                              <Sparkles size={13} style={{ color: ORANGE }} />
+                            </button>
                           </span>
                         </TableActions>
                       </CenterTableRow>

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { Anthropic } from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
-import { TUTOR_EXCHANGE_QUOTA } from "@/app/utils/tutor-quota";
+import { resolveTutorQuota } from "@/app/utils/tutor-quota";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -70,22 +70,10 @@ async function saveMessage(userId: string, role: "user" | "assistant", content: 
 async function loadProfile(userId: string) {
   const { data } = await supabaseAdmin
     .from("profiles")
-    .select("role, pack_name, tutor_ia_used")
+    .select("role, pack_name, tutor_ia_used, tutor_ia_total")
     .eq("id", userId)
     .maybeSingle();
   return data;
-}
-
-const STAFF_ROLES = new Set(["admin", "center_manager", "trainer", "superadmin"]);
-
-/** NEXA : pas de packs — tout compte étudiant authentifié a 15 échanges. */
-function computeAccess(profile: { role: string | null } | null | undefined) {
-  const isAdmin = profile?.role === "admin";
-  const role = profile?.role ?? "student";
-  const hasAccess = Boolean(profile && !STAFF_ROLES.has(role));
-  const unlimited = isAdmin;
-  const total = TUTOR_EXCHANGE_QUOTA;
-  return { isAdmin, total, unlimited, hasAccess };
 }
 
 export async function GET(req: Request) {
@@ -93,13 +81,13 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
 
   const [profile, history] = await Promise.all([loadProfile(user.id), loadHistory(user.id)]);
-  const { total, unlimited, hasAccess } = computeAccess(profile);
+  const access = resolveTutorQuota(profile);
 
   return NextResponse.json({
-    hasAccess,
-    unlimited,
-    total: unlimited ? null : total,
-    used: unlimited ? null : profile?.tutor_ia_used ?? 0,
+    hasAccess: access.hasAccess,
+    unlimited: access.unlimited,
+    total: access.total,
+    used: access.used,
     history,
   });
 }
@@ -125,17 +113,17 @@ export async function POST(req: Request) {
   }
 
   const profile = await loadProfile(user.id);
-  const { total, unlimited, hasAccess, used } = { ...computeAccess(profile), used: profile?.tutor_ia_used ?? 0 };
+  const access = resolveTutorQuota(profile);
 
-  if (!hasAccess) {
+  if (!access.hasAccess) {
     return NextResponse.json(
       { error: "Le tuteur IA n'est pas disponible pour ce compte." },
       { status: 403 },
     );
   }
-  if (!unlimited && used >= TUTOR_EXCHANGE_QUOTA) {
+  if (access.exhausted) {
     return NextResponse.json(
-      { error: `Quota de ${TUTOR_EXCHANGE_QUOTA} échanges au tuteur IA épuisé.` },
+      { error: `Quota de ${access.total} échanges au tuteur IA épuisé.` },
       { status: 403 },
     );
   }
@@ -165,19 +153,19 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Le tuteur IA est momentanément indisponible. Réessayez." }, { status: 502 });
   }
 
-  let nextUsed = used;
-  if (!unlimited) {
+  let nextUsed = access.used ?? 0;
+  if (!access.unlimited && access.total != null) {
     const { data: quotaRow } = await supabaseAdmin
       .from("profiles")
-      .update({ tutor_ia_used: used + 1 })
+      .update({ tutor_ia_used: (access.used ?? 0) + 1 })
       .eq("id", user.id)
-      .lt("tutor_ia_used", TUTOR_EXCHANGE_QUOTA)
+      .lt("tutor_ia_used", access.total)
       .select("tutor_ia_used")
       .maybeSingle();
 
     if (!quotaRow) {
       return NextResponse.json(
-        { error: `Quota de ${TUTOR_EXCHANGE_QUOTA} échanges au tuteur IA épuisé.` },
+        { error: `Quota de ${access.total} échanges au tuteur IA épuisé.` },
         { status: 403 },
       );
     }
@@ -189,8 +177,8 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     reply,
-    unlimited,
-    total: unlimited ? null : total,
-    used: unlimited ? null : nextUsed,
+    unlimited: access.unlimited,
+    total: access.unlimited ? null : access.total,
+    used: access.unlimited ? null : nextUsed,
   });
 }

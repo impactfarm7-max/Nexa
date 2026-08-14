@@ -389,7 +389,7 @@ export default function TutorPage() {
               {isQuotaReached && (
                 <div className="flex items-center justify-center gap-2 p-3 mt-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-xs font-semibold text-center mx-auto w-fit">
                   <AlertCircle className="w-4 h-4" />
-                  {t("dashboard", "tutorQuotaReached", { count: TUTOR_EXCHANGE_QUOTA })}
+                  {t("dashboard", "tutorQuotaReached", { count: quotaTotal })}
                 </div>
               )}
 
@@ -418,7 +418,7 @@ export default function TutorPage() {
                   }}
                   placeholder={
                     isQuotaReached
-                      ? t("dashboard", "tutorQuotaPlaceholder", { count: TUTOR_EXCHANGE_QUOTA })
+                      ? t("dashboard", "tutorQuotaPlaceholder", { count: quotaTotal })
                       : t("dashboard", "tutorInputPlaceholder")
                   }
                   disabled={isBlocked || isTyping}

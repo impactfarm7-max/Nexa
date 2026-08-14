@@ -256,7 +256,9 @@ export function OfferFormModal({
     : t("superadmin", offerI18nKey(offer));
   const period = Math.max(1, parseInt(periodMonths, 10) || 1);
   const parsedAmount = parseInt(amount.replace(/\s/g, ""), 10);
-  const amountLabel = Number.isFinite(parsedAmount) ? parsedAmount.toLocaleString() : (en ? "Custom quote" : "Sur devis");
+  const amountLabel = Number.isFinite(parsedAmount)
+    ? parsedAmount.toLocaleString()
+    : t("superadmin", "centresCustomQuoteLabel");
 
   const centerQuotaLabels = useMemo(
     () =>
@@ -357,9 +359,7 @@ export function OfferFormModal({
             <h2 className="mt-1 text-lg font-black text-white">{center.name}</h2>
             <p className="mt-1 text-xs text-slate-500">
               {isTcf
-                ? (en
-                  ? "TCF plans are quote-based: Starter, Pro, Ultra or custom quote."
-                  : "Offres TCF sur devis : Starter, Pro, Ultra ou Sur devis.")
+                ? t("superadmin", "centresTcfOfferHint")
                 : t("superadmin", "centresOfferSelectHint")}
             </p>
           </div>

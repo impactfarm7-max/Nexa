@@ -192,7 +192,7 @@ function LoginPageContent() {
       <button
         type="button"
         onClick={() => setShowSupportMenu((prev) => !prev)}
-        className="h-10 px-4 rounded-full bg-orange-50 border border-orange-100 text-orange-600 font-black text-[10px] sm:text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-orange-100 transition-colors shadow-sm"
+        className="h-11 px-4 rounded-full bg-orange-50 border border-orange-100 text-orange-600 font-black text-[10px] sm:text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-orange-100 transition-colors shadow-md"
       >
         <MessageCircle className="w-4 h-4" />
         {t("auth", "loginSupportButton")}
@@ -206,7 +206,7 @@ function LoginPageContent() {
             className="fixed inset-0 z-40 cursor-default"
             onClick={() => setShowSupportMenu(false)}
           />
-          <div className="absolute right-0 top-12 z-50 w-[min(300px,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_45px_rgba(15,23,42,0.14)]">
+          <div className="absolute bottom-14 right-0 z-50 w-[min(300px,calc(100vw-2rem))] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_20px_45px_rgba(15,23,42,0.14)]">
             <div className="flex items-start gap-3 border-b border-slate-100 bg-orange-50/70 p-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orange-600 text-white">
                 <MessageCircle className="h-5 w-5" />
@@ -1174,8 +1174,10 @@ function LoginPageContent() {
           showBrand ? "lg:col-span-3" : "lg:col-span-5"
         } ${brandOnLeft ? "lg:order-2" : "lg:order-1"}`}
       >
-        <div className="absolute right-3 top-3 z-30 sm:right-6 sm:top-6">
-          <SupportButton />
+        <div className="pointer-events-none absolute bottom-4 right-3 z-30 sm:bottom-6 sm:right-6">
+          <div className="pointer-events-auto">
+            <SupportButton />
+          </div>
         </div>
 
         {/* Bandeau brand mobile — compact, sans scroll */}
@@ -1189,7 +1191,7 @@ function LoginPageContent() {
         )}
 
         <div className="min-h-0 flex-1 lg:overflow-y-auto">
-          <div className={`mx-auto flex w-full flex-col px-4 py-6 sm:min-h-full sm:justify-center sm:px-8 sm:py-10 lg:justify-center lg:py-12 ${isSignupFlow ? "max-w-[520px]" : "max-w-[420px]"}`}>
+          <div className={`mx-auto flex w-full flex-col px-4 py-6 pb-20 sm:min-h-full sm:justify-center sm:px-8 sm:py-10 sm:pb-24 lg:justify-center lg:py-12 ${isSignupFlow ? "max-w-[520px]" : "max-w-[420px]"}`}>
           {msg && (
             <div
               className={`mb-6 rounded-2xl border p-4 text-xs font-bold ${

@@ -57,13 +57,17 @@ export function usesTcfStudentPacks(mode: StudentExperienceMode): boolean {
   return mode === "tcf" || mode === "tcf_light" || mode === "b2c";
 }
 
-export function centerTypeLabel(centerType: string | null | undefined): string {
+export function centerTypeLabel(
+  centerType: string | null | undefined,
+  locale: "fr" | "en" = "fr",
+): string {
+  const en = locale === "en";
   switch (normalizeCenterType(centerType)) {
     case "tcf_canada":
-      return "Formation native";
+      return en ? "Native training" : "Formation native";
     case "formation_courte":
-      return "Formation courte";
+      return en ? "Short program" : "Formation courte";
     default:
-      return "Formation pluri-annuelle";
+      return en ? "Multi-year training" : "Formation pluri-annuelle";
   }
 }

@@ -50,6 +50,8 @@ export type NexaOfferConfig = {
   whiteLabel: boolean | "option";
   /** Prix unitaire mensuel par utilisateur (null = sur devis). */
   pricePerUser: number | null;
+  /** Prix d'entrée mensuel affiché ("à partir de"). */
+  entryPrice: number | null;
   monthlyFeeMin: number;
   monthlyFeeMax: number | null;
   supportLevel: "standard" | "priority" | "dedicated" | "account_manager";
@@ -100,6 +102,7 @@ export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfi
     courseBuilderPerMonth: 5,
     whiteLabel: false,
     pricePerUser: 2_500,
+    entryPrice: 12_500,
     monthlyFeeMin: 5 * 2_500,
     monthlyFeeMax: 40 * 2_500,
     supportLevel: "standard",
@@ -120,6 +123,7 @@ export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfi
     courseBuilderPerMonth: 10,
     whiteLabel: false,
     pricePerUser: 2_000,
+    entryPrice: 102_000,
     monthlyFeeMin: 41 * 2_000,
     monthlyFeeMax: 100 * 2_000,
     supportLevel: "priority",
@@ -140,6 +144,7 @@ export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfi
     courseBuilderPerMonth: 15,
     whiteLabel: "option",
     pricePerUser: 1_900,
+    entryPrice: 221_900,
     monthlyFeeMin: 101 * 1_900,
     monthlyFeeMax: 250 * 1_900,
     supportLevel: "dedicated",
@@ -160,6 +165,7 @@ export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfi
     courseBuilderPerMonth: null,
     whiteLabel: true,
     pricePerUser: null,
+    entryPrice: 505_000,
     monthlyFeeMin: 250 * 1_900,
     monthlyFeeMax: null,
     supportLevel: "account_manager",

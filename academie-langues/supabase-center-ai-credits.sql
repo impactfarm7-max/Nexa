@@ -236,12 +236,13 @@ BEGIN
   IF p_source IS NULL OR p_source NOT IN ('generic', 'typed') THEN
     RAISE EXCEPTION 'INVALID_SOURCE' USING ERRCODE = '22023';
   END IF;
-  IF p_profile_total_column IS DISTINCT FROM CASE p_credit_type
-    WHEN 'tutor_ia' THEN 'tutor_ia_total'
-    WHEN 'exam_sim' THEN 'exam_total'
-    WHEN 'ai_corrections' THEN 'ai_corrections_total'
-    WHEN 'course_builder' THEN 'course_builder_total'
-  END THEN
+  IF p_credit_type = 'tutor_ia' AND p_profile_total_column IS DISTINCT FROM 'tutor_ia_total' THEN
+    RAISE EXCEPTION 'INVALID_PROFILE_TOTAL_COLUMN' USING ERRCODE = '22023';
+  ELSIF p_credit_type = 'exam_sim' AND p_profile_total_column IS DISTINCT FROM 'exam_total' THEN
+    RAISE EXCEPTION 'INVALID_PROFILE_TOTAL_COLUMN' USING ERRCODE = '22023';
+  ELSIF p_credit_type = 'ai_corrections' AND p_profile_total_column IS DISTINCT FROM 'ai_corrections_total' THEN
+    RAISE EXCEPTION 'INVALID_PROFILE_TOTAL_COLUMN' USING ERRCODE = '22023';
+  ELSIF p_credit_type = 'course_builder' AND p_profile_total_column IS DISTINCT FROM 'course_builder_total' THEN
     RAISE EXCEPTION 'INVALID_PROFILE_TOTAL_COLUMN' USING ERRCODE = '22023';
   END IF;
   IF (p_payment_amount IS NULL) <> (p_payment_reason IS NULL)

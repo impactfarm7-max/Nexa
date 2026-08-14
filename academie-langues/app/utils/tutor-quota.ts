@@ -1,2 +1,1 @@
-/** Quota tuteur IA NEXA : 15 échanges (messages envoyés) par étudiant, fixe. */
-export const TUTOR_EXCHANGE_QUOTA = 15;
+export { TUTOR_EXCHANGE_QUOTA, resolveTutorQuota } from "./tutor-quota.core.mjs";
