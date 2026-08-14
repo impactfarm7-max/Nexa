@@ -72,7 +72,6 @@ export function CenterCreditsPanel({ centerId }: { centerId: string }) {
     setLoading(true);
     setError(null);
     setSuccess(false);
-    setSubmitting(false);
 
     try {
       const response = await superadminFetch<CreditsResponse>(
@@ -327,7 +326,7 @@ export function CenterCreditsPanel({ centerId }: { centerId: string }) {
               </div>
               <button
                 type="submit"
-                disabled={submitting}
+                disabled={submitting || loading}
                 className="inline-flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-white transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {submitting ? (
