@@ -9,6 +9,7 @@ import {
   ClipboardList, Calendar, Camera, Settings2, BarChart3,
   BookMarked, PenTool, ChevronDown, ChevronUp,
   PanelLeftClose, PanelLeftOpen, Video, Flag, Gem, LibraryBig,
+  Sparkles,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { STAFF_PERMISSION_ROUTES } from "@/app/utils/student-routes";
@@ -61,6 +62,7 @@ const MANAGER_NAV: NavItem[] = [
   { label: "navCommunaute",       icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
   { label: "navBibliotheque",     icon: LibraryBig,      path: "/centre/bibliotheque",               permKey: "bibliotheque" },
   { label: "navAbonnements",      icon: Gem,             path: "/centre/abonnements",                permKey: "abonnements" },
+  { label: "navCreditsIa",        icon: Sparkles,        path: "/centre/credits-ia",                 permKey: "abonnements" },
   { label: "navParametres",       icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
@@ -114,6 +116,7 @@ const TCF_MANAGER_NAV: NavItem[] = [
   { label: "navCommunaute",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
   { label: "navSessionsLive",  icon: Video,           path: "/centre/lives",                      permKey: "lives" },
   { label: "navAbonnements",   icon: Gem,             path: "/centre/abonnements",                permKey: "abonnements" },
+  { label: "navCreditsIa",     icon: Sparkles,        path: "/centre/credits-ia",                 permKey: "abonnements" },
   { label: "navParametres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
@@ -147,6 +150,7 @@ const SHORT_MANAGER_NAV: NavItem[] = [
   { label: "navCommunaute",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
   { label: "navSessionsLive",  icon: Video,           path: "/centre/lives",                      permKey: "lives" },
   { label: "navAbonnements",   icon: Gem,             path: "/centre/abonnements",                permKey: "abonnements" },
+  { label: "navCreditsIa",     icon: Sparkles,        path: "/centre/credits-ia",                 permKey: "abonnements" },
   { label: "navParametres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
 ];
 
