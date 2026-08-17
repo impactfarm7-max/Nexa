@@ -230,6 +230,46 @@ export default function SuperadminDashboardPage() {
   const statusMax = Math.max(1, ...STATUS_ORDER.map((s) => byStatus[s]));
   const offerMax = Math.max(1, ...OFFER_ORDER.map((o) => byOffer[o]));
 
+  const conversionRate =
+    decidedCentersTotal > 0 ? Math.round((activeCenters / decidedCentersTotal) * 100) : 0;
+
+  const monthlyGrowth = useMemo(() => {
+    const months: { key: string; label: string; count: number }[] = [];
+    const now = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push({
+        key: `${d.getFullYear()}-${d.getMonth()}`,
+        label: d.toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR", { month: "short" }),
+        count: 0,
+      });
+    }
+    const byKey = new Map(months.map((m) => [m.key, m]));
+    for (const c of centers) {
+      if (!c.created_at) continue;
+      const d = new Date(c.created_at);
+      const key = `${d.getFullYear()}-${d.getMonth()}`;
+      const bucket = byKey.get(key);
+      if (bucket) bucket.count += 1;
+    }
+    return months;
+  }, [centers, locale]);
+  const growthMax = Math.max(1, ...monthlyGrowth.map((m) => m.count));
+
+  const geoBreakdown = useMemo(() => {
+    const byCity = new Map<string, number>();
+    for (const c of centers) {
+      const city = (c.city || "").trim();
+      if (!city) continue;
+      byCity.set(city, (byCity.get(city) ?? 0) + 1);
+    }
+    const sorted = [...byCity.entries()].sort((a, b) => b[1] - a[1]);
+    const top = sorted.slice(0, 5);
+    const othersCount = sorted.slice(5).reduce((sum, [, count]) => sum + count, 0);
+    return { top, othersCount };
+  }, [centers]);
+  const geoMax = Math.max(1, ...geoBreakdown.top.map(([, count]) => count), geoBreakdown.othersCount);
+
   return (
     <div className="space-y-8">
       <div>
@@ -545,6 +585,62 @@ export default function SuperadminDashboardPage() {
                   </Link>
                 </li>
               ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <section className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+          <h2 className="mb-1 text-sm font-black text-white">{t("superadmin", "dashboardConversionRate")}</h2>
+          <p className="mt-3 text-3xl font-black text-emerald-400">{loading ? "—" : `${conversionRate}%`}</p>
+          {!loading && (
+            <p className="mt-1 text-[11px] text-slate-500">
+              {t("superadmin", "dashboardConversionRateHint")
+                .replace("{active}", String(activeCenters))
+                .replace("{decided}", String(decidedCentersTotal))}
+            </p>
+          )}
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+          <h2 className="text-sm font-black text-white">{t("superadmin", "dashboardGrowthTitle")}</h2>
+          <p className="text-[11px] text-slate-500">{t("superadmin", "dashboardGrowthSubtitle")}</p>
+          <div className="mt-5 flex h-24 items-end gap-2">
+            {monthlyGrowth.map((m) => (
+              <div key={m.key} className="group flex flex-1 flex-col items-center gap-1.5">
+                <div className="relative flex h-16 w-full items-end">
+                  <div
+                    className="w-full rounded-t bg-orange-500/80 transition-all duration-150 group-hover:bg-orange-400"
+                    style={{ height: `${loading ? 0 : Math.max(m.count > 0 ? 8 : 2, (m.count / growthMax) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[9px] font-bold uppercase text-slate-500">{m.label}</span>
+                <span className="text-[10px] font-black text-white">{loading ? "—" : m.count}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+          <h2 className="mb-4 text-sm font-black text-white">{t("superadmin", "dashboardGeoTitle")}</h2>
+          {loading ? (
+            <p className="text-sm text-slate-500">…</p>
+          ) : geoBreakdown.top.length === 0 ? (
+            <p className="text-sm text-slate-500">{t("superadmin", "dashboardGeoEmpty")}</p>
+          ) : (
+            <ul className="space-y-3">
+              {geoBreakdown.top.map(([city, count]) => (
+                <BarRow key={city} label={city} value={count} max={geoMax} colorClass="bg-sky-400" />
+              ))}
+              {geoBreakdown.othersCount > 0 && (
+                <BarRow
+                  label={t("superadmin", "dashboardGeoOthers")}
+                  value={geoBreakdown.othersCount}
+                  max={geoMax}
+                  colorClass="bg-slate-500"
+                />
+              )}
             </ul>
           )}
         </section>

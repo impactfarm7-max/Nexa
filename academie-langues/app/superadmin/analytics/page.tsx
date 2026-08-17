@@ -255,6 +255,20 @@ export default function SuperadminAnalyticsPage() {
   const pagesPerVisitor =
     data.periodVisitors > 0 ? Math.round((data.periodPageViews / data.periodVisitors) * 10) / 10 : 0;
 
+  const peakDay = useMemo(
+    () => data.series.reduce<Point | null>((best, p) => (!best || p.visitors > best.visitors ? p : best), null),
+    [data.series],
+  );
+  const avgVisitorsPerDay =
+    data.series.length > 0
+      ? Math.round(data.series.reduce((sum, p) => sum + p.visitors, 0) / data.series.length)
+      : 0;
+  const newVisitorsInPeriod = data.series.reduce((sum, p) => sum + p.newVisitors, 0);
+  const returningRate =
+    data.periodVisitors > 0
+      ? Math.max(0, Math.round(((data.periodVisitors - newVisitorsInPeriod) / data.periodVisitors) * 100))
+      : 0;
+
   const exportAudienceCsv = () => {
     const rows = [
       [
@@ -500,6 +514,28 @@ export default function SuperadminAnalyticsPage() {
             </div>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <p className="text-xs font-bold text-slate-400">{t("superadmin", "analyticsPeakDay")}</p>
+              <p className="mt-2 text-2xl font-black text-white">
+                {loading || !peakDay || peakDay.visitors === 0 ? "—" : formatShortDate(peakDay.date, locale)}
+              </p>
+              {!loading && peakDay && peakDay.visitors > 0 && (
+                <p className="mt-1 text-[11px] text-slate-500">
+                  {peakDay.visitors} {t("superadmin", "analyticsVisitorsTooltip")}
+                </p>
+              )}
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <p className="text-xs font-bold text-slate-400">{t("superadmin", "analyticsAvgPerDay")}</p>
+              <p className="mt-2 text-2xl font-black text-white">{loading ? "—" : avgVisitorsPerDay}</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
+              <p className="text-xs font-bold text-slate-400">{t("superadmin", "analyticsReturningRate")}</p>
+              <p className="mt-2 text-2xl font-black text-white">{loading ? "—" : `${returningRate}%`}</p>
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
             <div className="flex justify-between">
               <div>
@@ -514,15 +550,28 @@ export default function SuperadminAnalyticsPage() {
               {series.map((point) => (
                 <div
                   key={point.date}
-                  className="group flex h-full min-w-3 flex-1 items-end gap-px"
-                  title={`${point.date}: ${point.visitors} ${t("superadmin", "analyticsVisitorsTooltip")}`}
+                  className="group relative flex h-full min-w-3 flex-1 cursor-default items-end gap-px"
                 >
                   <div
-                    className="w-2/3 rounded-t bg-orange-500/80"
+                    role="tooltip"
+                    className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-max -translate-x-1/2 scale-95 rounded-lg border border-white/10 bg-[#141b2e] px-3 py-2 text-xs opacity-0 shadow-xl transition-all duration-150 group-hover:scale-100 group-hover:opacity-100"
+                  >
+                    <p className="font-black text-white">{formatShortDate(point.date, locale)}</p>
+                    <p className="mt-1 flex items-center gap-1.5 text-orange-300">
+                      <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+                      {point.visitors} {t("superadmin", "analyticsVisitorsTooltip")}
+                    </p>
+                    <p className="flex items-center gap-1.5 text-emerald-300">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      {point.newVisitors} {t("superadmin", "analyticsNewVisitorsToday")}
+                    </p>
+                  </div>
+                  <div
+                    className="w-2/3 origin-bottom rounded-t bg-orange-500/80 transition-all duration-150 group-hover:scale-x-125 group-hover:bg-orange-400"
                     style={{ height: `${Math.max(3, (point.visitors / max) * 90)}%` }}
                   />
                   <div
-                    className="w-1/3 rounded-t bg-emerald-400/80"
+                    className="w-1/3 origin-bottom rounded-t bg-emerald-400/80 transition-all duration-150 group-hover:scale-x-125 group-hover:bg-emerald-300"
                     style={{ height: `${Math.max(3, (point.newVisitors / max) * 90)}%` }}
                   />
                 </div>
