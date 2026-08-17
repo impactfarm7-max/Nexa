@@ -22,7 +22,7 @@ import { useI18n } from "@/app/i18n/I18nProvider";
 import { ACTION_TONE } from "@/app/utils/action-tones";
 import { ActionConfirmModal } from "@/app/components/centre/ActionConfirmModal";
 import { useActionFeedback } from "@/app/components/ActionFeedback";
-import { BLUE, CenterSelect } from "@/app/centre/center-page-ui";
+import { BLUE, ORANGE, CenterSelect } from "@/app/centre/center-page-ui";
 
 const MAX_ROWS = 150;
 const TEMPLATE_HEADERS = [
@@ -81,6 +81,7 @@ type ImportResult = {
   email: string;
   ok: boolean;
   error?: string;
+  code?: string;
   emailSent?: boolean;
   temporaryPassword?: string;
 };
@@ -207,6 +208,7 @@ export default function ImportStudentsCsvModal({
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [results, setResults] = useState<ImportResult[] | null>(null);
+  const [seatLimitReached, setSeatLimitReached] = useState(false);
 
   const selectedFiliere = filieres.find((f) => f.id === defaultFiliereId);
   const isShort = selectedFiliere?.type === "formation_courte";
@@ -501,7 +503,32 @@ export default function ImportStudentsCsvModal({
           body: JSON.stringify(body),
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || t("centre", "createStudentCreateError"));
+        if (!res.ok) {
+          if (data.code === "SEAT_LIMIT_REACHED") {
+            setSeatLimitReached(true);
+            out.push({
+              line: row.line,
+              email: row.email,
+              ok: false,
+              code: "SEAT_LIMIT_REACHED",
+              error: t("centre", "seatLimitMessage", { occupied: data.occupied, max: data.max, offer: data.offerName }),
+            });
+            for (let j = i + 1; j < validRows.length; j++) {
+              out.push({
+                line: validRows[j].line,
+                email: validRows[j].email,
+                ok: false,
+                code: "SEAT_LIMIT_REACHED",
+                error: t("centre", "seatLimitSkipped"),
+              });
+            }
+            setResults(out);
+            setImporting(false);
+            feedback.close();
+            return;
+          }
+          throw new Error(data.error || t("centre", "createStudentCreateError"));
+        }
 
         if (data.studentId) {
           await supabase.from("student_details").upsert({
@@ -739,6 +766,19 @@ export default function ImportStudentsCsvModal({
                 </button>
               )}
             </div>
+            {seatLimitReached && (
+              <div className="mb-3 p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700 font-medium">
+                <p>{results.find((r) => r.code === "SEAT_LIMIT_REACHED" && r.error !== t("centre", "seatLimitSkipped"))?.error}</p>
+                <button
+                  type="button"
+                  onClick={() => window.open(`https://wa.me/+237683375069?text=${encodeURIComponent(t("centre", "seatLimitContactMsg"))}`, "_blank")}
+                  className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+                  style={{ backgroundColor: ORANGE }}
+                >
+                  {t("centre", "seatLimitContact")}
+                </button>
+              </div>
+            )}
             <div className="rounded-xl border border-black/[0.06] max-h-56 overflow-auto">
               <table className="w-full text-left text-xs min-w-[32rem]">
                 <thead className="bg-neutral-50 text-[10px] font-bold uppercase tracking-wider text-neutral-400 sticky top-0">

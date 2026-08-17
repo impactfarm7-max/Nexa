@@ -2618,7 +2618,7 @@ function TcfSubjectsPicker({ selected, onChange }: { selected: string[]; onChang
 function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCreated }: {
   centerId: string; isTCF: boolean; campuses: Campus[]; staffList: StaffRow[]; onClose: () => void; onCreated: () => void;
 }) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const en = locale === "en";
   const [step,     setStep]     = useState(1);
   const [prenom,   setPrenom]   = useState("");
@@ -2644,6 +2644,7 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
 
   const [saving,           setSaving]           = useState(false);
   const [error,            setError]            = useState("");
+  const [seatLimitReached, setSeatLimitReached] = useState(false);
   const [result,           setResult]           = useState<{ emailSent: boolean; emailQueued?: boolean; temporaryPassword?: string } | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<{ campusId: string; campusName: string; managerName: string } | null>(null);
   const [copiedKind,       setCopiedKind]       = useState<"pwd" | "all" | null>(null);
@@ -2680,7 +2681,9 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
   const handleSubmit = async () => {
     if (saving) return;
     setError("");
+    setSeatLimitReached(false);
     setSaving(true);
+    let isSeatLimit = false;
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error(en ? "Session expired." : "Session expirée.");
@@ -2704,7 +2707,13 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(en ? "Error while creating the profile." : (data.error || "Erreur lors de la création."));
+      if (!res.ok) {
+        if (data.code === "SEAT_LIMIT_REACHED") {
+          isSeatLimit = true;
+          throw new Error(t("centre", "seatLimitMessage", { occupied: data.occupied, max: data.max, offer: data.offerName }));
+        }
+        throw new Error(en ? "Error while creating the profile." : (data.error || "Erreur lors de la création."));
+      }
       // Afficher le popup immédiatement, même si l'email part en arrière-plan
       setResult({
         emailSent: Boolean(data.emailSent),
@@ -2712,7 +2721,8 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
         temporaryPassword: data.temporaryPassword,
       });
     } catch (e: any) {
-      setError(en ? "Error while creating the profile." : (e.message || "Erreur lors de la création."));
+      setSeatLimitReached(isSeatLimit);
+      setError(isSeatLimit ? e.message : (en ? "Error while creating the profile." : (e.message || "Erreur lors de la création.")));
     } finally {
       setSaving(false);
     }
@@ -2991,7 +3001,21 @@ function CreateStaffModal({ centerId, isTCF, campuses, staffList, onClose, onCre
               </div>
             )}
 
-            {error && <p className="text-xs font-bold text-red-500 bg-red-50 p-3 rounded-xl border border-red-100">{error}</p>}
+            {error && (
+              <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                <p className="text-xs font-bold text-red-500">{error}</p>
+                {seatLimitReached && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(`https://wa.me/+237683375069?text=${encodeURIComponent(t("centre", "seatLimitContactMsg"))}`, "_blank")}
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+                    style={{ backgroundColor: "#eb670e" }}
+                  >
+                    {t("centre", "seatLimitContact")}
+                  </button>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-2">
               <button onClick={() => setStep(2)} className="h-11 px-4 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-600">{en ? "Back" : "Retour"}</button>

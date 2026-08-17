@@ -9,6 +9,7 @@ import {
   Wallet, RefreshCw, Download, Phone, MapPin, FileText, Trash2, CalendarDays
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import {
   buildCenterSignupUrl,
@@ -810,6 +811,7 @@ export default function CenterTCFStudentsPage() {
 // MODAL CRÉATION MANUELLE
 // ============================================================
 function CreateTCFManualModal({ centerId, onClose, onCreated }: { centerId: string; onClose: () => void; onCreated: (sid: string) => void }) {
+  const { t } = useI18n();
   const [prenom, setPrenom] = useState("");
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
@@ -820,6 +822,7 @@ function CreateTCFManualModal({ centerId, onClose, onCreated }: { centerId: stri
   const [birthDate, setBirthDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [seatLimitReached, setSeatLimitReached] = useState(false);
   const [creds, setCreds] = useState<{ email: string; password: string; studentId: string } | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -829,7 +832,7 @@ function CreateTCFManualModal({ centerId, onClose, onCreated }: { centerId: stri
   const create = async () => {
     if (!prenom.trim() || !nom.trim() || !email.trim()) { setError("Prénom, nom et email requis."); return; }
     if (!selectedAfrica || !region.trim() || !city.trim()) { setError("Pays, région et ville requis."); return; }
-    setSaving(true); setError("");
+    setSaving(true); setError(""); setSeatLimitReached(false);
     const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch("/api/centre/etudiants-tcf", {
       method: "POST",
@@ -849,7 +852,15 @@ function CreateTCFManualModal({ centerId, onClose, onCreated }: { centerId: stri
     });
     const json = await res.json();
     setSaving(false);
-    if (!res.ok) { setError(json.error || "Erreur."); return; }
+    if (!res.ok) {
+      if (json.code === "SEAT_LIMIT_REACHED") {
+        setSeatLimitReached(true);
+        setError(t("centre", "seatLimitMessage", { occupied: json.occupied, max: json.max, offer: json.offerName }));
+        return;
+      }
+      setError(json.error || "Erreur.");
+      return;
+    }
     setCreds({ email: json.email, password: json.password, studentId: json.studentId });
   };
 
@@ -910,7 +921,21 @@ function CreateTCFManualModal({ centerId, onClose, onCreated }: { centerId: stri
                 <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="w-full h-11 px-3 rounded-xl border bg-neutral-50 text-xs font-bold outline-none" style={{ color: BLUE }} />
                 <p className="text-[9px] text-neutral-400 mt-1">Optionnel — complétable plus tard sur le profil étudiant.</p>
               </div>
-              {error && <p className="text-xs font-bold text-red-500 bg-red-50 p-2 rounded-lg">{error}</p>}
+              {error && (
+                <div className="bg-red-50 p-2 rounded-lg">
+                  <p className="text-xs font-bold text-red-500">{error}</p>
+                  {seatLimitReached && (
+                    <button
+                      type="button"
+                      onClick={() => window.open(`https://wa.me/+237683375069?text=${encodeURIComponent(t("centre", "seatLimitContactMsg"))}`, "_blank")}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+                      style={{ backgroundColor: ORANGE }}
+                    >
+                      {t("centre", "seatLimitContact")}
+                    </button>
+                  )}
+                </div>
+              )}
               <button onClick={create} disabled={saving} className="w-full h-12 rounded-xl text-xs font-black uppercase tracking-wider text-white disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-90" style={{ backgroundColor: BLUE }}>
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <User size={14} />} Créer le compte
               </button>

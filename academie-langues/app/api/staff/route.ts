@@ -320,6 +320,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           {
             error: `Quota utilisateurs atteint (${seatCheck.occupied}/${seatCheck.max} — offre ${seatCheck.offerName}). Staff et étudiants partagent le même plafond.`,
+            code: "SEAT_LIMIT_REACHED",
+            occupied: seatCheck.occupied,
+            max: seatCheck.max,
+            offerName: seatCheck.offerName,
           },
           { status: 403 },
         );

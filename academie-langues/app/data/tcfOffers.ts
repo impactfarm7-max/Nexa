@@ -9,13 +9,66 @@ export type TcfOfferConfig = {
   key: TcfPlanKey;
   nameFr: string;
   nameEn: string;
-  /** Toujours sur devis pour le TCF. */
+  /** "Sur devis" uniquement pour le palier Entreprise (custom). */
   priceFr: string;
   priceEn: string;
+  /** Prix unitaire mensuel par étudiant (null = sur devis). */
+  pricePerUser: number | null;
+  /** Prix d'entrée mensuel affiché ("à partir de"). */
+  entryPrice: number | null;
+  minStudents: number;
+  maxStudents: number | null;
   highlight?: boolean;
   featuresFr: string[];
   featuresEn: string[];
 };
+
+/**
+ * Technologie complète : identique sur tous les paliers TCF (seuls l'effectif,
+ * le prix et le niveau d'accompagnement changent). Voir
+ * docs/superpowers/specs/2026-08-13-tcf-offers-vs-libre-design.md.
+ */
+const TCF_FULL_STACK_FR = [
+  "Tableau de bord centre & étudiant",
+  "Gestion étudiants & staff illimités",
+  "Programme TCF Canada complet",
+  "Compréhension écrite",
+  "Compréhension orale",
+  "Expression écrite",
+  "Expression orale",
+  "Examens blancs universels",
+  "Simulateurs d'examen (entraînement, examen, oral)",
+  "Cours & constructeur de cours",
+  "Bibliothèque de ressources",
+  "Devoirs & missions",
+  "Quiz & évaluations",
+  "Tuteur IA",
+  "Sessions Live",
+  "Communauté",
+  "Rapports & statistiques",
+  "Finance & facturation",
+];
+
+const TCF_FULL_STACK_EN = [
+  "Center & student dashboard",
+  "Unlimited student & staff management",
+  "Full TCF Canada program",
+  "Reading comprehension",
+  "Listening comprehension",
+  "Written expression",
+  "Oral expression",
+  "Universal mock exams",
+  "Exam simulators (practice, exam, oral)",
+  "Courses & course builder",
+  "Resource library",
+  "Homework & assignments",
+  "Quizzes & evaluations",
+  "AI tutor",
+  "Live sessions",
+  "Community",
+  "Reports & analytics",
+  "Finance & billing",
+];
 
 export const TCF_OFFERS: Record<TcfPlanKey, TcfOfferConfig> = {
   starter: {
@@ -24,16 +77,12 @@ export const TCF_OFFERS: Record<TcfPlanKey, TcfOfferConfig> = {
     nameEn: "Starter",
     priceFr: "Sur devis",
     priceEn: "Custom quote",
-    featuresFr: [
-      "Accès plateforme TCF Canada",
-      "Gestion étudiants & staff",
-      "Examens blancs universels",
-    ],
-    featuresEn: [
-      "TCF Canada platform access",
-      "Student & staff management",
-      "Universal mock exams",
-    ],
+    pricePerUser: 8_500,
+    entryPrice: 25_500,
+    minStudents: 1,
+    maxStudents: 3,
+    featuresFr: [...TCF_FULL_STACK_FR],
+    featuresEn: [...TCF_FULL_STACK_EN],
   },
   pro: {
     key: "pro",
@@ -41,17 +90,13 @@ export const TCF_OFFERS: Record<TcfPlanKey, TcfOfferConfig> = {
     nameEn: "Pro",
     priceFr: "Sur devis",
     priceEn: "Custom quote",
+    pricePerUser: 8_000,
+    entryPrice: 48_000,
+    minStudents: 4,
+    maxStudents: 6,
     highlight: true,
-    featuresFr: [
-      "Tout Starter",
-      "Sessions Live illimitées",
-      "Rapports & statistiques avancés",
-    ],
-    featuresEn: [
-      "Everything in Starter",
-      "Unlimited Live sessions",
-      "Advanced reports & analytics",
-    ],
+    featuresFr: [...TCF_FULL_STACK_FR, "Support prioritaire"],
+    featuresEn: [...TCF_FULL_STACK_EN, "Priority support"],
   },
   ultra: {
     key: "ultra",
@@ -59,32 +104,38 @@ export const TCF_OFFERS: Record<TcfPlanKey, TcfOfferConfig> = {
     nameEn: "Ultra",
     priceFr: "Sur devis",
     priceEn: "Custom quote",
-    featuresFr: [
-      "Tout Pro",
-      "Communauté & campus multiples",
-      "Accompagnement dédié NEXA",
-    ],
-    featuresEn: [
-      "Everything in Pro",
-      "Community & multi-campus",
-      "Dedicated NEXA support",
-    ],
+    pricePerUser: 7_000,
+    entryPrice: 70_000,
+    minStudents: 7,
+    maxStudents: 10,
+    featuresFr: [...TCF_FULL_STACK_FR, "Support prioritaire", "Campus multiples", "Accompagnement dédié NEXA"],
+    featuresEn: [...TCF_FULL_STACK_EN, "Priority support", "Multiple campuses", "Dedicated NEXA support"],
   },
   custom: {
     key: "custom",
-    nameFr: "Sur devis",
-    nameEn: "Custom quote",
+    nameFr: "Entreprise",
+    nameEn: "Enterprise",
     priceFr: "Sur devis",
     priceEn: "Custom quote",
+    pricePerUser: null,
+    entryPrice: null,
+    minStudents: 11,
+    maxStudents: null,
     featuresFr: [
-      "Accès personnalisé selon le volume et les besoins du centre",
-      "Périmètre et tarification définis avec NEXA",
-      "Accompagnement dédié",
+      "Plus de 10 utilisateurs",
+      ...TCF_FULL_STACK_FR,
+      "Support prioritaire",
+      "Campus multiples",
+      "Marque blanche",
+      "SLA & accompagnement dédié",
     ],
     featuresEn: [
-      "Personalized access based on center volume and needs",
-      "Scope and pricing agreed with NEXA",
-      "Dedicated support",
+      "More than 10 users",
+      ...TCF_FULL_STACK_EN,
+      "Priority support",
+      "Multiple campuses",
+      "White-label",
+      "SLA & dedicated support",
     ],
   },
 };

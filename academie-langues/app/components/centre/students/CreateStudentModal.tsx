@@ -106,6 +106,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   // --- État global ---
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [seatLimitReached, setSeatLimitReached] = useState(false);
   const [result, setResult] = useState<{ emailSent: boolean; temporaryPassword?: string } | null>(null);
   const [availableCoupons, setAvailableCoupons] = useState<CouponListItem[]>([]);
 
@@ -353,7 +354,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   // SOUMISSION
   // ============================================================
   const handleSubmit = async () => {
-    setError(""); setSaving(true);
+    setError(""); setSeatLimitReached(false); setSaving(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error(t("centre", "passageSessionExpired"));
@@ -410,7 +411,13 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(locale === "en" ? t("centre", "createStudentCreateError") : (data.error || t("centre", "createStudentCreateError")));
+      if (!res.ok) {
+        if (data.code === "SEAT_LIMIT_REACHED") {
+          setSeatLimitReached(true);
+          throw new Error(t("centre", "seatLimitMessage", { occupied: data.occupied, max: data.max, offer: data.offerName }));
+        }
+        throw new Error(locale === "en" ? t("centre", "createStudentCreateError") : (data.error || t("centre", "createStudentCreateError")));
+      }
 
       // Créer les détails complémentaires (pays, indicatif, responsable)
       if (data.studentId) {
@@ -474,7 +481,17 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
         {error && (
           <div className="mb-5 p-3.5 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700 font-medium">
-            {error}
+            <p>{error}</p>
+            {seatLimitReached && (
+              <button
+                type="button"
+                onClick={() => window.open(`https://wa.me/+237683375069?text=${encodeURIComponent(t("centre", "seatLimitContactMsg"))}`, "_blank")}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+                style={{ backgroundColor: ORANGE }}
+              >
+                {t("centre", "seatLimitContact")}
+              </button>
+            )}
           </div>
         )}
 

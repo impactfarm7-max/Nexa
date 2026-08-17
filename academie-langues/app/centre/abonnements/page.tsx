@@ -47,6 +47,15 @@ function offerDisplayTagline(key: Exclude<NexaOfferKey, "custom">, t: ReturnType
   }
 }
 
+function tcfStudentsLabel(
+  offer: { minStudents: number; maxStudents: number | null },
+  t: ReturnType<typeof useI18n>["t"],
+): string {
+  return offer.maxStudents == null
+    ? t("centre", "abonnementsStudentsFrom", { min: offer.minStudents })
+    : t("centre", "abonnementsStudentsRange", { min: offer.minStudents, max: offer.maxStudents });
+}
+
 const CORE_FEATURE_KEYS = [
   "abonnementsCoreDashboard",
   "abonnementsCorePlanner",
@@ -169,47 +178,71 @@ export default function AbonnementsPage() {
             {TCF_PLAN_KEYS.map((key) => {
               const offer = TCF_OFFERS[key];
               const isCurrent = currentTcfPlan === key;
-              const isRecommended = !currentTcfPlan && key === "pro";
-              const highlighted = isCurrent || Boolean(offer.highlight && isRecommended);
+              const isMostChosen = key === "pro";
               const features = en ? offer.featuresEn : offer.featuresFr;
               const name = en ? offer.nameEn : offer.nameFr;
               const price = en ? offer.priceEn : offer.priceFr;
+              const isQuote = offer.pricePerUser == null;
+              const perUserLabel = offer.pricePerUser != null
+                ? offer.pricePerUser.toLocaleString(en ? "en-US" : "fr-FR")
+                : null;
+              const entryPriceLabel = offer.entryPrice != null
+                ? offer.entryPrice.toLocaleString(en ? "en-US" : "fr-FR")
+                : null;
 
               return (
                 <div
                   key={key}
-                  className={`group rounded-2xl border p-6 flex flex-col bg-white transition-all duration-300 ease-out will-change-transform hover:-translate-y-1.5 hover:shadow-[0_16px_40px_-12px_rgba(17,34,78,0.22)] ${
-                    highlighted ? "border-2 shadow-lg" : "border-black/[0.08] hover:border-[#11224E]/25"
-                  }`}
-                  style={
-                    highlighted
-                      ? {
-                          borderColor: isCurrent ? BLUE : ORANGE,
-                          boxShadow: `0 8px 24px ${isCurrent ? BLUE : ORANGE}22`,
-                        }
-                      : undefined
-                  }
+                  className="group relative rounded-2xl border-2 p-6 flex flex-col bg-white shadow-lg transition-all duration-300 ease-out will-change-transform hover:-translate-y-1.5 hover:shadow-[0_16px_40px_-12px_rgba(235,103,14,0.28)]"
+                  style={{
+                    borderColor: isCurrent ? BLUE : ORANGE,
+                    boxShadow: `0 8px 24px ${(isCurrent ? BLUE : ORANGE)}22`,
+                  }}
                 >
-                  {isCurrent && (
-                    <span
-                      className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-white"
-                      style={{ backgroundColor: BLUE }}
-                    >
-                      {t("centre", "abonnementsCurrentBadge")}
-                    </span>
-                  )}
-                  {!isCurrent && isRecommended && (
-                    <span
-                      className="self-start mb-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider text-white"
-                      style={{ backgroundColor: ORANGE }}
-                    >
-                      <Sparkles size={11} /> {t("centre", "abonnementsRecommended")}
-                    </span>
-                  )}
+                  <div className="mb-3 flex min-h-[26px] flex-wrap gap-2">
+                    {isCurrent && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-white"
+                        style={{ backgroundColor: BLUE }}
+                      >
+                        {t("centre", "abonnementsCurrentBadge")}
+                      </span>
+                    )}
+                    {isMostChosen && (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white"
+                        style={{ backgroundColor: ORANGE }}
+                      >
+                        <Sparkles size={11} /> {t("centre", "abonnementsMostChosen")}
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-lg font-black transition-colors duration-300 group-hover:text-[#eb670e]" style={{ color: BLUE }}>{name}</h3>
-                  <p className="mt-4 text-2xl font-black leading-none" style={{ color: BLUE }}>
-                    {price}
+                  <p className="text-[12px] mt-1 font-medium" style={{ color: "rgba(17,34,78,0.55)" }}>
+                    {tcfStudentsLabel(offer, t)}
                   </p>
+                  {isQuote ? (
+                    <p className="mt-4 text-2xl font-black leading-none" style={{ color: BLUE }}>
+                      {price}
+                    </p>
+                  ) : (
+                    <div className="mt-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(17,34,78,0.45)" }}>
+                        {t("centre", "abonnementsPricePerUserLabel")}
+                      </p>
+                      <p className="mt-0.5 text-2xl font-black leading-none tabular-nums transition-transform duration-300 group-hover:scale-[1.03] origin-left" style={{ color: BLUE }}>
+                        {perUserLabel}
+                      </p>
+                      <p className="mt-1 text-xs font-bold" style={{ color: "rgba(17,34,78,0.55)" }}>
+                        {t("centre", "abonnementsPricePerUser")}
+                      </p>
+                    </div>
+                  )}
+                  {entryPriceLabel && (
+                    <p className="mt-1.5 text-xs font-bold tabular-nums" style={{ color: "rgba(17,34,78,0.55)" }}>
+                      {t("centre", "abonnementsPriceFrom")} {entryPriceLabel} {t("centre", "abonnementsPricePerMonth")}
+                    </p>
+                  )}
                   <ul className="mt-5 space-y-2.5 flex-1">
                     {features.map((f) => (
                       <li key={f} className="flex items-start gap-2 text-[13px]" style={{ color: "rgba(17,34,78,0.75)" }}>
@@ -221,7 +254,7 @@ export default function AbonnementsPage() {
                   <button
                     onClick={contact}
                     className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-all duration-300 group-hover:brightness-110 group-hover:scale-[1.02]"
-                    style={{ backgroundColor: highlighted ? ORANGE : BLUE }}
+                    style={{ backgroundColor: ORANGE }}
                   >
                     <MessageCircle size={16} />
                     {t("centre", "abonnementsContact")}

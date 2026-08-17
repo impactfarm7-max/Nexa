@@ -700,7 +700,9 @@ export default function CreerCentrePage() {
                                 {locale === "en" ? offer.nameEn : offer.nameFr}
                               </p>
                               <p className="text-[11px] text-neutral-500 mt-0.5">
-                                {locale === "en" ? offer.priceEn : offer.priceFr}
+                                {offer.entryPrice != null
+                                  ? `${t("marketing", "ouvrirCentreOfferFrom")} ${offer.entryPrice.toLocaleString(locale === "en" ? "en-US" : "fr-FR")} ${t("marketing", "ouvrirCentreOfferFcfaPerMonth")}`
+                                  : (locale === "en" ? offer.priceEn : offer.priceFr)}
                                 {" · "}
                                 {(locale === "en" ? offer.featuresEn : offer.featuresFr)[0]}
                               </p>

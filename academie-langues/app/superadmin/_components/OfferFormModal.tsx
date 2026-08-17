@@ -56,7 +56,6 @@ type StudentQuotaFields = {
 };
 
 const CENTER_QUOTA_KEYS = [
-  "maxStudents",
   "maxCampus",
   "maxStaffAccounts",
   "tutorInteractionsPerStudent",
@@ -108,10 +107,13 @@ function parseOptionalInt(raw: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-function defaultCenterQuotas(overrides?: Record<string, unknown> | null): CenterQuotaFields {
+function defaultCenterQuotas(
+  overrides?: Record<string, unknown> | null,
+  tierMaxStudents?: number | null,
+): CenterQuotaFields {
   const base = NEXA_OFFERS.entreprise;
   return {
-    maxStudents: numOrEmpty(overrides?.maxStudents ?? base.maxStudents),
+    maxStudents: numOrEmpty(overrides?.maxStudents ?? tierMaxStudents ?? base.maxStudents),
     maxCampus: numOrEmpty(overrides?.maxCampus ?? base.maxCampus),
     maxStaffAccounts: numOrEmpty(overrides?.maxStaffAccounts ?? base.maxStaffAccounts),
     tutorInteractionsPerStudent: numOrEmpty(
@@ -232,24 +234,45 @@ export function OfferFormModal({
   useEffect(() => {
     if (isTcf) {
       setAmount(center.subscription_amount != null ? String(center.subscription_amount) : "");
-      return;
-    }
-    const cfg = offer !== "custom" ? NEXA_OFFERS[offer as Exclude<NexaOfferKey, "custom">] : null;
-    if (center.subscription_amount != null && mode === "change" && normalizeNexaOffer(center.nexa_offer) === offer) {
-      setAmount(String(center.subscription_amount));
-    } else if (cfg) {
-      setAmount(String(cfg.monthlyFeeMin));
-    } else if (center.subscription_amount != null && offer === "custom") {
-      setAmount(String(center.subscription_amount));
     } else {
-      setAmount("");
+      const cfg = offer !== "custom" ? NEXA_OFFERS[offer as Exclude<NexaOfferKey, "custom">] : null;
+      if (center.subscription_amount != null && mode === "change" && normalizeNexaOffer(center.nexa_offer) === offer) {
+        setAmount(String(center.subscription_amount));
+      } else if (cfg) {
+        setAmount(String(cfg.monthlyFeeMin));
+      } else if (center.subscription_amount != null && offer === "custom") {
+        setAmount(String(center.subscription_amount));
+      } else {
+        setAmount("");
+      }
+
+      if (offer === "custom") {
+        setCenterQuotas(defaultCenterQuotas(center.quota_overrides));
+        setStudentQuotas(defaultStudentQuotas(center.quota_overrides));
+      }
     }
 
-    if (offer === "custom") {
-      setCenterQuotas(defaultCenterQuotas(center.quota_overrides));
-      setStudentQuotas(defaultStudentQuotas(center.quota_overrides));
+    // Nombre d'utilisateurs : garde la valeur existante si on édite l'offre déjà
+    // active du centre, sinon propose le plafond par défaut du palier choisi.
+    const tierMaxStudents = isTcf
+      ? TCF_OFFERS[tcfPlan].maxStudents
+      : offer !== "custom"
+        ? NEXA_OFFERS[offer as Exclude<NexaOfferKey, "custom">].maxStudents
+        : null;
+    const existingOverrideMaxStudents =
+      center.quota_overrides && typeof center.quota_overrides === "object"
+        ? (center.quota_overrides as Record<string, unknown>).maxStudents
+        : undefined;
+    const sameSelection = isTcf
+      ? normalizeTcfPlan(center.plan_type) === tcfPlan
+      : normalizeNexaOffer(center.nexa_offer) === offer;
+
+    if (mode === "change" && sameSelection && existingOverrideMaxStudents != null) {
+      setCenterQuotas((prev) => ({ ...prev, maxStudents: numOrEmpty(existingOverrideMaxStudents) }));
+    } else {
+      setCenterQuotas((prev) => ({ ...prev, maxStudents: numOrEmpty(tierMaxStudents) }));
     }
-  }, [offer, isTcf, center.subscription_amount, center.nexa_offer, center.quota_overrides, mode]);
+  }, [offer, tcfPlan, isTcf, center.subscription_amount, center.nexa_offer, center.plan_type, center.quota_overrides, mode]);
 
   const offerLabel = isTcf
     ? (en ? TCF_OFFERS[tcfPlan].nameEn : TCF_OFFERS[tcfPlan].nameFr)
@@ -302,11 +325,9 @@ export function OfferFormModal({
       body.nexa_offer = offer;
     }
     if (Number.isFinite(parsedAmount)) body.subscription_amount = parsedAmount;
-    if (isCustom) {
-      body.quota_overrides = buildQuotaOverrides(centerQuotas, studentQuotas, isTcf);
-    } else if (mode === "change" && !isTcf) {
-      body.quota_overrides = null;
-    }
+    body.quota_overrides = isCustom
+      ? buildQuotaOverrides(centerQuotas, studentQuotas, isTcf)
+      : { maxStudents: parseOptionalInt(centerQuotas.maxStudents) };
 
     const result = await feedback.run(
       async () => {
@@ -392,7 +413,16 @@ export function OfferFormModal({
                       {en ? cfg.nameEn : cfg.nameFr}
                     </p>
                     <p className="mt-1 text-[10px] text-slate-500">
-                      {en ? cfg.priceEn : cfg.priceFr}
+                      {cfg.maxStudents == null
+                        ? t("superadmin", "centresOfferStudentsFrom", { min: String(cfg.minStudents) })
+                        : t("superadmin", "centresOfferStudentsRange", {
+                            min: String(cfg.minStudents),
+                            max: String(cfg.maxStudents),
+                          })}
+                      {" · "}
+                      {cfg.entryPrice != null
+                        ? `${cfg.entryPrice.toLocaleString(en ? "en-US" : "fr-FR")} FCFA`
+                        : (en ? cfg.priceEn : cfg.priceFr)}
                     </p>
                   </button>
                 );
@@ -454,6 +484,21 @@ export function OfferFormModal({
               className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-orange-400"
             />
           </div>
+        </div>
+
+        <div className="mt-3">
+          <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+            {t("superadmin", "centresQuotaMaxStudents")}
+          </label>
+          <input
+            type="number"
+            min={0}
+            value={centerQuotas.maxStudents}
+            onChange={(e) => setCenterQuotas((prev) => ({ ...prev, maxStudents: e.target.value }))}
+            placeholder="∞"
+            className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-orange-400"
+          />
+          <p className="mt-1 text-[10px] text-slate-500">{t("superadmin", "centresModalSeatsHint")}</p>
         </div>
 
         {isCustom && (
