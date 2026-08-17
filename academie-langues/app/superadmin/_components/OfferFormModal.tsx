@@ -215,7 +215,7 @@ export function OfferFormModal({
   const feedback = useActionFeedback();
   const isTcf = center.center_type === "tcf_canada";
   const initialNexaOffer = normalizeNexaOffer(center.nexa_offer) ?? "decouverte";
-  const initialTcfPlan = normalizeTcfPlan(center.plan_type) ?? "pro";
+  const initialTcfPlan = normalizeTcfPlan(center.plan_type) ?? "advance";
   const [offer, setOffer] = useState<NexaOfferKey>(initialNexaOffer);
   const [tcfPlan, setTcfPlan] = useState<TcfPlanKey>(initialTcfPlan);
   const [amount, setAmount] = useState("");
@@ -415,10 +415,12 @@ export function OfferFormModal({
                     <p className="mt-1 text-[10px] text-slate-500">
                       {cfg.maxStudents == null
                         ? t("superadmin", "centresOfferStudentsFrom", { min: String(cfg.minStudents) })
-                        : t("superadmin", "centresOfferStudentsRange", {
-                            min: String(cfg.minStudents),
-                            max: String(cfg.maxStudents),
-                          })}
+                        : cfg.minStudents > 1
+                          ? t("superadmin", "centresOfferStudentsRange", {
+                              min: String(cfg.minStudents),
+                              max: String(cfg.maxStudents),
+                            })
+                          : t("superadmin", "centresOfferStudentsUpTo", { count: String(cfg.maxStudents) })}
                       {" · "}
                       {cfg.entryPrice != null
                         ? `${cfg.entryPrice.toLocaleString(en ? "en-US" : "fr-FR")} FCFA`

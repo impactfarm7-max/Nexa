@@ -68,7 +68,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
   const tcfPlan = isTcf ? normalizeTcfPlan(body?.plan_type ?? body?.nexa_offer) : null;
 
   if (isTcf && !tcfPlan) {
-    return NextResponse.json({ error: "Offre TCF requise (Starter, Pro, Ultra ou Sur devis)." }, { status: 400 });
+    return NextResponse.json({ error: "Offre TCF requise (Access, Lite, Advance ou Entreprise)." }, { status: 400 });
   }
   if (!isTcf && !nexaOffer) {
     return NextResponse.json({ error: "Offre NEXA requise." }, { status: 400 });

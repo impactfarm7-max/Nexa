@@ -658,8 +658,8 @@ export default function CreerCentrePage() {
                   <p className="text-[12px] text-neutral-500 font-medium leading-relaxed">
                     {centerType === "tcf_canada"
                       ? (locale === "en"
-                        ? "TCF plans are quote-based (Starter, Pro, Ultra or custom)."
-                        : "Les offres TCF sont sur devis (Starter, Pro, Ultra ou Sur devis).")
+                        ? "TCF plans: Access, Lite, Advance or Enterprise."
+                        : "Offres TCF : Access, Lite, Advance ou Entreprise.")
                       : t("marketing", "ouvrirCentreOfferHint")}
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -700,11 +700,9 @@ export default function CreerCentrePage() {
                                 {locale === "en" ? offer.nameEn : offer.nameFr}
                               </p>
                               <p className="text-[11px] text-neutral-500 mt-0.5">
-                                {offer.entryPrice != null
-                                  ? `${t("marketing", "ouvrirCentreOfferFrom")} ${offer.entryPrice.toLocaleString(locale === "en" ? "en-US" : "fr-FR")} ${t("marketing", "ouvrirCentreOfferFcfaPerMonth")}`
-                                  : (locale === "en" ? offer.priceEn : offer.priceFr)}
+                                {locale === "en" ? offer.priceEn : offer.priceFr}
                                 {" · "}
-                                {(locale === "en" ? offer.featuresEn : offer.featuresFr)[0]}
+                                {locale === "en" ? offer.taglineEn : offer.taglineFr}
                               </p>
                             </button>
                           );

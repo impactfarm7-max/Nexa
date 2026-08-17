@@ -1,18 +1,19 @@
 /**
- * Catalogue TCF Canada — Starter / Pro / Ultra (historique abonnements centre).
+ * Catalogue TCF Canada — Access / Lite / Advance / Entreprise (plaquette officielle NEXA).
  * Distinct du catalogue NEXA libre (Découverte / Croissance / Pro / Entreprise).
  */
 
-export type TcfPlanKey = "starter" | "pro" | "ultra" | "custom";
+export type TcfPlanKey = "access" | "lite" | "advance" | "entreprise";
 
 export type TcfOfferConfig = {
   key: TcfPlanKey;
   nameFr: string;
   nameEn: string;
-  /** "Sur devis" uniquement pour le palier Entreprise (custom). */
+  taglineFr: string;
+  taglineEn: string;
   priceFr: string;
   priceEn: string;
-  /** Prix unitaire mensuel par étudiant (null = sur devis). */
+  /** Prix unitaire mensuel par étudiant (Access uniquement — null sinon). */
   pricePerUser: number | null;
   /** Prix d'entrée mensuel affiché ("à partir de"). */
   entryPrice: number | null;
@@ -23,119 +24,120 @@ export type TcfOfferConfig = {
   featuresEn: string[];
 };
 
-/**
- * Technologie complète : identique sur tous les paliers TCF (seuls l'effectif,
- * le prix et le niveau d'accompagnement changent). Voir
- * docs/superpowers/specs/2026-08-13-tcf-offers-vs-libre-design.md.
- */
-const TCF_FULL_STACK_FR = [
-  "Tableau de bord centre & étudiant",
-  "Gestion étudiants & staff illimités",
-  "Programme TCF Canada complet",
-  "Compréhension écrite",
-  "Compréhension orale",
-  "Expression écrite",
-  "Expression orale",
-  "Examens blancs universels",
-  "Simulateurs d'examen (entraînement, examen, oral)",
-  "Cours & constructeur de cours",
-  "Bibliothèque de ressources",
-  "Devoirs & missions",
-  "Quiz & évaluations",
-  "Tuteur IA",
-  "Sessions Live",
-  "Communauté",
-  "Rapports & statistiques",
-  "Finance & facturation",
-];
-
-const TCF_FULL_STACK_EN = [
-  "Center & student dashboard",
-  "Unlimited student & staff management",
-  "Full TCF Canada program",
-  "Reading comprehension",
-  "Listening comprehension",
-  "Written expression",
-  "Oral expression",
-  "Universal mock exams",
-  "Exam simulators (practice, exam, oral)",
-  "Courses & course builder",
-  "Resource library",
-  "Homework & assignments",
-  "Quizzes & evaluations",
-  "AI tutor",
-  "Live sessions",
-  "Community",
-  "Reports & analytics",
-  "Finance & billing",
-];
-
 export const TCF_OFFERS: Record<TcfPlanKey, TcfOfferConfig> = {
-  starter: {
-    key: "starter",
-    nameFr: "Starter",
-    nameEn: "Starter",
-    priceFr: "Sur devis",
-    priceEn: "Custom quote",
+  access: {
+    key: "access",
+    nameFr: "Access",
+    nameEn: "Access",
+    taglineFr: "Pour démarrer simplement",
+    taglineEn: "To get started simply",
+    priceFr: "8 500 FCFA / utilisateur / mois",
+    priceEn: "8,500 FCFA / user / month",
     pricePerUser: 8_500,
-    entryPrice: 25_500,
-    minStudents: 1,
-    maxStudents: 3,
-    featuresFr: [...TCF_FULL_STACK_FR],
-    featuresEn: [...TCF_FULL_STACK_EN],
-  },
-  pro: {
-    key: "pro",
-    nameFr: "Pro",
-    nameEn: "Pro",
-    priceFr: "Sur devis",
-    priceEn: "Custom quote",
-    pricePerUser: 8_000,
-    entryPrice: 48_000,
-    minStudents: 4,
-    maxStudents: 6,
-    highlight: true,
-    featuresFr: [...TCF_FULL_STACK_FR, "Support prioritaire"],
-    featuresEn: [...TCF_FULL_STACK_EN, "Priority support"],
-  },
-  ultra: {
-    key: "ultra",
-    nameFr: "Ultra",
-    nameEn: "Ultra",
-    priceFr: "Sur devis",
-    priceEn: "Custom quote",
-    pricePerUser: 7_000,
-    entryPrice: 70_000,
-    minStudents: 7,
-    maxStudents: 10,
-    featuresFr: [...TCF_FULL_STACK_FR, "Support prioritaire", "Campus multiples", "Accompagnement dédié NEXA"],
-    featuresEn: [...TCF_FULL_STACK_EN, "Priority support", "Multiple campuses", "Dedicated NEXA support"],
-  },
-  custom: {
-    key: "custom",
-    nameFr: "Entreprise",
-    nameEn: "Enterprise",
-    priceFr: "Sur devis",
-    priceEn: "Custom quote",
-    pricePerUser: null,
     entryPrice: null,
-    minStudents: 11,
-    maxStudents: null,
+    minStudents: 1,
+    maxStudents: 5,
     featuresFr: [
-      "Plus de 10 utilisateurs",
-      ...TCF_FULL_STACK_FR,
-      "Support prioritaire",
-      "Campus multiples",
-      "Marque blanche",
-      "SLA & accompagnement dédié",
+      "Gestion des étudiants",
+      "Cours & devoirs",
+      "Examens & quiz",
+      "Suivi des résultats",
+      "Application mobile",
+      "Support par email",
     ],
     featuresEn: [
-      "More than 10 users",
-      ...TCF_FULL_STACK_EN,
+      "Student management",
+      "Courses & homework",
+      "Exams & quizzes",
+      "Results tracking",
+      "Mobile app",
+      "Email support",
+    ],
+  },
+  lite: {
+    key: "lite",
+    nameFr: "Lite",
+    nameEn: "Lite",
+    taglineFr: "Pour structurer votre gestion",
+    taglineEn: "To structure your management",
+    priceFr: "40 000 FCFA / mois",
+    priceEn: "40,000 FCFA / month",
+    pricePerUser: null,
+    entryPrice: null,
+    minStudents: 1,
+    maxStudents: 15,
+    featuresFr: [
+      "Gestion du staff",
+      "Planning & emploi du temps",
+      "Communauté",
+      "Rapports avancés",
+      "Support prioritaire",
+    ],
+    featuresEn: [
+      "Staff management",
+      "Planning & timetable",
+      "Community",
+      "Advanced reports",
       "Priority support",
-      "Multiple campuses",
-      "White-label",
-      "SLA & dedicated support",
+    ],
+  },
+  advance: {
+    key: "advance",
+    nameFr: "Advance",
+    nameEn: "Advance",
+    taglineFr: "Pour accélérer votre croissance",
+    taglineEn: "To accelerate your growth",
+    priceFr: "80 000 FCFA / mois",
+    priceEn: "80,000 FCFA / month",
+    pricePerUser: null,
+    entryPrice: null,
+    minStudents: 1,
+    maxStudents: 40,
+    highlight: true,
+    featuresFr: [
+      "Gestion financière complète",
+      "Paiements & facturation",
+      "Tableaux de bord avancés",
+      "Alertes & notifications",
+      "Exports personnalisés",
+      "Support prioritaire +",
+    ],
+    featuresEn: [
+      "Full financial management",
+      "Payments & billing",
+      "Advanced dashboards",
+      "Alerts & notifications",
+      "Custom exports",
+      "Priority support +",
+    ],
+  },
+  entreprise: {
+    key: "entreprise",
+    nameFr: "Entreprise",
+    nameEn: "Enterprise",
+    taglineFr: "Pour les grandes structures",
+    taglineEn: "For large organizations",
+    priceFr: "180 000 FCFA / mois",
+    priceEn: "180,000 FCFA / month",
+    pricePerUser: null,
+    entryPrice: null,
+    minStudents: 1,
+    maxStudents: 100,
+    featuresFr: [
+      "Multi-campus",
+      "Administration avancée",
+      "API & intégrations",
+      "Sauvegarde renforcée",
+      "Accompagnement dédié",
+      "Support premium 24/7",
+    ],
+    featuresEn: [
+      "Multi-campus",
+      "Advanced administration",
+      "API & integrations",
+      "Enhanced backups",
+      "Dedicated support",
+      "24/7 premium support",
     ],
   },
 };
@@ -146,13 +148,16 @@ export function isTcfPlanKey(value: unknown): value is TcfPlanKey {
   return typeof value === "string" && value in TCF_OFFERS;
 }
 
-/** Normalise plan_type DB (Starter / starter / Sur devis…). */
+/** Normalise plan_type DB (Access / Lite / Advance / Entreprise / anciens paliers). */
 export function normalizeTcfPlan(value: unknown): TcfPlanKey | null {
   if (typeof value !== "string") return null;
   const raw = value.trim().toLowerCase();
-  if (raw === "sur devis" || raw === "sur_devis" || raw === "custom quote" || raw === "custom") {
-    return "custom";
+  if (raw === "sur devis" || raw === "sur_devis" || raw === "custom quote" || raw === "custom" || raw === "ultra") {
+    return "entreprise";
   }
+  // Anciens paliers (Starter / Pro) — remappés vers la nouvelle plaquette.
+  if (raw === "starter") return "access";
+  if (raw === "pro") return "advance";
   return isTcfPlanKey(raw) ? raw : null;
 }
 

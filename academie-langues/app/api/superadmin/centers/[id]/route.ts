@@ -269,7 +269,7 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     } else {
       const normalized = normalizeTcfPlan(rawPlan);
       if (!normalized) {
-        return NextResponse.json({ error: "Offre TCF invalide (Starter, Pro, Ultra ou Sur devis)." }, { status: 400 });
+        return NextResponse.json({ error: "Offre TCF invalide (Access, Lite, Advance ou Entreprise)." }, { status: 400 });
       }
       nextPlanType = normalized;
       nextOffer = null;

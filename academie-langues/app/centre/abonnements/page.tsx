@@ -51,9 +51,10 @@ function tcfStudentsLabel(
   offer: { minStudents: number; maxStudents: number | null },
   t: ReturnType<typeof useI18n>["t"],
 ): string {
-  return offer.maxStudents == null
-    ? t("centre", "abonnementsStudentsFrom", { min: offer.minStudents })
-    : t("centre", "abonnementsStudentsRange", { min: offer.minStudents, max: offer.maxStudents });
+  if (offer.maxStudents == null) return t("centre", "abonnementsStudentsFrom", { min: offer.minStudents });
+  return offer.minStudents > 1
+    ? t("centre", "abonnementsStudentsRange", { min: offer.minStudents, max: offer.maxStudents })
+    : t("centre", "abonnementsStudentsUpTo", { max: offer.maxStudents });
 }
 
 const CORE_FEATURE_KEYS = [
@@ -70,6 +71,23 @@ const CORE_FEATURE_KEYS = [
   "abonnementsCoreFinance",
   "abonnementsCoreLive",
   "abonnementsCoreInterfaces",
+] as const;
+
+const TCF_CORE_FEATURE_KEYS = [
+  "abonnementsTcfCoreDashboard",
+  "abonnementsTcfCoreProgram",
+  "abonnementsTcfCoreCompEcrite",
+  "abonnementsTcfCoreCompOrale",
+  "abonnementsTcfCoreExpEcrite",
+  "abonnementsTcfCoreExpOrale",
+  "abonnementsTcfCoreExamBlanc",
+  "abonnementsTcfCoreSimulateurs",
+  "abonnementsTcfCoreCours",
+  "abonnementsTcfCoreDevoirs",
+  "abonnementsTcfCoreQuiz",
+  "abonnementsTcfCoreTuteur",
+  "abonnementsTcfCoreLive",
+  "abonnementsTcfCoreBibliotheque",
 ] as const;
 
 function fmtLimit(value: number | null, unlimited: string): string {
@@ -178,9 +196,10 @@ export default function AbonnementsPage() {
             {TCF_PLAN_KEYS.map((key) => {
               const offer = TCF_OFFERS[key];
               const isCurrent = currentTcfPlan === key;
-              const isMostChosen = key === "pro";
+              const isMostChosen = key === "advance";
               const features = en ? offer.featuresEn : offer.featuresFr;
               const name = en ? offer.nameEn : offer.nameFr;
+              const tagline = en ? offer.taglineEn : offer.taglineFr;
               const price = en ? offer.priceEn : offer.priceFr;
               const isQuote = offer.pricePerUser == null;
               const perUserLabel = offer.pricePerUser != null
@@ -219,7 +238,7 @@ export default function AbonnementsPage() {
                   </div>
                   <h3 className="text-lg font-black transition-colors duration-300 group-hover:text-[#eb670e]" style={{ color: BLUE }}>{name}</h3>
                   <p className="text-[12px] mt-1 font-medium" style={{ color: "rgba(17,34,78,0.55)" }}>
-                    {tcfStudentsLabel(offer, t)}
+                    {tagline}
                   </p>
                   {isQuote ? (
                     <p className="mt-4 text-2xl font-black leading-none" style={{ color: BLUE }}>
@@ -243,6 +262,9 @@ export default function AbonnementsPage() {
                       {t("centre", "abonnementsPriceFrom")} {entryPriceLabel} {t("centre", "abonnementsPricePerMonth")}
                     </p>
                   )}
+                  <p className="mt-3 text-xs font-bold" style={{ color: "rgba(17,34,78,0.55)" }}>
+                    {tcfStudentsLabel(offer, t)}
+                  </p>
                   <ul className="mt-5 space-y-2.5 flex-1">
                     {features.map((f) => (
                       <li key={f} className="flex items-start gap-2 text-[13px]" style={{ color: "rgba(17,34,78,0.75)" }}>
@@ -251,6 +273,19 @@ export default function AbonnementsPage() {
                       </li>
                     ))}
                   </ul>
+                  <div className="mt-4 pt-4 border-t border-black/[0.06]">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2.5">
+                      {t("centre", "abonnementsIncludedTitle")}
+                    </p>
+                    <ul className="space-y-1.5">
+                      {TCF_CORE_FEATURE_KEYS.map((keyName) => (
+                        <li key={keyName} className="flex items-start gap-2 text-[11px]" style={{ color: "rgba(17,34,78,0.6)" }}>
+                          <Check size={12} className="shrink-0 mt-0.5" style={{ color: BLUE }} />
+                          {t("centre", keyName)}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                   <button
                     onClick={contact}
                     className="mt-6 w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-sm text-white transition-all duration-300 group-hover:brightness-110 group-hover:scale-[1.02]"
