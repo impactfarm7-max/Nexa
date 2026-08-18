@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Building2,
+  Check,
   Inbox,
+  Info,
   Loader2,
   Mail,
   Phone,
@@ -222,6 +224,18 @@ export default function SuperadminDemandesPage() {
         </button>
       </div>
 
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "requestsHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "requestsHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "requestsHowItWorksDiff")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "requestsHowItWorksActions")}</p>
+      </div>
+
       {error && (
         <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
           {error}
@@ -272,9 +286,11 @@ export default function SuperadminDemandesPage() {
                     <button
                       type="button"
                       onClick={() => void setStatus(application.id, "contacted")}
-                      disabled={actionId === application.id}
-                      className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-amber-300 hover:bg-amber-500 hover:text-white disabled:opacity-50"
+                      disabled={actionId === application.id || application.status === "contacted"}
+                      title={application.status === "contacted" ? t("superadmin", "requestsAlreadyContacted") : undefined}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-amber-300 hover:bg-amber-500 hover:text-white disabled:opacity-50 disabled:hover:bg-amber-500/10 disabled:hover:text-amber-300"
                     >
+                      {application.status === "contacted" && <Check className="h-3 w-3" />}
                       {t("superadmin", "requestsMarkContacted")}
                     </button>
                     <button
@@ -288,9 +304,11 @@ export default function SuperadminDemandesPage() {
                     <button
                       type="button"
                       onClick={() => void setStatus(application.id, "rejected")}
-                      disabled={actionId === application.id}
-                      className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-red-300 hover:bg-red-500 hover:text-white disabled:opacity-50"
+                      disabled={actionId === application.id || application.status === "rejected"}
+                      title={application.status === "rejected" ? t("superadmin", "requestsAlreadyRejected") : undefined}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-[10px] font-black uppercase tracking-widest text-red-300 hover:bg-red-500 hover:text-white disabled:opacity-50 disabled:hover:bg-red-500/10 disabled:hover:text-red-300"
                     >
+                      {application.status === "rejected" && <Check className="h-3 w-3" />}
                       {t("superadmin", "requestsReject")}
                     </button>
                   </div>

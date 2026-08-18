@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Handshake, Loader2, Search } from "lucide-react";
+import { Handshake, Info, Loader2, Search } from "lucide-react";
 import { superadminFetch } from "@/app/utils/superadmin-api-client";
 import { nexaOfferLabel, type NexaOfferKey } from "@/app/data/nexaOffers";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -123,6 +123,19 @@ export default function SuperadminCommercialPage() {
         </p>
       </div>
 
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "commercialHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "commercialHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "commercialHowItWorksCriteria")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "commercialHowItWorksIntent")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "commercialHowItWorksMarkPaid")}</p>
+      </div>
+
       <div className="relative max-w-md">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
         <input
@@ -193,6 +206,7 @@ export default function SuperadminCommercialPage() {
                         type="button"
                         disabled={busyId === c.id}
                         onClick={() => void setIntent(c.id, "trial_convert")}
+                        title={t("superadmin", "commercialIntentHint")}
                         className="rounded-lg border border-white/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-slate-300 hover:bg-white/5 disabled:opacity-50"
                       >
                         {t("superadmin", "commercialIntent_trial_convert")}
@@ -201,6 +215,7 @@ export default function SuperadminCommercialPage() {
                         type="button"
                         disabled={busyId === c.id}
                         onClick={() => void setIntent(c.id, "upgrade")}
+                        title={t("superadmin", "commercialIntentHint")}
                         className="rounded-lg border border-white/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-slate-300 hover:bg-white/5 disabled:opacity-50"
                       >
                         {t("superadmin", "commercialIntent_upgrade")}
@@ -209,6 +224,7 @@ export default function SuperadminCommercialPage() {
                         type="button"
                         disabled={busyId === c.id}
                         onClick={() => void markPaid(c.id)}
+                        title={t("superadmin", "billingMarkPaidHint")}
                         className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-emerald-300 hover:bg-emerald-500/20 disabled:opacity-50"
                       >
                         {t("superadmin", "billingMarkPaid")}

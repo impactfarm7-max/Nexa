@@ -72,6 +72,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [centers, setCenters] = useState<CenterRow[]>([]);
+  const [newApplicationsCount, setNewApplicationsCount] = useState(0);
   const [studentResults, setStudentResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -171,6 +172,9 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
     if (!authorized || isBootstrapRoute) return;
     void superadminFetch<{ centers: CenterRow[] }>("/api/superadmin/centers")
       .then((json) => setCenters(json.centers || []))
+      .catch(() => undefined);
+    void superadminFetch<{ applications: { status: string }[] }>("/api/superadmin/applications")
+      .then((json) => setNewApplicationsCount((json.applications || []).filter((a) => a.status === "new").length))
       .catch(() => undefined);
   }, [authorized, isBootstrapRoute]);
 
@@ -291,7 +295,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
         </div>
         <nav className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label={t("superadmin", "navAriaLabel")}>
           {!collapsed && favorites.length > 0 && <div className="mb-5 rounded-2xl border border-amber-500/10 bg-amber-500/[0.04] p-1.5"><p className="px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-500/60">{t("superadmin", "favorites")}</p>{favorites.map((href) => { const item = NAV_ITEMS.find((entry) => entry.href === href); if (!item) return null; return <Link key={href} href={href} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-amber-200/70 hover:bg-amber-500/10"><Star className="h-3.5 w-3.5 fill-current" />{item.label}</Link>; })}</div>}
-          {groups.map((group) => <div key={group} className="mb-5">{!collapsed && <p className="mb-1.5 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-slate-600">{group}</p>}{NAV_ITEMS.filter((item) => item.group === group).map(({ href, label, description, icon: Icon }) => { const active = pathname === href || pathname.startsWith(`${href}/`); const count = href === "/superadmin/centres" ? pendingCenters.length : href === "/superadmin/dashboard" ? alertCounts.badge : 0; return <Link key={href} href={href} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)} className={`mb-1 flex min-h-12 items-center rounded-xl transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${active ? "bg-orange-500 text-white shadow-lg shadow-orange-950/30" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}><Icon className="h-4.5 w-4.5 shrink-0" />{!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{label}</p><p className={`truncate text-[9px] ${active ? "text-orange-100/70" : "text-slate-600"}`}>{description}</p></div>}{count > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">{count}</span>}</Link>; })}</div>)}
+          {groups.map((group) => <div key={group} className="mb-5">{!collapsed && <p className="mb-1.5 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-slate-600">{group}</p>}{NAV_ITEMS.filter((item) => item.group === group).map(({ href, label, description, icon: Icon }) => { const active = pathname === href || pathname.startsWith(`${href}/`); const count = href === "/superadmin/demandes" ? newApplicationsCount : href === "/superadmin/centres" ? pendingCenters.length : href === "/superadmin/dashboard" ? alertCounts.badge : 0; return <Link key={href} href={href} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)} className={`mb-1 flex min-h-12 items-center rounded-xl transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${active ? "bg-orange-500 text-white shadow-lg shadow-orange-950/30" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}><Icon className="h-4.5 w-4.5 shrink-0" />{!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{label}</p><p className={`truncate text-[9px] ${active ? "text-orange-100/70" : "text-slate-600"}`}>{description}</p></div>}{count > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">{count}</span>}</Link>; })}</div>)}
         </nav>
         <div className="shrink-0 border-t border-white/[0.07] p-3">
           <div className={`flex items-center ${collapsed ? "flex-col gap-1" : "gap-1"}`}>

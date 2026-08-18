@@ -169,7 +169,7 @@ export async function GET(req: NextRequest) {
       .select("center_id")
       .not("center_id", "is", null)
       .in("role", ["center_manager", "campus_manager", "trainer", "staff"]),
-    supabaseAdmin.from("campuses").select("center_id"),
+    supabaseAdmin.from("campuses").select("center_id").eq("status", "actif"),
   ]);
 
   const centers = centersQuery.data;
