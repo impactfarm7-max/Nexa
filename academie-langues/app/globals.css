@@ -429,6 +429,158 @@ body {
   background-color: #FFFBF7 !important;
 }
 
+/* Account profiles use the same visual tokens as Centre pages (Programmes,
+   Staff and Finance), while keeping each profile's existing composition. */
+.nexa-account-profile,
+.platform-profile-page {
+  --profile-blue: #11224e;
+  --profile-orange: #eb670e;
+  --profile-surface: #f7f7f6;
+  --profile-border: rgb(0 0 0 / 0.08);
+  color: var(--profile-blue);
+  font-feature-settings: "kern" 1, "liga" 1;
+}
+
+.nexa-account-profile section {
+  border-color: var(--profile-border) !important;
+  box-shadow: none !important;
+}
+
+.nexa-account-profile h1,
+.nexa-account-profile h2,
+.nexa-account-profile h3,
+.nexa-account-profile p.font-extrabold,
+.platform-profile-page h1,
+.platform-profile-page h2,
+.platform-profile-page h3 {
+  letter-spacing: -0.02em;
+}
+
+.nexa-account-profile .font-extrabold,
+.platform-profile-page .font-black,
+.platform-profile-page .font-extrabold {
+  font-weight: 800 !important;
+}
+
+.nexa-account-profile [class*="text-neutral-400"],
+.platform-profile-page [class*="text-neutral-400"],
+.platform-profile-page [class*="text-slate-400"] {
+  color: #737373 !important;
+}
+
+/* Student profiles used Tailwind's default orange. Centre UI uses Nexa's
+   deeper action orange, so all account variants now share one accent. */
+.platform-profile-page .text-orange-500,
+.platform-profile-page .text-orange-600,
+.platform-profile-page .text-orange-700 {
+  color: var(--profile-orange) !important;
+}
+
+.platform-profile-page .bg-orange-500,
+.platform-profile-page .bg-orange-600 {
+  background-color: var(--profile-orange) !important;
+}
+
+.platform-profile-page .border-orange-200,
+.platform-profile-page .border-orange-300 {
+  border-color: rgb(235 103 14 / 0.24) !important;
+}
+
+.nexa-account-profile input,
+.nexa-account-profile select,
+.platform-profile-page input,
+.platform-profile-page select {
+  font: inherit;
+  color: #262626;
+}
+
+.nexa-account-profile input:focus,
+.nexa-account-profile select:focus,
+.platform-profile-page input:focus,
+.platform-profile-page select:focus {
+  border-color: rgb(17 34 78 / 0.4) !important;
+  box-shadow: 0 0 0 2px rgb(17 34 78 / 0.08) !important;
+}
+
+.nexa-account-profile .profile-pin-description,
+.nexa-account-profile .profile-pin-empty-copy {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: clamp(0.625rem, 0.72vw, 0.75rem) !important;
+  line-height: 1.4;
+}
+
+/* The security column contains more controls than the identity card. Keep the
+   original two-column composition, but use the compact density of Centre
+   tables/forms so both sides remain visually balanced. */
+@media (min-width: 1024px) {
+  .nexa-account-profile {
+    align-items: stretch !important;
+  }
+
+  .nexa-account-profile .profile-identity-column {
+    display: flex;
+    height: 100%;
+    min-height: 100%;
+    flex-direction: column;
+    align-self: stretch;
+  }
+
+  .nexa-account-profile .profile-identity-card {
+    flex: 1 1 auto;
+    height: 100%;
+  }
+
+  .nexa-account-profile .profile-security-column {
+    gap: 0.75rem;
+  }
+
+  .nexa-account-profile .profile-security-column > section + section {
+    margin-top: 0.75rem !important;
+  }
+
+  .nexa-account-profile .profile-security-column > section {
+    padding: 1rem !important;
+  }
+
+  .nexa-account-profile .profile-security-column > section > div:first-child {
+    margin-bottom: 0.75rem;
+  }
+
+  .nexa-account-profile .profile-security-column [class*="space-y-4"] {
+    row-gap: 0.75rem;
+  }
+
+  .nexa-account-profile .profile-security-column [class*="p-5"] {
+    padding: 1rem !important;
+  }
+
+  .nexa-account-profile .profile-security-column [class*="p-4"] {
+    padding: 0.75rem !important;
+  }
+
+  .nexa-account-profile .profile-security-column input {
+    height: 2.5rem !important;
+  }
+
+  .nexa-account-profile .profile-security-column button[class*="h-10"] {
+    height: 2.25rem !important;
+  }
+
+  .nexa-account-profile .profile-security-column label[class*="items-start"] {
+    gap: 0.75rem !important;
+    padding: 0.75rem !important;
+  }
+
+  .nexa-account-profile .profile-security-column p[class*="text-[13px]"] {
+    font-size: 0.75rem !important;
+    line-height: 1.35;
+  }
+}
+
 .platform-profile-page header button,
 .platform-profile-page header a {
   min-height: 40px;

@@ -5,13 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
-  BadgeCheck,
   Building2,
   Calendar,
-  Camera,
   CreditCard,
-  Edit2,
-  KeyRound,
+  Lock,
   LogOut,
   Mail,
   MapPin,
@@ -20,6 +17,7 @@ import {
   Phone,
   Save,
   ShieldCheck,
+  Smartphone,
   User,
   Wallet,
 } from "lucide-react";
@@ -35,9 +33,11 @@ import {
 import StudentRouteSkeleton from "@/app/components/StudentRouteSkeleton";
 import DownloadAppButton from "@/app/components/DownloadAppButton";
 import { LogoutConfirmDialog } from "@/app/components/LogoutConfirmDialog";
-import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
+import { BRAND } from "@/app/utils/brand";
+import { centerNotoSans } from "@/app/centre/center-page-ui";
 import { AFRICA_54, findAfricaCountry, resolveAfricaCountry } from "@/app/data/africa-54";
 import { checkPasswordStrength, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
+import { initPwaInstallCapture, isIosDevice, isPwaInstalled, promptPwaInstall } from "@/app/utils/pwa-install";
 import {
   NEXA_STUDENT_QUOTA_LABELS,
   NEXA_STUDENT_QUOTAS,
@@ -46,6 +46,18 @@ import {
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
 import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/financeI18n";
+import {
+  IdCard,
+  MetaLine,
+  Group,
+  Row,
+  EditableRow,
+  AccordionRow,
+  ButtonRow,
+  PField,
+  PButton,
+  useAccordion,
+} from "@/app/components/profile/ProfileKit";
 
 type StudentAccount = {
   user: { id: string; email: string | null; created_at: string | null };
@@ -167,12 +179,14 @@ export default function CenterStudentProfil() {
   });
 
   const [passwordForm, setPasswordForm] = useState({ password: "", confirm: "" });
-  const [passwordOpen, setPasswordOpen] = useState(false);
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [canInstallApp, setCanInstallApp] = useState(false);
+  const [installBusy, setInstallBusy] = useState(false);
+  const acc = useAccordion();
   const financeEn = locale === "en" && !isTcfCanadaCenter(account?.center.center_type);
   const financeLocale = financeEn ? "en-US" : "fr-FR";
   const financeDate = (value?: string | null) => value
@@ -234,6 +248,29 @@ export default function CenterStudentProfil() {
   useEffect(() => {
     void loadAccount();
   }, []);
+
+  useEffect(() => {
+    initPwaInstallCapture();
+    const sync = () => setCanInstallApp(!isPwaInstalled());
+    sync();
+    window.addEventListener("nexa-pwa-install-ready", sync);
+    return () => window.removeEventListener("nexa-pwa-install-ready", sync);
+  }, []);
+
+  const handleInstallRow = async () => {
+    if (installBusy || isPwaInstalled()) return;
+    if (isIosDevice()) {
+      document.querySelector<HTMLButtonElement>('button[aria-label="Télécharger l\'app"]')?.click();
+      return;
+    }
+    setInstallBusy(true);
+    try {
+      await promptPwaInstall();
+      setCanInstallApp(!isPwaInstalled());
+    } finally {
+      setInstallBusy(false);
+    }
+  };
 
   const displayCountry =
     account?.profile?.country ||
@@ -408,7 +445,7 @@ export default function CenterStudentProfil() {
       if (error) throw error;
       setPasswordForm({ password: "", confirm: "" });
       setPasswordMessage(td("profilPasswordUpdated"));
-      setPasswordOpen(false);
+      acc.close();
     } catch (err: unknown) {
       setPasswordError(err instanceof Error ? err.message : td("profilPasswordUpdateError"));
     } finally {
@@ -450,8 +487,10 @@ export default function CenterStudentProfil() {
     );
   }
 
+  const emptyValue = "—";
+
   return (
-    <div className="platform-profile-page min-h-[100dvh] bg-[#FFFBF7] text-[#11224E] pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-10 overflow-x-hidden">
+    <div className={`platform-profile-page ${centerNotoSans.className} min-h-[100dvh] bg-[#FFFBF7] text-[#11224E] pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-10 overflow-x-hidden`}>
       <header className="sticky top-0 z-30 border-b border-black/[0.06] bg-[#FFFBF7] pt-[env(safe-area-inset-top,0px)]">
         <div className="nexa-student-shell flex items-center gap-2 sm:gap-3 h-[68px]">
           <Link
@@ -470,43 +509,34 @@ export default function CenterStudentProfil() {
             </h1>
           </div>
           <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <DownloadAppButton />
             {!isEditing ? (
               <button
                 onClick={startEditing}
-                className="hidden h-9 sm:h-10 items-center gap-2 rounded-lg border px-3.5 text-xs font-semibold lg:flex"
+                className="flex h-9 sm:h-10 items-center gap-2 rounded-lg border px-3.5 text-xs font-semibold"
                 style={{ color: BRAND.blue, border: `1.5px solid ${BRAND.blue}` }}
               >
-                <Edit2 className="h-3.5 w-3.5" />
-                {td("profilEdit")}
+                <span className="hidden sm:inline">{td("profilEdit")}</span>
+                <span className="sm:hidden">✎</span>
               </button>
             ) : (
               <>
                 <button
                   onClick={cancelEditing}
-                  className="hidden h-9 sm:h-10 items-center rounded-lg border border-black/[0.08] px-3.5 text-xs font-semibold text-neutral-600 lg:flex"
+                  className="hidden sm:flex h-9 sm:h-10 items-center rounded-lg border border-black/[0.08] px-3.5 text-xs font-semibold text-neutral-600"
                 >
                   {td("profilCancel")}
                 </button>
                 <button
                   onClick={saveProfile}
                   disabled={saving}
-                  className="hidden h-9 sm:h-10 items-center gap-2 rounded-lg px-3.5 text-xs font-semibold text-white disabled:opacity-50 lg:flex"
+                  className="flex h-9 sm:h-10 items-center gap-2 rounded-lg px-3.5 text-xs font-semibold text-white disabled:opacity-50"
                   style={{ backgroundColor: BRAND.blue }}
                 >
                   <Save className="h-3.5 w-3.5" />
-                  {saving ? td("profilSaving") : td("profilSave")}
+                  <span className="hidden sm:inline">{saving ? td("profilSaving") : td("profilSave")}</span>
                 </button>
               </>
             )}
-            <button
-              onClick={() => setLogoutConfirmOpen(true)}
-              aria-label={td("profilLogout")}
-              className="flex h-9 sm:h-10 sm:w-auto sm:px-3.5 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 text-xs font-semibold text-red-600 hover:bg-red-100 w-9"
-            >
-              <LogOut className="h-3.5 w-3.5 shrink-0" />
-              <span className="hidden sm:inline">{td("profilLogout")}</span>
-            </button>
           </div>
         </div>
       </header>
@@ -546,260 +576,119 @@ export default function CenterStudentProfil() {
         </div>
       )}
 
-      <section className="nexa-student-shell grid gap-4 sm:gap-5 md:gap-6 py-5 sm:py-6 md:py-8 xl:gap-8 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
-        <aside className="min-w-0 space-y-4 sm:space-y-5">
-          <section className="relative overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border border-neutral-200 bg-white p-4 sm:p-5 md:p-6 text-center shadow-sm">
-            <div className="absolute top-0 left-0 h-1 w-full" style={{ backgroundColor: BRAND.orange }} />
+      <div className="nexa-student-shell pt-5 md:pt-8 pb-6 max-w-5xl space-y-4">
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] gap-4 items-start">
+        <div className="space-y-4 min-w-0">
+        <IdCard
+          photoUrl={account.profile.avatar_url}
+          photoIcon={User}
+          photoUploading={avatarUploading}
+          onPhotoClick={() => fileInputRef.current?.click()}
+          name={displayName}
+          tags={[
+            {
+              label: account.isPluriannual
+                ? td("profilStudentPluriannual")
+                : isTcfCanadaCenter(account.center.center_type)
+                  ? td("profilStudentTcf")
+                  : td("profilStudentCenter"),
+            },
+            { label: statusLabel, tone: isPaused ? "warning" : isRevoked ? "warning" : "positive" },
+          ]}
+        >
+          <MetaLine icon={Mail}>{account.profile.email || account.user.email || emptyValue}</MetaLine>
+          <MetaLine icon={Building2}>{displayCountry}</MetaLine>
+          <MetaLine icon={Calendar}>{formatDateFr(account.profile.created_at || account.user.created_at, locale)}</MetaLine>
+        </IdCard>
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={handleAvatarChange}
-            />
-
-            <div className="mx-auto mb-3 sm:mb-4 flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] border border-orange-200/40 bg-orange-50">
-              {avatarUploading ? (
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-200 border-t-orange-500" />
-              ) : account.profile.avatar_url ? (
-                <img src={account.profile.avatar_url} alt="Avatar" className="h-full w-full object-cover" />
-              ) : (
-                <User className="h-9 w-9 sm:h-10 sm:w-10 text-orange-600" />
-              )}
-            </div>
-
-            {!avatarUploading && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-neutral-600 transition-colors hover:border-orange-200 hover:bg-orange-50 hover:text-orange-600"
-              >
-                <Camera size={11} /> {td("profilChangePhoto")}
-              </button>
-            )}
-
-            <div className="mt-4 sm:mt-5">
-              <div className="flex items-center justify-center gap-2 px-2">
-                <p className="truncate text-lg sm:text-xl font-black">{displayName}</p>
-                <BadgeCheck className="h-5 w-5 shrink-0 text-orange-500" />
-              </div>
-              <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-                <span className="inline-flex items-center rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-blue-700">
-                  {account.isPluriannual
-                    ? td("profilStudentPluriannual")
-                    : isTcfCanadaCenter(account.center.center_type)
-                      ? td("profilStudentTcf")
-                      : td("profilStudentCenter")}
-                </span>
-                <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${statusBadgeClass}`}>
-                  {statusLabel}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-5 sm:mt-6 border-t border-neutral-100 pt-4 sm:pt-5 text-left">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-black text-slate-900">{td("profilPersonalInfo")}</p>
-                  <p className="mt-0.5 text-[10px] font-bold text-slate-400">
-                    {isEditing ? td("profilEditInfoHelp") : td("profilInfoHelp")}
-                  </p>
-                </div>
-                {isEditing && (
-                  <span className="shrink-0 rounded-full bg-orange-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-widest text-orange-600">
-                    {td("profilEditingBadge")}
-                  </span>
-                )}
-              </div>
-
-              {isEditing && (
-                <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                  <Field label={td("profilFirstName")} value={form.prenom} onChange={(value) => setForm((c) => ({ ...c, prenom: value }))} />
-                  <Field label={td("profilLastName")} value={form.nom} onChange={(value) => setForm((c) => ({ ...c, nom: value }))} />
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 gap-3 text-sm font-semibold text-slate-500 sm:grid-cols-2 lg:grid-cols-1">
-                <InfoLine icon={Mail} label={td("profilEmail")} value={account.profile.email || account.user.email || "—"} />
-                {isEditing ? (
-                  <Field label={td("profilPhoneWhatsapp")} value={form.phone} onChange={(value) => setForm((c) => ({ ...c, phone: value }))} />
-                ) : (
-                  <InfoLine icon={Phone} label={td("profilPhoneWhatsapp")} value={savedForm.phone || "—"} />
-                )}
-                {isEditing ? (
-                  <label className="block min-w-0">
-                    <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilCountry")}</span>
-                    <select
-                      value={form.countryCode}
-                      onChange={(e) => setForm((c) => ({ ...c, countryCode: e.target.value }))}
-                      className="h-12 w-full max-w-full rounded-2xl border border-orange-200 bg-white px-3 sm:px-4 text-sm font-bold text-slate-900 outline-none transition-colors focus:border-orange-500"
-                    >
-                      <option value="">{td("profilSelectCountry")}</option>
-                      {AFRICA_54.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.flag} {c.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                ) : (
-                  <InfoLine icon={Building2} label={td("profilCountry")} value={displayCountry} />
-                )}
-                {isEditing ? (
-                  <Field label={td("profilCity")} value={form.ville} onChange={(value) => setForm((c) => ({ ...c, ville: value }))} />
-                ) : (
-                  <InfoLine icon={MapPin} label={td("profilCity")} value={savedForm.ville || account.profile.city || "—"} />
-                )}
-                {isEditing ? (
-                  <Field
-                    label={td("profilBirthDate")}
-                    value={form.birth_date}
-                    onChange={(value) => setForm((c) => ({ ...c, birth_date: value }))}
-                    type="date"
-                  />
-                ) : (
-                  <InfoLine icon={Calendar} label={td("profilBirthDate")} value={formatDateFr(account.profile.birth_date, locale)} />
-                )}
-                {account.profile.genre ? <InfoLine icon={User} label={td("profilGender")} value={account.profile.genre} /> : null}
-                <InfoLine icon={Calendar} label={td("profilMemberSince")} value={formatDateFr(account.profile.created_at || account.user.created_at, locale)} />
-              </div>
-
-              <div className="mt-5 flex flex-col gap-3 lg:hidden">
-                {!isEditing ? (
-                  <button
-                    onClick={startEditing}
-                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-orange-100 bg-orange-50 text-sm font-black uppercase tracking-widest text-orange-600"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                    {td("profilEdit")}
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={saveProfile}
-                      disabled={saving}
-                      className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-sm font-black uppercase tracking-widest text-white disabled:opacity-50"
-                      style={{ backgroundColor: BRAND.blue }}
-                    >
-                      <Save className="h-4 w-4" />
-                      {saving ? td("profilSaving") : td("profilSave")}
-                    </button>
-                    <button
-                      onClick={cancelEditing}
-                      className="flex h-11 w-full items-center justify-center rounded-2xl bg-neutral-100 text-sm font-black uppercase tracking-widest text-slate-500"
-                    >
-                      {td("profilCancel")}
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          </section>
-
-          <button
-            onClick={() => setLogoutConfirmOpen(true)}
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-neutral-900 text-sm font-black uppercase tracking-widest text-white transition hover:bg-orange-600 lg:hidden"
-          >
-            <LogOut className="h-4 w-4" />
-            {td("profilSignOut")}
-          </button>
-        </aside>
-
-        <div className="min-w-0 space-y-4 sm:space-y-5">
-          <section className="rounded-[1.25rem] sm:rounded-[1.5rem] border border-neutral-200 bg-white p-4 sm:p-5 shadow-sm transition-all">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: BRAND.blue }}>
-                <KeyRound className="h-4 w-4" />
-              </div>
+        <Group title={td("profilPersonalInfo")}>
+          <EditableRow icon={User} label={td("profilFirstName")} value={account.profile.prenom || emptyValue}
+            editing={isEditing} editValue={form.prenom} onEditChange={(v) => setForm((c) => ({ ...c, prenom: v }))} />
+          <EditableRow icon={User} label={td("profilLastName")} value={account.profile.nom || emptyValue}
+            editing={isEditing} editValue={form.nom} onEditChange={(v) => setForm((c) => ({ ...c, nom: v }))} />
+          <Row icon={Mail} label={td("profilEmail")} value={account.profile.email || account.user.email || emptyValue} />
+          <EditableRow icon={Phone} label={td("profilPhoneWhatsapp")} value={savedForm.phone || emptyValue}
+            editing={isEditing} editValue={form.phone} onEditChange={(v) => setForm((c) => ({ ...c, phone: v }))} />
+          {isEditing ? (
+            <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
+              <Building2 size={16} className="shrink-0" style={{ color: "#eb670e" }} strokeWidth={1.9} />
               <div className="min-w-0 flex-1">
-                <p className="text-base font-black">{td("profilPassword")}</p>
-                <p className="truncate text-[11px] font-bold text-slate-400">
-                  {td("profilPasswordHelp")}
-                </p>
-              </div>
-              {!passwordOpen && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPasswordOpen(true);
-                    setPasswordError(null);
-                    setPasswordMessage(null);
-                  }}
-                  className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-orange-100 bg-orange-50 px-2.5 sm:px-3 text-[10px] font-black uppercase tracking-wider text-orange-600 hover:bg-orange-100"
+                <p className="text-[11px] font-semibold mb-1" style={{ color: "rgba(17,34,78,0.4)" }}>{td("profilCountry")}</p>
+                <select
+                  value={form.countryCode}
+                  onChange={(e) => setForm((c) => ({ ...c, countryCode: e.target.value }))}
+                  className="w-full h-8 -mt-1 bg-transparent text-[13.5px] font-bold outline-none border-b"
+                  style={{ color: "#11224E", borderColor: "rgba(235,103,14,0.4)" }}
                 >
-                  <Edit2 className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{td("profilEdit")}</span>
-                </button>
-              )}
-            </div>
-
-            {passwordMessage && !passwordOpen && (
-              <p className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-700">
-                {passwordMessage}
-              </p>
-            )}
-
-            {passwordOpen && (
-              <div className="mt-5 border-t border-neutral-100 pt-5">
-                <div className="mb-4">
-                  <p className="text-sm font-black text-slate-900">{td("profilSetNewPassword")}</p>
-                  <p className="mt-1 text-xs font-medium text-slate-400">
-                    {PASSWORD_POLICY_HINT}
-                  </p>
-                </div>
-
-                {passwordError && (
-                  <p className="mb-4 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-600">
-                    {passwordError}
-                  </p>
-                )}
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field
-                    label={td("profilNewPassword")}
-                    value={passwordForm.password}
-                    onChange={(value) => setPasswordForm((c) => ({ ...c, password: value }))}
-                    type="password"
-                  />
-                  <Field
-                    label={td("profilConfirmPassword")}
-                    value={passwordForm.confirm}
-                    onChange={(value) => setPasswordForm((c) => ({ ...c, confirm: value }))}
-                    type="password"
-                  />
-                </div>
-
-                <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPasswordOpen(false);
-                      setPasswordForm({ password: "", confirm: "" });
-                      setPasswordError(null);
-                    }}
-                    disabled={passwordSaving}
-                    className="h-11 w-full rounded-xl bg-neutral-100 px-5 text-xs font-black uppercase tracking-wider text-slate-500 hover:bg-neutral-200 disabled:opacity-50 sm:w-auto"
-                  >
-                    {td("profilCancel")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handlePasswordChange}
-                    disabled={passwordSaving}
-                    className="flex h-11 w-full items-center justify-center gap-2 rounded-xl px-5 text-xs font-black uppercase tracking-wider text-white hover:opacity-90 disabled:opacity-50 sm:w-auto"
-                    style={{ backgroundColor: BRAND.orange }}
-                  >
-                    <ShieldCheck className="h-4 w-4" />
-                    {passwordSaving ? td("profilUpdating") : td("profilConfirm")}
-                  </button>
-                </div>
+                  <option value="">{td("profilSelectCountry")}</option>
+                  {AFRICA_54.map((c) => (
+                    <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+                  ))}
+                </select>
               </div>
-            )}
-          </section>
+            </div>
+          ) : (
+            <Row icon={Building2} label={td("profilCountry")} value={displayCountry} />
+          )}
+          <EditableRow icon={MapPin} label={td("profilCity")} value={savedForm.ville || account.profile.city || emptyValue}
+            editing={isEditing} editValue={form.ville} onEditChange={(v) => setForm((c) => ({ ...c, ville: v }))} />
+          <EditableRow icon={Calendar} label={td("profilBirthDate")} value={formatDateFr(account.profile.birth_date, locale)}
+            editing={isEditing} editValue={form.birth_date} onEditChange={(v) => setForm((c) => ({ ...c, birth_date: v }))} type="date" />
+          {account.profile.genre ? <Row icon={User} label={td("profilGender")} value={account.profile.genre} /> : null}
+          <Row icon={Calendar} label={td("profilMemberSince")} value={formatDateFr(account.profile.created_at || account.user.created_at, locale)} />
+        </Group>
+        </div>
 
-          <section className="rounded-[1.5rem] sm:rounded-[2rem] border border-neutral-200 bg-white p-4 sm:p-5 md:p-6 shadow-sm">
+        <div className="space-y-4 min-w-0">
+        <Group title={td("profilSecurityTitle")}>
+          <AccordionRow
+            icon={Lock}
+            label={td("profilPassword")}
+            description={td("profilPasswordHelp")}
+            open={acc.isOpen("password")}
+            onToggle={() => acc.toggle("password")}
+          >
+            {passwordMessage && (
+              <p className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{passwordMessage}</p>
+            )}
+            <p className="text-[12px] font-medium mb-3" style={{ color: "rgba(17,34,78,0.5)" }}>{PASSWORD_POLICY_HINT}</p>
+            {passwordError && (
+              <p className="mb-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{passwordError}</p>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2 mb-4">
+              <PField label={td("profilNewPassword")} value={passwordForm.password} onChange={(v) => setPasswordForm((c) => ({ ...c, password: v }))} type="password" />
+              <PField label={td("profilConfirmPassword")} value={passwordForm.confirm} onChange={(v) => setPasswordForm((c) => ({ ...c, confirm: v }))} type="password" />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <PButton variant="ghost" onClick={() => { acc.close(); setPasswordForm({ password: "", confirm: "" }); setPasswordError(null); }} disabled={passwordSaving}>
+                {td("profilCancel")}
+              </PButton>
+              <PButton onClick={handlePasswordChange} busy={passwordSaving}>
+                <ShieldCheck size={14} />
+                {td("profilConfirm")}
+              </PButton>
+            </div>
+          </AccordionRow>
+        </Group>
+
+        <Group title={td("profilSessionTitle")}>
+          {canInstallApp && (
+            <ButtonRow
+              icon={Smartphone}
+              label={installBusy ? td("profilInstalling") : td("profilDownloadApp")}
+              onClick={() => void handleInstallRow()}
+              busy={installBusy}
+              tone="brand"
+            />
+          )}
+          <ButtonRow icon={LogOut} label={td("profilSignOut")} onClick={() => setLogoutConfirmOpen(true)} tone="danger" />
+        </Group>
+        <div className="hidden"><DownloadAppButton /></div>
+
+          <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="mb-4 sm:mb-6 flex items-start sm:items-center gap-3">
-              <div className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl text-white" style={{ backgroundColor: BRAND.orange }}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: BRAND.orange }}>
                 <Package className="h-5 w-5" />
               </div>
               <div className="min-w-0">
@@ -867,10 +756,10 @@ export default function CenterStudentProfil() {
             )}
           </section>
 
-          <section className="rounded-[1.5rem] sm:rounded-[2rem] border border-neutral-200 bg-white p-4 sm:p-5 md:p-6 shadow-sm">
+          <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 md:p-6 shadow-sm">
             <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-start sm:items-center gap-3">
-                <div className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-2xl text-white" style={{ backgroundColor: BRAND.blue }}>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: BRAND.blue }}>
                   <Wallet className="h-5 w-5" />
                 </div>
                 <div className="min-w-0">
@@ -1053,7 +942,8 @@ export default function CenterStudentProfil() {
             )}
           </section>
         </div>
-      </section>
+        </div>
+      </div>
 
       {logoutConfirmOpen && (
         <LogoutConfirmDialog
@@ -1069,50 +959,6 @@ export default function CenterStudentProfil() {
         />
       )}
     </div>
-  );
-}
-
-function InfoLine({ icon: Icon, label, value }: { icon: typeof Mail; label: string; value: string }) {
-  return (
-    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-neutral-100 bg-neutral-50 px-3 sm:px-4 py-3">
-      <Icon className="h-4 w-4 shrink-0 text-orange-600" />
-      <span className="min-w-0 flex-1">
-        <span className="block text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
-        <span className="block truncate text-sm font-black text-slate-900" title={value}>{value}</span>
-      </span>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  readOnly = false,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange?: (value: string) => void;
-  readOnly?: boolean;
-  type?: string;
-}) {
-  return (
-    <label className="block min-w-0">
-      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange?.(event.target.value)}
-        readOnly={readOnly}
-        disabled={readOnly}
-        className={`h-12 w-full max-w-full rounded-2xl border px-3 sm:px-4 text-sm font-bold outline-none transition-colors ${
-          readOnly
-            ? "cursor-default border-neutral-100 bg-neutral-100 text-slate-500"
-            : "border-orange-200 bg-white text-slate-900 focus:border-orange-500"
-        }`}
-      />
-    </label>
   );
 }
 

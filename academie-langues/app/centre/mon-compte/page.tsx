@@ -235,7 +235,7 @@ export default function CenterAccountPage() {
         />
       }
     >
-      <section className="nexa-center-shell grid gap-5 py-6 lg:grid-cols-[0.9fr_1.4fr]">
+      <section className="nexa-account-profile nexa-center-shell grid gap-5 py-6 lg:grid-cols-[0.9fr_1.4fr]">
         <aside className="space-y-4">
           <section className="rounded-xl border border-black/[0.08] bg-white p-5">
             <div className="flex items-center gap-4">

@@ -12,32 +12,40 @@ import {
   User,
   GraduationCap,
   LogOut,
-  BadgeCheck,
   Crown,
   Clock,
-  AlertCircle,
   Phone,
-  Edit2,
   Save,
   Trash2,
-  Camera,
   ShieldCheck,
   Zap,
   Leaf,
   Star,
   Target,
-  Layers
+  Layers,
+  Globe2,
+  Smartphone,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { logClientActivity } from "../utils/client-activity";
 import { logoutAndClearSession } from "../utils/session";
 import { useSimulationLimit } from "@/app/hooks/useSimulationLimit";
 import { useI18n } from "@/app/i18n/I18nProvider";
-import { BRAND, STUDENT_TEXT } from "@/app/utils/brand";
+import { BRAND } from "@/app/utils/brand";
 import StudentRouteSkeleton from "@/app/components/StudentRouteSkeleton";
-import DownloadAppButton from "@/app/components/DownloadAppButton";
 import { LogoutConfirmDialog } from "@/app/components/LogoutConfirmDialog";
 import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
+import { initPwaInstallCapture, isIosDevice, isPwaInstalled, promptPwaInstall } from "@/app/utils/pwa-install";
+import DownloadAppButton from "@/app/components/DownloadAppButton";
+import { centerNotoSans } from "@/app/centre/center-page-ui";
+import {
+  IdCard,
+  MetaLine,
+  Group,
+  Row,
+  EditableRow,
+  ButtonRow,
+} from "@/app/components/profile/ProfileKit";
 
 type Profile = {
   id: string;
@@ -58,7 +66,6 @@ type Profile = {
   avatar_url: string | null;
 };
 
-// ✅ Tous les mois à exactement 3 lettres
 const MOIS_3 = [
   "jan", "fév", "mar", "avr", "mai", "jun",
   "jul", "aoû", "sep", "oct", "nov", "déc",
@@ -81,7 +88,6 @@ export default function ProfilPage() {
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
-  // 🎯 GESTION DU MODE ÉDITION
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     ville: "",
@@ -93,113 +99,29 @@ export default function ProfilPage() {
   });
   const [saving, setSaving] = useState(false);
 
-  // 📸 GESTION DE L'AVATAR
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [canInstallApp, setCanInstallApp] = useState(false);
+  const [installBusy, setInstallBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🟢 IMPORT DU VIGILE DES PACKS
-  const { 
-    packType, 
-    isSubValid, 
-    eeLeft, 
-    examLeft, 
-    dailyCount 
-  } = useSimulationLimit();
+  const { packType, isSubValid, eeLeft, examLeft, dailyCount } = useSimulationLimit();
 
-  // ==========================================
-  // 🎨 CONFIGURATION DES THEMES DE PACKS
-  // ==========================================
   const PACK_THEMES: Record<string, any> = {
-    ivoire: {
-      name: "MEMBRE IVOIRE",
-      bg: "bg-gradient-to-br from-yellow-400 to-yellow-600",
-      border: "border-yellow-500",
-      text: "text-white",
-      iconBg: "bg-white/20",
-      iconText: "text-white",
-      icon: Crown
-    },
-    cauris: {
-      name: "MEMBRE CAURIS",
-      bg: "bg-gradient-to-br from-blue-500 to-blue-700",
-      border: "border-blue-600",
-      text: "text-white",
-      iconBg: "bg-white/20",
-      iconText: "text-white",
-      icon: ShieldCheck
-    },
-    ebene: {
-      name: "MEMBRE ÉBÈNE",
-      bg: "bg-gradient-to-br from-slate-800 to-slate-950",
-      border: "border-slate-800",
-      text: "text-white",
-      iconBg: "bg-white/10",
-      iconText: "text-white",
-      icon: Zap
-    },
-    raphia: {
-      name: "MEMBRE RAPHIA",
-      bg: "bg-gradient-to-br from-emerald-400 to-emerald-600",
-      border: "border-emerald-500",
-      text: "text-white",
-      iconBg: "bg-white/20",
-      iconText: "text-white",
-      icon: Leaf
-    },
-    acceleree: {
-      name: "FORMATION ACCÉLÉRÉE",
-      bg: "bg-gradient-to-br from-indigo-500 to-indigo-700",
-      border: "border-indigo-600",
-      text: "text-white",
-      iconBg: "bg-white/20",
-      iconText: "text-white",
-      icon: Zap
-    },
-    complete: {
-      name: "FORMATION COMPLÈTE",
-      bg: "bg-gradient-to-br from-purple-500 to-purple-700",
-      border: "border-purple-600",
-      text: "text-white",
-      iconBg: "bg-white/20",
-      iconText: "text-white",
-      icon: Star
-    },
-    admin: {
-      name: "ADMINISTRATEUR",
-      bg: "bg-gradient-to-br from-slate-900 to-slate-700",
-      border: "border-slate-700",
-      text: "text-white",
-      iconBg: "bg-white/10",
-      iconText: "text-white",
-      icon: ShieldCheck
-    },
-    aucun: {
-      name: "ÉTUDIANT CLASSIQUE",
-      bg: "bg-neutral-50",
-      border: "border-neutral-200/60",
-      text: "text-neutral-900",
-      iconBg: "bg-neutral-900",
-      iconText: "text-white",
-      icon: GraduationCap
-    }
+    ivoire: { name: "MEMBRE IVOIRE", icon: Crown, tone: "positive" as const },
+    cauris: { name: "MEMBRE CAURIS", icon: ShieldCheck, tone: "positive" as const },
+    ebene: { name: "MEMBRE ÉBÈNE", icon: Zap, tone: "positive" as const },
+    raphia: { name: "MEMBRE RAPHIA", icon: Leaf, tone: "positive" as const },
+    acceleree: { name: "FORMATION ACCÉLÉRÉE", icon: Zap, tone: "positive" as const },
+    complete: { name: "FORMATION COMPLÈTE", icon: Star, tone: "positive" as const },
+    admin: { name: "ADMINISTRATEUR", icon: ShieldCheck, tone: "positive" as const },
+    aucun: { name: "ÉTUDIANT CLASSIQUE", icon: GraduationCap, tone: "neutral" as const },
   };
 
-  // Si abonnement actif mais pack non encore assigné → thème générique "Accès Premium"
   const resolvedPackType = (isSubValid && packType === "aucun") ? "_premium_actif" : packType;
-  const PREMIUM_FALLBACK_THEME = {
-    name: "ACCÈS PREMIUM",
-    bg: "bg-gradient-to-br from-orange-500 to-orange-600",
-    border: "border-orange-500",
-    text: "text-white",
-    iconBg: "bg-white/20",
-    iconText: "text-white",
-    icon: Crown
-  };
-  const currentTheme = resolvedPackType === "_premium_actif"
-    ? PREMIUM_FALLBACK_THEME
-    : (PACK_THEMES[packType] || PACK_THEMES.aucun);
+  const PREMIUM_FALLBACK_THEME = { name: "ACCÈS PREMIUM", icon: Crown, tone: "positive" as const };
+  const currentTheme = resolvedPackType === "_premium_actif" ? PREMIUM_FALLBACK_THEME : (PACK_THEMES[packType] || PACK_THEMES.aucun);
   const ThemeIcon = currentTheme.icon;
 
   const displayName = useMemo(() => {
@@ -216,28 +138,18 @@ export default function ProfilPage() {
     const raw = profile?.created_at || user?.created_at;
     if (!raw) return "—";
     const d = new Date(raw);
-    return d.toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
   }, [profile, user]);
 
   const loadProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession();
-
     if (!session) {
       router.push("/login");
       return;
     }
-
     setUser(session.user);
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", session.user.id)
-      .single();
+    const { data, error } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
 
     if (isCenterStudent(data)) {
       setProfileMode("center");
@@ -258,41 +170,53 @@ export default function ProfilPage() {
         formation: "tcf",
         avatar_url: null,
       };
-      const { data: created } = await supabase
-        .from("profiles")
-        .upsert(fallback)
-        .select("*")
-        .single();
+      const { data: created } = await supabase.from("profiles").upsert(fallback).select("*").single();
       setProfile((created as Profile) ?? null);
     } else {
       const fullData = { ...data };
-      if (!fullData.ville && session.user.user_metadata?.ville)
-        fullData.ville = session.user.user_metadata.ville;
-      if (!fullData.phone && session.user.user_metadata?.phone)
-        fullData.phone = session.user.user_metadata.phone;
+      if (!fullData.ville && session.user.user_metadata?.ville) fullData.ville = session.user.user_metadata.ville;
+      if (!fullData.phone && session.user.user_metadata?.phone) fullData.phone = session.user.user_metadata.phone;
       setProfile(fullData as Profile);
     }
     logClientActivity("Ouverture profil", "Page Mon compte consultee");
-
     setLoading(false);
   };
 
-  // Chargement initial
   useEffect(() => { loadProfile(); }, []);
 
-  // Recharge les données quand l'onglet redevient visible (ex: retour depuis /admin)
   useEffect(() => {
     const handleVisibility = () => { if (document.visibilityState === "visible") loadProfile(); };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, []);
 
-  // 📸 UPLOAD AVATAR
+  useEffect(() => {
+    initPwaInstallCapture();
+    const sync = () => setCanInstallApp(!isPwaInstalled());
+    sync();
+    window.addEventListener("nexa-pwa-install-ready", sync);
+    return () => window.removeEventListener("nexa-pwa-install-ready", sync);
+  }, []);
+
+  const handleInstallRow = async () => {
+    if (installBusy || isPwaInstalled()) return;
+    if (isIosDevice()) {
+      document.querySelector<HTMLButtonElement>('button[aria-label="Télécharger l\'app"]')?.click();
+      return;
+    }
+    setInstallBusy(true);
+    try {
+      await promptPwaInstall();
+      setCanInstallApp(!isPwaInstalled());
+    } finally {
+      setInstallBusy(false);
+    }
+  };
+
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    // Vérification taille (max 2MB) et type
     if (file.size > 2 * 1024 * 1024) {
       alert(t("dashboard", "profilImageTooLarge"));
       return;
@@ -303,34 +227,17 @@ export default function ProfilPage() {
     }
 
     setAvatarUploading(true);
-
     try {
       const ext = file.name.split(".").pop();
       const filePath = `${user.id}/avatar.${ext}`;
-
-      // Upload dans le bucket "avatars"
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(filePath, file, { upsert: true });
-
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file, { upsert: true });
       if (uploadError) throw uploadError;
 
-      // Récupération de l'URL publique
-      const { data: urlData } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(filePath);
+      const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`;
 
-      const publicUrl = `${urlData.publicUrl}?t=${Date.now()}`; // cache busting
-
-      // Sauvegarde dans profiles
-      await supabase
-        .from("profiles")
-        .update({ avatar_url: urlData.publicUrl })
-        .eq("id", user.id);
-
-      setProfile((prev) =>
-        prev ? { ...prev, avatar_url: publicUrl } : null
-      );
+      await supabase.from("profiles").update({ avatar_url: urlData.publicUrl }).eq("id", user.id);
+      setProfile((prev) => (prev ? { ...prev, avatar_url: publicUrl } : null));
       logClientActivity("Avatar modifie", "Photo de profil mise a jour");
     } catch (err: any) {
       alert("Erreur lors de l'upload : " + err.message);
@@ -340,11 +247,9 @@ export default function ProfilPage() {
     }
   };
 
-  // 🎯 FONCTION POUR ENREGISTRER LES MODIFICATIONS
   const handleSaveProfile = async () => {
     if (!user) return;
     setSaving(true);
-
     try {
       const selectedAfrica = findAfricaCountry(editForm.countryCode);
       const cityValue = editForm.ville.trim();
@@ -383,7 +288,6 @@ export default function ProfilPage() {
 
       setIsEditing(false);
       logClientActivity("Profil modifie", "Informations personnelles mises a jour");
-      alert("Profil mis à jour avec succès !");
     } catch (err: any) {
       alert("Erreur lors de la mise à jour : " + err.message);
     } finally {
@@ -426,17 +330,10 @@ export default function ProfilPage() {
 
     try {
       if (!user) return;
-
-      // 1. Supprimer de la table profiles
       await supabase.from("profiles").delete().eq("id", user.id);
-
-      // 2. Supprimer du compte Auth Supabase
-      const { error: authError } = await supabase.auth.admin.deleteUser(
-        user.id,
-      );
+      const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
 
       if (authError) {
-        // Si l'admin API échoue, utiliser la méthode standard
         await supabase.auth.signOut();
         localStorage.clear();
         router.replace("/login");
@@ -444,7 +341,6 @@ export default function ProfilPage() {
         return;
       }
 
-      // 3. Déconnecter et nettoyer
       await supabase.auth.signOut();
       localStorage.clear();
       router.replace("/login");
@@ -462,418 +358,151 @@ export default function ProfilPage() {
     return <CenterStudentProfil />;
   }
 
+  const emptyValue = "—";
+
   return (
-    <div className="platform-profile-page min-h-[100dvh] bg-[#FFFBF7] text-neutral-900 font-sans pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-10 overflow-x-hidden">
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-neutral-200/60">
-        <div className="nexa-student-shell py-3 md:py-4 xl:py-5 flex items-center gap-3">
+    <div className={`platform-profile-page ${centerNotoSans.className} min-h-[100dvh] bg-[#FFFBF7] text-neutral-900 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-10 overflow-x-hidden`}>
+      <header className="sticky top-0 z-30 border-b border-neutral-200 bg-white/85 backdrop-blur-xl pt-[env(safe-area-inset-top,0px)]">
+        <div className="nexa-student-shell flex items-center gap-2 sm:gap-3 py-2.5 sm:py-3 md:py-4">
           <button
             onClick={() => router.push("/dashboard")}
             aria-label="Retour au tableau de bord"
-            className="inline-flex min-w-[44px] min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-full md:rounded-2xl bg-white border border-neutral-200 shadow-sm hover:shadow-md transition group md:px-4 md:py-2"
+            className="flex h-10 w-10 sm:h-11 sm:w-11 shrink-0 items-center justify-center rounded-full border border-neutral-200 bg-white text-slate-600 shadow-sm hover:bg-neutral-50"
           >
-            <ArrowLeft className="w-4 h-4 text-neutral-800 stroke-[1.8] group-hover:-translate-x-1 transition-transform" />
-            <span className="hidden md:inline text-[10px] font-extrabold uppercase tracking-wider">
-              Dashboard
-            </span>
+            <ArrowLeft className="h-5 w-5" />
           </button>
-
-          <div className="flex-1 min-w-0 text-center md:text-right">
-            <p className="hidden md:block text-[10px] font-extrabold uppercase tracking-wider text-orange-600">
-              Profil Étudiant
-            </p>
-            <p className={`${STUDENT_TEXT.pageTitle} truncate`} style={{ color: BRAND.blue }}>
-              <span className="md:hidden">Mon profil</span>
-              <span className="hidden md:inline">Dossier Académique</span>
-            </p>
-            <p className="md:hidden text-xs font-bold text-neutral-500 truncate mt-0.5">{displayName}</p>
+          <div className="min-w-0 flex-1">
+            <span className="inline-flex rounded-full bg-orange-50 px-2.5 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-widest text-orange-600">
+              Mon profil
+            </span>
+            <h1 className="mt-1 truncate text-base sm:text-lg md:text-xl font-black leading-tight" style={{ color: BRAND.blue }}>
+              {displayName}
+            </h1>
           </div>
-
-          <div className="hidden md:flex items-center gap-4 shrink-0">
-            <DownloadAppButton />
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             {!isEditing ? (
               <button
                 onClick={startEditing}
-                className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-100 transition-colors text-[10px] font-extrabold uppercase tracking-wider"
+                className="flex h-9 sm:h-10 items-center gap-2 rounded-full border border-orange-100 bg-orange-50 px-3.5 sm:px-4 text-xs font-black uppercase tracking-widest text-orange-600 hover:bg-orange-100"
               >
-                <Edit2 size={14} /> Modifier le profil
+                <span className="hidden sm:inline">Modifier</span>
+                <span className="sm:hidden">✎</span>
               </button>
             ) : (
-              <div className="flex items-center gap-2">
+              <>
                 <button
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors text-[10px] font-extrabold uppercase tracking-wider"
+                  className="hidden sm:flex h-10 items-center rounded-full border border-neutral-200 bg-neutral-50 px-4 text-xs font-black uppercase tracking-widest text-slate-500 hover:bg-neutral-100"
                 >
                   Annuler
                 </button>
                 <button
                   onClick={handleSaveProfile}
                   disabled={saving}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-xl hover:bg-emerald-600 transition-colors text-[10px] font-extrabold uppercase tracking-wider disabled:opacity-50"
+                  className="flex h-9 sm:h-10 items-center gap-2 rounded-full px-3.5 sm:px-4 text-xs font-black uppercase tracking-widest text-white hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: BRAND.blue }}
                 >
-                  <Save size={14} />{" "}
-                  {saving ? "Enregistrement..." : "Enregistrer"}
+                  <Save className="h-4 w-4" />
+                  <span className="hidden sm:inline">{saving ? "..." : "Enregistrer"}</span>
                 </button>
-              </div>
+              </>
             )}
           </div>
-
-          <div className="w-11 shrink-0 md:hidden" aria-hidden />
         </div>
       </header>
 
-      <div className="nexa-student-shell pt-6 md:pt-10 pb-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 xl:gap-10">
+      <div className="nexa-student-shell pt-5 md:pt-8 pb-6 max-w-5xl space-y-4">
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] gap-4 items-start">
+        <div className="space-y-4 min-w-0">
+        <IdCard
+          photoUrl={profile?.avatar_url}
+          photoIcon={User}
+          photoUploading={avatarUploading}
+          onPhotoClick={() => fileInputRef.current?.click()}
+          name={displayName}
+          tags={[
+            { label: isSubValid ? currentTheme.name : "Abonnement inactif", tone: isSubValid ? "positive" : "warning" },
+          ]}
+        >
+          <MetaLine icon={Mail}>{profile?.email || user?.email || emptyValue}</MetaLine>
+          <MetaLine icon={Globe2}>{profile?.country || emptyValue}</MetaLine>
+          <MetaLine icon={Calendar}>{dateInscription}</MetaLine>
+        </IdCard>
 
-          {/* COLONNE GAUCHE */}
-          <div className="lg:col-span-1 space-y-6">
-            <section className="bg-white rounded-3xl border border-neutral-200/60 shadow-sm p-6 text-center lg:text-left overflow-hidden relative">
-              <div className="absolute top-0 left-0 w-full h-1 bg-orange-500" />
-
-              <div className="flex flex-col items-center lg:items-start">
-                {/* 📸 AVATAR AVEC BOUTON UNIQUE */}
-                <div className="mb-4">
-
-                  {/* Input unique — sur mobile le système propose galerie ou caméra nativement */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleAvatarChange}
-                  />
-
-                  {/* Photo ou icône par défaut */}
-                  <div className="w-20 h-20 md:w-24 md:h-24 rounded-[2rem] overflow-hidden bg-orange-500/10 border border-orange-200/40 flex items-center justify-center mx-auto lg:mx-0">
-                    {avatarUploading ? (
-                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-orange-200 border-t-orange-500" />
-                    ) : profile?.avatar_url ? (
-                      <img
-                        src={profile.avatar_url}
-                        alt="Avatar"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User className="w-10 h-10 md:w-12 md:h-12 text-orange-600 stroke-[1.5]" />
-                    )}
-                  </div>
-
-                  {/* Bouton modifier la photo */}
-                  {!avatarUploading ? (
-                    <div className="flex justify-center lg:justify-start mt-3">
-                      <button
-                        onClick={() => fileInputRef.current?.click()}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 hover:bg-orange-50 hover:text-orange-600 text-neutral-600 rounded-xl text-[10px] font-black uppercase tracking-wider transition-colors border border-neutral-200 hover:border-orange-200"
-                      >
-                        <Camera size={11} /> Modifier la photo
-                      </button>
-                    </div>
-                  ) : (
-                    <p className="text-[10px] text-orange-500 font-bold text-center lg:text-left mt-2 animate-pulse">
-                      Upload en cours...
-                    </p>
-                  )}
-                </div>
-
-                <div className="mb-4 w-full">
-                  <div className="flex items-center gap-2 justify-center lg:justify-start">
-                    {/* 🎯 PRÉNOM ÉDITABLE */}
-                    {isEditing ? (
-                      <input
-                        type="text"
-                        value={editForm.prenom}
-                        onChange={(e) =>
-                          setEditForm({ ...editForm, prenom: e.target.value })
-                        }
-                        className="text-xl md:text-2xl font-black text-neutral-900 leading-tight bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 outline-none focus:border-orange-500 w-full text-center lg:text-left"
-                        placeholder="Votre prénom"
-                      />
-                    ) : (
-                      <p className="text-xl md:text-2xl xl:text-3xl font-black text-neutral-900 leading-tight">
-                        {displayName}
-                      </p>
-                    )}
-                    {!isEditing && (
-                      <BadgeCheck className="w-5 h-5 text-orange-500 fill-orange-500/10 shrink-0" />
-                    )}
-                  </div>
-
-                  <span
-                    className={`inline-flex items-center justify-center lg:justify-start gap-1.5 px-3 py-1 mt-3 rounded-full text-[10px] font-extrabold border uppercase mx-auto lg:mx-0 ${
-                      isSubValid ? "bg-emerald-50 border-emerald-100 text-emerald-700" : "bg-red-50 border-red-100 text-red-700"
-                    }`}
-                  >
-                    {isSubValid && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                    {isSubValid ? <ThemeIcon size={12} /> : <AlertCircle size={12} />}
-                    {isSubValid ? currentTheme.name : "Abonnement Inactif"}
-                  </span>
-                </div>
+        <Group title="Informations personnelles">
+          <EditableRow icon={User} label="Prénom" value={profile?.prenom || emptyValue}
+            editing={isEditing} editValue={editForm.prenom} onEditChange={(v) => setEditForm((c) => ({ ...c, prenom: v }))} />
+          <Row icon={Mail} label="Email" value={profile?.email || user?.email || emptyValue} />
+          {isEditing ? (
+            <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
+              <Globe2 size={16} className="shrink-0" style={{ color: "#eb670e" }} strokeWidth={1.9} />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold mb-1" style={{ color: "rgba(17,34,78,0.4)" }}>Pays</p>
+                <select
+                  value={editForm.countryCode}
+                  onChange={(e) => setEditForm((c) => ({ ...c, countryCode: e.target.value, region: "" }))}
+                  className="w-full h-8 -mt-1 bg-transparent text-[13.5px] font-bold outline-none border-b"
+                  style={{ color: "#11224E", borderColor: "rgba(235,103,14,0.4)" }}
+                >
+                  {AFRICA_54.map((c) => (
+                    <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+                  ))}
+                </select>
               </div>
-
-              {/* 🎯 BOUTONS MOBILE POUR L'ÉDITION */}
-              <div className="md:hidden mt-6 space-y-3">
-                <DownloadAppButton className="w-full" labelClassName="inline" />
-                {!isEditing ? (
-                  <button
-                    onClick={startEditing}
-                    className="w-full rounded-2xl px-5 py-4 font-extrabold text-sm text-orange-600 bg-orange-50 hover:bg-orange-100 transition items-center justify-center gap-2 flex"
-                  >
-                    <Edit2 size={16} /> Modifier mon profil
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      onClick={handleSaveProfile}
-                      disabled={saving}
-                      className="w-full rounded-2xl px-5 py-4 font-extrabold text-sm text-white bg-emerald-500 hover:bg-emerald-600 transition items-center justify-center gap-2 flex disabled:opacity-50"
-                    >
-                      <Save size={16} />{" "}
-                      {saving
-                        ? "Enregistrement..."
-                        : "Enregistrer les modifications"}
-                    </button>
-                    <button
-                      onClick={() => setIsEditing(false)}
-                      className="w-full rounded-2xl px-5 py-3 font-bold text-sm text-slate-500 bg-slate-100 hover:bg-slate-200 transition items-center justify-center flex"
-                    >
-                      Annuler
-                    </button>
-                  </>
-                )}
-              </div>
-
-              <button
-                onClick={() => setLogoutConfirmOpen(true)}
-                className="hidden lg:flex w-full mt-6 rounded-2xl px-5 py-4 font-extrabold text-sm text-white shadow-lg transition bg-neutral-900 hover:bg-orange-600 items-center justify-center gap-2 group"
-              >
-                <LogOut className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform" />
-                Se déconnecter
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                className="hidden lg:flex w-full mt-3 rounded-2xl px-5 py-4 font-extrabold text-sm text-white shadow-lg transition bg-red-600 hover:bg-red-700 items-center justify-center gap-2 group"
-              >
-                <Trash2 className="w-4 h-4 text-white" />
-                Supprimer le compte
-              </button>
-            </section>
-
-            {/* SECTION INFORMATIONS PERSONNELLES */}
-            <section className="bg-white rounded-3xl border border-neutral-200/60 shadow-sm p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">
-                  Informations Personnelles
-                </h3>
-                {isEditing && (
-                  <span className="text-[10px] font-bold text-orange-500 animate-pulse bg-orange-50 px-2 py-1 rounded-md">
-                    Mode édition
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                <InfoRow
-                  icon={<Mail className="w-4 h-4 text-neutral-700 stroke-[1.8]" />}
-                  label="Email"
-                  value={profile?.email || user?.email || "—"}
-                  isEditing={false}
-                />
-                <InfoRow
-                  icon={<MapPin className="w-4 h-4 text-neutral-700 stroke-[1.8]" />}
-                  label="Pays"
-                  value={profile?.country || "—"}
-                  isEditing={false}
-                />
-                <InfoRow
-                  icon={<MapPin className="w-4 h-4 text-neutral-700 stroke-[1.8]" />}
-                  label="Région"
-                  value={profile?.region || "—"}
-                  isEditing={isEditing}
-                  editValue={editForm.region}
-                  onEditChange={(val) =>
-                    setEditForm({ ...editForm, region: val })
-                  }
-                  placeholder="Ex: Littoral"
-                />
-                <InfoRow
-                  icon={<MapPin className="w-4 h-4 text-neutral-700 stroke-[1.8]" />}
-                  label="Ville"
-                  value={profile?.city || profile?.ville || "—"}
-                  isEditing={isEditing}
-                  editValue={editForm.ville}
-                  onEditChange={(val) =>
-                    setEditForm({ ...editForm, ville: val })
-                  }
-                  placeholder="Ex: Douala"
-                />
-                {isEditing && (
-                  <div className="flex items-center gap-4 rounded-2xl bg-white border border-orange-300 p-4 ring-2 ring-orange-500/10">
-                    <div className="w-10 h-10 rounded-xl bg-white border border-neutral-200/60 flex items-center justify-center shrink-0 shadow-sm">
-                      <MapPin className="w-4 h-4 text-neutral-700 stroke-[1.8]" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[9px] text-neutral-400 font-black uppercase tracking-widest mb-1">Pays</p>
-                      <select
-                        value={editForm.countryCode}
-                        onChange={(e) => setEditForm({ ...editForm, countryCode: e.target.value, region: "" })}
-                        className="w-full bg-transparent text-sm font-bold text-neutral-900 outline-none border-b border-orange-200 pb-1"
-                      >
-                        {AFRICA_54.map((c) => (
-                          <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-                <InfoRow
-                  icon={<Calendar className="w-4 h-4 text-neutral-700 stroke-[1.8]" />}
-                  label="Date de naissance"
-                  value={profile?.birth_date ? formatDateCourte(profile.birth_date) : "—"}
-                  isEditing={isEditing}
-                  editValue={editForm.birth_date}
-                  onEditChange={(val) =>
-                    setEditForm({ ...editForm, birth_date: val })
-                  }
-                  placeholder=""
-                  inputType="date"
-                />
-                <InfoRow
-                  icon={<Phone className="w-4 h-4 text-neutral-700 stroke-[1.8]" />}
-                  label="Téléphone"
-                  value={profile?.phone || "—"}
-                  isEditing={isEditing}
-                  editValue={editForm.phone}
-                  onEditChange={(val) =>
-                    setEditForm({ ...editForm, phone: val })
-                  }
-                  placeholder="Ex: +237 600 000 000"
-                />
-                <InfoRow
-                  icon={<Calendar className="w-4 h-4 text-neutral-700 stroke-[1.8]" />}
-                  label="Inscrit depuis"
-                  value={dateInscription}
-                  isEditing={false}
-                />
-              </div>
-            </section>
-          </div>
-
-          {/* COLONNE DROITE : LE STATUT DU PACK ET LES QUOTAS */}
-          <div className="lg:col-span-2 space-y-6">
-            <section className="bg-white rounded-3xl border border-neutral-200/60 shadow-sm p-6">
-              <h3 className="text-[10px] font-black uppercase tracking-widest text-orange-600 ml-1 mb-4">
-                Statut de l'abonnement
-              </h3>
-
-              {/* 💳 GRANDE CARTE DU PACK */}
-              <div className={`${currentTheme.bg} rounded-2xl border ${currentTheme.border} p-5 md:p-6 mb-4 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-4 transition-all duration-300`}>
-                <div className={`w-16 h-16 rounded-2xl ${currentTheme.iconBg} flex items-center justify-center shrink-0`}>
-                  <ThemeIcon className={`w-8 h-8 ${currentTheme.iconText} stroke-[1.8]`} />
-                </div>
-                <div className="min-w-0 w-full sm:w-auto">
-                  <p className={`text-lg sm:text-xl md:text-2xl xl:text-3xl font-black ${currentTheme.text} tracking-tight break-words`}>
-                    {currentTheme.name}
-                  </p>
-                  <p
-                    className={`text-xs sm:text-sm font-bold uppercase mt-1 ${
-                      isSubValid ? "text-emerald-400" : "text-red-400"
-                    }`}
-                  >
-                    {isSubValid
-                      ? (packType !== "aucun" ? `${currentTheme.name} — Actif` : "Abonnement Actif")
-                      : (profile?.subscription_ends_at ? "Abonnement Expiré" : "Aucun Abonnement")}
-                  </p>
-                </div>
-              </div>
-
-              {/* 📊 GRILLE DES QUOTAS ET DATES */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
-                {/* 1. Carte Jours restants */}
-                <div className="flex items-center gap-4 rounded-2xl bg-neutral-50 border border-neutral-200/60 p-4 group hover:bg-white hover:border-orange-100 transition-all">
-                  <div className={`w-10 h-10 rounded-xl border flex items-center justify-center shrink-0 transition-transform shadow-sm group-hover:scale-110 ${isSubValid ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-                    <Clock className={`w-4 h-4 stroke-[1.8] ${isSubValid ? 'text-emerald-500' : 'text-red-500'}`} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[9px] text-neutral-400 font-black uppercase tracking-widest">Jours restants</p>
-                    <p className="text-sm font-bold text-neutral-900 truncate mt-0.5">
-                      {profile?.subscription_ends_at && profile.subscription_ends_at !== "null"
-                        ? Math.max(0, Math.ceil((new Date(profile.subscription_ends_at).getTime() - new Date().getTime()) / (1000 * 3600 * 24)))
-                        : "—"} jours
-                    </p>
-                  </div>
-                </div>
-
-                {/* 2. Carte Simulations EE */}
-                <div className="flex items-center gap-4 rounded-2xl bg-neutral-50 border border-neutral-200/60 p-4 group hover:bg-white hover:border-orange-100 transition-all">
-                  <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200 flex items-center justify-center shrink-0 transition-transform shadow-sm group-hover:scale-110">
-                    <Target className="w-4 h-4 text-orange-500 stroke-[1.8]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[9px] text-neutral-400 font-black uppercase tracking-widest">
-                      {packType === "aucun" ? "Essai Gratuit / Jour" : "Simulations EE (Restant)"}
-                    </p>
-                    <p className="text-sm font-bold text-neutral-900 truncate mt-0.5">
-                      {packType !== "aucun" 
-                        ? (eeLeft > 1000 ? "Illimité (∞)" : `${eeLeft} restantes`) 
-                        : `${Math.max(0, 1 - dailyCount)} essai restant`}
-                    </p>
-                  </div>
-                </div>
-
-                {/* 3. Carte Examens Complets (Caché pour Raphia et Classique) */}
-                {["ivoire", "cauris", "ebene"].includes(packType) && (
-                  <div className="flex items-center gap-4 rounded-2xl bg-neutral-50 border border-neutral-200/60 p-4 group hover:bg-white hover:border-orange-100 transition-all">
-                    <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center shrink-0 transition-transform shadow-sm group-hover:scale-110">
-                      <Layers className="w-4 h-4 text-blue-500 stroke-[1.8]" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[9px] text-neutral-400 font-black uppercase tracking-widest">Examens Complets (4M)</p>
-                      <p className="text-sm font-bold text-neutral-900 truncate mt-0.5">
-                        {examLeft} restants
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. Carte Date de début / fin */}
-                <div className="flex items-center gap-4 rounded-2xl bg-neutral-50 border border-neutral-200/60 p-4 group hover:bg-white hover:border-orange-100 transition-all">
-                  <div className="w-10 h-10 rounded-xl bg-white border border-neutral-200/60 flex items-center justify-center shrink-0 transition-transform shadow-sm group-hover:scale-110">
-                    <Calendar className="w-4 h-4 text-neutral-700 stroke-[1.8]" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[9px] text-neutral-400 font-black uppercase tracking-widest">
-                      Date de fin
-                    </p>
-                    <p className="text-sm font-bold text-neutral-900 truncate mt-0.5">
-                      {profile?.subscription_ends_at && profile.subscription_ends_at !== "null"
-                        ? formatDateCourte(profile.subscription_ends_at)
-                        : "—"}
-                    </p>
-                  </div>
-                </div>
-
-              </div>
-            </section>
-
-            <button
-              onClick={() => setLogoutConfirmOpen(true)}
-              className="lg:hidden w-full rounded-[2rem] px-5 py-5 font-black text-base text-white shadow-xl transition bg-neutral-900 active:scale-95 inline-flex items-center justify-center gap-3"
-            >
-              <LogOut className="w-5 h-5 text-white stroke-[2]" />
-              Se déconnecter
-            </button>
-            <button
-              onClick={handleDeleteAccount}
-              className="lg:hidden w-full mt-3 rounded-[2rem] px-5 py-5 font-black text-base text-white shadow-xl transition bg-red-600 active:scale-95 inline-flex items-center justify-center gap-3"
-            >
-              <Trash2 className="w-5 h-5 text-white stroke-[2]" />
-              Supprimer le compte
-            </button>
-          </div>
+            </div>
+          ) : (
+            <Row icon={Globe2} label="Pays" value={profile?.country || emptyValue} />
+          )}
+          <EditableRow icon={MapPin} label="Région" value={profile?.region || emptyValue}
+            editing={isEditing} editValue={editForm.region} onEditChange={(v) => setEditForm((c) => ({ ...c, region: v }))} placeholder="Ex: Littoral" />
+          <EditableRow icon={MapPin} label="Ville" value={profile?.city || profile?.ville || emptyValue}
+            editing={isEditing} editValue={editForm.ville} onEditChange={(v) => setEditForm((c) => ({ ...c, ville: v }))} placeholder="Ex: Douala" />
+          <EditableRow icon={Calendar} label="Date de naissance" value={profile?.birth_date ? formatDateCourte(profile.birth_date) : emptyValue}
+            editing={isEditing} editValue={editForm.birth_date} onEditChange={(v) => setEditForm((c) => ({ ...c, birth_date: v }))} type="date" />
+          <EditableRow icon={Phone} label="Téléphone" value={profile?.phone || emptyValue}
+            editing={isEditing} editValue={editForm.phone} onEditChange={(v) => setEditForm((c) => ({ ...c, phone: v }))} placeholder="Ex: +237 600 000 000" />
+        </Group>
         </div>
 
-        <p className="text-center text-[11px] text-neutral-400 font-bold uppercase tracking-[0.2em] pt-10 opacity-50">
-          NEXA • Système Synchronisé v2.6
+        <div className="space-y-4 min-w-0">
+        <Group title="Abonnement">
+          <Row icon={ThemeIcon} label="Formule" value={isSubValid ? currentTheme.name : (profile?.subscription_ends_at ? "Expiré" : "Aucun abonnement")} />
+          <Row icon={Clock} label="Jours restants" value={
+            profile?.subscription_ends_at && profile.subscription_ends_at !== "null"
+              ? `${Math.max(0, Math.ceil((new Date(profile.subscription_ends_at).getTime() - Date.now()) / 86400000))} jours`
+              : emptyValue
+          } />
+          <Row icon={Target} label={packType === "aucun" ? "Essai gratuit / jour" : "Simulations EE"} value={
+            packType !== "aucun" ? (eeLeft > 1000 ? "Illimité" : `${eeLeft} restantes`) : `${Math.max(0, 1 - dailyCount)} essai restant`
+          } />
+          {["ivoire", "cauris", "ebene"].includes(packType) && (
+            <Row icon={Layers} label="Examens complets (4M)" value={`${examLeft} restants`} />
+          )}
+          <Row icon={Calendar} label="Date de fin" value={
+            profile?.subscription_ends_at && profile.subscription_ends_at !== "null" ? formatDateCourte(profile.subscription_ends_at) : emptyValue
+          } />
+        </Group>
+
+        <Group title="Session">
+          {canInstallApp && (
+            <ButtonRow
+              icon={Smartphone}
+              label={installBusy ? "Installation…" : "Télécharger l'app"}
+              onClick={() => void handleInstallRow()}
+              busy={installBusy}
+              tone="brand"
+            />
+          )}
+          <ButtonRow icon={LogOut} label="Se déconnecter" onClick={() => setLogoutConfirmOpen(true)} tone="danger" />
+          <ButtonRow icon={Trash2} label="Supprimer le compte" onClick={handleDeleteAccount} tone="danger" />
+        </Group>
+        </div>
+        </div>
+        <div className="hidden"><DownloadAppButton /></div>
+
+        <p className="text-center text-[11px] text-neutral-400 font-bold uppercase tracking-[0.2em] pt-6 opacity-50">
+          NEXA
         </p>
       </div>
 
@@ -890,64 +519,6 @@ export default function ProfilPage() {
           }}
         />
       )}
-    </div>
-  );
-}
-
-// 🎯 COMPOSANT INFOROW AVEC SUPPORT ÉDITION
-function InfoRow({
-  icon,
-  label,
-  value,
-  isEditing = false,
-  editValue = "",
-  onEditChange,
-  placeholder = "",
-  inputType = "text",
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-  isEditing?: boolean;
-  editValue?: string;
-  onEditChange?: (val: string) => void;
-  placeholder?: string;
-  inputType?: string;
-}) {
-  return (
-    <div
-      className={`flex items-center gap-4 rounded-2xl bg-neutral-50 border p-4 transition-all group ${
-        isEditing
-          ? "border-orange-300 bg-white shadow-sm ring-2 ring-orange-500/10"
-          : "border-neutral-200/60 hover:bg-white hover:border-orange-100"
-      }`}
-    >
-      <div
-        className={`w-10 h-10 rounded-xl bg-white border border-neutral-200/60 flex items-center justify-center shrink-0 transition-transform shadow-sm ${
-          !isEditing && "group-hover:scale-110"
-        }`}
-      >
-        {icon}
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[9px] text-neutral-400 font-black uppercase tracking-widest">
-          {label}
-        </p>
-
-        {isEditing && onEditChange ? (
-          <input
-            type={inputType}
-            value={editValue}
-            onChange={(e) => onEditChange(e.target.value)}
-            placeholder={placeholder}
-            className="w-full mt-1 bg-slate-50 border border-slate-200 rounded-md px-2 py-1 text-sm font-bold text-neutral-900 outline-none focus:border-orange-500 transition-colors"
-          />
-        ) : (
-          <p className="text-sm font-bold text-neutral-900 truncate mt-0.5">
-            {value}
-          </p>
-        )}
-      </div>
     </div>
   );
 }
