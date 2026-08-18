@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   AlertTriangle, BarChart3, Bell, Building2, ChevronRight, Command, Headphones, Handshake, Inbox, LayoutDashboard,
   Layers, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck,
-  Star, Sun, ScrollText, Users, UsersRound, UserCog, X, LibraryBig,
+  Star, Sun, ScrollText, Users, UsersRound, UserCog, Wallet, X, LibraryBig,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { superadminFetch } from "../utils/superadmin-api-client";
@@ -29,6 +29,7 @@ const NAV_CONFIG = [
   { href: "/superadmin/analytics", menuKey: "analytics", labelKey: "navAnalyticsLabel", descKey: "navAnalyticsDesc", icon: BarChart3, groupKey: "groupPiloting" },
   { href: "/superadmin/alertes", menuKey: "alertes", labelKey: "navAlertsLabel", descKey: "navAlertsDesc", icon: AlertTriangle, groupKey: "groupPiloting" },
   { href: "/superadmin/commercial", menuKey: "commercial", labelKey: "navCommercialLabel", descKey: "navCommercialDesc", icon: Handshake, groupKey: "groupPiloting" },
+  { href: "/superadmin/finance", menuKey: "finance", labelKey: "navFinanceLabel", descKey: "navFinanceDesc", icon: Wallet, groupKey: "groupPiloting" },
   { href: "/superadmin/demandes", menuKey: "centres", labelKey: "navDemandesLabel", descKey: "navDemandesDesc", icon: Inbox, groupKey: "groupPiloting" },
   { href: "/superadmin/centres", menuKey: "centres", labelKey: "navCentersLabel", descKey: "navCentersDesc", icon: Building2, groupKey: "groupNetwork" },
   { href: "/superadmin/effectifs", menuKey: "effectifs", labelKey: "navHeadcountLabel", descKey: "navHeadcountDesc", icon: UsersRound, groupKey: "groupNetwork" },

@@ -18,7 +18,7 @@ const PACK_LABELS: Record<string, string> = {
   complete: "Formation Complète",
 };
 
-function fmtFCFA(n: number) {
+export function fmtFCFA(n: number) {
   const v = Math.round(Number(n) || 0);
   const neg = v < 0;
   const abs = Math.abs(v).toString();
@@ -26,7 +26,7 @@ function fmtFCFA(n: number) {
   return neg ? `-${grouped}` : grouped;
 }
 
-function fmtDate(iso: string | null, locale = "fr") {
+export function fmtDate(iso: string | null, locale = "fr") {
   return iso
     ? new Date(iso).toLocaleDateString(locale === "en" ? "en-US" : "fr-FR", { day: "2-digit", month: "short", year: "numeric" })
     : "—";
@@ -88,7 +88,7 @@ async function addPdfLogo(doc: any, logoUrl: string | null, x: number, y: number
   doc.addImage(dataUrl, format, x, y, size, size);
 }
 
-async function createDoc(subtitle: string, config?: Partial<DocumentExportConfig>, locale = "fr") {
+export async function createDoc(subtitle: string, config?: Partial<DocumentExportConfig>, locale = "fr") {
   const cfg = resolveConfig(config);
   const { default: jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
@@ -145,7 +145,7 @@ async function createDoc(subtitle: string, config?: Partial<DocumentExportConfig
   return { doc, autoTable, startY: ruleY + 8, cfg };
 }
 
-function addPdfFooter(doc: any, cfg: DocumentExportConfig) {
+export function addPdfFooter(doc: any, cfg: DocumentExportConfig) {
   if (!cfg.footerText) return;
   const pageHeight = doc.internal.pageSize.getHeight();
   doc.setFont("helvetica", "italic");

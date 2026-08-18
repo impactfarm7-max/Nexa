@@ -27,6 +27,7 @@ const MENU_LABEL_KEYS: Record<SuperadminMenuKey, string> = {
   analytics: "navAnalyticsLabel",
   alertes: "navAlertsLabel",
   commercial: "navCommercialLabel",
+  finance: "navFinanceLabel",
   centres: "navCentersLabel",
   effectifs: "navHeadcountLabel",
   etudiants: "navStudentsLabel",

@@ -387,6 +387,25 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
     return NextResponse.json({ error: updateError?.message || "Centre introuvable." }, { status: 404 });
   }
 
+  if (markPaid) {
+    const amount = Math.max(0, Math.trunc(Number(center.subscription_amount) || 0));
+    if (amount > 0) {
+      const { error: paymentError } = await supabaseAdmin.from("finance_payments").insert({
+        center_id: center.id,
+        amount,
+        method: "autre",
+        period_label: null,
+        paid_at: new Date().toISOString(),
+        note: "Enregistré automatiquement via « Marquer payé ».",
+        source: "auto_mark_paid",
+        created_by: ctx.user.id,
+      });
+      if (paymentError) {
+        console.warn("[finance] auto_mark_paid insert failed:", paymentError.message);
+      }
+    }
+  }
+
   if (hasStatus) {
     const action =
       body.status === "rejected"
