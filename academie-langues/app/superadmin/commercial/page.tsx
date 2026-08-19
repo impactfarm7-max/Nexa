@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Handshake, Info, Loader2, Search } from "lucide-react";
 import { superadminFetch } from "@/app/utils/superadmin-api-client";
 import { nexaOfferLabel, type NexaOfferKey } from "@/app/data/nexaOffers";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { useSuperadminCenters } from "../SuperadminCentersContext";
 
 type Usage = {
   seatsOccupied: number;
@@ -34,28 +35,10 @@ const PIPELINE = new Set(["trial", "trial_expired", "subscription_expired"]);
 
 export default function SuperadminCommercialPage() {
   const { t, locale } = useI18n();
-  const [centers, setCenters] = useState<CenterRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { centers, loading, error: sharedError, refresh: load } = useSuperadminCenters<CenterRow>();
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-
-  const load = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const json = await superadminFetch<{ centers: CenterRow[] }>("/api/superadmin/centers");
-      setCenters(json.centers || []);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : t("superadmin", "centersLoadError"));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void load();
-  }, [t]);
 
   const rows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -150,8 +133,8 @@ export default function SuperadminCommercialPage() {
         <div className="flex justify-center py-16">
           <Loader2 className="h-6 w-6 animate-spin text-orange-400" />
         </div>
-      ) : error ? (
-        <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>
+      ) : error || sharedError ? (
+        <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error || sharedError}</p>
       ) : rows.length === 0 ? (
         <p className="text-sm text-slate-500">{t("superadmin", "commercialEmpty")}</p>
       ) : (

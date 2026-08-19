@@ -19,6 +19,7 @@ import {
   type SuperadminAccess,
   type SuperadminMenuKey,
 } from "@/app/data/superadminMenus";
+import { SuperadminCentersContext } from "./SuperadminCentersContext";
 
 const MFA_SETUP_PATH = "/superadmin/mfa-setup";
 const CHANGE_PASSWORD_PATH = "/superadmin/change-password";
@@ -73,6 +74,8 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [centers, setCenters] = useState<CenterRow[]>([]);
+  const [centersLoading, setCentersLoading] = useState(true);
+  const [centersError, setCentersError] = useState<string | null>(null);
   const [newApplicationsCount, setNewApplicationsCount] = useState(0);
   const [studentResults, setStudentResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -169,15 +172,25 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
     }
   }, [authorized, isBootstrapRoute, access, pathname, router]);
 
+  const refreshCenters = useCallback(async () => {
+    setCentersError(null);
+    try {
+      const json = await superadminFetch<{ centers: CenterRow[] }>("/api/superadmin/centers");
+      setCenters(json.centers || []);
+    } catch (e) {
+      setCentersError(e instanceof Error ? e.message : "Erreur de chargement.");
+    } finally {
+      setCentersLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authorized || isBootstrapRoute) return;
-    void superadminFetch<{ centers: CenterRow[] }>("/api/superadmin/centers")
-      .then((json) => setCenters(json.centers || []))
-      .catch(() => undefined);
+    void refreshCenters();
     void superadminFetch<{ applications: { status: string }[] }>("/api/superadmin/applications")
       .then((json) => setNewApplicationsCount((json.applications || []).filter((a) => a.status === "new").length))
       .catch(() => undefined);
-  }, [authorized, isBootstrapRoute]);
+  }, [authorized, isBootstrapRoute, refreshCenters]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -355,7 +368,11 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
           </div>
           {email && <span className="hidden max-w-40 truncate text-[10px] font-medium text-slate-500 2xl:block">{email}</span>}
         </header>
-        <main className="custom-scrollbar mx-auto w-full max-w-[1600px] flex-1 overflow-x-hidden overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        <main className="custom-scrollbar mx-auto w-full max-w-[1600px] flex-1 overflow-x-hidden overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
+          <SuperadminCentersContext.Provider value={{ centers, loading: centersLoading, error: centersError, refresh: refreshCenters }}>
+            {children}
+          </SuperadminCentersContext.Provider>
+        </main>
       </div>
 
       {commandOpen && <div className="fixed inset-0 z-[100] flex items-start justify-center bg-black/75 px-4 pt-[10vh] backdrop-blur-sm" onClick={() => setCommandOpen(false)}><div className="w-full max-w-2xl overflow-hidden rounded-3xl border border-white/10 bg-[#0b1120] shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="flex h-16 items-center gap-3 border-b border-white/[0.07] px-5"><Command className="h-5 w-5 text-orange-400" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("superadmin", "searchPlaceholder")} className="min-w-0 flex-1 bg-transparent text-base text-white outline-none placeholder:text-slate-600" /><kbd className="rounded border border-white/10 px-2 py-1 text-[9px] text-slate-500">ESC</kbd></div><div className="custom-scrollbar max-h-[55vh] overflow-y-auto p-2">{query.trim().length < 2 && <p className="px-4 py-10 text-center text-sm text-slate-500">{t("superadmin", "searchNetworkPrompt")}</p>}{searching && <div className="space-y-2 p-2">{[1,2,3].map((item) => <div key={item} className="h-14 animate-pulse rounded-xl bg-white/5" />)}</div>}{!searching && query.trim().length >= 2 && results.length === 0 && <p className="px-4 py-10 text-center text-sm text-slate-500">{t("superadmin", "noResults")}</p>}{!searching && results.map((result) => <Link key={`${result.type}-${result.id}`} href={result.href} onClick={() => { setCommandOpen(false); setQuery(""); }} className="flex items-center gap-3 rounded-2xl px-4 py-3 hover:bg-white/5"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10 text-xs font-black text-orange-400">{result.type[0]}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-bold text-white">{result.title}</p><p className="truncate text-xs text-slate-500">{result.type} · {result.detail}</p></div><ChevronRight className="h-4 w-4 text-slate-700" /></Link>)}</div></div></div>}

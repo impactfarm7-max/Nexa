@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
 import {
+  ArrowUpRight,
   Building2,
   Calendar,
   CreditCard,
@@ -67,6 +69,15 @@ type CenterDetail = {
   commercial_intent?: string | null;
   commercial_note?: string | null;
   upgrade_requested_at?: string | null;
+};
+
+type FinancePaymentRow = {
+  id: string;
+  amount: number;
+  method: string;
+  paid_at: string;
+  document_number: string;
+  source: "manual" | "auto_mark_paid";
 };
 
 type ManagerRow = {
@@ -187,6 +198,8 @@ export function CenterDetailPanel({
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [viewAsOpen, setViewAsOpen] = useState(false);
   const [billingBusy, setBillingBusy] = useState(false);
+  const [payments, setPayments] = useState<FinancePaymentRow[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
 
   const load = useCallback(async () => {
     if (!centerId) return;
@@ -210,6 +223,28 @@ export function CenterDetailPanel({
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
+
+  useEffect(() => {
+    if (!centerId) {
+      setPayments([]);
+      return;
+    }
+    let cancelled = false;
+    setPaymentsLoading(true);
+    void superadminFetch<{ payments: FinancePaymentRow[] }>(`/api/superadmin/finance/payments?centerId=${centerId}&days=365`)
+      .then((json) => {
+        if (!cancelled) setPayments(json.payments || []);
+      })
+      .catch(() => {
+        if (!cancelled) setPayments([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPaymentsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [centerId, refreshKey]);
 
   const markPaid = async () => {
     if (!centerId) return;
@@ -576,6 +611,36 @@ export function CenterDetailPanel({
               {t("superadmin", "billingMarkGrace")}
             </button>
           </div>
+        </div>
+
+        <div className="mt-4 border-t border-white/[0.06] pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+              {t("superadmin", "billingHistoryTitle")}
+            </p>
+            <Link
+              href="/superadmin/finance"
+              className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-orange-400 hover:text-orange-300"
+            >
+              {t("superadmin", "billingViewAllFinance")}
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </div>
+          {paymentsLoading ? (
+            <p className="mt-3 text-xs text-slate-500">…</p>
+          ) : payments.length === 0 ? (
+            <p className="mt-3 text-xs text-slate-500">{t("superadmin", "billingHistoryEmpty")}</p>
+          ) : (
+            <ul className="mt-3 space-y-1.5">
+              {payments.slice(0, 5).map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.03] px-3 py-2 text-xs">
+                  <span className="text-slate-400">{formatDate(p.paid_at, locale)}</span>
+                  <span className="font-mono text-[10px] text-slate-600">{p.document_number}</span>
+                  <span className="font-black text-white">{p.amount.toLocaleString()} FCFA</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
 

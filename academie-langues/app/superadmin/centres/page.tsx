@@ -10,6 +10,7 @@ import { ConfirmDialog } from "../_components/ConfirmDialog";
 import { CenterDetailPanel, type DerivedStatus } from "../_components/CenterDetailPanel";
 import { OfferFormModal } from "../_components/OfferFormModal";
 import { PauseModal } from "../_components/PauseModal";
+import { useSuperadminCenters } from "../SuperadminCentersContext";
 
 type CenterStats = {
   actifs: number;
@@ -77,10 +78,8 @@ function SuperadminCentresPageContent() {
   const { t } = useI18n();
   const feedback = useActionFeedback();
   const searchParams = useSearchParams();
-  const [centers, setCenters] = useState<CenterRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { centers, loading, error: sharedError, refresh: refreshShared } = useSuperadminCenters<CenterRow>();
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [search, setSearch] = useState("");
@@ -103,29 +102,18 @@ function SuperadminCentresPageContent() {
   const loadCenters = useCallback(
     async (silent = false) => {
       if (silent) setRefreshing(true);
-      else setLoading(true);
-      setError(null);
-      try {
-        const json = await superadminFetch<{ centers: CenterRow[] }>("/api/superadmin/centers");
-        const list = json.centers || [];
-        setCenters(list);
-        if (silent) setDetailRefreshKey((key) => key + 1);
-        if (selectedId && !list.some((c) => c.id === selectedId)) {
-          setSelectedId(null);
-        }
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : t("superadmin", "centersLoadError"));
-      } finally {
-        setLoading(false);
-        setRefreshing(false);
-      }
+      await refreshShared();
+      if (silent) setDetailRefreshKey((key) => key + 1);
+      setRefreshing(false);
     },
-    [selectedId, t],
+    [refreshShared],
   );
 
   useEffect(() => {
-    void loadCenters();
-  }, [loadCenters]);
+    if (selectedId && !centers.some((c) => c.id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [centers, selectedId]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<StatusFilter, number> = {
@@ -307,8 +295,8 @@ function SuperadminCentresPageContent() {
         </div>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>
+      {sharedError && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{sharedError}</div>
       )}
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,340px)_1fr]">

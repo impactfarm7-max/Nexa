@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Ban, CalendarClock, Loader2, ShieldAlert, Users } from "lucide-react";
-import { superadminFetch } from "../../utils/superadmin-api-client";
 import { collectCenterAlerts, type AlertCenter, type CenterAlert, type CenterAlertKind } from "../../utils/center-alerts";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { useSuperadminCenters } from "../SuperadminCentersContext";
 
 type CenterRow = AlertCenter & {
   derived_status?: string;
@@ -24,21 +24,8 @@ const KIND_ORDER: CenterAlertKind[] = [
 
 export default function SuperadminAlertesPage() {
   const { t, locale } = useI18n();
-  const [centers, setCenters] = useState<CenterRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { centers, loading } = useSuperadminCenters<CenterRow>();
   const [filterKind, setFilterKind] = useState<CenterAlertKind | null>(null);
-
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const json = await superadminFetch<{ centers: CenterRow[] }>("/api/superadmin/centers");
-        setCenters(json.centers || []);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, []);
 
   const allAlerts = useMemo(() => collectCenterAlerts(centers), [centers]);
   const alerts = useMemo(

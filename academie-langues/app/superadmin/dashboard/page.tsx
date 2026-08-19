@@ -19,6 +19,7 @@ import { superadminFetch } from "../../utils/superadmin-api-client";
 import { collectCenterAlerts, type AlertCenter } from "../../utils/center-alerts";
 import { nexaOfferLabel, type NexaOfferKey } from "@/app/data/nexaOffers";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { useSuperadminCenters } from "../SuperadminCentersContext";
 
 type CenterStats = { actifs: number; pauses: number; expires: number; termines: number; revoques: number; total: number };
 type DerivedStatus =
@@ -114,26 +115,25 @@ function BarRow({
 
 export default function SuperadminDashboardPage() {
   const { t, locale } = useI18n();
-  const [loading, setLoading] = useState(true);
-  const [centers, setCenters] = useState<CenterRow[]>([]);
+  const { centers, loading: centersLoading } = useSuperadminCenters<CenterRow>();
+  const [extrasLoading, setExtrasLoading] = useState(true);
   const [libraryPending, setLibraryPending] = useState(0);
   const [supportUnread, setSupportUnread] = useState(0);
+  const loading = centersLoading || extrasLoading;
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [centersJson, libraryJson, supportJson] = await Promise.all([
-          superadminFetch<{ centers: CenterRow[] }>("/api/superadmin/centers"),
+        const [libraryJson, supportJson] = await Promise.all([
           superadminFetch<{ documents: unknown[] }>("/api/superadmin/bibliotheque").catch(() => ({ documents: [] })),
           superadminFetch<{ conversations: Array<{ unread: number }> }>("/api/superadmin/support").catch(() => ({
             conversations: [],
           })),
         ]);
-        setCenters(centersJson.centers || []);
         setLibraryPending((libraryJson.documents || []).length);
         setSupportUnread((supportJson.conversations || []).reduce((sum, c) => sum + (c.unread || 0), 0));
       } finally {
-        setLoading(false);
+        setExtrasLoading(false);
       }
     };
     load();

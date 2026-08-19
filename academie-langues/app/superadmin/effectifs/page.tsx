@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, ArrowUpDown, Download, Loader2, Search, Users } from "lucide-react";
-import { superadminFetch } from "../../utils/superadmin-api-client";
 import { nexaOfferLabel, type NexaOfferKey } from "@/app/data/nexaOffers";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { useSuperadminCenters } from "../SuperadminCentersContext";
 
 type CenterStats = {
   actifs: number;
@@ -39,28 +39,10 @@ type SortKey = "name" | "actifs" | "total" | "pauses" | "expires" | "revoques";
 
 export default function SuperadminEffectifsPage() {
   const { t, locale } = useI18n();
-  const [centers, setCenters] = useState<CenterRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const { centers, loading, error } = useSuperadminCenters<CenterRow>();
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("actifs");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const json = await superadminFetch<{ centers: CenterRow[] }>("/api/superadmin/centers");
-        setCenters(json.centers || []);
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : t("superadmin", "centersLoadError"));
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, [t]);
 
   const toggleSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));

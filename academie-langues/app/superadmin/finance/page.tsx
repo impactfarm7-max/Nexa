@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Download, Plus, Search, Wallet, X } from "lucide-react";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { useActionFeedback } from "@/app/components/ActionFeedback";
@@ -8,6 +9,7 @@ import { superadminFetch } from "../../utils/superadmin-api-client";
 import { FINANCE_METHODS, type FinanceMethod } from "@/app/data/financePayments";
 import { downloadInvoicePdf, downloadReceiptPdf, type FinanceInvoicePayment } from "@/app/utils/financePdfExport";
 import { nexaOfferLabel, type NexaOfferKey } from "@/app/data/nexaOffers";
+import { useSuperadminCenters } from "../SuperadminCentersContext";
 
 type Payment = {
   id: string;
@@ -74,7 +76,7 @@ function RecordPaymentModal({
 }) {
   const { t, locale } = useI18n();
   const feedback = useActionFeedback();
-  const [centers, setCenters] = useState<CenterOption[]>([]);
+  const { centers } = useSuperadminCenters<CenterOption>();
   const [search, setSearch] = useState("");
   const [centerId, setCenterId] = useState("");
   const [amount, setAmount] = useState("");
@@ -84,17 +86,6 @@ function RecordPaymentModal({
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-
-  useEffect(() => {
-    void (async () => {
-      try {
-        const json = await superadminFetch<{ centers: CenterOption[] }>("/api/superadmin/centers");
-        setCenters(json.centers || []);
-      } catch {
-        setCenters([]);
-      }
-    })();
-  }, []);
 
   const filteredCenters = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -265,8 +256,19 @@ function RecordPaymentModal({
   );
 }
 
+type UnpaidCenter = {
+  id: string;
+  name: string;
+  city?: string | null;
+  billing_status?: string | null;
+  derived_status?: string;
+  subscription_amount?: number | null;
+  renewal_at?: string | null;
+};
+
 export default function SuperadminFinancePage() {
   const { t, locale } = useI18n();
+  const { centers } = useSuperadminCenters<UnpaidCenter>();
   const [days, setDays] = useState(30);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [summary, setSummary] = useState<Summary>(EMPTY_SUMMARY);
@@ -296,6 +298,19 @@ export default function SuperadminFinancePage() {
   }, [load]);
 
   const growthMax = Math.max(1, ...summary.monthlyRevenue.map((m) => m.total));
+
+  const unpaidCenters = useMemo(
+    () =>
+      centers
+        .filter(
+          (c) =>
+            c.billing_status === "unpaid" ||
+            c.billing_status === "grace" ||
+            c.derived_status === "subscription_expired",
+        )
+        .sort((a, b) => (Number(b.subscription_amount) || 0) - (Number(a.subscription_amount) || 0)),
+    [centers],
+  );
 
   const toInvoicePayment = (p: Payment): FinanceInvoicePayment => ({
     document_number: p.document_number,
@@ -366,6 +381,45 @@ export default function SuperadminFinancePage() {
               <p className="mt-1 text-2xl font-black text-white">{loading ? "—" : summary.countPeriod}</p>
             </div>
           </div>
+
+          {unpaidCenters.length > 0 && (
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/[0.04] p-5">
+              <h3 className="font-black text-white">{t("superadmin", "financeUnpaidTitle")}</h3>
+              <p className="text-xs text-slate-500">{t("superadmin", "financeUnpaidSubtitle")}</p>
+              <ul className="mt-4 space-y-2">
+                {unpaidCenters.map((c) => (
+                  <li key={c.id}>
+                    <Link
+                      href={`/superadmin/centres?focus=${c.id}`}
+                      className="flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-black/20 px-4 py-3 text-sm hover:border-orange-400/40"
+                    >
+                      <span className="min-w-0 truncate font-bold text-slate-200">{c.name}</span>
+                      <span className="flex shrink-0 items-center gap-3">
+                        <span
+                          className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+                            c.derived_status === "subscription_expired"
+                              ? "border-orange-500/30 text-orange-300"
+                              : c.billing_status === "unpaid"
+                                ? "border-red-500/30 text-red-300"
+                                : "border-amber-500/30 text-amber-300"
+                          }`}
+                        >
+                          {c.derived_status === "subscription_expired"
+                            ? t("superadmin", "centresDerivedStatus_subscription_expired")
+                            : c.billing_status === "unpaid"
+                              ? t("superadmin", "billingStatusUnpaid")
+                              : t("superadmin", "billingStatusGrace")}
+                        </span>
+                        {c.subscription_amount != null && (
+                          <span className="font-black text-white">{formatFcfa(c.subscription_amount, locale)}</span>
+                        )}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-5">
             <h3 className="font-black text-white">{t("superadmin", "financeChartTitle")}</h3>
