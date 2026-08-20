@@ -967,6 +967,10 @@ export default function CenterStaffPage() {
                   key={`payroll-${selectedStaff.id}`}
                   staff={selectedStaff}
                   centerId={centerId}
+                  onEditContract={() => {
+                    setActiveTab("rh");
+                    setRhEditing(true);
+                  }}
                 />
               )}
 

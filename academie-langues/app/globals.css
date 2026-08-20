@@ -625,7 +625,7 @@ body {
 .superadmin-light,
 .superadmin-light > div,
 .superadmin-light > div > header {
-  background-color: rgb(248 250 252) !important;
+  background-color: #FFFBF7 !important;
 }
 
 /* Surfaces "carte" (fond quasi-noir des pages sombres) → blanc */
@@ -636,14 +636,11 @@ body {
 .superadmin-light .bg-\[\#111827\],
 .superadmin-light .bg-\[\#141b2e\],
 .superadmin-light .bg-black\/20,
-.superadmin-light .bg-black\/30,
-.superadmin-light .bg-black\/70,
-.superadmin-light .bg-black\/75,
-.superadmin-light .bg-black\/80 {
+.superadmin-light .bg-black\/30 {
   background-color: white !important;
 }
 .superadmin-light .bg-\[\#05070d\]\/90 {
-  background-color: rgb(255 255 255 / 0.92) !important;
+  background-color: rgb(255 255 255 / 0.88) !important;
 }
 
 /* Surfaces subtiles (hover/inputs sur fond sombre) → gris très clair */
@@ -665,7 +662,7 @@ body {
 .superadmin-light .border-white\/\[0\.06\],
 .superadmin-light .border-white\/\[0\.07\],
 .superadmin-light .border-white\/\[0\.08\] {
-  border-color: rgb(226 232 240) !important;
+  border-color: rgba(17, 34, 78, 0.08) !important;
 }
 
 /* Texte principal / secondaire */
@@ -673,13 +670,34 @@ body {
 .superadmin-light .text-slate-100,
 .superadmin-light .text-slate-200,
 .superadmin-light .text-slate-300 {
-  color: rgb(15 23 42) !important;
+  color: #11224E !important;
 }
 .superadmin-light .text-slate-400,
 .superadmin-light .text-slate-500,
 .superadmin-light .text-slate-600,
 .superadmin-light .text-slate-700 {
-  color: rgb(71 85 105) !important;
+  color: rgba(17, 34, 78, 0.62) !important;
+}
+
+/* L'état actif de la sidebar reste lisible sur le fond bleu nuit. */
+.superadmin-light .superadmin-sidebar .superadmin-nav-active,
+.superadmin-light .superadmin-sidebar .superadmin-nav-active p,
+.superadmin-light .superadmin-sidebar .superadmin-nav-active svg {
+  color: white !important;
+}
+
+/* Même géométrie calme que le dashboard Centre Libre. */
+.superadmin-light main > section,
+.superadmin-light main > div {
+  --sa-card-radius: 0.875rem;
+}
+
+.superadmin-light main .rounded-3xl {
+  border-radius: 1rem !important;
+}
+
+.superadmin-light main .rounded-2xl {
+  border-radius: 0.875rem !important;
 }
 
 /* Eyebrows / libellés orange (déjà sur la marque, juste assombris pour le contraste) */

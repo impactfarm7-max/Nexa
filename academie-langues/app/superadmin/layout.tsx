@@ -9,6 +9,7 @@ import {
   Star, Sun, ScrollText, Users, UsersRound, UserCog, Wallet, X, LibraryBig,
 } from "lucide-react";
 import { Noto_Sans } from "next/font/google";
+import { BRAND } from "@/app/utils/brand";
 import { supabase } from "../utils/supabase";
 import { superadminFetch } from "../utils/superadmin-api-client";
 import { collectCenterAlerts } from "../utils/center-alerts";
@@ -75,7 +76,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   const [access, setAccess] = useState<SuperadminAccess | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   const [favorites, setFavorites] = useState<string[]>([]);
   const [commandOpen, setCommandOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -110,7 +111,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
     try {
       const prefs = JSON.parse(localStorage.getItem(PREFS_KEY) || "{}");
       setCollapsed(Boolean(prefs.collapsed));
-      if (prefs.theme === "light") setTheme("light");
+      if (prefs.theme === "dark") setTheme("dark");
       if (Array.isArray(prefs.favorites)) setFavorites(prefs.favorites);
     } catch { /* utiliser les préférences par défaut */ }
   }, []);
@@ -305,34 +306,37 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
     },
   ].filter(Boolean) as { href: string; label: string; tone: string }[];
 
+  const light = theme === "light";
+  const muted = (opacity: number) => `rgba(17,34,78,${opacity})`;
+
   return (
-    <div className={`superadmin-shell ${superadminNotoSans.className} flex h-dvh overflow-hidden ${theme === "light" ? "superadmin-light bg-slate-100 text-slate-900" : "bg-[#05070d] text-slate-100"}`}>
+    <div className={`superadmin-shell ${superadminNotoSans.className} flex h-dvh overflow-hidden ${light ? "superadmin-light text-slate-900" : "bg-[#05070d] text-slate-100"}`} style={light ? { backgroundColor: BRAND.bg } : undefined}>
       {mobileOpen && <button aria-label={t("superadmin", "closeMenu")} className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
-      <aside className={`superadmin-sidebar fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.08] bg-[#080d18] shadow-2xl transition-[width,transform] duration-300 lg:static lg:z-auto lg:h-full lg:shrink-0 lg:translate-x-0 ${collapsed ? "lg:w-20" : "lg:w-72"} w-[min(88vw,18rem)] ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex h-20 shrink-0 items-center gap-3 border-b border-white/[0.07] px-5">
+      <aside className={`superadmin-sidebar fixed inset-y-0 left-0 z-50 flex h-dvh flex-col transition-[width,transform] duration-300 lg:static lg:z-auto lg:h-full lg:shrink-0 lg:translate-x-0 ${light ? "border-r shadow-none" : "border-r border-white/[0.08] bg-[#080d18] shadow-2xl"} ${collapsed ? "lg:w-20" : "lg:w-64"} w-[min(88vw,16rem)] ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`} style={light ? { backgroundColor: BRAND.bg, borderColor: muted(0.1) } : undefined}>
+        <div className={`flex h-20 shrink-0 items-center gap-3 px-5 ${light ? "border-b" : "border-b border-white/[0.07]"}`} style={light ? { borderColor: muted(0.1) } : undefined}>
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg shadow-orange-950/40"><ShieldCheck className="h-5 w-5 text-white" /></div>
-          {!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-sm font-black uppercase tracking-wider text-white">{t("superadmin", "brandName")}</p><p className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-600">{t("superadmin", "brandSubtitle")}</p></div>}
-          <button onClick={() => setMobileOpen(false)} className="rounded-xl p-2 text-slate-500 hover:text-white lg:hidden"><X className="h-5 w-5" /></button>
+          {!collapsed && <div className="min-w-0 flex-1"><p className={`truncate text-sm font-black uppercase tracking-wider ${light ? "" : "text-white"}`} style={light ? { color: BRAND.blue } : undefined}>{t("superadmin", "brandName")}</p><p className={`mt-0.5 text-[9px] font-bold uppercase tracking-[0.2em] ${light ? "" : "text-slate-600"}`} style={light ? { color: muted(0.4) } : undefined}>{t("superadmin", "brandSubtitle")}</p></div>}
+          <button onClick={() => setMobileOpen(false)} className={`rounded-xl p-2 lg:hidden ${light ? "hover:bg-black/[0.04]" : "text-slate-500 hover:text-white"}`} style={light ? { color: muted(0.45) } : undefined}><X className="h-5 w-5" /></button>
         </div>
         <nav className="custom-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label={t("superadmin", "navAriaLabel")}>
-          {!collapsed && favorites.length > 0 && <div className="mb-5 rounded-2xl border border-amber-500/10 bg-amber-500/[0.04] p-1.5"><p className="px-2 py-1 text-[9px] font-black uppercase tracking-widest text-amber-500/60">{t("superadmin", "favorites")}</p>{favorites.map((href) => { const item = NAV_ITEMS.find((entry) => entry.href === href); if (!item) return null; return <Link key={href} href={href} onClick={() => setMobileOpen(false)} className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold text-amber-200/70 hover:bg-amber-500/10"><Star className="h-3.5 w-3.5 fill-current" />{item.label}</Link>; })}</div>}
-          {groups.map((group) => <div key={group} className="mb-5">{!collapsed && <p className="mb-1.5 px-3 text-[9px] font-black uppercase tracking-[0.2em] text-slate-600">{group}</p>}{NAV_ITEMS.filter((item) => item.group === group).map(({ href, label, description, icon: Icon }) => { const active = pathname === href || pathname.startsWith(`${href}/`); const count = href === "/superadmin/demandes" ? newApplicationsCount : href === "/superadmin/centres" ? pendingCenters.length : href === "/superadmin/dashboard" ? alertCounts.badge : 0; return <Link key={href} href={href} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)} className={`mb-1 flex min-h-12 items-center rounded-xl transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${active ? "bg-orange-500 text-white shadow-lg shadow-orange-950/30" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`}><Icon className="h-4.5 w-4.5 shrink-0" />{!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{label}</p><p className={`truncate text-[9px] ${active ? "text-orange-100/70" : "text-slate-600"}`}>{description}</p></div>}{count > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">{count}</span>}</Link>; })}</div>)}
+          {!collapsed && favorites.length > 0 && <div className={`mb-5 rounded-xl border p-1.5 ${light ? "border-black/[0.06] bg-white/60" : "border-amber-500/10 bg-amber-500/[0.04]"}`}><p className={`px-2 py-1 text-[9px] font-black uppercase tracking-widest ${light ? "text-neutral-400" : "text-amber-500/60"}`}>{t("superadmin", "favorites")}</p>{favorites.map((href) => { const item = NAV_ITEMS.find((entry) => entry.href === href); if (!item) return null; return <Link key={href} href={href} onClick={() => setMobileOpen(false)} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold ${light ? "hover:bg-black/[0.04]" : "text-amber-200/70 hover:bg-amber-500/10"}`} style={light ? { color: BRAND.blue } : undefined}><Star className="h-3.5 w-3.5 fill-current" style={light ? { color: BRAND.orange } : undefined} />{item.label}</Link>; })}</div>}
+          {groups.map((group) => <div key={group} className="mb-5">{!collapsed && <p className={`mb-1.5 px-3 text-[9px] font-black uppercase tracking-[0.2em] ${light ? "" : "text-slate-600"}`} style={light ? { color: muted(0.35) } : undefined}>{group}</p>}{NAV_ITEMS.filter((item) => item.group === group).map(({ href, label, description, icon: Icon }) => { const active = pathname === href || pathname.startsWith(`${href}/`); const count = href === "/superadmin/demandes" ? newApplicationsCount : href === "/superadmin/centres" ? pendingCenters.length : href === "/superadmin/dashboard" ? alertCounts.badge : 0; return <Link key={href} href={href} title={collapsed ? label : undefined} onClick={() => setMobileOpen(false)} className={`relative mb-1 flex min-h-12 items-center rounded-xl transition ${collapsed ? "justify-center px-2" : "gap-3 px-3"} ${active ? "superadmin-nav-active text-white shadow-lg shadow-orange-950/30" : light ? "hover:bg-black/[0.04]" : "text-slate-400 hover:bg-white/[0.05] hover:text-white"}`} style={active ? { backgroundColor: light ? BRAND.blue : "#f97316" } : light ? { color: muted(0.62) } : undefined}>{active && light && <span className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full" style={{ width: 3, height: "60%", backgroundColor: BRAND.orange }} />}<Icon className="h-4.5 w-4.5 shrink-0" style={!active && light ? { color: muted(0.45) } : undefined} />{!collapsed && <div className="min-w-0 flex-1"><p className="truncate text-xs font-black">{label}</p><p className={`truncate text-[9px] ${active ? "opacity-70" : light ? "" : "text-slate-600"}`} style={!active && light ? { color: muted(0.4) } : undefined}>{description}</p></div>}{count > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-black text-white">{count}</span>}</Link>; })}</div>)}
         </nav>
-        <div className="shrink-0 border-t border-white/[0.07] p-3">
+        <div className={`shrink-0 p-3 ${light ? "border-t" : "border-t border-white/[0.07]"}`} style={light ? { borderColor: muted(0.1) } : undefined}>
           <div className={`flex items-center ${collapsed ? "flex-col gap-1" : "gap-1"}`}>
-            <button onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")} title={t("superadmin", "changeTheme")} className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-white/5 hover:text-white">{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{!collapsed && t("superadmin", "theme")}</button>
-            <button onClick={() => setCollapsed((value) => !value)} title={t("superadmin", "reduceSidebar")} className="hidden h-10 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-white/5 hover:text-white lg:flex">{collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}{!collapsed && t("superadmin", "reduce")}</button>
+            <button onClick={() => setTheme((value) => value === "dark" ? "light" : "dark")} title={t("superadmin", "changeTheme")} className={`flex h-10 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-bold ${light ? "hover:bg-black/[0.04]" : "text-slate-500 hover:bg-white/5 hover:text-white"}`} style={light ? { color: muted(0.5) } : undefined}>{theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}{!collapsed && t("superadmin", "theme")}</button>
+            <button onClick={() => setCollapsed((value) => !value)} title={t("superadmin", "reduceSidebar")} className={`hidden h-10 flex-1 items-center justify-center gap-2 rounded-xl text-xs font-bold lg:flex ${light ? "hover:bg-black/[0.04]" : "text-slate-500 hover:bg-white/5 hover:text-white"}`} style={light ? { color: muted(0.5) } : undefined}>{collapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}{!collapsed && t("superadmin", "reduce")}</button>
           </div>
-          <button onClick={handleSignOut} className={`mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-xl text-xs font-bold text-slate-500 hover:bg-red-500/10 hover:text-red-300`}><LogOut className="h-4 w-4" />{!collapsed && t("superadmin", "signOut")}</button>
+          <button onClick={handleSignOut} className={`mt-1 flex h-10 w-full items-center justify-center gap-2 rounded-xl text-xs font-bold hover:bg-red-500/10 hover:text-red-500 ${light ? "" : "text-slate-500 hover:text-red-300"}`} style={light ? { color: muted(0.5) } : undefined}><LogOut className="h-4 w-4" />{!collapsed && t("superadmin", "signOut")}</button>
         </div>
       </aside>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-30 flex h-20 shrink-0 items-center gap-3 border-b border-white/[0.07] bg-[#05070d]/90 px-4 backdrop-blur-xl sm:px-6">
-          <button onClick={() => setMobileOpen(true)} aria-label={t("superadmin", "openMenu")} className="rounded-xl border border-white/[0.07] p-2.5 text-slate-400 lg:hidden"><Menu className="h-5 w-5" /></button>
-          <div className="min-w-0 flex-1"><p className="text-[9px] font-black uppercase tracking-[0.22em] text-orange-400">{activeItem.group}</p><h1 className="truncate text-base font-black text-white">{activeItem.label}</h1></div>
-          <LanguageSwitcher compact dark />
-          <button onClick={() => setCommandOpen(true)} className="hidden items-center gap-2 rounded-xl border border-white/[0.07] bg-white/[0.03] px-3 py-2.5 text-xs font-bold text-slate-400 hover:text-white sm:flex"><Search className="h-4 w-4" /><span className="hidden xl:inline">{t("superadmin", "globalSearch")}</span><kbd className="hidden rounded border border-white/10 px-1.5 py-0.5 text-[9px] text-slate-600 xl:inline">Ctrl K</kbd></button>
+        <header className={`sticky top-0 z-30 flex h-20 shrink-0 items-center gap-3 border-b px-4 backdrop-blur-xl sm:px-6 ${light ? "bg-white/80 border-black/[0.06]" : "border-white/[0.07] bg-[#05070d]/90"}`}>
+          <button onClick={() => setMobileOpen(true)} aria-label={t("superadmin", "openMenu")} className={`rounded-xl border p-2.5 lg:hidden ${light ? "border-black/[0.08] text-neutral-500" : "border-white/[0.07] text-slate-400"}`}><Menu className="h-5 w-5" /></button>
+          <div className="min-w-0 flex-1"><p className="text-[9px] font-black uppercase tracking-[0.22em]" style={{ color: BRAND.orange }}>{activeItem.group}</p><h1 className={`truncate text-base font-black ${light ? "" : "text-white"}`} style={light ? { color: BRAND.blue } : undefined}>{activeItem.label}</h1></div>
+          <LanguageSwitcher compact dark={!light} />
+          <button onClick={() => setCommandOpen(true)} className={`hidden items-center gap-2 rounded-xl border px-3 py-2.5 text-xs font-bold sm:flex ${light ? "border-black/[0.08] bg-white text-neutral-500 hover:bg-neutral-50" : "border-white/[0.07] bg-white/[0.03] text-slate-400 hover:text-white"}`}><Search className="h-4 w-4" /><span className="hidden xl:inline">{t("superadmin", "globalSearch")}</span><kbd className={`hidden rounded border px-1.5 py-0.5 text-[9px] xl:inline ${light ? "border-black/10 text-neutral-400" : "border-white/10 text-slate-600"}`}>Ctrl K</kbd></button>
           <button onClick={() => toggleFavorite(activeItem.href)} aria-label={t("superadmin", "addToFavorites")} className={`hidden rounded-xl border p-2.5 sm:block ${favorites.includes(activeItem.href) ? "border-amber-400/30 bg-amber-400/10 text-amber-400" : "border-white/[0.07] text-slate-500"}`}><Star className={`h-4 w-4 ${favorites.includes(activeItem.href) ? "fill-current" : ""}`} /></button>
           <div className="relative" ref={notificationsRef}>
             <button
@@ -340,7 +344,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
               onClick={() => setNotificationsOpen((value) => !value)}
               aria-label={t("superadmin", "notifications")}
               aria-expanded={notificationsOpen}
-              className="relative rounded-xl border border-white/[0.07] p-2.5 text-slate-400"
+              className={`relative rounded-xl border p-2.5 ${light ? "border-black/[0.08] bg-white text-neutral-500" : "border-white/[0.07] text-slate-400"}`}
             >
               <Bell className="h-4 w-4" />
               {alertCounts.badge > 0 && (
@@ -350,7 +354,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
               )}
             </button>
             {notificationsOpen && (
-              <div className="absolute right-0 top-12 w-[min(22rem,85vw)] rounded-2xl border border-white/10 bg-[#0b1120] p-2 shadow-2xl">
+              <div className={`absolute right-0 top-12 w-[min(22rem,85vw)] rounded-2xl border p-2 shadow-2xl ${light ? "border-black/[0.08] bg-white" : "border-white/10 bg-[#0b1120]"}`}>
                 <p className="px-3 py-2 text-xs font-black uppercase tracking-wider text-white">{t("superadmin", "toHandle")}</p>
                 {bellItems.length === 0 ? (
                   <p className="px-3 py-6 text-center text-xs text-slate-500">{t("superadmin", "allUpToDate")}</p>

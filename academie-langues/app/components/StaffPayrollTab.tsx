@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useState, type ElementType, type React
 import { createPortal } from "react-dom";
 import {
   Loader2, Plus, Trash2, X, AlertTriangle, Eye, ArrowLeft,
-  Download, Pencil, RotateCcw, CalendarDays, ClipboardList,
+  Download, Pencil, RotateCcw, CalendarDays, ClipboardList, ChevronLeft,
+  ChevronRight, Check, WalletCards,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/utils/documentConfig";
@@ -72,22 +73,31 @@ function currentYm() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function shiftMonth(ym: string, amount: number) {
+  const [year, month] = ym.split("-").map(Number);
+  const date = new Date(year, (month || 1) - 1 + amount, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
 function PayrollSection({
   icon: Icon,
   title,
   description,
   actions,
+  className = "",
   children,
 }: {
   icon: ElementType;
   title: string;
   description: string;
   actions?: ReactNode;
+  className?: string;
   children: ReactNode;
 }) {
   return (
-    <section className="grid grid-cols-1 lg:grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-5 sm:gap-8 py-8 border-b border-black/[0.06] first:pt-2 last:border-b-0">
-      <div className="lg:sticky lg:top-4 self-start min-w-0">
+    <section className={`py-6 border-b border-black/[0.06] first:pt-2 last:border-b-0 ${className}`}>
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-4">
+        <div className="min-w-0">
         <div className="flex items-center gap-3">
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 border border-black/[0.06]"
@@ -100,9 +110,10 @@ function PayrollSection({
           </h2>
         </div>
         <p className="text-sm text-neutral-500 mt-3 leading-relaxed font-medium">{description}</p>
-        {actions && <div className="mt-4 flex flex-wrap gap-2">{actions}</div>}
+        </div>
+        {actions && <div className="flex flex-wrap gap-2 shrink-0">{actions}</div>}
       </div>
-      <div className="space-y-4 w-full min-w-0 rounded-xl border border-black/[0.06] p-5 sm:p-6" style={{ backgroundColor: SURFACE }}>
+      <div className="space-y-4 w-full min-w-0 rounded-2xl border border-black/[0.06] p-4 sm:p-6" style={{ backgroundColor: SURFACE }}>
         {children}
       </div>
     </section>
@@ -119,6 +130,7 @@ type Props = {
     job_title?: string | null;
   };
   centerId: string;
+  onEditContract?: () => void;
 };
 
 type ConfirmKind =
@@ -130,7 +142,7 @@ type ConfirmKind =
   | { kind: "applyBase" }
   | { kind: "includePrime" };
 
-export default function StaffPayrollTab({ staff, centerId }: Props) {
+export default function StaffPayrollTab({ staff, centerId, onEditContract }: Props) {
   const { locale, t } = useI18n();
   const feedback = useActionFeedback();
   const statusLabel = (status: string) => t("centre", status === "draft" ? "staffPayrollDraft" : status === "validated" ? "staffPayrollValidated" : status === "paid" ? "staffPayrollPaid" : status);
@@ -167,6 +179,8 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
   const [confirmBusy, setConfirmBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [periodPickerOpen, setPeriodPickerOpen] = useState(false);
+  const [pendingPeriodYm, setPendingPeriodYm] = useState(periodYm);
 
   const applyBundle = (json: {
     period?: Period | null;
@@ -435,11 +449,12 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full flex flex-col">
       <PayrollSection
+        className="order-2"
         icon={CalendarDays}
         title={t("centre", "staffPayrollYearJournal")}
-        description={t("centre", "staffPayrollYearJournalHelp")}
+        description={locale === "en" ? "Review previous payslips and reopen a period when needed." : "Retrouvez les anciens bulletins et rouvrez une période si nécessaire."}
         actions={
           <CenterSelect
             size="sm"
@@ -510,20 +525,17 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
       </PayrollSection>
 
       <PayrollSection
+        className="order-1"
         icon={ClipboardList}
-        title={locale === "en" ? "Payroll entry" : "Enregistrer"}
-        description={locale === "en" ? "Enter bonuses, deductions, payments, and approval for the selected month." : "Saisie du mois sélectionné : primes, retenues, versements et validation."}
+        title={locale === "en" ? "Monthly payroll" : "Paie du mois"}
+        description={locale === "en" ? "Prepare the amount, approve the payslip, then record the payment." : "Préparez le montant, validez le bulletin, puis enregistrez le paiement."}
         actions={
           <>
-            <label className="flex items-center gap-1.5 h-8 px-2.5 rounded-lg border-2 bg-white text-xs font-bold" style={{ borderColor: ORANGE, color: BLUE }}>
-              {locale === "en" ? "Period" : "Période"} :
-              <input
-                type="month"
-                value={periodYm}
-                onChange={(e) => setPeriodYm(e.target.value)}
-                className="h-full bg-transparent text-xs font-semibold text-neutral-700 outline-none"
-              />
-            </label>
+            {periodYm !== currentYm() && (
+              <button type="button" onClick={() => setPeriodYm(currentYm())} className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold" style={{ color: BLUE }}>
+                {locale === "en" ? "Current month" : "Mois actuel"}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setPreviewOpen(true)}
@@ -535,6 +547,20 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
           </>
         }
       >
+        <div className="rounded-xl border border-black/[0.06] bg-white p-3">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 text-center mb-2">{locale === "en" ? "Current pay period" : "Période de paie affichée"}</p>
+          <div className="flex items-center justify-between gap-3">
+            <button type="button" onClick={() => setPeriodYm(shiftMonth(periodYm, -1))} className="w-10 h-10 rounded-lg grid place-items-center text-neutral-500 hover:bg-neutral-100" aria-label={locale === "en" ? "Previous month" : "Mois précédent"}><ChevronLeft size={19} /></button>
+            <div className="text-center min-w-0 flex-1 py-1">
+              <span className="block text-lg font-extrabold capitalize" style={{ color: BLUE }}>{periodLabel(periodYm, locale)}</span>
+              <button type="button" onClick={() => { setPendingPeriodYm(periodYm); setPeriodPickerOpen(true); }} className="mt-1.5 h-8 px-3 rounded-lg text-xs font-bold text-white" style={{ backgroundColor: BLUE }}>
+                <CalendarDays size={13} className="inline mr-1.5 -mt-0.5" />{locale === "en" ? "Choose period" : "Choisir la période"}
+              </button>
+            </div>
+            <button type="button" onClick={() => setPeriodYm(shiftMonth(periodYm, 1))} className="w-10 h-10 rounded-lg grid place-items-center text-neutral-500 hover:bg-neutral-100" aria-label={locale === "en" ? "Next month" : "Mois suivant"}><ChevronRight size={19} /></button>
+          </div>
+        </div>
+
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <p className="text-base font-extrabold tracking-tight capitalize" style={{ color: BLUE }}>
@@ -579,6 +605,20 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
           </div>
         </div>
 
+        {period && (
+          <div className="grid grid-cols-3 gap-1 rounded-xl bg-white border border-black/[0.06] p-1.5" aria-label={locale === "en" ? "Payroll progress" : "Progression de la paie"}>
+            {[
+              { label: locale === "en" ? "1. Prepare" : "1. Préparer", done: period.status !== "draft", active: period.status === "draft" },
+              { label: locale === "en" ? "2. Approve" : "2. Valider", done: period.status === "paid", active: period.status === "validated" },
+              { label: locale === "en" ? "3. Pay" : "3. Payer", done: period.status === "paid", active: period.status === "paid" },
+            ].map((step) => (
+              <div key={step.label} className={`min-h-9 rounded-lg px-2 flex items-center justify-center gap-1.5 text-[11px] sm:text-xs font-bold text-center ${step.active ? "bg-[#11224E] text-white" : step.done ? "bg-emerald-50 text-emerald-700" : "text-neutral-400"}`}>
+                {step.done && <Check size={12} strokeWidth={3} />} {step.label}
+              </div>
+            ))}
+          </div>
+        )}
+
         {totals && (
           <div className="rounded-lg border border-black/[0.06] bg-white p-4">
             <div className="flex flex-wrap items-end justify-between gap-4">
@@ -616,7 +656,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
           </div>
         )}
 
-        {period?.status !== "paid" && (
+        {period?.status === "draft" && (
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -639,15 +679,19 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
           >
             <Plus size={14} /> {locale === "en" ? "Adjustment" : "Ajustement"}
           </button>
-          <button
-            type="button"
-            onClick={() => setConfirm({ kind: "pay" })}
-            disabled={!period || !totals}
-            className={ACTION_TONE.positiveBtnMd}
-          >
-            {t("centre", "staffPayrollPay")}
-          </button>
         </div>
+        )}
+
+        {period?.status === "validated" && (
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-emerald-900">{locale === "en" ? "Payslip approved" : "Bulletin validé"}</p>
+              <p className="text-xs text-emerald-700 mt-0.5">{locale === "en" ? "The amount is locked. Record the payment to close this month." : "Le montant est verrouillé. Enregistrez le paiement pour clôturer ce mois."}</p>
+            </div>
+            <button type="button" onClick={openNewPay} disabled={!totals} className={`${ACTION_TONE.positiveBtnMd} shrink-0`}>
+              <WalletCards size={14} /> {locale === "en" ? "Record payment" : "Enregistrer le paiement"}
+            </button>
+          </div>
         )}
 
         {error && (
@@ -680,7 +724,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                       <span className={`text-sm tabular-nums font-semibold mr-1 ${l.type === "retenue" ? ACTION_TONE.negativeText : ACTION_TONE.positiveText}`}>
                         {l.type === "retenue" ? "−" : "+"}{fmt(Number(l.amount), locale)}
                       </span>
-                      {period?.status !== "paid" && (
+                      {period?.status === "draft" && (
                         <>
                       <button type="button" onClick={() => openEditLine(l)} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]" title={locale === "en" ? "Edit" : "Modifier"}>
                         <Pencil size={14} />
@@ -701,7 +745,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
         <div>
           <div className="flex items-center justify-between mb-2">
             <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{locale === "en" ? "Payment history" : "Historique des versements"}</p>
-            {period?.status !== "paid" && (
+            {period?.status === "validated" && (
             <button type="button" onClick={openNewPay} className="text-xs font-semibold" style={{ color: BLUE }}>
               {locale === "en" ? "Add" : "Ajouter"}
             </button>
@@ -725,7 +769,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <span className={`text-sm tabular-nums font-semibold mr-1 ${ACTION_TONE.positiveText}`}>+{fmt(Number(p.amount), locale)}</span>
-                      {period?.status !== "paid" && (
+                      {period?.status === "validated" && (
                         <>
                       <button type="button" onClick={() => openEditPay(p)} className="p-1.5 rounded-md text-neutral-400 hover:text-neutral-700 hover:bg-black/[0.04]">
                         <Pencil size={14} />
@@ -750,9 +794,16 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
 
         <div className="rounded-lg border border-black/[0.06] bg-white p-4 space-y-4">
           <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400 mb-2">
-              {locale === "en" ? "Contract (reference, fixed)" : "Contrat (référence, fixe)"}
-            </p>
+            <div className="flex items-center justify-between gap-3 mb-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">
+                {locale === "en" ? "Contract (reference, fixed)" : "Contrat (référence, fixe)"}
+              </p>
+              {onEditContract && (
+                <button type="button" onClick={onEditContract} className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-neutral-50" style={{ color: BLUE }}>
+                  <Pencil size={12} /> {locale === "en" ? "Edit contract" : "Modifier le contrat"}
+                </button>
+              )}
+            </div>
             <div className="rounded-lg bg-black/[0.02] border border-black/[0.05] px-3.5 py-2.5 flex flex-wrap gap-x-6 gap-y-1.5 text-sm text-neutral-600 font-medium">
               <span>{locale === "en" ? "Base salary" : "Salaire de base"} <strong className={`font-semibold ${ACTION_TONE.positiveText}`}>{fmt(contract.base_salary, locale)}</strong></span>
               <span>{locale === "en" ? "Fixed bonus" : "Prime fixe"} <strong className={`font-semibold ${ACTION_TONE.positiveText}`}>{contract.prime > 0 ? fmt(contract.prime, locale) : "—"}</strong></span>
@@ -770,7 +821,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                   )}
                   disabled={
                     saving ||
-                    period.status === "paid" ||
+                    period.status !== "draft" ||
                     lines.some(
                       (l) =>
                         l.type === "prime" &&
@@ -812,7 +863,7 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
                 />
                 <button
                   type="button"
-                  disabled={saving || period.status === "paid" || Math.round(Number(baseEdit) || 0) === Math.round(Number(period.base_salary_snapshot) || 0)}
+                  disabled={saving || period.status !== "draft" || Math.round(Number(baseEdit) || 0) === Math.round(Number(period.base_salary_snapshot) || 0)}
                   onClick={() => setConfirm({ kind: "applyBase" })}
                   className="h-10 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 hover:bg-black/[0.03] disabled:opacity-40 shrink-0"
                 >
@@ -829,6 +880,26 @@ export default function StaffPayrollTab({ staff, centerId }: Props) {
       </PayrollSection>
 
       {/* Modal ligne */}
+      {periodPickerOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPeriodPickerOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-5 sm:p-6 border border-black/[0.06]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 mb-5">
+              <div>
+                <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>{locale === "en" ? "Choose pay period" : "Choisir la période de paie"}</h3>
+                <p className="text-sm text-neutral-500 mt-1">{locale === "en" ? "Select the month you want to prepare or review." : "Sélectionnez le mois à préparer ou à consulter."}</p>
+              </div>
+              <button type="button" onClick={() => setPeriodPickerOpen(false)} className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500"><X size={18} /></button>
+            </div>
+            <label className="text-sm font-semibold text-neutral-600 block mb-1.5">{locale === "en" ? "Month and year" : "Mois et année"}</label>
+            <input type="month" autoFocus value={pendingPeriodYm} onChange={(e) => setPendingPeriodYm(e.target.value)} className="w-full h-12 px-3 rounded-lg border-2 text-base font-semibold outline-none" style={{ borderColor: BLUE }} />
+            <div className="flex justify-end gap-2 mt-5">
+              <button type="button" onClick={() => setPeriodPickerOpen(false)} className="h-10 px-4 rounded-lg text-sm font-semibold text-neutral-600 bg-neutral-100">{locale === "en" ? "Cancel" : "Annuler"}</button>
+              <button type="button" disabled={!pendingPeriodYm} onClick={() => { setPeriodYm(pendingPeriodYm); setPeriodPickerOpen(false); }} className="h-10 px-5 rounded-lg text-sm font-semibold text-white disabled:opacity-40" style={{ backgroundColor: BLUE }}>{locale === "en" ? "Show period" : "Afficher la période"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {lineOpen && (
         <div className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setLineOpen(false)}>
           <div
