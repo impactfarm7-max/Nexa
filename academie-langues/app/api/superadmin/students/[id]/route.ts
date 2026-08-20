@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSuperadminContext, logSuperadminAction, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
 
 const ACTIONS = new Set(["reset_password", "pause", "resume", "revoke", "reactivate"]);
+const USER_ROLES = ["student", "center_manager", "campus_manager", "trainer", "staff"];
 
 function generatePassword(prenom: string): string {
   const digits = Math.floor(1000 + Math.random() * 9000);
@@ -26,11 +27,11 @@ export async function PATCH(req: NextRequest, context: { params: Promise<{ id: s
       "id, prenom, email, center_id, role, tag_status, center_status, pack_name, subscription_ends_at, subscription_paused_at",
     )
     .eq("id", id)
-    .eq("role", "student")
+    .in("role", USER_ROLES)
     .maybeSingle();
 
   if (studentError) return NextResponse.json({ error: studentError.message }, { status: 500 });
-  if (!student) return NextResponse.json({ error: "Etudiant introuvable." }, { status: 404 });
+  if (!student) return NextResponse.json({ error: "Utilisateur introuvable." }, { status: 404 });
 
   const now = new Date();
   const nowIso = now.toISOString();

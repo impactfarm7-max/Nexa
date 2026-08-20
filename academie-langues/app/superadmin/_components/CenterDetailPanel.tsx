@@ -97,6 +97,7 @@ type CenterUsage = {
   seatsMax: number | null;
   seatsPct: number | null;
   seatsOver: boolean;
+  studentCount: number;
   staffCount: number;
   staffMax: number | null;
   staffOver: boolean;
@@ -425,7 +426,7 @@ export function CenterDetailPanel({
       {/* Subscription block — always visible, primary CTA for offer assignment */}
       <div className="rounded-2xl border border-orange-500/25 bg-orange-500/[0.06] p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-widest text-orange-400/90">
               {t("superadmin", "centresSubscriptionTitle")}
             </p>
@@ -440,26 +441,26 @@ export function CenterDetailPanel({
               )}
             </div>
             {(offerCfg || offerKey === "custom") && (
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                <span className="rounded-lg bg-black/20 px-2 py-0.5 text-[10px] font-bold text-slate-400">
+              <div className="custom-scrollbar mt-3 flex flex-nowrap gap-1.5 overflow-x-auto pb-1">
+                <span className="shrink-0 whitespace-nowrap rounded-lg bg-black/20 px-2 py-0.5 text-[10px] font-bold text-slate-400">
                   {t("superadmin", "centresQuotaMaxStudents")}: {formatQuota(maxStudents as number | null)}
                 </span>
-                <span className="rounded-lg bg-black/20 px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                <span className="shrink-0 whitespace-nowrap rounded-lg bg-black/20 px-2 py-0.5 text-[10px] font-bold text-slate-400">
                   {t("superadmin", "centresQuotaCampus")}: {formatQuota(campus as number | null)}
                 </span>
-                <span className="rounded-lg bg-black/20 px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                <span className="shrink-0 whitespace-nowrap rounded-lg bg-black/20 px-2 py-0.5 text-[10px] font-bold text-slate-400">
                   {t("superadmin", "centresQuotaStaff")}: {formatQuota(staff as number | null)}
                 </span>
-                <span className="rounded-lg bg-black/20 px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                <span className="shrink-0 whitespace-nowrap rounded-lg bg-black/20 px-2 py-0.5 text-[10px] font-bold text-slate-400">
                   {t("superadmin", "centresQuotaTutor")}: {formatQuota(tutor as number | null)}
                 </span>
-                <span className="rounded-lg bg-black/20 px-2 py-0.5 text-[10px] font-bold text-slate-400">
+                <span className="shrink-0 whitespace-nowrap rounded-lg bg-black/20 px-2 py-0.5 text-[10px] font-bold text-slate-400">
                   {t("superadmin", "centresQuotaLive")}: {live == null ? "∞" : `${live}h`}
                 </span>
               </div>
             )}
             {offerKey === "custom" && studentOverrides && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
+              <div className="custom-scrollbar mt-2 flex flex-nowrap gap-1.5 overflow-x-auto pb-1">
                 {(
                   [
                     ["centresQuotaEe", "expressionEcrite"],
@@ -469,7 +470,7 @@ export function CenterDetailPanel({
                     ["centresQuotaTutorIa", "sessionsTuteurIa"],
                   ] as const
                 ).map(([labelKey, field]) => (
-                  <span key={field} className="rounded-lg bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold text-orange-300/90">
+                  <span key={field} className="shrink-0 whitespace-nowrap rounded-lg bg-orange-500/10 px-2 py-0.5 text-[10px] font-bold text-orange-300/90">
                     {t("superadmin", labelKey)}: {formatQuota(typeof studentOverrides[field] === "number" ? (studentOverrides[field] as number) : null)}
                   </span>
                 ))}
@@ -506,9 +507,16 @@ export function CenterDetailPanel({
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
             {t("superadmin", "usageTitle")}
           </p>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {(
               [
+                {
+                  label: t("superadmin", "usageStudents"),
+                  used: detail.usage.studentCount,
+                  max: null,
+                  over: false,
+                  pct: null,
+                },
                 {
                   label: t("superadmin", "usageSeats"),
                   used: detail.usage.seatsOccupied,
@@ -667,12 +675,13 @@ export function CenterDetailPanel({
                 label={t("superadmin", "requestsPhone")}
                 value={center.phone}
                 icon={<Phone className="h-3.5 w-3.5" />}
-                nowrap
+                span
               />
               <FicheField
                 label={t("superadmin", "requestsCenterEmail")}
                 value={center.email}
                 icon={<Mail className="h-3.5 w-3.5" />}
+                span
               />
               <FicheRow
                 label={t("superadmin", "requestsAddress")}
@@ -703,12 +712,13 @@ export function CenterDetailPanel({
                 label={t("superadmin", "requestsEmail")}
                 value={primaryManager?.email ?? detail?.creatorEmail}
                 icon={<Mail className="h-3.5 w-3.5" />}
+                span
               />
               <FicheField
                 label={t("superadmin", "requestsContactPhone")}
                 value={primaryManager?.phone ?? center.phone}
                 icon={<Phone className="h-3.5 w-3.5" />}
-                nowrap
+                span
               />
             </FicheSection>
           </div>

@@ -31,6 +31,8 @@ type StudentRow = {
   phone: string | null;
   ville: string | null;
   center_id: string | null;
+  role: string | null;
+  job_title: string | null;
   tag_status: string | null;
   center_status: string | null;
   subscription_ends_at: string | null;
@@ -42,7 +44,12 @@ type StudentRow = {
 
 type CenterInfo = { id: string; name: string; code: string | null };
 type StatusFilter = "all" | "active" | "paused" | "expired" | "revoked";
+type TypeFilter = "all" | "student" | "staff";
 type ConfirmKind = "pause" | "resume" | "revoke" | "reactivate";
+
+function isStaffRow(student: StudentRow): boolean {
+  return student.role != null && student.role !== "student";
+}
 
 function derivedStatus(student: StudentRow): Exclude<StatusFilter, "all"> {
   if (student.tag_status === "revoque" || student.center_status === "revoked") return "revoked";
@@ -70,6 +77,7 @@ export default function SuperadminEtudiantsPage() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [centers, setCenters] = useState<Record<string, CenterInfo>>({});
   const [total, setTotal] = useState(0);
@@ -129,9 +137,13 @@ export default function SuperadminEtudiantsPage() {
   }, [loadStudents]);
 
   const filtered = useMemo(() => {
-    if (statusFilter === "all") return students;
-    return students.filter((s) => derivedStatus(s) === statusFilter);
-  }, [students, statusFilter]);
+    return students.filter((s) => {
+      if (statusFilter !== "all" && derivedStatus(s) !== statusFilter) return false;
+      if (typeFilter === "student" && isStaffRow(s)) return false;
+      if (typeFilter === "staff" && !isStaffRow(s)) return false;
+      return true;
+    });
+  }, [students, statusFilter, typeFilter]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<StatusFilter, number> = { all: students.length, active: 0, paused: 0, expired: 0, revoked: 0 };
@@ -215,10 +227,10 @@ export default function SuperadminEtudiantsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-black text-white">{t("superadmin", "studentsTitle")}</h1>
-        <p className="mt-1 text-sm text-slate-400">{t("superadmin", "studentsSubtitle")}</p>
+        <h1 className="text-2xl font-black text-white">{t("superadmin", "usersTitle")}</h1>
+        <p className="mt-1 text-sm text-slate-400">{t("superadmin", "usersSubtitle")}</p>
         <p className="mt-2 text-xs font-bold uppercase tracking-widest text-slate-600">
-          {t("superadmin", "studentsCount", { count: String(total) })}
+          {t("superadmin", "usersCount", { count: String(total) })}
         </p>
       </div>
 
@@ -227,7 +239,7 @@ export default function SuperadminEtudiantsPage() {
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("superadmin", "studentsSearchPlaceholder")}
+          placeholder={t("superadmin", "usersSearchPlaceholder")}
           className="w-full rounded-2xl border border-white/10 bg-[#0a0f1c] py-3.5 pl-11 pr-4 text-sm text-white outline-none focus:border-orange-400"
         />
         {loading && <Loader2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-slate-500" />}
@@ -248,9 +260,37 @@ export default function SuperadminEtudiantsPage() {
               }`}
             >
               {filterLabel(key)}
-              <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${active ? "bg-orange-500/30" : "bg-white/5"}`}>
-                {statusCounts[key]}
-              </span>
+              {(key === "all" || !hasMore) && (
+                <span className={`rounded-full px-1.5 py-0.5 text-[9px] ${active ? "bg-orange-500/30" : "bg-white/5"}`}>
+                  {key === "all" ? total : statusCounts[key]}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {(
+          [
+            ["all", "usersTypeAll"],
+            ["student", "usersTypeStudent"],
+            ["staff", "usersTypeStaff"],
+          ] as const
+        ).map(([key, labelKey]) => {
+          const active = typeFilter === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setTypeFilter(key)}
+              className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${
+                active
+                  ? "border-sky-500/50 bg-sky-500/15 text-sky-300"
+                  : "border-white/10 bg-[#0a0f1c] text-slate-400 hover:border-white/20"
+              }`}
+            >
+              {t("superadmin", labelKey)}
             </button>
           );
         })}
@@ -263,23 +303,24 @@ export default function SuperadminEtudiantsPage() {
       {loading && students.length === 0 ? (
         <p className="flex items-center justify-center gap-2 py-10 text-sm text-slate-500">
           <Loader2 className="h-4 w-4 animate-spin" />
-          {t("superadmin", "centersLoading")}
+          {t("superadmin", "studentsLoading")}
         </p>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-[#0a0f1c] p-12 text-center">
           <Inbox className="mx-auto mb-3 h-8 w-8 text-slate-700" />
           <p className="font-black text-white">
             {debouncedQuery.length >= 2
-              ? t("superadmin", "studentsNoResult", { query: debouncedQuery })
-              : t("superadmin", "studentsEmptyTitle")}
+              ? t("superadmin", "usersNoResult", { query: debouncedQuery })
+              : t("superadmin", "usersEmptyTitle")}
           </p>
-          <p className="mt-1 text-sm text-slate-500">{t("superadmin", "studentsEmptyHint")}</p>
+          <p className="mt-1 text-sm text-slate-500">{t("superadmin", "usersEmptyHint")}</p>
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map((student) => {
             const status = derivedStatus(student);
             const badge = statusStyle(status);
+            const staff = isStaffRow(student);
             const center = student.center_id ? centers[student.center_id] : null;
             return (
               <div
@@ -289,6 +330,13 @@ export default function SuperadminEtudiantsPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="font-black text-white">{displayName(student)}</h3>
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${
+                        staff ? "border-sky-500/25 bg-sky-500/10 text-sky-300" : "border-violet-500/25 bg-violet-500/10 text-violet-300"
+                      }`}
+                    >
+                      {staff ? (student.job_title || t("superadmin", "usersTypeStaff")) : t("superadmin", "usersTypeStudent")}
+                    </span>
                     <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${badge.className}`}>
                       {t("superadmin", badge.key)}
                     </span>
@@ -314,7 +362,7 @@ export default function SuperadminEtudiantsPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   {center ? (
                     <Link
-                      href={`/superadmin/centres?open=${center.id}`}
+                      href={`/superadmin/centres?focus=${center.id}`}
                       className={`${btnClass} text-slate-300 hover:border-orange-500/40 hover:text-orange-400`}
                     >
                       <Building2 className="h-3.5 w-3.5 shrink-0" />

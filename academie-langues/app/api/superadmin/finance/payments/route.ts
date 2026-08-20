@@ -64,6 +64,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: insertError?.message || "Échec de l'enregistrement." }, { status: 500 });
   }
 
+  await supabaseAdmin
+    .from("centers")
+    .update({ billing_status: "current", last_payment_at: parsed.value.paid_at })
+    .eq("id", parsed.value.center_id);
+
   await logSuperadminAction(ctx.user.id, "finance_payment_recorded", {
     targetType: "center",
     targetId: parsed.value.center_id,

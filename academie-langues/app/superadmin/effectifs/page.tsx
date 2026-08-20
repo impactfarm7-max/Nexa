@@ -140,19 +140,30 @@ export default function SuperadminEffectifsPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {[
-          { label: t("superadmin", "effectifsColActive"), value: totals.actifs },
-          { label: t("superadmin", "effectifsColPaused"), value: totals.pauses },
-          { label: t("superadmin", "effectifsColExpired"), value: totals.expires },
-          { label: t("superadmin", "effectifsColRevoked"), value: totals.revoques },
-          { label: t("superadmin", "effectifsColTotal"), value: totals.total },
-        ].map((card) => (
-          <div key={card.label} className="rounded-2xl border border-white/10 bg-[#0a0f1c] px-4 py-3">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{card.label}</p>
-            <p className="mt-1 text-xl font-black text-white">{loading ? "—" : card.value}</p>
-          </div>
-        ))}
+      <div>
+        <p className="mb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+          <Users className="h-3.5 w-3.5" />
+          {t("superadmin", "effectifsStatsTitle")}
+        </p>
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          {[
+            { label: t("superadmin", "effectifsCardActive"), value: totals.actifs, tone: "text-emerald-300" },
+            { label: t("superadmin", "effectifsCardPaused"), value: totals.pauses, tone: "text-slate-300" },
+            { label: t("superadmin", "effectifsCardExpired"), value: totals.expires, tone: "text-amber-300" },
+            { label: t("superadmin", "effectifsCardRevoked"), value: totals.revoques, tone: "text-rose-300" },
+            { label: t("superadmin", "effectifsCardTotal"), value: totals.total, tone: "text-white" },
+          ].map((card) => (
+            <div key={card.label} className="rounded-2xl border border-white/10 bg-[#0a0f1c] px-4 py-3">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{card.label}</p>
+              <p className={`mt-1 text-xl font-black ${card.tone}`}>
+                {loading ? "—" : card.value}
+                <span className="ml-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                  {t("superadmin", "effectifsCardUnit")}
+                </span>
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="relative">

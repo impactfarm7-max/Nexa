@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Download, Plus, Search, Wallet, X } from "lucide-react";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { useActionFeedback } from "@/app/components/ActionFeedback";
@@ -70,22 +71,36 @@ function methodLabel(method: FinanceMethod, t: ReturnType<typeof useI18n>["t"]) 
 function RecordPaymentModal({
   onClose,
   onRecorded,
+  initialCenterId,
+  initialAmount,
+  initialPeriodLabel,
 }: {
   onClose: () => void;
   onRecorded: () => void;
+  initialCenterId?: string;
+  initialAmount?: string;
+  initialPeriodLabel?: string;
 }) {
   const { t, locale } = useI18n();
   const feedback = useActionFeedback();
   const { centers } = useSuperadminCenters<CenterOption>();
-  const [search, setSearch] = useState("");
-  const [centerId, setCenterId] = useState("");
-  const [amount, setAmount] = useState("");
+  const [search, setSearch] = useState(() => centers.find((c) => c.id === initialCenterId)?.name || "");
+  const [centerId, setCenterId] = useState(initialCenterId || "");
+  const [amount, setAmount] = useState(initialAmount || "");
   const [method, setMethod] = useState<FinanceMethod>("mobile_money");
-  const [periodLabel, setPeriodLabel] = useState("");
+  const [periodLabel, setPeriodLabel] = useState(initialPeriodLabel || "");
   const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+
+  useEffect(() => {
+    if (initialCenterId && !search) {
+      const c = centers.find((x) => x.id === initialCenterId);
+      if (c) setSearch(c.name);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centers, initialCenterId]);
 
   const filteredCenters = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -267,7 +282,16 @@ type UnpaidCenter = {
 };
 
 export default function SuperadminFinancePage() {
+  return (
+    <Suspense fallback={null}>
+      <SuperadminFinancePageContent />
+    </Suspense>
+  );
+}
+
+function SuperadminFinancePageContent() {
   const { t, locale } = useI18n();
+  const searchParams = useSearchParams();
   const { centers } = useSuperadminCenters<UnpaidCenter>();
   const [days, setDays] = useState(30);
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -275,6 +299,19 @@ export default function SuperadminFinancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [prefill, setPrefill] = useState<{ centerId: string; amount: string; period: string } | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("openPayment")) {
+      setPrefill({
+        centerId: searchParams.get("centerId") || "",
+        amount: searchParams.get("amount") || "",
+        period: searchParams.get("period") || "",
+      });
+      setModalOpen(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -498,7 +535,16 @@ export default function SuperadminFinancePage() {
       )}
 
       {modalOpen && (
-        <RecordPaymentModal onClose={() => setModalOpen(false)} onRecorded={() => void load()} />
+        <RecordPaymentModal
+          onClose={() => {
+            setModalOpen(false);
+            setPrefill(null);
+          }}
+          onRecorded={() => void load()}
+          initialCenterId={prefill?.centerId}
+          initialAmount={prefill?.amount}
+          initialPeriodLabel={prefill?.period}
+        />
       )}
     </div>
   );

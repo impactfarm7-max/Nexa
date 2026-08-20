@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
+import { logSuperadminAction } from "@/app/utils/superadmin-auth-server";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,6 +39,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!data) return NextResponse.json({ error: "Document introuvable ou déjà traité." }, { status: 404 });
+
+  await logSuperadminAction(user.id, status === "approved" ? "library_document_approved" : "library_document_rejected", {
+    targetType: "bibliotheque_document",
+    targetId: id,
+    req,
+    metadata: { titre: data.titre ?? null, centerId: data.center_id ?? null, rejectionReason: rejection_reason ?? null },
+  });
 
   return NextResponse.json({ document: data });
 }

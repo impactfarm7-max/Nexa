@@ -90,6 +90,21 @@ body {
   color: var(--text);
 }
 
+/* Superadmin : color-scheme natif sur les champs de formulaire (selects,
+   date pickers) pour qu'ils suivent le thème du dashboard au lieu du thème
+   clair par défaut du navigateur. Scopé aux champs (pas au shell entier)
+   pour ne pas repeindre les scrollbars natives du reste de la page. */
+.superadmin-shell:not(.superadmin-light) select,
+.superadmin-shell:not(.superadmin-light) input,
+.superadmin-shell:not(.superadmin-light) textarea {
+  color-scheme: dark;
+}
+.superadmin-shell.superadmin-light select,
+.superadmin-shell.superadmin-light input,
+.superadmin-shell.superadmin-light textarea {
+  color-scheme: light;
+}
+
 .app-shell {
   max-width: var(--maxw);
   margin: 0 auto;

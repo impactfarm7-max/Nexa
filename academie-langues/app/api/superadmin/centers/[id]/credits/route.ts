@@ -4,7 +4,7 @@ import {
   emptyWallet,
   isAiCreditType,
 } from "@/app/data/aiCredits";
-import { getSuperadminContext, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
+import { getSuperadminContext, logSuperadminAction, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
 
 const WALLET_COLUMNS = "center_id, generic, tutor_ia, exam_sim, ai_corrections, course_builder, updated_at";
 const PURCHASE_COLUMNS = "id, center_id, mode, credit_type, quantity, amount_fcfa, note, created_by, created_at";
@@ -185,6 +185,18 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       { status: 500 },
     );
   }
+
+  await logSuperadminAction(ctx.user.id, "center_ai_credits_purchased", {
+    targetType: "center",
+    targetId: id,
+    req,
+    metadata: {
+      mode: input.mode,
+      creditType: input.creditType,
+      quantity: input.quantity,
+      amountFcfa: input.amountFcfa,
+    },
+  });
 
   return NextResponse.json({
     wallet: {

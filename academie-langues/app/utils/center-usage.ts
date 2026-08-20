@@ -14,6 +14,7 @@ export type CenterUsage = {
   seatsMax: number | null;
   seatsPct: number | null;
   seatsOver: boolean;
+  studentCount: number;
   staffCount: number;
   staffMax: number | null;
   staffOver: boolean;
@@ -57,6 +58,7 @@ export function buildCenterUsage(input: {
     seatsMax: typeof seatsMax === "number" ? seatsMax : null,
     seatsPct,
     seatsOver: typeof seatsMax === "number" && seatsOccupied > seatsMax,
+    studentCount: studentSeats,
     staffCount,
     staffMax: null,
     staffOver: false,

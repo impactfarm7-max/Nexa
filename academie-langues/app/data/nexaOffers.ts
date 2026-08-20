@@ -304,7 +304,7 @@ export function nexaOfferLabel(
 ): string {
   const normalized = normalizeNexaOffer(key);
   if (!normalized) return locale === "en" ? "Not assigned" : "Non attribuée";
-  if (normalized === "custom") return locale === "en" ? "Custom quote" : "Sur devis";
+  if (normalized === "custom") return locale === "en" ? "Enterprise" : "Entreprise";
   if (locale === "en") {
     const enNames: Record<Exclude<NexaOfferKey, "custom">, string> = {
       decouverte: "Discovery",

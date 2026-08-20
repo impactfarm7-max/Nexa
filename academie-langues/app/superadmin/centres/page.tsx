@@ -2,13 +2,14 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Building2, ChevronRight, Inbox, Loader2, RefreshCcw, Search } from "lucide-react";
+import { Building2, ChevronRight, Inbox, Loader2, Plus, RefreshCcw, Search } from "lucide-react";
 import { superadminFetch } from "../../utils/superadmin-api-client";
 import { useI18n } from "../../i18n/I18nProvider";
 import { useActionFeedback } from "../../components/ActionFeedback";
 import { ConfirmDialog } from "../_components/ConfirmDialog";
 import { CenterDetailPanel, type DerivedStatus } from "../_components/CenterDetailPanel";
 import { OfferFormModal } from "../_components/OfferFormModal";
+import { CreateCenterModal } from "../_components/CreateCenterModal";
 import { PauseModal } from "../_components/PauseModal";
 import { useSuperadminCenters } from "../SuperadminCentersContext";
 
@@ -89,6 +90,7 @@ function SuperadminCentresPageContent() {
   const [pauseModal, setPauseModal] = useState<CenterRow | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [detailRefreshKey, setDetailRefreshKey] = useState(0);
+  const [createOpen, setCreateOpen] = useState(false);
 
   useEffect(() => {
     const status = searchParams.get("status");
@@ -240,14 +242,24 @@ function SuperadminCentresPageContent() {
           <h1 className="text-2xl font-black text-white">{t("superadmin", "centresTitle")}</h1>
           <p className="mt-1 text-sm text-slate-400">{t("superadmin", "centresSubtitle")}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => void loadCenters(true)}
-          className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0a0f1c] px-4 py-2 text-xs font-bold text-slate-300 hover:border-orange-500/40 hover:text-orange-400"
-        >
-          <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
-          {t("superadmin", "analyticsRefresh")}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void loadCenters(true)}
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-[#0a0f1c] px-4 py-2 text-xs font-bold text-slate-300 hover:border-orange-500/40 hover:text-orange-400"
+          >
+            <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+            {t("superadmin", "analyticsRefresh")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center gap-2 rounded-xl bg-orange-500 px-4 py-2 text-xs font-black text-white hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" />
+            {t("superadmin", "createCenterButton")}
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -422,6 +434,16 @@ function SuperadminCentresPageContent() {
           center={pauseModal}
           onClose={() => setPauseModal(null)}
           onSuccess={() => void loadCenters(true)}
+        />
+      )}
+
+      {createOpen && (
+        <CreateCenterModal
+          onClose={() => setCreateOpen(false)}
+          onCreated={(centerId) => {
+            setStatusFilter("trial");
+            void loadCenters(true).then(() => setSelectedId(centerId));
+          }}
         />
       )}
 

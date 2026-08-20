@@ -25,7 +25,28 @@ const ACTION_KEYS: Record<string, string> = {
   center_pending_approved: "auditActionCenterApproved", student_password_reset: "auditActionPasswordReset",
   student_paused: "auditActionStudentPaused", student_resumed: "auditActionStudentResumed",
   student_revoked: "auditActionStudentRevoked", student_reactivated: "auditActionStudentReactivated",
+  "application.approve": "auditActionApplicationApproved",
+  center_activated: "auditActionCenterActivated", center_paused: "auditActionCenterPaused",
+  center_resumed: "auditActionCenterResumed", center_revoked: "auditActionCenterRevoked",
+  center_subscription_updated: "auditActionCenterSubscriptionUpdated", center_view_as: "auditActionCenterViewAs",
+  center_ai_credits_purchased: "auditActionCreditsPurchased", superadmin_created: "auditActionSuperadminCreated",
+  superadmin_updated: "auditActionSuperadminUpdated", finance_payment_recorded: "auditActionFinancePaymentRecorded",
+  library_document_approved: "auditActionLibraryApproved", library_document_rejected: "auditActionLibraryRejected",
 };
+
+const STATUS_UPDATE_KEYS: Record<string, string> = {
+  contacted: "auditActionApplicationContacted",
+  rejected: "auditActionApplicationRejected",
+};
+
+function actionLabel(entry: AuditLogEntry, t: (ns: "superadmin", key: string) => string): string {
+  if (entry.action === "application.status_update") {
+    const status = typeof entry.metadata?.status === "string" ? entry.metadata.status : "";
+    const key = STATUS_UPDATE_KEYS[status];
+    return key ? t("superadmin", key) : entry.action;
+  }
+  return ACTION_KEYS[entry.action] ? t("superadmin", ACTION_KEYS[entry.action]) : entry.action;
+}
 
 function actionTone(action: string) {
   if (action.includes("rejected") || action === "center_suspended") return "text-red-300 border-red-500/20 bg-red-500/10";
@@ -125,7 +146,7 @@ export default function SuperadminAuditPage() {
                 <div key={entry.id} className="flex flex-col gap-2 rounded-xl border border-white/10 bg-[#0a0f1c] p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-start gap-3">
                     <span className={`mt-0.5 rounded-full border px-2 py-0.5 text-[9px] font-black uppercase tracking-widest ${actionTone(entry.action)}`}>
-                      {ACTION_KEYS[entry.action] ? t("superadmin", ACTION_KEYS[entry.action]) : entry.action}
+                      {actionLabel(entry, t)}
                     </span>
                     <div>
                       {detail && <p className="text-sm font-semibold text-slate-300">{detail}</p>}

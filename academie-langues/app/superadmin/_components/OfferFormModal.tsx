@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { superadminFetch } from "@/app/utils/superadmin-api-client";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -89,6 +90,12 @@ function offerI18nKey(key: NexaOfferKey): string {
     default:
       return "centresOfferCustom";
   }
+}
+
+function formatMoneyInput(raw: string): string {
+  const digits = raw.replace(/[^\d]/g, "");
+  if (!digits) return "";
+  return Number(digits).toLocaleString("fr-FR");
 }
 
 function numOrEmpty(value: unknown): string {
@@ -213,12 +220,14 @@ export function OfferFormModal({
 }) {
   const { t, locale } = useI18n();
   const feedback = useActionFeedback();
+  const router = useRouter();
   const isTcf = center.center_type === "tcf_canada";
   const initialNexaOffer = normalizeNexaOffer(center.nexa_offer) ?? "decouverte";
   const initialTcfPlan = normalizeTcfPlan(center.plan_type) ?? "advance";
   const [offer, setOffer] = useState<NexaOfferKey>(initialNexaOffer);
   const [tcfPlan, setTcfPlan] = useState<TcfPlanKey>(initialTcfPlan);
   const [amount, setAmount] = useState("");
+  const [pricePerStudent, setPricePerStudent] = useState("");
   const [periodMonths, setPeriodMonths] = useState(String(center.subscription_period_months ?? 1));
   const [centerQuotas, setCenterQuotas] = useState<CenterQuotaFields>(() =>
     defaultCenterQuotas(center.quota_overrides),
@@ -228,20 +237,28 @@ export function OfferFormModal({
   );
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const isCustom = !isTcf && offer === "custom";
+  const isCustom = isTcf ? tcfPlan === "entreprise" : offer === "custom";
+
+  const recomputeAmountFromPerStudent = (perStudentRaw: string, maxStudentsRaw: string) => {
+    const per = parseFloat(perStudentRaw.replace(/\s/g, ""));
+    const max = parseInt(maxStudentsRaw.replace(/\s/g, ""), 10);
+    if (Number.isFinite(per) && per > 0 && Number.isFinite(max) && max > 0) {
+      setAmount(formatMoneyInput(String(Math.round(per * max))));
+    }
+  };
   const en = locale === "en";
 
   useEffect(() => {
     if (isTcf) {
-      setAmount(center.subscription_amount != null ? String(center.subscription_amount) : "");
+      setAmount(center.subscription_amount != null ? formatMoneyInput(String(center.subscription_amount)) : "");
     } else {
       const cfg = offer !== "custom" ? NEXA_OFFERS[offer as Exclude<NexaOfferKey, "custom">] : null;
       if (center.subscription_amount != null && mode === "change" && normalizeNexaOffer(center.nexa_offer) === offer) {
-        setAmount(String(center.subscription_amount));
+        setAmount(formatMoneyInput(String(center.subscription_amount)));
       } else if (cfg) {
-        setAmount(String(cfg.monthlyFeeMin));
+        setAmount(formatMoneyInput(String(cfg.monthlyFeeMin)));
       } else if (center.subscription_amount != null && offer === "custom") {
-        setAmount(String(center.subscription_amount));
+        setAmount(formatMoneyInput(String(center.subscription_amount)));
       } else {
         setAmount("");
       }
@@ -357,10 +374,24 @@ export function OfferFormModal({
         errorTitle: t("superadmin", "requestsActionImpossible"),
       },
     );
-    if (result.ok) onClose();
+    if (result.ok) {
+      onClose();
+      if (Number.isFinite(parsedAmount) && parsedAmount > 0) {
+        const periodLabel = new Date().toLocaleDateString(en ? "en-GB" : "fr-FR", {
+          month: "long",
+          year: "numeric",
+        });
+        router.push(
+          `/superadmin/finance?openPayment=1&centerId=${encodeURIComponent(center.id)}&amount=${parsedAmount}&period=${encodeURIComponent(periodLabel)}`,
+        );
+      }
+    }
   };
 
-  const selectableKeys: NexaOfferKey[] = [...NEXA_OFFER_KEYS, "custom"];
+  const selectableKeys: NexaOfferKey[] = [
+    ...NEXA_OFFER_KEYS.filter((key) => key !== "entreprise"),
+    "custom",
+  ];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-6" onClick={onClose}>
@@ -461,15 +492,35 @@ export function OfferFormModal({
           })}
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-4">
+          <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
+            {t("superadmin", "centresModalPricePerStudent")}
+          </label>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={pricePerStudent}
+            onChange={(e) => {
+              const formatted = formatMoneyInput(e.target.value);
+              setPricePerStudent(formatted);
+              recomputeAmountFromPerStudent(formatted, centerQuotas.maxStudents);
+            }}
+            placeholder="FCFA"
+            className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-orange-400"
+          />
+          <p className="mt-1 text-[10px] text-slate-500">{t("superadmin", "centresModalPricePerStudentHint")}</p>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
           <div>
             <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">
               {t("superadmin", "centresModalAmountLabel")}
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => setAmount(formatMoneyInput(e.target.value))}
               className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-orange-400"
               placeholder="FCFA"
             />
@@ -496,7 +547,10 @@ export function OfferFormModal({
             type="number"
             min={0}
             value={centerQuotas.maxStudents}
-            onChange={(e) => setCenterQuotas((prev) => ({ ...prev, maxStudents: e.target.value }))}
+            onChange={(e) => {
+              setCenterQuotas((prev) => ({ ...prev, maxStudents: e.target.value }));
+              recomputeAmountFromPerStudent(pricePerStudent, e.target.value);
+            }}
             placeholder="∞"
             className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-orange-400"
           />

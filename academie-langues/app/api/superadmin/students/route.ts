@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSuperadminContext, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
 
-const STUDENT_FIELDS =
-  "id, prenom, nom, email, phone, ville, center_id, tag_status, center_status, subscription_ends_at, subscription_paused_at, pack_name, last_sign_in_at, created_at";
+const USER_FIELDS =
+  "id, prenom, nom, email, phone, ville, center_id, role, job_title, tag_status, center_status, subscription_ends_at, subscription_paused_at, pack_name, last_sign_in_at, created_at";
+
+const STAFF_ROLES = ["center_manager", "campus_manager", "trainer", "staff"];
+const USER_ROLES = ["student", ...STAFF_ROLES];
 
 const PAGE_SIZE = 50;
 
@@ -15,8 +18,8 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from("profiles")
-    .select(STUDENT_FIELDS, { count: "exact" })
-    .eq("role", "student")
+    .select(USER_FIELDS, { count: "exact" })
+    .in("role", USER_ROLES)
     .order("created_at", { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1);
 
