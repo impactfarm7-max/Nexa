@@ -8,6 +8,7 @@ import {
   Layers, LogOut, Menu, Moon, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck,
   Star, Sun, ScrollText, Users, UsersRound, UserCog, Wallet, X, LibraryBig,
 } from "lucide-react";
+import { Noto_Sans } from "next/font/google";
 import { supabase } from "../utils/supabase";
 import { superadminFetch } from "../utils/superadmin-api-client";
 import { collectCenterAlerts } from "../utils/center-alerts";
@@ -20,6 +21,12 @@ import {
   type SuperadminMenuKey,
 } from "@/app/data/superadminMenus";
 import { SuperadminCentersContext } from "./SuperadminCentersContext";
+
+const superadminNotoSans = Noto_Sans({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700", "800"],
+  display: "swap",
+});
 
 const MFA_SETUP_PATH = "/superadmin/mfa-setup";
 const CHANGE_PASSWORD_PATH = "/superadmin/change-password";
@@ -299,7 +306,7 @@ export default function SuperadminLayout({ children }: { children: React.ReactNo
   ].filter(Boolean) as { href: string; label: string; tone: string }[];
 
   return (
-    <div className={`superadmin-shell flex h-dvh overflow-hidden ${theme === "light" ? "superadmin-light bg-slate-100 text-slate-900" : "bg-[#05070d] text-slate-100"}`}>
+    <div className={`superadmin-shell ${superadminNotoSans.className} flex h-dvh overflow-hidden ${theme === "light" ? "superadmin-light bg-slate-100 text-slate-900" : "bg-[#05070d] text-slate-100"}`}>
       {mobileOpen && <button aria-label={t("superadmin", "closeMenu")} className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} />}
       <aside className={`superadmin-sidebar fixed inset-y-0 left-0 z-50 flex h-dvh flex-col border-r border-white/[0.08] bg-[#080d18] shadow-2xl transition-[width,transform] duration-300 lg:static lg:z-auto lg:h-full lg:shrink-0 lg:translate-x-0 ${collapsed ? "lg:w-20" : "lg:w-72"} w-[min(88vw,18rem)] ${mobileOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex h-20 shrink-0 items-center gap-3 border-b border-white/[0.07] px-5">
