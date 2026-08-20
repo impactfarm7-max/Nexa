@@ -236,7 +236,7 @@ function SuperadminCentresPageContent() {
     `centresDerivedStatus_${status}` as keyof typeof import("../../i18n/messages/superadmin").superadmin.fr;
 
   return (
-    <div className="space-y-5">
+    <div className="superadmin-centres-page space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-black text-white">{t("superadmin", "centresTitle")}</h1>
@@ -273,7 +273,7 @@ function SuperadminCentresPageContent() {
               onClick={() => setStatusFilter(key)}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-colors ${
                 active
-                  ? "border-orange-500/50 bg-orange-500/15 text-orange-300"
+                  ? "centres-filter-active border-orange-500/50 bg-orange-500/15 text-orange-300"
                   : "border-white/10 bg-[#0a0f1c] text-slate-400 hover:border-white/20"
               }`}
             >
@@ -335,7 +335,7 @@ function SuperadminCentresPageContent() {
                   onClick={() => setSelectedId(center.id)}
                   className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${
                     selected
-                      ? "border-orange-500/40 bg-orange-500/10"
+                      ? "center-list-selected border-orange-500/40 bg-orange-500/10"
                       : "border-white/10 bg-[#0a0f1c] hover:border-white/20"
                   }`}
                 >
@@ -343,7 +343,7 @@ function SuperadminCentresPageContent() {
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span className="truncate font-black text-white">{center.name}</span>
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest ${
+                        className={`center-type-badge rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest ${
                           isTcf ? "bg-blue-500/15 text-blue-300" : "bg-violet-500/15 text-violet-300"
                         }`}
                       >

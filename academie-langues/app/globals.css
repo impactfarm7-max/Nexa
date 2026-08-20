@@ -686,6 +686,103 @@ body {
   color: white !important;
 }
 
+/* Palette Centre Libre : bleu nuit pour agir, orange pour attirer l'attention. */
+.superadmin-light .bg-orange-500 {
+  background-color: #11224E !important;
+  color: white !important;
+}
+
+.superadmin-light .bg-orange-500 .text-white,
+.superadmin-light button.bg-orange-500,
+.superadmin-light a.bg-orange-500 {
+  color: white !important;
+}
+
+.superadmin-light .superadmin-count-badge {
+  background-color: #F87B1B !important;
+  color: white !important;
+}
+
+.superadmin-light .superadmin-attention-card {
+  background-color: white !important;
+  border-color: rgba(17, 34, 78, 0.08) !important;
+}
+
+.superadmin-light .superadmin-attention-card .text-red-400 {
+  color: #F87B1B !important;
+}
+
+/* Les couleurs décoratives secondaires convergent vers l'accent de la marque. */
+.superadmin-light .text-sky-300,
+.superadmin-light .text-sky-400,
+.superadmin-light .text-violet-300,
+.superadmin-light .text-rose-300,
+.superadmin-light .text-amber-300,
+.superadmin-light .text-amber-400 {
+  color: #D85C08 !important;
+}
+
+/* Les boutons sémantiques conservent leur sens et un libellé blanc lisible. */
+.superadmin-light button.bg-emerald-500,
+.superadmin-light button.bg-emerald-600,
+.superadmin-light button.bg-red-500,
+.superadmin-light a.bg-emerald-500,
+.superadmin-light a.bg-emerald-600,
+.superadmin-light a.bg-red-500 {
+  color: white !important;
+}
+
+/* Centres & abonnements : sobriété du dashboard Centre Libre. */
+.superadmin-light .superadmin-centres-page .center-type-badge {
+  background-color: rgba(17, 34, 78, 0.06) !important;
+  color: rgba(17, 34, 78, 0.62) !important;
+}
+
+.superadmin-light .superadmin-centres-page .centres-filter-active {
+  background-color: #11224E !important;
+  border-color: #11224E !important;
+  color: white !important;
+}
+
+.superadmin-light .superadmin-centres-page .centres-filter-active span {
+  background-color: rgba(255, 255, 255, 0.16) !important;
+  color: white !important;
+}
+
+.superadmin-light .superadmin-centres-page .center-list-selected {
+  background-color: white !important;
+  border-color: rgba(17, 34, 78, 0.32) !important;
+  box-shadow: inset 3px 0 0 #F87B1B;
+}
+
+.superadmin-light .superadmin-centres-page .center-stats-grid [class*="text-"] {
+  color: #11224E !important;
+}
+
+.superadmin-light .superadmin-centres-page .center-offer-card,
+.superadmin-light .superadmin-centres-page .center-credits-card {
+  background-color: white !important;
+  border-color: rgba(17, 34, 78, 0.08) !important;
+}
+
+.superadmin-light .superadmin-centres-page button[class*="bg-sky-500"],
+.superadmin-light .superadmin-centres-page button[class*="bg-emerald-500"] {
+  background-color: #11224E !important;
+  border-color: #11224E !important;
+  color: white !important;
+}
+
+.superadmin-light .superadmin-centres-page button[class*="bg-sky-500"] svg,
+.superadmin-light .superadmin-centres-page button[class*="bg-emerald-500"] svg {
+  color: white !important;
+}
+
+.superadmin-light .superadmin-centres-page button[class*="border-amber-500"] {
+  background-color: white !important;
+  border-color: rgba(17, 34, 78, 0.10) !important;
+  color: #11224E !important;
+}
+
 /* Même géométrie calme que le dashboard Centre Libre. */
 .superadmin-light main > section,
 .superadmin-light main > div {

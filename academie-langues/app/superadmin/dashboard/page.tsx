@@ -312,7 +312,7 @@ export default function SuperadminDashboardPage() {
         </div>
         <Link
           href="/superadmin/centres?status=trial"
-          className={`rounded-2xl border p-5 transition-colors ${
+          className={`superadmin-attention-card rounded-2xl border p-5 transition-colors ${
             alertSummary.trialUrgent > 0
               ? "border-red-500/20 bg-red-500/5 hover:border-red-500/40"
               : "border-white/10 bg-[#0a0f1c] hover:border-orange-500/30"

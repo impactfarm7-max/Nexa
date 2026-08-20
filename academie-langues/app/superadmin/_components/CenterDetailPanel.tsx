@@ -406,7 +406,7 @@ export function CenterDetailPanel({
           </div>
         </div>
         {detail?.stats && (
-          <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+          <div className="center-stats-grid mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
             {[
               { label: t("superadmin", "effectifsColActive"), value: detail.stats.actifs, className: "text-emerald-300" },
               { label: t("superadmin", "effectifsColPaused"), value: detail.stats.pauses, className: "text-slate-300" },
@@ -424,7 +424,7 @@ export function CenterDetailPanel({
       </div>
 
       {/* Subscription block — always visible, primary CTA for offer assignment */}
-      <div className="rounded-2xl border border-orange-500/25 bg-orange-500/[0.06] p-5">
+      <div className="center-offer-card rounded-2xl border border-orange-500/25 bg-orange-500/[0.06] p-5">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-black uppercase tracking-widest text-orange-400/90">

@@ -170,7 +170,7 @@ export function CenterCreditsPanel({ centerId }: { centerId: string }) {
   ];
 
   return (
-    <section className="rounded-2xl border border-orange-500/20 bg-[#0a0f1c] p-4 sm:p-5">
+    <section className="center-credits-card rounded-2xl border border-orange-500/20 bg-[#0a0f1c] p-4 sm:p-5">
       <div className="flex items-start gap-3">
         <span className="rounded-xl border border-orange-500/20 bg-orange-500/10 p-2 text-orange-300">
           <Coins className="h-4 w-4" />
