@@ -11,12 +11,10 @@ import {
   SUPERADMIN_ASSIGNABLE_MENUS,
   type SuperadminMenuKey,
 } from "@/app/data/superadminMenus";
+import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
 
 function generatePassword(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  let out = "";
-  for (let i = 0; i < 12; i++) out += alphabet[Math.floor(Math.random() * alphabet.length)];
-  return out;
+  return generateSecureTemporaryPassword();
 }
 
 type PermRow = {

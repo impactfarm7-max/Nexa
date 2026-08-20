@@ -53,10 +53,10 @@ async function loadOrBootstrapAccess(userId: string): Promise<SuperadminAccess> 
     .eq("user_id", userId)
     .maybeSingle();
 
-  // Table absente / pas encore migrée → accès total (compat).
+  // Une erreur de permissions ne doit jamais accorder davantage de droits.
   if (error) {
     console.warn("[superadmin] permissions lookup:", error.message);
-    return { isOwner: true, menus: [], disabled: false };
+    return { isOwner: false, menus: [], disabled: true };
   }
 
   if (!row) {

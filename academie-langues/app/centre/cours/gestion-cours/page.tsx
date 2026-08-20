@@ -32,6 +32,7 @@ import { supabase } from "@/app/utils/supabase";
 import { loadCenterBootstrap, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import CenterContentSkeleton from "@/app/components/CenterContentSkeleton";
+import { sanitizeLessonHtml } from "@/app/utils/sanitizeLessonHtml";
 import {
   TCF_COURSE_DISCIPLINE_CODES,
   TCF_NEUTRAL_DISCIPLINE,
@@ -1216,7 +1217,7 @@ export default function CenterCoursPage() {
                                         <Lock size={12} /> Se débloque le {new Date(l.unlock_at!).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })}
                                       </div>
                                     )}
-                                    {l.body && <div className="text-xs text-neutral-600 leading-relaxed prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: l.body }} />}
+                                    {l.body && <div className="text-xs text-neutral-600 leading-relaxed prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: sanitizeLessonHtml(l.body) }} />}
 
                                     <div className="space-y-2">
                                       {media.map((m) => (

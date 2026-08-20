@@ -9,6 +9,7 @@ import {
 } from "@/app/data/nexaOffers";
 import { sendStudentActivatedEmail } from "@/app/utils/activation-emails";
 import { assertCenterHasStudentSeat } from "@/app/utils/center-student-quota";
+import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,9 +17,8 @@ const supabaseAdmin = createClient(
 );
 
 function generatePassword(prenom: string): string {
-  const digits = Math.floor(1000 + Math.random() * 9000);
-  const base = prenom.trim().charAt(0).toUpperCase() + prenom.trim().slice(1, 4).toLowerCase();
-  return `${base || "Iag"}${digits}`;
+  void prenom;
+  return generateSecureTemporaryPassword();
 }
 
 async function getCenterForUser(req: Request) {

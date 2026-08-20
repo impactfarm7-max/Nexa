@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -6,9 +7,8 @@ const supabaseAdmin = createClient(
 );
 
 function generatePassword(name: string) {
-  const prefix = name.trim().replace(/[^a-zA-Z]/g, "").slice(0, 4) || "IAG";
-  const digits = Math.floor(1000 + Math.random() * 9000);
-  return `${prefix.charAt(0).toUpperCase()}${prefix.slice(1).toLowerCase()}${digits}`;
+  void name;
+  return generateSecureTemporaryPassword();
 }
 
 function codePrefix(name: string) {

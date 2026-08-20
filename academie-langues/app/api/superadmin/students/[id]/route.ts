@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSuperadminContext, logSuperadminAction, supabaseAdmin } from "@/app/utils/superadmin-auth-server";
+import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
 
 const ACTIONS = new Set(["reset_password", "pause", "resume", "revoke", "reactivate"]);
 const USER_ROLES = ["student", "center_manager", "campus_manager", "trainer", "staff"];
 
 function generatePassword(prenom: string): string {
-  const digits = Math.floor(1000 + Math.random() * 9000);
-  const base = prenom.trim().charAt(0).toUpperCase() + prenom.trim().slice(1, 4).toLowerCase();
-  return `${base || "Iag"}${digits}`;
+  void prenom;
+  return generateSecureTemporaryPassword();
 }
 
 export async function PATCH(req: NextRequest, context: { params: Promise<{ id: string }> }) {

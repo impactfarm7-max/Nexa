@@ -4,6 +4,7 @@ import { sendEmail } from "@/app/utils/email-server";
 import { filterModulePermissions, TCF_SUBJECT_KEYS, ensureTcfCommunautePermission, ensureDefaultLivesPermission, TRAINER_DEFAULT_MODULE_PERMISSIONS } from "@/app/data/tcf-teaching-subjects";
 import { assertCenterHasUserSeat } from "@/app/utils/center-student-quota";
 import { getPublicSiteUrl } from "@/app/utils/public-site-url";
+import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,10 +39,8 @@ const CAMPUS_MANAGER_PERMISSIONS = [
   "lives",
 ];
 
-/** Mot de passe temporaire simple : Nexa + 4 chiffres (ex. Nexa4821). */
 function generatePassword(): string {
-  const digits = String(Math.floor(1000 + Math.random() * 9000));
-  return `Nexa${digits}`;
+  return generateSecureTemporaryPassword();
 }
 
 async function requireCenterManager(token: string | undefined) {

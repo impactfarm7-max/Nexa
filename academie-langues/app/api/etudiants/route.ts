@@ -30,16 +30,15 @@ import {
   incrementCouponUse,
 } from "@/app/utils/coupon.server";
 import { getPublicSiteUrl } from "@/app/utils/public-site-url";
+import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-/** Mot de passe temporaire simple : Nexa + 4 chiffres (ex. Nexa4821). */
 function generatePassword(): string {
-  const digits = String(Math.floor(1000 + Math.random() * 9000));
-  return `Nexa${digits}`;
+  return generateSecureTemporaryPassword();
 }
 
 type CallerAuth = {

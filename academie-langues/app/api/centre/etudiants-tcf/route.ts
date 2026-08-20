@@ -30,6 +30,7 @@ import {
 } from "@/app/data/nexaOffers";
 import { assertCenterHasStudentSeat } from "@/app/utils/center-student-quota";
 import { sumNamedExtraFees } from "@/app/utils/short-pricing";
+import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,8 +38,7 @@ const supabaseAdmin = createClient(
 );
 
 function generatePassword(): string {
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  return Array.from({ length: 10 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return generateSecureTemporaryPassword();
 }
 
 async function resolveCampusForFiliere(centerId: string, filiereId: string): Promise<string | null> {

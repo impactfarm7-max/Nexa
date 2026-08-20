@@ -210,8 +210,11 @@ export default function SupportPage() {
   const uploadSupportImage = async (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
+    if (!user && guestToken) formData.append("guestToken", guestToken);
+    const { data: { session } } = await supabase.auth.getSession();
     const res = await fetch("/api/support/upload", {
       method: "POST",
+      headers: session ? { Authorization: `Bearer ${session.access_token}` } : undefined,
       body: formData,
     });
     const json = await res.json();

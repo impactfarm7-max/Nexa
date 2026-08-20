@@ -17,8 +17,20 @@ const withPWA = withPWAInit({
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
-  { key: "X-XSS-Protection", value: "1; mode=block" },
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "upgrade-insecure-requests",
+    ].join("; "),
+  },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-site" },
+  { key: "Origin-Agent-Cluster", value: "?1" },
   {
     key: "Permissions-Policy",
     value: "geolocation=(), microphone=(self), camera=(self)",

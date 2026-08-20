@@ -79,7 +79,13 @@ export async function getCenterStaffContext(req: Request): Promise<CenterStaffRe
       .select("campus_id")
       .eq("profile_id", user.id);
     const ids = [...new Set((access || []).map((r) => r.campus_id).filter(Boolean))];
-    if (ids.length > 0) scopedCampusIds = ids;
+    if (ids.length === 0) {
+      return {
+        ctx: null,
+        error: NextResponse.json({ error: "Aucun campus attribue." }, { status: 403 }),
+      };
+    }
+    scopedCampusIds = ids;
   }
 
   return {

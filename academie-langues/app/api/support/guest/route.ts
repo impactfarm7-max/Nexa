@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { encryptServer, decryptServer } from "@/app/utils/messageCrypto.server";
 import { runSupportBot } from "@/app/utils/support-bot";
+import { consumeFixedWindow, requestIp } from "@/app/utils/fixed-window-rate-limit";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +25,13 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const token = normalizeToken(searchParams.get("token"));
   if (!token) return NextResponse.json({ error: "Token manquant ou invalide" }, { status: 400 });
+  const rate = consumeFixedWindow(`guest-support-read:${token}:${requestIp(req)}`, 120, 60 * 60 * 1000);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Trop de requetes. Reessayez plus tard." },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+    );
+  }
 
   const { data, error } = await supabaseAdmin
     .from("guest_support_messages")
@@ -73,6 +81,16 @@ export async function POST(req: Request) {
 
   if (!token || (!message && !imageUrl)) {
     return NextResponse.json({ error: "Token et message ou image requis" }, { status: 400 });
+  }
+  const rate = consumeFixedWindow(`guest-support:${token}:${requestIp(req)}`, 30, 60 * 60 * 1000);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Trop de messages. Reessayez plus tard." },
+      { status: 429, headers: { "Retry-After": String(rate.retryAfterSeconds) } },
+    );
+  }
+  if (message.length > 4000 || (guestName?.length || 0) > 100 || (guestEmail?.length || 0) > 254 || (imageUrl?.length || 0) > 2048) {
+    return NextResponse.json({ error: "Message ou informations trop longs." }, { status: 413 });
   }
 
   const messageWithFallback = imageUrl

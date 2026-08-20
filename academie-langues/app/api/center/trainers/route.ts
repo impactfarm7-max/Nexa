@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
+import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,10 +24,8 @@ const ALLOWED_PERMISSIONS = new Set([
 ]);
 
 function generatePassword(name: string): string {
-  const digits = Math.floor(1000 + Math.random() * 9000);
-  const clean = name.trim().replace(/[^a-zA-Z]/g, "");
-  const base = clean.charAt(0).toUpperCase() + clean.slice(1, 4).toLowerCase();
-  return `${base || "Iag"}${digits}`;
+  void name;
+  return generateSecureTemporaryPassword();
 }
 
 async function getCenterForUser(req: Request) {
