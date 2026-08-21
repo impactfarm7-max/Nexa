@@ -14,6 +14,10 @@ import {
   type SaViewAsPending,
 } from "@/app/utils/sa-view-as";
 
+// StrictMode (dev) monte l'effet deux fois : sans ce garde-fou au niveau module,
+// le premier passage consomme le token sessionStorage avant le second passage réel.
+let viewAsEnterConsumed = false;
+
 export default function ViewAsEnterPage() {
   const [error, setError] = useState<string | null>(null);
   const [returning, setReturning] = useState(false);
@@ -35,6 +39,8 @@ export default function ViewAsEnterPage() {
   };
 
   useEffect(() => {
+    if (viewAsEnterConsumed) return;
+    viewAsEnterConsumed = true;
     let cancelled = false;
 
     const run = async () => {

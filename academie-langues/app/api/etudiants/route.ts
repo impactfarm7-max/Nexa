@@ -8,6 +8,8 @@ import {
 } from "@/app/utils/studentClassroom.server";
 import {
   getNexaB2bProfileQuotas,
+  resolveEffectiveNexaOfferKey,
+  type NexaOfferKey,
 } from "@/app/data/nexaOffers";
 import { assertCenterHasStudentSeat } from "@/app/utils/center-student-quota";
 import {
@@ -323,6 +325,7 @@ export async function POST(req: NextRequest) {
     // ---- 4a. Plafond étudiants + type centre selon offre NEXA ----
     let centerTypeRaw: string | null = null;
     let centerQuotaOverrides: Record<string, unknown> | null = null;
+    let centerOfferKey: NexaOfferKey = "decouverte";
     if (callerCenterId) {
       const { data: centerRow } = await supabaseAdmin
         .from("centers")
@@ -330,6 +333,7 @@ export async function POST(req: NextRequest) {
         .eq("id", callerCenterId)
         .maybeSingle();
       centerTypeRaw = centerRow?.center_type ?? null;
+      centerOfferKey = resolveEffectiveNexaOfferKey(centerRow);
       centerQuotaOverrides =
         centerRow?.quota_overrides && typeof centerRow.quota_overrides === "object"
           ? (centerRow.quota_overrides as Record<string, unknown>)
@@ -338,7 +342,7 @@ export async function POST(req: NextRequest) {
       if (!seatCheck.ok) {
         return NextResponse.json(
           {
-            error: `Quota utilisateurs atteint pour l'offre ${seatCheck.offerName} (${seatCheck.occupied}/${seatCheck.max}). Staff et étudiants partagent le même plafond ; expirés / révoqués / terminés libèrent une place.`,
+            error: `Quota utilisateurs atteint pour l'offre ${seatCheck.offerName} (${seatCheck.occupied}/${seatCheck.max}). Contactez votre responsable pour passer à une offre supérieure.`,
             code: "SEAT_LIMIT_REACHED",
             occupied: seatCheck.occupied,
             max: seatCheck.max,
@@ -485,7 +489,7 @@ export async function POST(req: NextRequest) {
           tutor_ia_total: TUTOR_EXCHANGE_QUOTA,
           tutor_ia_used: 0,
         }
-      : getNexaB2bProfileQuotas(centerQuotaOverrides);
+      : getNexaB2bProfileQuotas(centerQuotaOverrides, 1, centerOfferKey);
 
     // ---- 6. Renseigner le profil ----
     // Le trigger on_auth_user_created peut pré-créer la ligne avec un tag_status
@@ -582,8 +586,13 @@ export async function POST(req: NextRequest) {
           ? cursusPaymentPlan
           : null;
       if (planSource) {
+        const { count: existingInstallmentsCount } = await supabaseAdmin
+          .from("enrollment_installments")
+          .select("id", { count: "exact", head: true })
+          .eq("enrollment_id", enrollmentId);
+
         const templates = parsePaymentPlanInstallments(planSource);
-        const rows = scaleInstallmentsToTotal(templates, resolvedTuition);
+        const rows = existingInstallmentsCount ? [] : scaleInstallmentsToTotal(templates, resolvedTuition);
         if (rows.length > 0) {
           const { error: instErr } = await supabaseAdmin.from("enrollment_installments").insert(
             rows.map((r) => ({

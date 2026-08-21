@@ -3,6 +3,7 @@ export function localizeInstallmentLabel(label: string | null | undefined, local
   if (locale !== "en" || !value) return value;
   return value
     .replace(/^(?:Échéance|Echeance)\b/i, "Installment")
+    .replace(/^Acompte\b/i, "Deposit")
     .replace(/\(Acompte\)/gi, "(Deposit)")
     .replace(/^(?:À|A) l['’]inscription$/i, "Upon enrollment")
     .replace(/^Solde apr(?:è|e)s r(?:é|e)duction$/i, "Balance after discount");

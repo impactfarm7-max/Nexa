@@ -569,7 +569,7 @@ export default function CenterFinancePage() {
     setJournalLoading(true);
     let query = supabase
       .from("student_payments")
-      .select("id, enrollment_id, amount, payment_method, receipt_number, payment_date, notes, enrollments!inner(student_id, filieres!inner(name), profiles:student_id(prenom, nom))")
+      .select("id, enrollment_id, amount, payment_method, receipt_number, payment_date, notes, enrollments!inner(student_id, campus_id, filieres!inner(name), profiles:student_id(prenom, nom))")
       .eq("center_id", centerId)
       .order("payment_date", { ascending: false });
 
@@ -579,6 +579,7 @@ export default function CenterFinancePage() {
       query = query.lte("payment_date", end.toISOString());
     }
     if (methodFilter !== "all") query = query.eq("payment_method", methodFilter);
+    if (campusFilter) query = query.eq("enrollments.campus_id", campusFilter);
 
     const { data } = await query.limit(500);
     setPayments((data || []).map((p: any) => ({
@@ -593,7 +594,7 @@ export default function CenterFinancePage() {
       filiere_name: (p.enrollments?.filieres?.name || "—").toUpperCase(),
     })));
     setJournalLoading(false);
-  }, [centerId, dateFrom, dateTo, methodFilter]);
+  }, [centerId, dateFrom, dateTo, methodFilter, campusFilter]);
 
   useEffect(() => { if (activeTab === "journal") loadJournal(); }, [activeTab, loadJournal]);
 
