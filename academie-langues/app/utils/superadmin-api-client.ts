@@ -39,7 +39,7 @@ export async function superadminFetch<T = any>(path: string, options: Superadmin
     const res = await fetch(path, {
       ...options,
       headers: {
-        "Content-Type": "application/json",
+        ...(options.body instanceof FormData ? {} : { "Content-Type": "application/json" }),
         Authorization: `Bearer ${token ?? ""}`,
         ...options.headers,
       },

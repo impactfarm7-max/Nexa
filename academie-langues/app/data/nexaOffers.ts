@@ -277,13 +277,16 @@ export function hasCustomStudentQuotaOverrides(
 export function getNexaB2bProfileQuotas(
   overrides?: Record<string, unknown> | null,
   monthUnits = 1,
+  offerKey: NexaOfferKey = "decouverte",
 ) {
   const q = resolveNexaStudentQuotas(overrides);
   const months = Math.max(1, Math.ceil(monthUnits));
   const custom = hasCustomStudentQuotaOverrides(overrides);
+  const tutorInteractions = getOfferQuota(offerKey, "tutorInteractionsPerStudent", overrides);
+  const aiCorrections = getOfferQuota(offerKey, "aiCorrectionsPerStudent", overrides);
   return {
     pack_name: custom ? "nexa_custom" : "nexa_b2b",
-    ee_total: q.expressionEcrite * months,
+    ee_total: aiCorrections == null ? null : aiCorrections * months,
     ee_used: 0,
     exam_total: q.modesExamensEe * months,
     exam_used: 0,
@@ -293,7 +296,7 @@ export function getNexaB2bProfileQuotas(
     eo_used: 0,
     coaching_total: 0,
     coaching_used: 0,
-    tutor_ia_total: q.sessionsTuteurIa * months,
+    tutor_ia_total: tutorInteractions == null ? null : tutorInteractions * months,
     tutor_ia_used: 0,
   };
 }

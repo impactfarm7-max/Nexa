@@ -86,7 +86,7 @@ export async function POST(req: Request) {
   if (!seatCheck.ok) {
     return NextResponse.json(
       {
-        error: `Quota utilisateurs atteint pour l'offre ${seatCheck.offerName} (${seatCheck.occupied}/${seatCheck.max}). Staff et étudiants partagent le même plafond ; expirés / révoqués / terminés libèrent une place.`,
+        error: `Quota utilisateurs atteint pour l'offre ${seatCheck.offerName} (${seatCheck.occupied}/${seatCheck.max}). Contactez votre responsable pour passer à une offre supérieure.`,
         code: "SEAT_LIMIT_REACHED",
         occupied: seatCheck.occupied,
         max: seatCheck.max,
@@ -124,7 +124,7 @@ export async function POST(req: Request) {
       : null;
   const useCustom =
     normalizeNexaOffer(centerRow?.nexa_offer) === "custom" && hasCustomStudentQuotaOverrides(overrides);
-  const quotas = useCustom ? getNexaB2bProfileQuotas(overrides) : getTcfCenterQuotas(3); // 90 jours ≈ 3 mois
+  const quotas = useCustom ? getNexaB2bProfileQuotas(overrides, 1, "custom") : getTcfCenterQuotas(3); // 90 jours ≈ 3 mois
   const { error: profileError } = await supabaseAdmin.from("profiles").upsert({
     id: userId,
     prenom: prenom.trim(),

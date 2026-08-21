@@ -3,6 +3,7 @@ import { Anthropic } from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { resolveTutorQuota } from "@/app/utils/tutor-quota";
+import { getOfferQuota, resolveEffectiveNexaOfferKey } from "@/app/data/nexaOffers";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -70,17 +71,32 @@ async function saveMessage(userId: string, role: "user" | "assistant", content: 
 async function loadProfile(userId: string) {
   const { data } = await supabaseAdmin
     .from("profiles")
-    .select("role, pack_name, tutor_ia_used, tutor_ia_total")
+    .select("role, center_id, pack_name, tutor_ia_used, tutor_ia_total")
     .eq("id", userId)
     .maybeSingle();
   return data;
+}
+
+async function applyCenterTutorLimit(profile: Awaited<ReturnType<typeof loadProfile>>) {
+  if (!profile?.center_id || !["nexa_b2b", "nexa_custom"].includes(String(profile.pack_name).toLowerCase())) return profile;
+  const { data: center } = await supabaseAdmin.from("centers")
+    .select("nexa_offer, status, created_at, trial_ends_at, quota_overrides")
+    .eq("id", profile.center_id).maybeSingle();
+  if (!center) return profile;
+  const overrides = center.quota_overrides && typeof center.quota_overrides === "object"
+    ? center.quota_overrides as Record<string, unknown> : null;
+  return {
+    ...profile,
+    tutor_ia_total: getOfferQuota(resolveEffectiveNexaOfferKey(center), "tutorInteractionsPerStudent", overrides) ?? -1,
+  };
 }
 
 export async function GET(req: Request) {
   const user = await getAuthUser(req);
   if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
 
-  const [profile, history] = await Promise.all([loadProfile(user.id), loadHistory(user.id)]);
+  const [rawProfile, history] = await Promise.all([loadProfile(user.id), loadHistory(user.id)]);
+  const profile = await applyCenterTutorLimit(rawProfile);
   const access = resolveTutorQuota(profile);
 
   return NextResponse.json({
@@ -112,7 +128,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Message trop long (4000 caractères max)." }, { status: 400 });
   }
 
-  const profile = await loadProfile(user.id);
+  const profile = await applyCenterTutorLimit(await loadProfile(user.id));
   const access = resolveTutorQuota(profile);
 
   if (!access.hasAccess) {

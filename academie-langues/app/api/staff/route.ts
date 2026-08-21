@@ -318,7 +318,7 @@ export async function POST(req: NextRequest) {
       if (!seatCheck.ok) {
         return NextResponse.json(
           {
-            error: `Quota utilisateurs atteint (${seatCheck.occupied}/${seatCheck.max} — offre ${seatCheck.offerName}). Staff et étudiants partagent le même plafond.`,
+            error: `Quota utilisateurs atteint (${seatCheck.occupied}/${seatCheck.max} — offre ${seatCheck.offerName}). Contactez votre responsable pour passer à une offre supérieure.`,
             code: "SEAT_LIMIT_REACHED",
             occupied: seatCheck.occupied,
             max: seatCheck.max,

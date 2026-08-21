@@ -1,5 +1,6 @@
 export const centre = {
   fr: {
+    campusQuotaReached: "Votre offre actuelle est limitée à {max} campus. Contactez votre responsable pour passer à une offre supérieure.",
     staffActionSuspendOk: "Compte suspendu.", staffActionReactivateOk: "Compte réactivé.", staffActionDeleteOk: "Collaborateur supprimé.", staffActionSaveOk: "Modifications enregistrées.", studentsActionRevokeOk: "Accès révoqué.", studentsActionReactivateOk: "Accès rétabli.", studentsActionActivateOk: "Inscription validée.", livesActionCreateOk: "Session créée.", livesActionUpdateOk: "Session enregistrée.", livesActionCancelOk: "Session annulée.", livesActionDeleteOk: "Session supprimée.", programsUnpublishedOk: "Programme repassé en brouillon.", financeCouponCreatedOk: "Coupon créé.", financeCouponUpdatedOk: "Coupon mis à jour.", financePaymentOk: "Paiement enregistré.", financeCollectConfirm: "Encaisser {amount} FCFA pour {name} ?", financeCouponToggleConfirm: "{action} le coupon {code} ?", financeCouponDisable: "Désactiver", financeCouponEnable: "Réactiver",
     studentFinancePaymentNote: "Note de paiement",
     financeCouponCreateError: "Impossible de créer le coupon.", financePaymentRecordError: "Impossible d'enregistrer le paiement.", financeCouponCodePlaceholder: "RENTRÉE25",
@@ -293,6 +294,7 @@ export const centre = {
     notesWeightOf: "Poids", notesWeighted: "Pondérée %",
   },
   en: {
+    campusQuotaReached: "Your current plan is limited to {max} campus(es). Contact your account manager to upgrade to a higher plan.",
     staffActionSuspendOk: "Account suspended.", staffActionReactivateOk: "Account reactivated.", staffActionDeleteOk: "Staff member deleted.", staffActionSaveOk: "Changes saved.", studentsActionRevokeOk: "Access revoked.", studentsActionReactivateOk: "Access restored.", studentsActionActivateOk: "Enrollment approved.", livesActionCreateOk: "Session created.", livesActionUpdateOk: "Session saved.", livesActionCancelOk: "Session cancelled.", livesActionDeleteOk: "Session deleted.", programsUnpublishedOk: "Program returned to draft.", financeCouponCreatedOk: "Coupon created.", financeCouponUpdatedOk: "Coupon updated.", financePaymentOk: "Payment recorded.", financeCollectConfirm: "Collect {amount} FCFA from {name}?", financeCouponToggleConfirm: "{action} coupon {code}?", financeCouponDisable: "Disable", financeCouponEnable: "Re-enable",
     studentFinancePaymentNote: "Payment note",
     financeCouponCreateError: "Unable to create the coupon.", financePaymentRecordError: "Unable to record the payment.", financeCouponCodePlaceholder: "WELCOME25",

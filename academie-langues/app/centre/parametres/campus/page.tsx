@@ -70,6 +70,7 @@ export default function CampusSettingsPage() {
   const [centerId, setCenterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [multiEnabled, setMultiEnabled] = useState(false);
+  const [campusMax, setCampusMax] = useState<number | null>(null);
   const [activating, setActivating] = useState(false);
 
   const [campuses, setCampuses] = useState<Campus[]>([]);
@@ -113,6 +114,15 @@ export default function CampusSettingsPage() {
     if (cErr) console.error("centers:", cErr.message);
     setMultiEnabled(!!center?.multi_campus_enabled);
 
+    const quotaResponse = await fetch("/api/center/campuses", {
+      headers: { Authorization: `Bearer ${session.access_token}`, "X-Nexa-Locale": locale },
+      cache: "no-store",
+    });
+    if (quotaResponse.ok) {
+      const quota = await quotaResponse.json();
+      setCampusMax(typeof quota.max === "number" ? quota.max : null);
+    }
+
     const { data: rows, error: campErr } = await supabase
       .from("campuses").select("*").eq("center_id", cId)
       .order("is_main", { ascending: false }).order("created_at", { ascending: true });
@@ -123,7 +133,7 @@ export default function CampusSettingsPage() {
     setLockedCampuses(new Set(list.map((c) => c.id)));
 
     setLoading(false);
-  }, [selectedId]);
+  }, [selectedId, locale]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -185,6 +195,10 @@ export default function CampusSettingsPage() {
 
   const activateMulti = async () => {
     if (!centerId) return;
+    if (campusMax !== null && campuses.length >= campusMax) {
+      alert(t("centre", "campusQuotaReached", { max: campusMax }));
+      return;
+    }
     setActivating(true);
     const main = campuses.find((c) => c.is_main);
     const { error } = await supabase
@@ -197,13 +211,26 @@ export default function CampusSettingsPage() {
 
   const addCampus = async () => {
     if (!newName.trim() || !centerId) return;
+    if (campusMax !== null && campuses.length >= campusMax) {
+      alert(t("centre", "campusQuotaReached", { max: campusMax }));
+      return;
+    }
     setAdding(true);
-    const { data, error } = await supabase.from("campuses")
-      .insert({ center_id: centerId, name: newName.trim(), is_main: campuses.length === 0, status: "en_construction" })
-      .select().single();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setAdding(false); return; }
+    const response = await fetch("/api/center/campuses", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${session.access_token}`,
+        "X-Nexa-Locale": locale,
+      },
+      body: JSON.stringify({ name: newName.trim() }),
+    });
+    const json = await response.json().catch(() => ({}));
     setAdding(false);
-    if (error) { alert(t("centre", "campusError") + " : " + error.message); return; }
-    const newCampus = data as Campus;
+    if (!response.ok) { alert(json.error || t("centre", "campusError")); return; }
+    const newCampus = json.campus as Campus;
     setCampuses((p) => [...p, newCampus]);
     setSelectedId(newCampus.id);
     setLockedCampuses((p) => { const s = new Set(p); s.delete(newCampus.id); return s; });
@@ -340,7 +367,7 @@ export default function CampusSettingsPage() {
           <button
             type="button"
             onClick={addCampus}
-            disabled={adding || !newName.trim()}
+            disabled={adding || !newName.trim() || (campusMax !== null && campuses.length >= campusMax)}
             className="h-10 px-4 rounded-lg text-xs font-bold uppercase tracking-wider text-white disabled:opacity-40 inline-flex items-center justify-center gap-2 shrink-0"
             style={{ backgroundColor: BLUE }}
           >
@@ -348,6 +375,11 @@ export default function CampusSettingsPage() {
             {t("centre", "campusCreate")}
           </button>
         </div>
+        {campusMax !== null && campuses.length >= campusMax && (
+          <p className="mt-2 max-w-xl text-xs font-semibold text-amber-700">
+            {t("centre", "campusQuotaReached", { max: campusMax })}
+          </p>
+        )}
       </section>
 
       {/* ── Rubrique 2 : Visualiser / modifier ── */}

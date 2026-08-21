@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
+import { assertCenterHasUserSeat } from "@/app/utils/center-student-quota";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -106,6 +107,17 @@ export async function POST(req: Request) {
   const { prenom, email, phone, ville, genre, permissions, roleLabel } = await req.json();
   if (!prenom?.trim() || !email?.trim()) {
     return NextResponse.json({ error: "Prenom et email sont requis." }, { status: 400 });
+  }
+
+  const seatCheck = await assertCenterHasUserSeat(centerId!, supabaseAdmin);
+  if (!seatCheck.ok) {
+    return NextResponse.json(
+      {
+        error: `Votre offre ${seatCheck.offerName} est limitée à ${seatCheck.max} utilisateurs. Contactez votre responsable pour passer à une offre supérieure.`,
+        code: "USER_QUOTA_REACHED",
+      },
+      { status: 409 },
+    );
   }
 
   const normalizedEmail = email.trim().toLowerCase();

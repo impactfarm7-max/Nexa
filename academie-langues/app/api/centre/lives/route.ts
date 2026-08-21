@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { notifyLiveSlotParticipants } from "@/app/utils/notifyCollectiveSlot.server";
 import { sessionStartMs, sessionEndMs, JOIN_BEFORE_MS } from "@/app/utils/collectiveLive";
-import { resolveEffectiveNexaOffer } from "@/app/data/nexaOffers";
+import { getOfferQuota, resolveEffectiveNexaOffer, resolveEffectiveNexaOfferKey } from "@/app/data/nexaOffers";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -26,6 +26,52 @@ const PARTICIPANT_ROLES = [
   "campus_manager",
   "center_manager",
 ];
+
+function hoursBetween(start: string, end: string) {
+  const [sh, sm] = start.slice(0, 5).split(":").map(Number);
+  const [eh, em] = end.slice(0, 5).split(":").map(Number);
+  return Math.max(0, (eh * 60 + em - sh * 60 - sm) / 60);
+}
+
+async function liveQuotaExceeded(
+  centerId: string,
+  studentIds: string[],
+  date: string,
+  start: string,
+  end: string,
+  excludeSlotId?: string,
+) {
+  if (studentIds.length === 0) return null;
+  const { data: center } = await supabaseAdmin.from("centers")
+    .select("nexa_offer, status, created_at, trial_ends_at, quota_overrides")
+    .eq("id", centerId).maybeSingle();
+  if (!center) return null;
+  const overrides = center.quota_overrides && typeof center.quota_overrides === "object"
+    ? center.quota_overrides as Record<string, unknown> : null;
+  const max = getOfferQuota(resolveEffectiveNexaOfferKey(center), "liveHoursPerStudent", overrides);
+  if (typeof max !== "number") return null;
+
+  const monthStart = `${date.slice(0, 7)}-01`;
+  const monthEndDate = new Date(`${monthStart}T00:00:00Z`);
+  monthEndDate.setUTCMonth(monthEndDate.getUTCMonth() + 1);
+  const monthEnd = monthEndDate.toISOString().slice(0, 10);
+  let query = supabaseAdmin.from("schedule_slots")
+    .select("id, start_time, end_time, schedule_slot_participants(user_id)")
+    .eq("center_id", centerId).eq("session_scope", "live")
+    .gte("specific_date", monthStart).lt("specific_date", monthEnd);
+  if (excludeSlotId) query = query.neq("id", excludeSlotId);
+  const { data: slots } = await query;
+  const used = new Map(studentIds.map((id) => [id, 0]));
+  for (const slot of slots ?? []) {
+    const duration = hoursBetween(String(slot.start_time), String(slot.end_time));
+    for (const participant of slot.schedule_slot_participants ?? []) {
+      if (used.has(participant.user_id)) used.set(participant.user_id, (used.get(participant.user_id) ?? 0) + duration);
+    }
+  }
+  const requested = hoursBetween(start, end);
+  const blocked = studentIds.find((id) => (used.get(id) ?? 0) + requested > max);
+  return blocked ? { max, offerName: resolveEffectiveNexaOffer(center).name } : null;
+}
 
 async function getCallerCenter(userId: string) {
   const { data: profile } = await supabaseAdmin
@@ -274,7 +320,7 @@ export async function POST(req: Request) {
 
   const { data: validPeople } = await supabaseAdmin
     .from("profiles")
-    .select("id")
+    .select("id, role")
     .eq("center_id", ctx.centerId)
     .in("role", PARTICIPANT_ROLES)
     .in("id", participantIds);
@@ -285,33 +331,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: msg(req, "Aucun participant valide pour ce centre.", "No valid participant for this center.") }, { status: 400 });
   }
 
-  const { data: centerRow } = await supabaseAdmin
-    .from("centers")
-    .select("nexa_offer, status, created_at")
-    .eq("id", ctx.centerId)
-    .maybeSingle();
-  const offer = resolveEffectiveNexaOffer(centerRow);
-  if (!offer.modules.includes("lives")) {
+  const studentIds = (validPeople ?? []).filter((p) => p.role === "student").map((p) => p.id);
+  const liveLimit = await liveQuotaExceeded(ctx.centerId, studentIds, specificDate, startTime, endTime);
+  if (liveLimit) {
     return NextResponse.json({
       error: msg(req,
-        `Les sessions Lives ne sont pas incluses dans l'offre ${offer.name}.`,
-        `Live sessions are not included in the ${offer.name} plan.`),
-    }, { status: 403 });
-  }
-  const liveLimit = offer.liveHoursPerStudent;
-  if (liveLimit != null) {
-    const { count: liveCount } = await supabaseAdmin
-      .from("schedule_slots")
-      .select("id", { count: "exact", head: true })
-      .eq("center_id", ctx.centerId)
-      .eq("session_scope", "live");
-    if ((liveCount || 0) >= liveLimit * 10) {
-      return NextResponse.json({
-        error: msg(req,
-          `Limite de Lives atteinte pour l'offre ${offer.name}.`,
-          `Live session limit reached for the ${offer.name} plan.`),
-      }, { status: 403 });
-    }
+        `Le quota de ${liveLimit.max} heures Live par étudiant est atteint pour l'offre ${liveLimit.offerName}. Contactez votre responsable pour passer à une offre supérieure.`,
+        `The ${liveLimit.max} Live hours per student quota for the ${liveLimit.offerName} plan has been reached. Contact your account manager to upgrade.`),
+      code: "LIVE_QUOTA_REACHED",
+    }, { status: 409 });
   }
 
   const d = new Date(`${specificDate}T12:00:00`);
@@ -385,7 +413,7 @@ export async function PATCH(req: Request) {
 
   const { data: slot } = await supabaseAdmin
     .from("schedule_slots")
-    .select("id, specific_date, title, start_time, end_time")
+    .select("id, specific_date, title, start_time, end_time, schedule_slot_participants(user_id)")
     .eq("id", slotId)
     .eq("center_id", ctx.centerId)
     .eq("session_scope", "live")
@@ -453,6 +481,24 @@ export async function PATCH(req: Request) {
 
   if (participantIds && participantIds.length === 0) {
     return NextResponse.json({ error: msg(req, "Sélectionnez au moins un participant.", "Select at least one participant.") }, { status: 400 });
+  }
+
+  const quotaParticipantIds = participantIds ?? (slot.schedule_slot_participants ?? []).map((p) => p.user_id);
+  const { data: quotaPeople } = quotaParticipantIds.length > 0
+    ? await supabaseAdmin.from("profiles").select("id, role")
+      .eq("center_id", ctx.centerId).in("id", quotaParticipantIds)
+    : { data: [] as { id: string; role: string }[] };
+  const quotaStudentIds = (quotaPeople ?? []).filter((p) => p.role === "student").map((p) => p.id);
+  const liveLimit = await liveQuotaExceeded(
+    ctx.centerId, quotaStudentIds, specificDate, startTime, endTime, slotId,
+  );
+  if (liveLimit) {
+    return NextResponse.json({
+      error: msg(req,
+        `Le quota de ${liveLimit.max} heures Live par étudiant est atteint pour l'offre ${liveLimit.offerName}. Contactez votre responsable pour passer à une offre supérieure.`,
+        `The ${liveLimit.max} Live hours per student quota for the ${liveLimit.offerName} plan has been reached. Contact your account manager to upgrade.`),
+      code: "LIVE_QUOTA_REACHED",
+    }, { status: 409 });
   }
 
   const d = new Date(`${specificDate}T12:00:00`);

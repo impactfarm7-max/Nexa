@@ -21,6 +21,9 @@ export function resolveTutorQuota(profile) {
   }
 
   const totalRaw = profile?.tutor_ia_total;
+  if (Number(totalRaw) === -1) {
+    return { hasAccess, unlimited: true, total: null, used: null, remaining: null, exhausted: false };
+  }
   let total;
   if (totalRaw == null || totalRaw === "") {
     total = TUTOR_EXCHANGE_QUOTA;

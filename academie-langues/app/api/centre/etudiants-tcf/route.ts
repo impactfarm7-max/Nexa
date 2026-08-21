@@ -438,7 +438,7 @@ export async function POST(req: NextRequest) {
   if (!seatCheck.ok) {
     return NextResponse.json(
       {
-        error: `Quota utilisateurs atteint pour l'offre ${seatCheck.offerName} (${seatCheck.occupied}/${seatCheck.max}). Staff et étudiants partagent le même plafond ; expirés / révoqués / terminés libèrent une place.`,
+        error: `Quota utilisateurs atteint pour l'offre ${seatCheck.offerName} (${seatCheck.occupied}/${seatCheck.max}). Contactez votre responsable pour passer à une offre supérieure.`,
         code: "SEAT_LIMIT_REACHED",
         occupied: seatCheck.occupied,
         max: seatCheck.max,
@@ -609,7 +609,7 @@ async function activateTcfStudent(params: {
   const useCustom =
     normalizeNexaOffer(centerOffer?.nexa_offer) === "custom" && hasCustomStudentQuotaOverrides(overrides);
   // Sur devis : montants saisis = pack absolu. Pack Ébène standard : scale durée.
-  const quotas = useCustom ? getNexaB2bProfileQuotas(overrides) : getTcfCenterQuotas(months);
+  const quotas = useCustom ? getNexaB2bProfileQuotas(overrides, 1, "custom") : getTcfCenterQuotas(months);
 
   const campusId = await resolveCampusForFiliere(centerId, filiere.id);
   if (!campusId) {

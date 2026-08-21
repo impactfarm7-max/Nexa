@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getOfferQuota, resolveEffectiveNexaOfferKey } from "@/app/data/nexaOffers";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -149,7 +150,7 @@ export async function checkAndConsumeQuota(
   const { data: profile } = await supabaseAdmin
     .from("profiles")
     .select(
-      "role, tag_status, pack_name, subscription_ends_at, subscription_paused_at, ee_used, ee_total, exam_used, exam_total, eo_used, eo_total, daily_sim_count, daily_sim_date, weekly_eo_count, weekly_eo_reset_date, created_at"
+      "role, center_id, tag_status, pack_name, subscription_ends_at, subscription_paused_at, ee_used, ee_total, exam_used, exam_total, eo_used, eo_total, daily_sim_count, daily_sim_date, weekly_eo_count, weekly_eo_reset_date, created_at"
     )
     .eq("id", userId)
     .single();
@@ -176,7 +177,18 @@ export async function checkAndConsumeQuota(
   }
 
   const pack = profile.pack_name?.toLowerCase() || "aucun";
-  const isPackStudent = ["raphia", "ebene", "cauris", "ivoire"].includes(pack);
+  const isPackStudent = ["raphia", "ebene", "cauris", "ivoire", "nexa_b2b", "nexa_custom"].includes(pack);
+  let centerAiCorrectionMax: number | null | undefined;
+  if (["nexa_b2b", "nexa_custom"].includes(pack) && profile.center_id) {
+    const { data: center } = await supabaseAdmin.from("centers")
+      .select("nexa_offer, status, created_at, trial_ends_at, quota_overrides")
+      .eq("id", profile.center_id).maybeSingle();
+    if (center) {
+      const overrides = center.quota_overrides && typeof center.quota_overrides === "object"
+        ? center.quota_overrides as Record<string, unknown> : null;
+      centerAiCorrectionMax = getOfferQuota(resolveEffectiveNexaOfferKey(center), "aiCorrectionsPerStudent", overrides);
+    }
+  }
   const isFormation = ["acceleree", "complete"].includes(pack);
   const isSubValid = Boolean(
     profile.subscription_ends_at &&
@@ -194,7 +206,11 @@ export async function checkAndConsumeQuota(
   // ── ZEN (Expression Écrite entraînement) ─────────────────────────────────
   if (type === "zen") {
     if (isPackStudent) {
-      const total = profile.ee_total ?? 0;
+      const total = centerAiCorrectionMax === null
+        ? UNLIMITED
+        : centerAiCorrectionMax !== undefined
+          ? centerAiCorrectionMax
+          : (profile.ee_total ?? 0);
       const used = profile.ee_used ?? 0;
       if (total !== UNLIMITED && used >= total) {
         return { allowed: false, error: "Quota EE épuisé." };
