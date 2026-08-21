@@ -9,12 +9,30 @@ import { clearStudentAccessCache } from "@/app/utils/student-access-cache";
 import {
   SA_VIEW_AS_PENDING_KEY,
   saveSaReturnSession,
+  takeSaReturnSession,
   writeSaViewAs,
   type SaViewAsPending,
 } from "@/app/utils/sa-view-as";
 
 export default function ViewAsEnterPage() {
   const [error, setError] = useState<string | null>(null);
+  const [returning, setReturning] = useState(false);
+
+  const returnToSuperadmin = async () => {
+    setReturning(true);
+    const saved = takeSaReturnSession();
+    if (saved) {
+      const { error: restoreError } = await supabase.auth.setSession({
+        access_token: saved.access_token,
+        refresh_token: saved.refresh_token,
+      });
+      if (!restoreError) {
+        window.location.assign("/superadmin/dashboard");
+        return;
+      }
+    }
+    window.location.assign("/superadmin/dashboard");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -88,12 +106,14 @@ export default function ViewAsEnterPage() {
       {error ? (
         <>
           <p className="text-sm font-bold text-red-300">{error}</p>
-          <a
-            href="/superadmin/dashboard"
-            className="mt-4 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-black text-white hover:opacity-90"
+          <button
+            type="button"
+            disabled={returning}
+            onClick={() => void returnToSuperadmin()}
+            className="mt-4 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-black text-white hover:opacity-90 disabled:opacity-60"
           >
             Retour superadmin
-          </a>
+          </button>
         </>
       ) : (
         <>

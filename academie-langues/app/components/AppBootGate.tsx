@@ -7,6 +7,7 @@ import { isCenterStaff } from "@/app/utils/student-routes";
 import { isPublicAppRoute } from "@/app/utils/public-routes";
 import { clearStaleAuthSession, isRefreshTokenError } from "@/app/utils/supabase-auth";
 import { clearViewAs, isStudentPreviewPath, isViewAsStudentPreview } from "@/app/utils/view-as";
+import { readSaViewAs } from "@/app/utils/sa-view-as";
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
@@ -169,6 +170,10 @@ export default function AppBootGate({ children }: { children: React.ReactNode })
     if (!pathname) return;
 
     if (isPublicRoute) return;
+
+    // Aperçu superadmin (« vue en tant que ») : pas de session_token/PIN pour
+    // l'identité impersonnée — ce contrôle déclencherait un signOut à tort.
+    if (readSaViewAs()) return;
 
     // si pas de PIN hash local, on ne lock pas ici (onboarding gère)
     const pinHash = getString("iag_pin_hash");

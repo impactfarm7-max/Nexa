@@ -282,6 +282,7 @@ export default function CenterCoursPage() {
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestionDraft[]>([defaultQuestion()]);
   const [savingQuiz, setSavingQuiz] = useState(false);
   const [quizError, setQuizError] = useState("");
+  const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
@@ -456,22 +457,24 @@ export default function CenterCoursPage() {
 
     setSaving(true);
     try {
-      const { data: course, error } = await supabase.from("courses").insert({
-        center_id: centerId,
-        discipline_id: disciplineId,
-        title: title.trim(),
-        description: description.trim() || null,
-        downloadable: downloadableDraft,
-        created_by: userId,
-      }).select("id").single();
-      if (error || !course) throw new Error(error?.message || "Erreur lors de la création.");
-
-      if (selectedGroupeIds.length > 0) {
-        const { error: grpErr } = await supabase.from("course_groupes").insert(
-          selectedGroupeIds.map((groupeId) => ({ course_id: course.id, groupe_id: groupeId }))
-        );
-        if (grpErr) throw new Error(grpErr.message);
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Session invalide.");
+      const response = await fetch("/api/center/courses", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim(),
+          disciplineId,
+          downloadable: downloadableDraft,
+          groupeIds: selectedGroupeIds,
+        }),
+      });
+      const json = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(json.error || "Erreur lors de la création.");
 
       await loadCourses(centerId, centerType);
       resetCreateForm();
@@ -795,6 +798,20 @@ export default function CenterCoursPage() {
     setQuizTitle("");
     setQuizQuestions([defaultQuestion()]);
     setQuizError("");
+    setEditingQuizId(null);
+  };
+
+  const startEditQuiz = (quiz: Quiz) => {
+    setQuizTitle(quiz.title);
+    setQuizQuestions(
+      quiz.questions.map((q) => ({
+        question: q.question,
+        options: q.options.map((o) => ({ label: o.label, is_correct: o.is_correct })),
+      })),
+    );
+    setQuizError("");
+    setEditingQuizId(quiz.id);
+    setNewQuizOpen(true);
   };
 
   const saveQuiz = async () => {
@@ -807,18 +824,33 @@ export default function CenterCoursPage() {
 
     setSavingQuiz(true);
     try {
-      const { data: quiz, error: quizErr } = await supabase
-        .from("quizzes")
-        .insert({ course_id: activeCourse.id, title: quizTitle.trim(), created_by: userId })
-        .select("id")
-        .single();
-      if (quizErr || !quiz) throw new Error(quizErr?.message || "Erreur lors de la création du quiz.");
+      let quizId = editingQuizId;
+
+      if (quizId) {
+        const { error: updateErr } = await supabase.from("quizzes").update({ title: quizTitle.trim() }).eq("id", quizId);
+        if (updateErr) throw new Error(updateErr.message);
+
+        const { data: existingQuestions } = await supabase.from("quiz_questions").select("id").eq("quiz_id", quizId);
+        const existingIds = (existingQuestions || []).map((q: any) => q.id);
+        if (existingIds.length > 0) {
+          await supabase.from("quiz_options").delete().in("question_id", existingIds);
+          await supabase.from("quiz_questions").delete().in("id", existingIds);
+        }
+      } else {
+        const { data: quiz, error: quizErr } = await supabase
+          .from("quizzes")
+          .insert({ course_id: activeCourse.id, title: quizTitle.trim(), created_by: userId })
+          .select("id")
+          .single();
+        if (quizErr || !quiz) throw new Error(quizErr?.message || "Erreur lors de la création du quiz.");
+        quizId = quiz.id;
+      }
 
       for (let i = 0; i < quizQuestions.length; i++) {
         const q = quizQuestions[i];
         const { data: question, error: qErr } = await supabase
           .from("quiz_questions")
-          .insert({ quiz_id: quiz.id, question: q.question.trim(), position: i })
+          .insert({ quiz_id: quizId, question: q.question.trim(), position: i })
           .select("id")
           .single();
         if (qErr || !question) continue;
@@ -832,6 +864,7 @@ export default function CenterCoursPage() {
       await loadQuizzes(activeCourse.id);
       resetQuizForm();
       setNewQuizOpen(false);
+      setExpandedQuiz(null);
     } catch (e: any) {
       setQuizError(e.message || "Erreur lors de l'enregistrement.");
     } finally {
@@ -1252,6 +1285,7 @@ export default function CenterCoursPage() {
                 <>
                   {newQuizOpen && (
                     <div className="bg-white border border-neutral-200 rounded-2xl p-5 mb-5 shadow-sm space-y-4">
+                      <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: ORANGE }}>{editingQuizId ? "Modifier le quiz" : "Nouveau quiz"}</p>
                       <input value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)} placeholder="Titre du quiz" className="w-full h-11 rounded-xl border border-neutral-200 bg-neutral-50 px-4 text-sm font-bold outline-none" style={{ color: BLUE }} />
 
                       {quizQuestions.map((q, qi) => (
@@ -1288,7 +1322,7 @@ export default function CenterCoursPage() {
 
                       <div className="flex gap-2 pt-2">
                         <button onClick={saveQuiz} disabled={savingQuiz} className="flex-1 h-11 flex items-center justify-center gap-2 rounded-xl text-xs font-black uppercase tracking-widest text-white disabled:opacity-50" style={{ backgroundColor: ORANGE }}>
-                          {savingQuiz ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Enregistrer le quiz
+                          {savingQuiz ? <Loader2 size={14} className="animate-spin" /> : editingQuizId ? <Edit3 size={14} /> : <Plus size={14} />} {editingQuizId ? "Mettre à jour le quiz" : "Enregistrer le quiz"}
                         </button>
                         <button onClick={() => { setNewQuizOpen(false); resetQuizForm(); }} className="h-11 px-5 rounded-xl text-xs font-bold bg-neutral-100 text-neutral-500">Annuler</button>
                       </div>
@@ -1330,9 +1364,14 @@ export default function CenterCoursPage() {
                                         </div>
                                       </div>
                                     ))}
-                                    <button onClick={() => deleteQuiz(q.id)} className="text-[10px] font-bold text-neutral-400 hover:text-red-500 flex items-center gap-1">
-                                      <Trash2 size={11} /> Supprimer ce quiz
-                                    </button>
+                                    <div className="flex items-center gap-4">
+                                      <button onClick={() => startEditQuiz(q)} className="text-[10px] font-bold text-neutral-400 hover:text-orange-500 flex items-center gap-1">
+                                        <Edit3 size={11} /> Modifier ce quiz
+                                      </button>
+                                      <button onClick={() => deleteQuiz(q.id)} className="text-[10px] font-bold text-neutral-400 hover:text-red-500 flex items-center gap-1">
+                                        <Trash2 size={11} /> Supprimer ce quiz
+                                      </button>
+                                    </div>
                                   </div>
                                 </motion.div>
                               )}
