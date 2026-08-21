@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Building2, ChevronRight, Inbox, Loader2, Plus, RefreshCcw, Search } from "lucide-react";
+import { Building2, ChevronRight, Inbox, Info, Loader2, Plus, RefreshCcw, Search } from "lucide-react";
 import { superadminFetch } from "../../utils/superadmin-api-client";
 import { useI18n } from "../../i18n/I18nProvider";
 import { useActionFeedback } from "../../components/ActionFeedback";
@@ -260,6 +260,18 @@ function SuperadminCentresPageContent() {
             {t("superadmin", "createCenterButton")}
           </button>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "centresHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "centresHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "centresHowItWorksStatus")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "centresHowItWorksActions")}</p>
       </div>
 
       <div className="flex flex-wrap gap-2">

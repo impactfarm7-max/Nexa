@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ScrollText, RefreshCcw, ChevronDown } from "lucide-react";
+import { ScrollText, RefreshCcw, ChevronDown, Info } from "lucide-react";
 import { superadminFetch } from "../../utils/superadmin-api-client";
 import { useI18n } from "../../i18n/I18nProvider";
 
@@ -124,6 +124,18 @@ export default function SuperadminAuditPage() {
           <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           {t("superadmin", "analyticsRefresh")}
         </button>
+      </div>
+
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "auditHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "auditHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "auditHowItWorksScope")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "auditHowItWorksReadOnly")}</p>
       </div>
 
       {error && (

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Ban, CalendarClock, Loader2, ShieldAlert, Users } from "lucide-react";
+import { AlertTriangle, Ban, CalendarClock, Info, Loader2, ShieldAlert, Users } from "lucide-react";
 import { collectCenterAlerts, type AlertCenter, type CenterAlert, type CenterAlertKind } from "../../utils/center-alerts";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { useSuperadminCenters } from "../SuperadminCentersContext";
@@ -79,6 +79,18 @@ export default function SuperadminAlertesPage() {
       <div>
         <h1 className="text-2xl font-black text-white">{t("superadmin", "alertesTitle")}</h1>
         <p className="mt-1 text-sm text-slate-400">{t("superadmin", "alertesSubtitle")}</p>
+      </div>
+
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "alertesHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "alertesHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "alertesHowItWorksKinds")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "alertesHowItWorksActions")}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Loader2, Plus, Shield, UserCog, X } from "lucide-react";
+import { Check, Info, Loader2, Plus, Shield, UserCog, X } from "lucide-react";
 import { superadminFetch } from "@/app/utils/superadmin-api-client";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { useActionFeedback } from "@/app/components/ActionFeedback";
@@ -84,6 +84,18 @@ export default function SuperadminEquipePage() {
           <Plus className="h-4 w-4" />
           {t("superadmin", "equipeCreate")}
         </button>
+      </div>
+
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "equipeHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "equipeHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "equipeHowItWorksMenus")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "equipeHowItWorksDisable")}</p>
       </div>
 
       {error && (

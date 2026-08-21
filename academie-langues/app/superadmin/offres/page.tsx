@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Building2, Check } from "lucide-react";
+import { Building2, Check, Info } from "lucide-react";
 import { NEXA_OFFERS, nexaOfferLabel, type NexaOfferKey } from "@/app/data/nexaOffers";
 import { TCF_OFFERS, TCF_PLAN_KEYS } from "@/app/data/tcfOffers";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -31,6 +31,18 @@ export default function SuperadminOffresPage() {
           <Building2 className="h-3.5 w-3.5" />
           {t("superadmin", "offresAssignCta")}
         </Link>
+      </div>
+
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "offresHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "offresHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "offresHowItWorksTypes")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "offresHowItWorksCustom")}</p>
       </div>
 
       <div>

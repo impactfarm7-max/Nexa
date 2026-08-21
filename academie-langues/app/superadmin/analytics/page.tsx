@@ -7,6 +7,7 @@ import {
   CalendarClock,
   Download,
   Eye,
+  Info,
   RefreshCw,
   TrendingDown,
   TrendingUp,
@@ -369,18 +370,18 @@ export default function SuperadminAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+        <div className="min-w-0">
           <h2 className="text-2xl font-black text-white">
             {tab === "audience" ? t("superadmin", "analyticsTitle") : t("superadmin", "analyticsNetwork")}
           </h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
             {tab === "audience"
               ? t("superadmin", "analyticsSubtitle")
               : t("superadmin", "analyticsNetworkSubtitle")}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-nowrap items-center gap-2 overflow-x-auto pb-1 [&>*]:shrink-0 lg:pb-0">
           <div className="flex rounded-lg border border-white/10 bg-white/5 p-0.5">
             {(["audience", "network"] as Tab[]).map((key) => (
               <button
@@ -454,6 +455,20 @@ export default function SuperadminAnalyticsPage() {
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
           </button>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h3 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "analyticsHowItWorksTitle")}
+          </h3>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">
+          {tab === "audience"
+            ? t("superadmin", "analyticsAudienceHowItWorks")
+            : t("superadmin", "analyticsNetworkHowItWorks")}
+        </p>
       </div>
 
       {error ? (

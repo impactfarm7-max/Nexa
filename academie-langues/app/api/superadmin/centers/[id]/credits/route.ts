@@ -198,6 +198,30 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     },
   });
 
+  if (input.amountFcfa && input.amountFcfa > 0) {
+    const paidAt = new Date().toISOString();
+    const creditLabel = input.mode === "typed" ? input.creditType : "génériques";
+    const { error: financeError } = await supabaseAdmin.from("finance_payments").insert({
+      center_id: id,
+      amount: input.amountFcfa,
+      method: "autre",
+      period_label: null,
+      paid_at: paidAt,
+      note: `Crédits IA (${creditLabel} x${input.quantity})${input.note ? ` — ${input.note}` : ""}`,
+      source: "manual",
+      created_by: ctx.user.id,
+    });
+
+    if (financeError) {
+      console.error("Unable to record finance payment for AI credits purchase", financeError);
+    } else {
+      await supabaseAdmin
+        .from("centers")
+        .update({ billing_status: "current", last_payment_at: paidAt })
+        .eq("id", id);
+    }
+  }
+
   return NextResponse.json({
     wallet: {
       generic: result.wallet_generic,

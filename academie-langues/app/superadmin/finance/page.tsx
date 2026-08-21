@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Download, Plus, Search, Wallet, X } from "lucide-react";
+import { Download, Info, Plus, Search, Wallet, X } from "lucide-react";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { useActionFeedback } from "@/app/components/ActionFeedback";
 import { superadminFetch } from "../../utils/superadmin-api-client";
@@ -66,6 +66,11 @@ function methodLabel(method: FinanceMethod, t: ReturnType<typeof useI18n>["t"]) 
     | "financeMethodEspeces"
     | "financeMethodAutre";
   return t("superadmin", key);
+}
+
+function formatAmountDigits(digits: string): string {
+  if (!digits) return "";
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 }
 
 function RecordPaymentModal({
@@ -202,10 +207,10 @@ function RecordPaymentModal({
             <div>
               <label className="text-[9px] font-black uppercase tracking-widest text-slate-500">{t("superadmin", "financeModalAmount")}</label>
               <input
-                type="number"
-                min={1}
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                type="text"
+                inputMode="numeric"
+                value={formatAmountDigits(amount)}
+                onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))}
                 className="mt-1.5 w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm text-white outline-none focus:border-orange-400"
               />
             </div>
@@ -392,6 +397,18 @@ function SuperadminFinancePageContent() {
         </div>
       </div>
 
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "financeHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "financeHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "financeHowItWorksRecord")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "financeHowItWorksUnpaid")}</p>
+      </div>
+
       {error ? (
         <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5 text-sm text-red-300">{error}</div>
       ) : (
@@ -462,20 +479,36 @@ function SuperadminFinancePageContent() {
             <h3 className="font-black text-white">{t("superadmin", "financeChartTitle")}</h3>
             <p className="text-xs text-slate-500">{t("superadmin", "financeChartSubtitle")}</p>
             <div className="mt-6 flex h-40 items-end gap-2">
-              {summary.monthlyRevenue.map((m) => (
-                <div key={m.key} className="group flex flex-1 flex-col items-center gap-1.5">
-                  <div className="relative flex h-28 w-full items-end">
-                    <div
-                      className="w-full rounded-t bg-orange-500/80 transition-all duration-150 group-hover:bg-orange-400"
-                      style={{ height: `${loading ? 0 : Math.max(m.total > 0 ? 6 : 2, (m.total / growthMax) * 100)}%` }}
-                      title={formatFcfa(m.total, locale)}
-                    />
+              {summary.monthlyRevenue.map((m, index) => {
+                const monthLabel = new Date(m.year, m.month, 1).toLocaleDateString(
+                  locale === "en" ? "en-GB" : "fr-FR",
+                  { month: "long", year: "numeric" },
+                );
+
+                return (
+                  <div
+                    key={m.key}
+                    className="group flex flex-1 flex-col items-center gap-1.5 outline-none"
+                    tabIndex={0}
+                    aria-label={`${monthLabel} : ${formatFcfa(m.total, locale)}`}
+                  >
+                    <div className="relative flex h-28 w-full items-end">
+                      <div
+                        className="relative w-full rounded-t bg-orange-500/80 transition-all duration-150 group-hover:bg-orange-400 group-focus:bg-orange-400"
+                        style={{ height: `${loading ? 0 : Math.max(m.total > 0 ? 6 : 2, (m.total / growthMax) * 100)}%` }}
+                      >
+                        <div className={`pointer-events-none absolute bottom-full z-10 mb-2 hidden whitespace-nowrap rounded-lg border border-white/10 bg-[#151b28] px-3 py-2 text-left shadow-xl group-hover:block group-focus:block ${index === 0 ? "left-0" : index === summary.monthlyRevenue.length - 1 ? "right-0" : "left-1/2 -translate-x-1/2"}`}>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">{monthLabel}</p>
+                          <p className="mt-0.5 text-sm font-black text-white">{formatFcfa(m.total, locale)}</p>
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-[9px] font-bold uppercase text-slate-500">
+                      {new Date(m.year, m.month, 1).toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR", { month: "short" })}
+                    </span>
                   </div>
-                  <span className="text-[9px] font-bold uppercase text-slate-500">
-                    {new Date(m.year, m.month, 1).toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR", { month: "short" })}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 

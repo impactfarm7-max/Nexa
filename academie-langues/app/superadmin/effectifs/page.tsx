@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, Loader2, Search, Users } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, Info, Loader2, Search, Users } from "lucide-react";
 import { nexaOfferLabel, type NexaOfferKey } from "@/app/data/nexaOffers";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { useSuperadminCenters } from "../SuperadminCentersContext";
@@ -138,6 +138,18 @@ export default function SuperadminEffectifsPage() {
           <Download className="h-3.5 w-3.5" />
           {t("superadmin", "effectifsExport")}
         </button>
+      </div>
+
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "effectifsHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "effectifsHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "effectifsHowItWorksUsage")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "effectifsHowItWorksExport")}</p>
       </div>
 
       <div>

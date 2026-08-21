@@ -1,9 +1,10 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../utils/supabase";
-import { Building2, Mail, Lock, Phone, Eye, EyeOff, MessageCircle, X, CheckCircle2, ArrowRight, Clock, Globe, MapPin, ShieldOff } from "lucide-react";
+import { Mail, Lock, Phone, Eye, EyeOff, MessageCircle, X, CheckCircle2, ArrowRight, Clock, ShieldOff } from "lucide-react";
 import { computeTutorUnlockAt } from "@/app/utils/tutor-unlock";
 import { TUTOR_EXCHANGE_QUOTA } from "@/app/utils/tutor-quota";
 import { getTcfCenterQuotas } from "@/app/data/packOffers";
@@ -13,6 +14,11 @@ import { prepareForLogin, isRefreshTokenError } from "../utils/supabase-auth";
 import { SIGNUP_COUNTRIES_FALLBACK, type SignupCountry } from "../data/signup-countries";
 import { checkPasswordStrength } from "@/app/utils/password-policy";
 import { useI18n } from "@/app/i18n/I18nProvider";
+
+const SignupForm = dynamic(() => import("./SignupForm"), { ssr: false, loading: () => null });
+const SuperadminMfaStep = dynamic(() => import("./SuperadminMfaStep"), { ssr: false, loading: () => null });
+const ResetPasswordStep = dynamic(() => import("./ResetPasswordStep"), { ssr: false, loading: () => null });
+const DeviceLimitStep = dynamic(() => import("./DeviceLimitStep"), { ssr: false, loading: () => null });
 
 type Step = "LOGIN" | "SIGNUP_FORM" | "SIGNUP_SUCCESS" | "RESET_PWD" | "SUPERADMIN_MFA";
 
@@ -85,6 +91,14 @@ function LoginPageContent() {
   useEffect(() => {
     const linkLocale = searchParams.get("lang");
     if (linkLocale === "fr" || linkLocale === "en") setLocale(linkLocale);
+  }, []);
+
+  // Le référentiel pays n'est utile qu'à l'étape SIGNUP_FORM — on ne le charge
+  // donc qu'à la première entrée sur cette étape, pas au montage de la page.
+  const [countriesLoaded, setCountriesLoaded] = useState(false);
+  useEffect(() => {
+    if (step !== "SIGNUP_FORM" || countriesLoaded) return;
+    setCountriesLoaded(true);
 
     supabase
       .from("countries_ref")
@@ -101,7 +115,7 @@ function LoginPageContent() {
           );
         }
       });
-  }, []);
+  }, [step, countriesLoaded]);
 
   const selectedCountry = countries.find((c) => c.code === countryCode) || countries[0];
 
@@ -1113,36 +1127,6 @@ function LoginPageContent() {
     </div>
   );
 
-  const switchAuthLink = (target: Step) => (
-    <p className="pt-2 text-center text-sm font-medium text-slate-500">
-      {target === "SIGNUP_FORM" ? (
-        <>
-          {t("auth", "loginNoAccountYet")}{" "}
-          <button
-            type="button"
-            onClick={() => { setStep("SIGNUP_FORM"); setMsg(null); }}
-            className="font-black hover:underline"
-            style={{ color: ORANGE }}
-          >
-            {t("auth", "loginCreateAccount")}
-          </button>
-        </>
-      ) : (
-        <>
-          {t("auth", "loginAlreadyHaveAccount")}{" "}
-          <button
-            type="button"
-            onClick={() => { setStep("LOGIN"); setMsg(null); }}
-            className="font-black hover:underline"
-            style={{ color: BLUE }}
-          >
-            {t("auth", "loginSignIn")}
-          </button>
-        </>
-      )}
-    </p>
-  );
-
   return (
     <div className="fixed inset-0 z-40 flex flex-col overflow-y-auto bg-[#FAFAFA] font-sans lg:grid lg:grid-cols-5 lg:overflow-hidden">
       {resolvingCenterLink && (
@@ -1235,43 +1219,14 @@ function LoginPageContent() {
 
           <div className="space-y-6">
             {deviceStep && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900">{t("auth", "loginDeviceLimitTitle")}</h2>
-                  <p className="mt-1 text-sm font-medium text-slate-500">
-                    {t("auth", "loginDeviceLimitDesc")}
-                  </p>
-                </div>
-                {activeSessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex flex-col items-stretch gap-3 rounded-2xl border border-slate-200/70 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0 pr-3">
-                      <p className="truncate text-xs font-bold text-slate-700">
-                        {session.device?.substring(0, 50) || t("auth", "loginUnknownDevice")}
-                      </p>
-                      <p className="mt-1 text-[10px] text-slate-400">
-                        {t("auth", "loginLastActivity")} {new Date(session.lastSeen).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => handleForceLogin(session.id)}
-                      disabled={removingId === session.id}
-                      className="shrink-0 rounded-xl px-4 py-2.5 text-xs font-black text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-                      style={{ backgroundColor: ORANGE }}
-                    >
-                      {removingId === session.id ? "..." : t("auth", "loginDisconnect")}
-                    </button>
-                  </div>
-                ))}
-                <button
-                  onClick={() => { setDeviceStep(false); setMsg(null); }}
-                  className="w-full py-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600"
-                >
-                  {t("auth", "loginCancel")}
-                </button>
-              </div>
+              <DeviceLimitStep
+                t={t}
+                ORANGE={ORANGE}
+                activeSessions={activeSessions}
+                handleForceLogin={handleForceLogin}
+                removingId={removingId}
+                onCancel={() => { setDeviceStep(false); setMsg(null); }}
+              />
             )}
 
             {!deviceStep && step === "LOGIN" && (
@@ -1337,218 +1292,68 @@ function LoginPageContent() {
             )}
 
             {!deviceStep && step === "SUPERADMIN_MFA" && (
-              <form onSubmit={handleVerifySuperadminMfa} className="space-y-5">
-                <div>
-                  <h2 className={formTitle}>{t("auth", "loginTwoStepVerification")}</h2>
-                  <p className={formSubtitle}>
-                    {t("auth", "loginEnterMfaCode")}
-                  </p>
-                </div>
-
-                <div className={fieldWrap}>
-                  <div className="pl-3 text-slate-400"><Lock className="h-5 w-5" /></div>
-                  <input
-                    required
-                    autoFocus
-                    inputMode="numeric"
-                    maxLength={6}
-                    placeholder="000000"
-                    className={`${fieldInput} tracking-[0.5em]`}
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  />
-                </div>
-
-                <button
-                  disabled={mfaVerifying || mfaCode.length !== 6}
-                  className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-sm font-black text-white shadow-lg transition-all hover:opacity-95 active:scale-[0.98] disabled:opacity-50"
-                  style={{ backgroundColor: BLUE }}
-                >
-                  {mfaVerifying ? t("auth", "loginVerifying") : t("auth", "loginValidate")}
-                  {!mfaVerifying && <ArrowRight size={16} />}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStep("LOGIN");
-                    setMfaCode("");
-                    setPendingAuth(null);
-                    setMfaFactorId(null);
-                    supabase.auth.signOut();
-                  }}
-                  className="w-full py-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600"
-                >
-                  {t("auth", "loginCancel")}
-                </button>
-              </form>
+              <SuperadminMfaStep
+                t={t}
+                formTitle={formTitle}
+                formSubtitle={formSubtitle}
+                fieldWrap={fieldWrap}
+                fieldInput={fieldInput}
+                BLUE={BLUE}
+                handleVerifySuperadminMfa={handleVerifySuperadminMfa}
+                mfaVerifying={mfaVerifying}
+                mfaCode={mfaCode}
+                setMfaCode={setMfaCode}
+                onCancel={() => {
+                  setStep("LOGIN");
+                  setMfaCode("");
+                  setPendingAuth(null);
+                  setMfaFactorId(null);
+                  supabase.auth.signOut();
+                }}
+              />
             )}
 
             {!deviceStep && step === "SIGNUP_FORM" && (
-              <form onSubmit={handleSignup} className="space-y-4 sm:space-y-5">
-                <div>
-                  <h2 className={formTitle}>{t("auth", "loginCreateAccount")}</h2>
-                  <p className={formSubtitle}>{t("auth", "loginCompleteInfoBelow")}</p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <input
-                    required
-                    placeholder={t("auth", "loginFirstNamePlaceholder")}
-                    className={fieldStandalone}
-                    value={prenom}
-                    onChange={(e) => setPrenom(e.target.value)}
-                  />
-                  <input
-                    required
-                    placeholder={t("auth", "loginLastNamePlaceholder")}
-                    className={fieldStandalone}
-                    value={nom}
-                    onChange={(e) => setNom(e.target.value)}
-                  />
-                </div>
-
-                <div className={fieldWrap}>
-                  <div className="pl-3 text-slate-400"><Globe className="h-4 w-4" /></div>
-                  <select
-                    required
-                    value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
-                    className={`${fieldInput} cursor-pointer`}
-                  >
-                    {countries.map((c) => (
-                      <option key={c.code} value={c.code}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className={fieldWrap}>
-                  <span className="shrink-0 pl-3 text-sm font-semibold text-slate-500">
-                    {selectedCountry?.phone_code || "+"}
-                  </span>
-                  <input
-                    required
-                    type="tel"
-                    placeholder={t("auth", "loginPhonePlaceholder")}
-                    className={fieldInput}
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/[^\d\s]/g, ""))}
-                  />
-                </div>
-
-                <div className={fieldWrap}>
-                  <div className="pl-3 text-slate-400"><MapPin className="h-4 w-4" /></div>
-                  <input
-                    required
-                    placeholder={t("auth", "loginCityPlaceholder")}
-                    className={fieldInput}
-                    value={ville}
-                    onChange={(e) => setVille(e.target.value)}
-                  />
-                </div>
-
-                <input
-                  required
-                  type="number"
-                  min={10}
-                  max={99}
-                  placeholder={t("auth", "loginAgePlaceholder")}
-                  className={fieldStandalone}
-                  value={age}
-                  onChange={(e) => setAge(e.target.value)}
-                />
-
-                <div className={fieldWrap}>
-                  <div className="pl-3 text-slate-400"><Mail className="h-4 w-4" /></div>
-                  <input
-                    required
-                    type="email"
-                    placeholder={t("auth", "loginEmailPlaceholder")}
-                    className={fieldInput}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-
-                {!centerLinkLabel && !linkedCenter && (
-                  <div className={fieldWrap}>
-                    <div className="pl-3 text-slate-400"><Building2 className="h-4 w-4" /></div>
-                    <input
-                      type="text"
-                      placeholder={t("auth", "loginCenterCodePlaceholder")}
-                      className={`${fieldInput} uppercase`}
-                      value={centerCode}
-                      onChange={(e) => {
-                        setCenterLinkLabel(null);
-                        setCenterCode(e.target.value.toUpperCase());
-                      }}
-                    />
-                  </div>
-                )}
-
-                <div className={`${fieldWrap} relative`}>
-                  <div className="pl-3 text-slate-400"><Lock className="h-4 w-4" /></div>
-                  <input
-                    required
-                    type={showSignupPassword ? "text" : "password"}
-                    placeholder={t("auth", "loginPasswordExamplePlaceholder")}
-                    className={`${fieldInput} pr-12 ${!showSignupPassword && password.length > 0 ? "tracking-widest" : ""}`}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    minLength={6}
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSignupPassword(!showSignupPassword)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-orange-500"
-                  >
-                    {showSignupPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-                <p className="px-1 text-[10px] font-medium leading-relaxed text-slate-400">
-                  {t("auth", "loginPasswordPolicyHint")}
-                </p>
-
-                <label className="flex cursor-pointer items-start gap-3 select-none">
-                  <div className="relative mt-0.5 shrink-0">
-                    <input
-                      type="checkbox"
-                      className="peer sr-only"
-                      checked={acceptCGU}
-                      onChange={(e) => setAcceptCGU(e.target.checked)}
-                    />
-                    <div className="flex h-5 w-5 items-center justify-center rounded-md border-2 border-slate-200 bg-white transition-all peer-checked:border-orange-500 peer-checked:bg-orange-500">
-                      {acceptCGU && (
-                        <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </div>
-                  </div>
-                  <span className="text-[11px] font-medium leading-relaxed text-slate-500">
-                    {t("auth", "loginAcceptThe")}{" "}
-                    <a href="/cgu" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline" style={{ color: ORANGE }} onClick={(e) => e.stopPropagation()}>
-                      {t("auth", "loginCguLabel")}
-                    </a>{" "}
-                    {t("auth", "loginAndThe")}{" "}
-                    <a href="/politique-confidentialite" target="_blank" rel="noopener noreferrer" className="font-bold hover:underline" style={{ color: ORANGE }} onClick={(e) => e.stopPropagation()}>
-                      {t("auth", "loginPrivacyPolicyLabel")}
-                    </a>.
-                  </span>
-                </label>
-
-                <button
-                  disabled={loading || !acceptCGU}
-                  className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-sm font-black text-white shadow-lg shadow-orange-500/20 transition-all hover:opacity-95 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{ backgroundColor: ORANGE }}
-                >
-                  {loading ? t("auth", "loginCreatingAccount") : t("auth", "loginCreateMyAccount")}
-                  {!loading && <ArrowRight size={16} />}
-                </button>
-
-                {switchAuthLink("LOGIN")}
-              </form>
+              <SignupForm
+                t={t}
+                formTitle={formTitle}
+                formSubtitle={formSubtitle}
+                fieldWrap={fieldWrap}
+                fieldInput={fieldInput}
+                fieldStandalone={fieldStandalone}
+                ORANGE={ORANGE}
+                BLUE={BLUE}
+                loading={loading}
+                handleSignup={handleSignup}
+                prenom={prenom}
+                setPrenom={setPrenom}
+                nom={nom}
+                setNom={setNom}
+                countries={countries}
+                countryCode={countryCode}
+                setCountryCode={setCountryCode}
+                selectedCountry={selectedCountry}
+                phone={phone}
+                setPhone={setPhone}
+                ville={ville}
+                setVille={setVille}
+                age={age}
+                setAge={setAge}
+                email={email}
+                setEmail={setEmail}
+                centerLinkLabel={centerLinkLabel}
+                linkedCenter={linkedCenter}
+                centerCode={centerCode}
+                setCenterCode={setCenterCode}
+                setCenterLinkLabel={setCenterLinkLabel}
+                showSignupPassword={showSignupPassword}
+                setShowSignupPassword={setShowSignupPassword}
+                password={password}
+                setPassword={setPassword}
+                acceptCGU={acceptCGU}
+                setAcceptCGU={setAcceptCGU}
+                onSwitchToLogin={() => { setStep("LOGIN"); setMsg(null); }}
+              />
             )}
 
             {!deviceStep && step === "SIGNUP_SUCCESS" && (
@@ -1585,40 +1390,19 @@ function LoginPageContent() {
             )}
 
             {!deviceStep && step === "RESET_PWD" && (
-              <form onSubmit={handleResetPwd} className="space-y-5">
-                <div>
-                  <h2 className={formTitle}>{t("auth", "loginForgotPasswordTitle")}</h2>
-                  <p className={formSubtitle}>{t("auth", "loginResetLinkDesc")}</p>
-                </div>
-
-                <div className={fieldWrap}>
-                  <div className="pl-3 text-slate-400"><Mail className="h-5 w-5" /></div>
-                  <input
-                    required
-                    type="email"
-                    placeholder={t("auth", "loginEmailPlaceholder")}
-                    className={fieldInput}
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-
-                <button
-                  disabled={loading}
-                  className="flex h-[52px] w-full items-center justify-center rounded-2xl text-sm font-black text-white transition-all hover:opacity-95 disabled:opacity-50"
-                  style={{ backgroundColor: ORANGE }}
-                >
-                  {loading ? t("auth", "loginSendingInProgress") : t("auth", "loginSendResetLink")}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setStep("LOGIN")}
-                  className="w-full py-2 text-xs font-bold uppercase tracking-widest text-slate-400 hover:text-slate-600"
-                >
-                  {t("auth", "loginBackToLogin")}
-                </button>
-              </form>
+              <ResetPasswordStep
+                t={t}
+                formTitle={formTitle}
+                formSubtitle={formSubtitle}
+                fieldWrap={fieldWrap}
+                fieldInput={fieldInput}
+                ORANGE={ORANGE}
+                loading={loading}
+                handleResetPwd={handleResetPwd}
+                email={email}
+                setEmail={setEmail}
+                onBackToLogin={() => setStep("LOGIN")}
+              />
             )}
           </div>
 

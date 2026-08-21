@@ -9,6 +9,7 @@ import {
   CalendarClock,
   Headphones,
   Inbox,
+  Info,
   LibraryBig,
   ShieldCheck,
   TrendingDown,
@@ -275,6 +276,18 @@ export default function SuperadminDashboardPage() {
       <div>
         <h1 className="text-2xl font-black text-white">{t("superadmin", "dashboardTitle")}</h1>
         <p className="mt-1 text-sm text-slate-400">{t("superadmin", "dashboardSubtitle")}</p>
+      </div>
+
+      <div className="rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "dashboardHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "dashboardHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "dashboardHowItWorksAlerts")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "dashboardHowItWorksCards")}</p>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">

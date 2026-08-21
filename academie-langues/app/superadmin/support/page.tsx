@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Headphones,
   ImageIcon,
+  Info,
   Loader2,
   RefreshCcw,
   Send,
@@ -188,6 +189,17 @@ export default function SuperadminSupportPage() {
           <RefreshCcw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
           {t("superadmin", "supportRefresh")}
         </button>
+      </div>
+
+      <div className="mb-4 rounded-2xl border border-orange-500/20 bg-orange-500/[0.04] p-4">
+        <div className="flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-orange-400" />
+          <h2 className="text-xs font-black uppercase tracking-widest text-orange-300">
+            {t("superadmin", "supportHowItWorksTitle")}
+          </h2>
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-slate-400">{t("superadmin", "supportHowItWorksIntro")}</p>
+        <p className="mt-1.5 text-xs leading-relaxed text-slate-400">{t("superadmin", "supportHowItWorksUnread")}</p>
       </div>
 
       {error && (
