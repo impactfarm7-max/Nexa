@@ -6,7 +6,7 @@ import { supabase } from "@/app/utils/supabase";
 import { loadCenterBootstrap, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import { resolveDashboardModules } from "@/app/centre/dashboard/utils";
 import { defaultReportPeriodRange, formatReportPeriodLabel } from "@/app/utils/reports-period";
-import { isReportHiddenForTcf, type ReportSlug } from "../config/p0-reports";
+import { isReportHiddenForTcf, REPORT_API_PATH, type ReportSlug } from "../config/p0-reports";
 import { fetchReportsBundle, peekReportsBundle } from "./reports-bundle-client";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
@@ -150,7 +150,14 @@ export function useReportPage<T>(slug: ReportSlug) {
       applyBundle(bundle);
 
       if (!bundle.reports[slug]) {
-        setError(t("centre", "reportsDataUnavailable"));
+        const response = await fetch(`${REPORT_API_PATH[slug]}${querySuffix}`, {
+          headers: { Authorization: `Bearer ${session.access_token}`, "x-nexa-locale": locale },
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || t("centre", "reportsDataUnavailable"));
+        setReport(payload.report as T);
+        setCampuses(payload.campuses || []);
+        setFilieres(payload.filieres || []);
       }
     } catch (e) {
       setError(e instanceof Error && e.message ? e.message : t("centre", "reportsLoadingError"));

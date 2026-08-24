@@ -679,6 +679,10 @@ export default function CenterFinancePage() {
     const num = parseInt(payAmount, 10);
     if (!num || num <= 0) { setPayError(t("centre", "financeInvalidAmount")); return; }
     if (!payModal) return;
+    if (!payModal.campus_id) {
+      setPayError(t("centre", "financeCampusRequiredBeforePayment"));
+      return;
+    }
     if (num > payModal.reste_a_payer) { setPayError(t("centre", "financeExceedsBalance", { balance: `${fmtFCFA(payModal.reste_a_payer)} F` })); return; }
 
     setPaySaving(true); setPayError("");

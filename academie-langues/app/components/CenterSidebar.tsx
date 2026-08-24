@@ -2,20 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import {
   LayoutDashboard, Users, GraduationCap, GitBranch, CreditCard,
   MessageSquare, Building2, BookOpen,
   ClipboardList, Calendar, Camera, Settings2, BarChart3,
   BookMarked, PenTool, ChevronDown, ChevronUp,
   PanelLeftClose, PanelLeftOpen, Video, Flag, Gem, LibraryBig,
-  Sparkles,
+  Sparkles, Plus, Loader2,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { STAFF_PERMISSION_ROUTES } from "@/app/utils/student-routes";
 import { filterModulePermissions, ensureTcfCommunautePermission, ensureDefaultLivesPermission, TRAINER_DEFAULT_MODULE_PERMISSIONS } from "@/app/data/tcf-teaching-subjects";
 import { normalizeCenterType, type CenterTypeCode } from "@/app/data/center-types";
-import { getCenterMeCache, peekCenterBootstrap } from "@/app/utils/center-me-cache";
+import { clearCenterMeCache, getCenterMeCache, loadCenterBootstrap, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import { BRAND } from "@/app/utils/brand";
 import { CenterBrandMark } from "@/app/centre/center-page-ui";
 import LanguageSwitcher from "@/app/components/LanguageSwitcher";
@@ -39,7 +39,7 @@ const TRAINER_DEFAULT_PATHS = [
 ];
 
 /* ─── Types ─────────────────────────────────────────────────────────────── */
-type Branch  = { id: string; name: string };
+type Branch  = { id: string; name: string; status?: string | null };
 type NavItem = {
   label: string;
   icon: React.ElementType;
@@ -204,6 +204,7 @@ function readSidebarCache(t: (ns: "centre", key: string) => string, locale: "fr"
   } | null;
   const role = json.role as string | null;
   const permissions = filterModulePermissions((json.permissions || []) as string[]);
+  const availableCenters = (json.centers || []) as Branch[];
 
   if (!center?.id || !role) return null;
 
@@ -220,7 +221,7 @@ function readSidebarCache(t: (ns: "centre", key: string) => string, locale: "fr"
     planType: resolvePlanLabel(center, t, locale),
     userRole: role,
     staffPermissions,
-    branches: [{ id: center.id, name: center.name || "Mon Établissement" }] as Branch[],
+    branches: availableCenters.length ? availableCenters : [{ id: center.id, name: center.name || "Mon Établissement" }],
     activeBranchId: center.id,
   };
 }
@@ -250,6 +251,19 @@ function CenterSidebarInner() {
   const [coursOpen,         setCoursOpen]         = useState(false);
   const [previewStaff,      setPreviewStaff]      = useState(false);
   const [hasAiCredits,      setHasAiCredits]      = useState(false);
+  const [createCenterOpen,  setCreateCenterOpen]  = useState(false);
+  const [switchingCenter,   setSwitchingCenter]   = useState(false);
+  const [switchError,       setSwitchError]       = useState("");
+  const branchMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!branchMenuOpen) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (!branchMenuRef.current?.contains(event.target as Node)) setBranchMenuOpen(false);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [branchMenuOpen]);
 
   useEffect(() => {
     const sync = () => setPreviewStaff(isViewAsStaffPreview());
@@ -275,6 +289,18 @@ function CenterSidebarInner() {
       setBranches(cached.branches);
       setActiveBranchId(cached.activeBranchId);
     }
+    void loadCenterBootstrap({ force: true }).then(() => {
+      const fresh = readSidebarCache(t, lang);
+      if (!fresh) return;
+      setCenterId(fresh.centerId);
+      setCenterName(fresh.centerName);
+      setCenterType(fresh.centerType);
+      setPlanType(fresh.planType);
+      setUserRole(fresh.userRole);
+      setStaffPermissions(fresh.staffPermissions);
+      setBranches(fresh.branches);
+      setActiveBranchId(fresh.activeBranchId);
+    });
   }, [t]);
 
   /* Logo + prénom en différé si le cache bootstrap suffit pour le menu */
@@ -430,6 +456,27 @@ function CenterSidebarInner() {
     setUploadingLogo(false);
   };
 
+  const switchCenter = async (id: string) => {
+    if (id === centerId || switchingCenter) { setBranchMenuOpen(false); return; }
+    setSwitchingCenter(true);
+    setSwitchError("");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setSwitchingCenter(false); return; }
+    const response = await fetch("/api/center/switch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ centerId: id }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setSwitchError(payload.error || "Impossible de changer de centre.");
+      setSwitchingCenter(false);
+      return;
+    }
+    clearCenterMeCache();
+    window.location.assign("/centre/dashboard");
+  };
+
   const canManage = !previewStaff && userRole === "center_manager";
   const isTrainer = !previewStaff && userRole === "trainer";
   const isManager = !previewStaff && FULL_ACCESS_ROLES.includes(userRole || "");
@@ -477,7 +524,6 @@ function CenterSidebarInner() {
     };
   };
 
-  const activeBranch = branches.find(b => b.id === activeBranchId);
 
   /* ── Styles partagés ─────────────────────────────────────────────────── */
 
@@ -600,13 +646,13 @@ function CenterSidebarInner() {
     >
 
       {/* ══ HEADER ══════════════════════════════════════════════════════ */}
-      <div className={`flex items-center gap-2 border-b border-black/[0.06] shrink-0 px-3 transition-all duration-300 ${
-        isCollapsed ? "h-16 justify-center flex-col py-2" : "h-[68px]"
+      <div ref={branchMenuRef} className={`relative flex items-center gap-2 border-b border-black/[0.06] shrink-0 px-3 transition-all duration-300 ${
+        isCollapsed ? "h-16 justify-center flex-col py-2" : "h-[72px]"
       }`}>
 
         {/* Logo + nom */}
         {!isCollapsed && (
-          <div className="flex items-center gap-2.5 flex-1 min-w-0">
+          <button type="button" onClick={() => setBranchMenuOpen((value) => !value)} className="flex items-center gap-2 flex-1 min-w-0 text-left rounded-xl hover:bg-black/[0.03] -ml-1 px-1 py-1">
             {/* Logo carré bordure bleue */}
             <div className="relative shrink-0">
               <CenterBrandMark
@@ -624,19 +670,22 @@ function CenterSidebarInner() {
             </div>
             {/* Nom */}
             <div className="flex-1 min-w-0">
-              <p className="font-black text-[13px] leading-tight truncate" style={{ color: BLUE }}>{centerName}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="flex min-w-0 items-center gap-1">
+                <p className="min-w-0 flex-1 truncate whitespace-nowrap font-black text-[13px] leading-tight" style={{ color: BLUE }}>{centerName}</p>
+                {switchingCenter ? <Loader2 size={12} className="animate-spin shrink-0" /> : <ChevronDown size={12} className={`shrink-0 transition-transform ${branchMenuOpen ? "rotate-180" : ""}`} />}
+              </div>
+              <div className="mt-1 flex min-w-0 items-center gap-1">
                 {isTCF && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider text-white" style={{ backgroundColor: ORANGE }}>
+                  <span className="inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[8px] font-black uppercase tracking-wide text-white" style={{ backgroundColor: ORANGE }}>
                     🇨🇦 TCF
                   </span>
                 )}
-                <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: "rgba(17,34,78,0.40)" }}>
+                <span className="min-w-0 truncate whitespace-nowrap text-[9px] font-black uppercase tracking-wide" style={{ color: "rgba(17,34,78,0.40)" }}>
                   {uploadingLogo ? t("centre", "sidebarEnvoi") : t("centre", "sidebarPlan").replace("{plan}", planType)}
                 </span>
               </div>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Logo centré quand collapsed */}
@@ -662,50 +711,25 @@ function CenterSidebarInner() {
             ? <PanelLeftOpen  size={17} />
             : <PanelLeftClose size={17} />}
         </button>
+        {!isCollapsed && branchMenuOpen && (
+          <div className="absolute left-3 right-3 top-full mt-1 z-[70] overflow-hidden rounded-xl border border-black/[0.08] bg-white shadow-xl">
+            <div className="max-h-64 overflow-y-auto p-1.5">
+              {branches.map((branch) => {
+                const pending = branch.status === "pending";
+                return (
+                  <button key={branch.id} type="button" disabled={switchingCenter} onClick={() => void switchCenter(branch.id)} className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[12px] font-bold ${branch.id === activeBranchId ? "text-white" : "text-[#11224E] hover:bg-black/[0.04]"} disabled:opacity-60`} style={branch.id === activeBranchId ? { backgroundColor: BLUE } : undefined}>
+                    <Building2 size={13} /><span className="min-w-0 flex-1 truncate">{branch.name}</span>{pending && <span className="text-[9px] uppercase">Essai</span>}
+                  </button>
+                );
+              })}
+              {switchError && <p className="mx-1 mt-1 rounded-lg bg-red-50 px-2.5 py-2 text-[11px] font-semibold text-red-700">{switchError}</p>}
+            </div>
+            {canManage && <button type="button" onClick={() => { setBranchMenuOpen(false); setCreateCenterOpen(true); }} className="flex w-full items-center gap-2 border-t border-neutral-100 px-4 py-3 text-[12px] font-bold text-[#11224E] hover:bg-neutral-50"><Plus size={14} /> Créer un autre centre</button>}
+          </div>
+        )}
       </div>
 
       {/* ══ SÉLECTEUR CAMPUS ════════════════════════════════════════════ */}
-      {!isCollapsed && branches.length > 0 && (
-        <div className="px-3 pt-2.5 relative shrink-0">
-          <button
-            onClick={() => setBranchMenuOpen(v => !v)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl transition-colors hover:bg-black/[0.04] border border-black/[0.06] bg-white"
-          >
-            <Building2 size={12} className="shrink-0" style={{ color: "rgba(17,34,78,0.40)" }} />
-            <span className="flex-1 text-left text-[12px] font-bold truncate" style={{ color: "rgba(17,34,78,0.70)" }}>
-              {activeBranch?.name || t("centre", "sidebarCampus")}
-            </span>
-            <ChevronDown
-              size={11}
-              className={`transition-transform shrink-0 ${branchMenuOpen ? "rotate-180" : ""}`}
-              style={{ color: "rgba(17,34,78,0.35)" }}
-            />
-          </button>
-          {branchMenuOpen && (
-            <div
-              className="absolute left-3 right-3 top-full mt-1 rounded-xl z-50 overflow-hidden border border-black/[0.08] bg-white shadow-lg"
-            >
-              {branches.map(b => (
-                <button
-                  key={b.id}
-                  onClick={() => { setActiveBranchId(b.id); setBranchMenuOpen(false); }}
-                  className={`w-full text-left px-4 py-2.5 text-[12px] font-bold transition-colors ${
-                    b.id === activeBranchId ? "text-white" : "hover:bg-black/[0.04]"
-                  }`}
-                  style={
-                    b.id === activeBranchId
-                      ? { backgroundColor: BLUE }
-                      : { color: "rgba(17,34,78,0.55)" }
-                  }
-                >
-                  {b.name}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* ══ NAVIGATION ══════════════════════════════════════════════════ */}
       <nav className="nexa-sidebar-nav flex-1 px-2.5 py-2 space-y-0.5 overflow-y-auto">
 
@@ -784,7 +808,62 @@ function CenterSidebarInner() {
           )}
         </Link>
       </div>
+      {createCenterOpen && <CreateCenterModal onClose={() => setCreateCenterOpen(false)} onCreated={() => { clearCenterMeCache(); window.location.reload(); }} />}
     </aside>
+  );
+}
+
+function CreateCenterModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [name, setName] = useState("");
+  const [city, setCity] = useState("");
+  const [centerType, setCenterType] = useState("generic");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [typeOpen, setTypeOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [created, setCreated] = useState(false);
+
+  const submit = (event: React.FormEvent) => {
+    event.preventDefault();
+    setError("");
+    setConfirmOpen(true);
+  };
+
+  const createCenter = async () => {
+    setConfirmOpen(false); setSaving(true); setError("");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setError("Session expirée."); setSaving(false); return; }
+    const response = await fetch("/api/center/create", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` }, body: JSON.stringify({ name, city, centerType }) });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) { setError(payload.error || "Création impossible."); setSaving(false); return; }
+    setSaving(false);
+    setCreated(true);
+  };
+
+  if (created) {
+    return <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#081538]/50 p-4"><div className="w-full max-w-md rounded-2xl bg-white p-6 text-center shadow-2xl"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-2xl text-emerald-700">✓</div><h2 className="mt-4 text-xl font-black text-[#11224E]">Centre créé</h2><p className="mt-2 text-sm leading-relaxed text-neutral-600">Le centre <strong>{name}</strong> est prêt. Votre essai gratuit de <strong>7 jours</strong> commence maintenant.</p><button type="button" onClick={onCreated} className="mt-5 h-10 rounded-xl bg-[#11224E] px-5 text-sm font-bold text-white">Accéder au centre</button></div></div>;
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#081538]/50 p-4" onMouseDown={onClose}>
+      <form onSubmit={submit} onMouseDown={(event) => event.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4"><div><h2 className="text-xl font-black text-[#11224E]">Créer un autre centre</h2><p className="mt-1 text-sm text-neutral-500">Un essai gratuit de 7 jours démarrera immédiatement.</p></div><button type="button" onClick={onClose} className="rounded-lg p-2 text-neutral-400 hover:bg-neutral-100">×</button></div>
+        <div className="mt-5 space-y-3">
+          <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Nom du centre" className="h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-[#11224E]" />
+          <input required value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ville" className="h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-[#11224E]" />
+          <div className="relative">
+            <button type="button" onClick={() => setTypeOpen((value) => !value)} className={`flex h-11 w-full items-center justify-between rounded-xl border bg-white px-3 text-left text-sm font-semibold text-[#11224E] transition ${typeOpen ? "border-[#11224E] ring-2 ring-[#11224E]/10" : "border-neutral-200"}`}>
+              <span>{centerType === "tcf_canada" ? "Centre TCF Canada" : centerType === "formation_courte" ? "Formation courte" : "Centre libre"}</span><ChevronDown size={16} className={`transition-transform ${typeOpen ? "rotate-180" : ""}`} />
+            </button>
+            {typeOpen && <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl">{[["generic", "Centre libre"], ["tcf_canada", "Centre TCF Canada"], ["formation_courte", "Formation courte"]].map(([value, label]) => <button key={value} type="button" onClick={() => { setCenterType(value); setTypeOpen(false); }} className={`w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${centerType === value ? "bg-[#11224E] text-white" : "text-[#11224E] hover:bg-neutral-100"}`}>{label}</button>)}</div>}
+          </div>
+        </div>
+        <p className="mt-3 rounded-xl bg-[#F5F7FB] px-3 py-2.5 text-xs leading-relaxed text-neutral-600">Après activation, vous compléterez l’adresse, les contacts, le logo, l’offre et les autres informations dans <strong>Paramètres</strong>.</p>
+        {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="h-10 rounded-xl border border-neutral-200 px-4 text-sm font-bold">Annuler</button><button disabled={saving} className="flex h-10 items-center gap-2 rounded-xl bg-[#11224E] px-4 text-sm font-bold text-white disabled:opacity-50">{saving && <Loader2 size={15} className="animate-spin" />}{saving ? "Création…" : "Créer"}</button></div>
+      </form>
+      {confirmOpen && <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[#081538]/55 p-4" onMouseDown={() => setConfirmOpen(false)}><div onMouseDown={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"><h3 className="text-lg font-black text-[#11224E]">Confirmer la création</h3><p className="mt-2 text-sm leading-relaxed text-neutral-600">Créer <strong>{name}</strong> à <strong>{city}</strong> comme <strong>{centerType === "tcf_canada" ? "centre TCF Canada" : centerType === "formation_courte" ? "centre de formation courte" : "centre libre"}</strong> ?</p><p className="mt-2 text-xs text-neutral-500">Vous basculerez vers ce centre et son essai gratuit de 7 jours commencera immédiatement.</p><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setConfirmOpen(false)} className="h-10 rounded-xl border border-neutral-200 px-4 text-sm font-bold">Retour</button><button type="button" onClick={() => void createCenter()} className="h-10 rounded-xl bg-[#11224E] px-4 text-sm font-bold text-white">Confirmer</button></div></div></div>}
+    </div>
   );
 }
 

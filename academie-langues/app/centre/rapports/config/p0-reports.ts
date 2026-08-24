@@ -10,6 +10,7 @@ export type ReportSlug =
   | "filieres-programmes"
   | "effectifs-personnel"
   | "masse-salariale"
+  | "rentabilite-campus"
   | "examens";
 
 export type ReportNavItem = {
@@ -76,6 +77,15 @@ export const REPORT_NAV: ReportNavItem[] = [
     href: "/centre/rapports/encaissements",
     section: "finance",
     priority: "P0",
+  },
+  {
+    slug: "rentabilite-campus",
+    label: "Campus profitability",
+    shortLabel: "Profitability",
+    description: "Collections minus payroll and campus expenses",
+    href: "/centre/rapports/rentabilite-campus",
+    section: "finance",
+    priority: "P1",
   },
   {
     slug: "recouvrement",
@@ -155,6 +165,7 @@ export const REPORT_API_PATH: Record<ReportSlug, string> = {
   "effectifs-personnel": "/api/center/reports/effectifs-personnel",
   "masse-salariale": "/api/center/reports/masse-salariale",
   encaissements: "/api/center/reports/encaissements",
+  "rentabilite-campus": "/api/center/reports/rentabilite-campus",
   recouvrement: "/api/center/reports/recouvrement",
   retards: "/api/center/reports/retards",
   "reductions-coupons": "/api/center/reports/reductions-coupons",

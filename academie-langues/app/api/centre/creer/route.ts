@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
       role: "manager",
       role_label: ownerRole?.trim() || "Directeur",
       permissions: ["finance", "etudiants", "filieres", "staff", "communaute", "parametres", "planning", "examens", "rapports", "cours", "lives"],
-    }, { onConflict: "user_id" });
+    }, { onConflict: "center_id,user_id" });
 
     // ── 7. Branding initial ───────────────────────────────────────────────────
     await supabaseAdmin.from("center_branding").upsert({
