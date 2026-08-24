@@ -286,7 +286,7 @@ export async function POST(req: Request) {
     await sendPushToUsers(recipientIds, {
       title: "Demande de coaching",
       body: message,
-      url: profile.center_id ? "/centre/cours/planning" : "/admin",
+      url: profile.center_id ? "/centre/cours/planning" : "/dashboard/coaching",
     });
 
     await sendEmails(
@@ -397,7 +397,7 @@ export async function DELETE(req: Request) {
 
   if (recipientIds.length > 0) {
     await supabaseAdmin.from("notifications").insert(recipientIds.map((recipientId) => ({ user_id: recipientId, message: adminMsg })));
-    await sendPushToUsers(recipientIds, { title: "Coaching annule", body: adminMsg, url: requesterProfile?.center_id ? "/centre/cours/coaching" : "/admin" });
+    await sendPushToUsers(recipientIds, { title: "Coaching annule", body: adminMsg, url: requesterProfile?.center_id ? "/centre/cours/coaching" : "/dashboard/coaching" });
   }
 
   await supabaseAdmin.from("notifications").insert({
@@ -525,7 +525,7 @@ export async function PATCH(req: Request) {
     await sendPushToUsers(recipientIds, {
       title: "Demande de report coaching",
       body: adminMsg,
-      url: centerId ? "/centre/cours/coaching" : "/admin",
+      url: centerId ? "/centre/cours/coaching" : "/dashboard/coaching",
     });
     await sendEmails(
       recipients

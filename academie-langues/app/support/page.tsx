@@ -138,11 +138,6 @@ export default function SupportPage() {
         return;
       }
 
-      if (profile?.role === "admin") {
-        router.push("/admin?tab=support");
-        return;
-      }
-
       const isCenter = Boolean(profile?.center_id);
       const adminIdUrl = isCenter
         ? "/api/messages/admin-id"

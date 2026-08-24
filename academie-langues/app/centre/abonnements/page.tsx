@@ -241,7 +241,7 @@ export default function AbonnementsPage() {
                     {tagline}
                   </p>
                   {isQuote ? (
-                    <p className="mt-4 text-2xl font-black leading-none" style={{ color: BLUE }}>
+                    <p className="mt-4 whitespace-nowrap text-[clamp(1.15rem,1.45vw,1.5rem)] font-black leading-none" style={{ color: BLUE }}>
                       {price}
                     </p>
                   ) : (
@@ -258,7 +258,7 @@ export default function AbonnementsPage() {
                     </div>
                   )}
                   {entryPriceLabel && (
-                    <p className="mt-1.5 text-xs font-bold tabular-nums" style={{ color: "rgba(17,34,78,0.55)" }}>
+                    <p className="mt-1.5 whitespace-nowrap text-[11px] font-bold tabular-nums" style={{ color: "rgba(17,34,78,0.55)" }}>
                       {t("centre", "abonnementsPriceFrom")} {entryPriceLabel} {t("centre", "abonnementsPricePerMonth")}
                     </p>
                   )}
@@ -347,24 +347,18 @@ export default function AbonnementsPage() {
                     {offerDisplayTagline(key, t)}
                   </p>
                   {isQuote ? (
-                    <p className="mt-4 text-2xl font-black leading-none" style={{ color: BLUE }}>
+                    <p className="mt-4 whitespace-nowrap text-[clamp(1.15rem,1.45vw,1.5rem)] font-black leading-none" style={{ color: BLUE }}>
                       {t("centre", "abonnementsPriceQuote")}
                     </p>
                   ) : (
                     <div className="mt-4">
-                      <p className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "rgba(17,34,78,0.45)" }}>
-                        {t("centre", "abonnementsPricePerUserLabel")}
-                      </p>
-                      <p className="mt-0.5 text-2xl font-black leading-none tabular-nums transition-transform duration-300 group-hover:scale-[1.03] origin-left" style={{ color: BLUE }}>
-                        {perUserLabel}
-                      </p>
-                      <p className="mt-1 text-xs font-bold" style={{ color: "rgba(17,34,78,0.55)" }}>
-                        {t("centre", "abonnementsPricePerUser")}
+                      <p className="whitespace-nowrap text-[clamp(1rem,1.25vw,1.3rem)] font-black leading-none tabular-nums transition-transform duration-300 group-hover:scale-[1.03] origin-left" style={{ color: BLUE }}>
+                        {perUserLabel} {t("centre", "abonnementsPricePerUser")}
                       </p>
                     </div>
                   )}
                   {entryPriceLabel && (
-                    <p className="mt-1.5 text-xs font-bold tabular-nums" style={{ color: "rgba(17,34,78,0.55)" }}>
+                    <p className="mt-1.5 whitespace-nowrap text-[11px] font-bold tabular-nums" style={{ color: "rgba(17,34,78,0.55)" }}>
                       {t("centre", "abonnementsPriceFrom")} {entryPriceLabel} {t("centre", "abonnementsPricePerMonth")}
                     </p>
                   )}

@@ -55,8 +55,7 @@ export default function LandingPage() {
         supabase.from("profiles").select("role, center_id").eq("id", session.user.id).maybeSingle(),
         supabase.from("center_users").select("center_id").eq("user_id", session.user.id).maybeSingle(),
       ]);
-      if (profile?.role === "admin") router.replace("/admin");
-      else if (isCenterStaff(profile) || centerMembership?.center_id) router.replace(CENTER_HOME);
+      if (isCenterStaff(profile) || centerMembership?.center_id) router.replace(CENTER_HOME);
       else router.replace("/dashboard");
     });
   }, [router]);

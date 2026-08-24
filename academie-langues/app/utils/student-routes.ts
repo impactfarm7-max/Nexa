@@ -50,7 +50,6 @@ export function isPrivilegedRole(profile: ProfileLike | null | undefined): boole
 /** Destination après connexion / PIN. */
 export function resolvePostLoginPath(profile: ProfileLike | null | undefined): string {
   if (!profile) return "/login";
-  if (profile.role === "admin") return "/admin";
   if (isSuperAdmin(profile)) return SUPERADMIN_HOME;
   if (isCenterStaff(profile)) return CENTER_HOME;
   return STUDENT_HOME;

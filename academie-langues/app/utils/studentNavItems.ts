@@ -8,7 +8,6 @@ import {
   LibraryBig,
   Timer,
   Users,
-  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 import { getStudentNavPaths } from "./student-routes";
@@ -83,15 +82,6 @@ export function getStudentNavItems(
   if (mode === "pluriannual") return getPluriannualNavItems(centerId);
   return getTcfLikeNavItems(centerId);
 }
-
-export const STUDENT_ADMIN_NAV_ITEM: StudentNavItem = {
-  label: "Dashboard Admin",
-  shortLabel: "Admin",
-  labelKey: "navAdmin",
-  shortLabelKey: "navAdmin",
-  icon: ShieldCheck,
-  path: "/admin",
-};
 
 /** Liens affichés dans la barre fixe mobile (hors menu « + »). */
 export function getBottomBarPrimaryItems(

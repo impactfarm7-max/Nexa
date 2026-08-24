@@ -8,7 +8,7 @@ const TRACKED_KEY = "nexa_analytics_last_track";
 export default function SiteAnalyticsTracker() {
   const pathname = usePathname();
   useEffect(() => {
-    if (!pathname || pathname.startsWith("/admin") || pathname.startsWith("/superadmin")) return;
+    if (!pathname || pathname.startsWith("/superadmin")) return;
     let visitorId = localStorage.getItem(VISITOR_KEY);
     if (!visitorId) { visitorId = crypto.randomUUID(); localStorage.setItem(VISITOR_KEY, visitorId); }
     const now = Date.now();

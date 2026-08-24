@@ -8,14 +8,12 @@ import {
   X,
   User,
   HeadphonesIcon,
-  ShieldCheck,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { getStudentNavPaths } from "../utils/student-routes";
 import {
   getBottomBarPrimaryItems,
   getBottomSheetNavItems,
-  STUDENT_ADMIN_NAV_ITEM,
 } from "../utils/studentNavItems";
 import { useTutorGlobalLock } from "../hooks/useTutorGlobalLock";
 import { motion, AnimatePresence } from "framer-motion";
@@ -128,7 +126,6 @@ export default function BottomNav() {
   if (
     hiddenRoutes.includes(pathname || "") ||
     hideOnImmersiveChat ||
-    pathname?.startsWith("/admin") ||
     pathname?.includes("/quiz") ||
     pathname?.includes("/resultat") ||
     pathname?.startsWith("/tcf-canada/comprehension/orale")
@@ -254,19 +251,6 @@ export default function BottomNav() {
                 <span className="text-xs font-bold text-slate-700">{t("dashboard", "mobileSupport")}</span>
               </Link>
 
-              {isAdmin && (
-                <Link
-                  href={STUDENT_ADMIN_NAV_ITEM.path}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl transition-colors col-span-2 ${
-                    pathname === STUDENT_ADMIN_NAV_ITEM.path ? "bg-orange-50 ring-2 ring-orange-200" : "bg-slate-50 hover:bg-slate-100"
-                  }`}
-                >
-                  <div className="w-12 h-12 rounded-full bg-orange-500/10 flex items-center justify-center text-[#eb670e]">
-                    <ShieldCheck size={22} />
-                  </div>
-                  <span className="text-xs font-bold text-slate-700">{t("dashboard", "navAdmin")}</span>
-                </Link>
-              )}
             </div>
           </motion.div>
         )}

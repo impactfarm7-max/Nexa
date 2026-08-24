@@ -14,7 +14,6 @@ export const PUBLIC_ROUTE_PREFIXES = [
   "/revoque",
   "/termine",
   "/pause",
-  "/admin",
   "/superadmin",
   "/view-as",
   "/presentation",

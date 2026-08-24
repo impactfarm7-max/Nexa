@@ -14,7 +14,7 @@ import { supabase } from "../utils/supabase";
 
 import { getStudentNavPaths } from "../utils/student-routes";
 
-import { getStudentNavItems, STUDENT_ADMIN_NAV_ITEM } from "../utils/studentNavItems";
+import { getStudentNavItems } from "../utils/studentNavItems";
 
 import { useTutorGlobalLock } from "../hooks/useTutorGlobalLock";
 
@@ -202,8 +202,6 @@ export default function Sidebar() {
   if (
 
     hiddenRoutes.includes(pathname || "") ||
-
-    pathname?.startsWith("/admin/login") ||
 
     pathname?.includes("/quiz") ||
 
@@ -525,76 +523,6 @@ export default function Sidebar() {
         })}
 
 
-
-        {isAdmin && (
-
-          <>
-
-            {!isCollapsed ? (
-
-              <p
-
-                className={`px-3 md:px-3.5 xl:px-4 2xl:px-5 pt-4 xl:pt-5 pb-1 xl:pb-2 ${STUDENT_TEXT.sidebarSection} text-white/30 select-none truncate`}
-
-              >
-
-                {t("dashboard", "sidebarAdminSection")}
-
-              </p>
-
-            ) : (
-
-              <div
-
-                className="mx-2 md:mx-3 xl:mx-4 my-2 md:my-2.5 xl:my-3 border-t"
-
-                style={{ borderColor: "rgba(255,255,255,0.12)" }}
-
-              />
-
-            )}
-
-            <Link
-
-              href={STUDENT_ADMIN_NAV_ITEM.path}
-
-              title={isCollapsed ? t("dashboard", "navAdmin") : undefined}
-
-              className={itemCls(pathname === "/admin")}
-
-              style={pathname === "/admin" ? { backgroundColor: "rgba(255,255,255,0.15)" } : undefined}
-
-            >
-
-              {pathname === "/admin" && (
-
-                <span
-
-                  className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full bg-white/90"
-
-                  style={{ width: 3, height: "60%" }}
-
-                />
-
-              )}
-
-              <STUDENT_ADMIN_NAV_ITEM.icon strokeWidth={2} className={`${iconCls(pathname === "/admin")} text-orange-300`} />
-
-              {!isCollapsed && (
-
-                <span className={`${STUDENT_TEXT.sidebarItem} truncate flex-1 min-w-0`}>
-
-                  {t("dashboard", "navAdmin")}
-
-                </span>
-
-              )}
-
-            </Link>
-
-          </>
-
-        )}
 
       </nav>
 

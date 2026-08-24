@@ -1014,7 +1014,6 @@ export default function Dashboard() {
   const handleCallSupport = () => { setShowSupportMenu(false); window.location.href = "tel:+237683375069"; };
   const handleOpenSupportChat = () => { setShowSupportMenu(false); router.push("/support"); };
   const handleSupportClick = () => {
-    if (isAdmin) { setShowSupportMenu(false); router.push("/admin?tab=support"); return; }
     setShowSupportMenu((p) => !p);
   };
 
