@@ -504,12 +504,8 @@ export async function POST(req: NextRequest) {
       center_id: callerCenterId,
       center_status: "active",
       tag_status: "normal",
-      formation: isPluri ? "pluriannuel" : centerType === "formation_courte" ? "formation_courte" : "tcf",
-      formations: isPluri
-        ? ["pluriannuel"]
-        : centerType === "formation_courte"
-          ? ["formation_courte"]
-          : ["tcf"],
+      formation: isPluri ? "pluriannuel" : "tcf",
+      formations: isPluri ? ["pluriannuel"] : ["tcf"],
       activated_at: new Date().toISOString(),
       subscription_ends_at: subscriptionEndsAt,
       ...quotas,

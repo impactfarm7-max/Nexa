@@ -63,7 +63,7 @@ export default function BibliothequePage() {
 
   useEffect(() => {
     if (centerLoading || !isPluriannual) return;
-    router.replace("/tcf-canada/cours?tab=centre");
+    router.replace("/cours");
   }, [centerLoading, isPluriannual, router]);
 
   useEffect(() => {

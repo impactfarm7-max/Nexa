@@ -692,7 +692,7 @@ export default function Dashboard() {
           id: `mission-${m.id}`,
           title: m.title || t("dashboard", "homeworkLabel"),
           subtitle: "",
-          href: `/tcf-canada/missions?mission=${m.id}`,
+          href: `${isPluriannual ? "/missions" : "/tcf-canada/missions"}?mission=${m.id}`,
           kind: "mission" as const,
           dueAt: m.due_at ?? null,
         }));
@@ -719,7 +719,7 @@ export default function Dashboard() {
                   id: `course-${courseId}`,
                   title: course.title || t("dashboard", "centerCourseLabel"),
                   subtitle: "",
-                  href: `/tcf-canada/cours?tab=centre&course=${courseId}`,
+                  href: `${isPluriannual ? "/cours" : "/tcf-canada/cours"}?tab=centre&course=${courseId}`,
                   kind: "course" as const,
                   courseId,
                   courseVersion,
@@ -1369,7 +1369,7 @@ export default function Dashboard() {
                   ) : (
                     <p className="text-sm text-neutral-400 font-medium py-6 text-center">
                       {t("dashboard", "gradesWidgetConsultPrefix")}{" "}
-                      <a href="/tcf-canada/cours?tab=notes" className="font-bold text-orange-500 hover:underline">
+                      <a href="/cours?tab=notes" className="font-bold text-orange-500 hover:underline">
                         {t("dashboard", "gradesWidgetCoursesNotesLink")}
                       </a>
                       .
@@ -1411,7 +1411,7 @@ export default function Dashboard() {
                   <FileWarning className="w-4 h-4 xl:w-5 xl:h-5" style={{ color: BRAND.orange }} /> {t("dashboard", "pendingHomeworkTitle")}
                 </h3>
                 <a
-                  href={isPluriannual ? "/tcf-canada/cours" : "/tcf-canada/cours?tab=centre"}
+                  href={isPluriannual ? "/cours" : "/tcf-canada/cours?tab=centre"}
                   className="text-[11px] font-bold text-neutral-400 hover:text-orange-500 transition-colors"
                 >
                   {t("dashboard", "seeAll")}

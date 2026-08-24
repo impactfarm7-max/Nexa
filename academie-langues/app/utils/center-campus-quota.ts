@@ -1,4 +1,6 @@
 import { getOfferQuota, resolveEffectiveNexaOffer, resolveEffectiveNexaOfferKey } from "@/app/data/nexaOffers";
+import { getTcfPlanQuota, resolveEffectiveTcfPlan } from "@/app/data/tcfOffers";
+import { isTcfCanadaCenter } from "@/app/data/center-types";
 
 type AdminClient = {
   from: (table: string) => any;
@@ -16,7 +18,7 @@ export async function assertCenterHasCampusSlot(
   const [{ data: center }, { count, error: countError }] = await Promise.all([
     client
       .from("centers")
-      .select("nexa_offer, status, created_at, trial_ends_at, quota_overrides")
+      .select("center_type, plan_type, nexa_offer, status, created_at, trial_ends_at, quota_overrides")
       .eq("id", centerId)
       .maybeSingle(),
     client
@@ -32,10 +34,15 @@ export async function assertCenterHasCampusSlot(
     center.quota_overrides && typeof center.quota_overrides === "object"
       ? (center.quota_overrides as Record<string, unknown>)
       : null;
+  const isTcf = isTcfCanadaCenter(center.center_type);
   const offerKey = resolveEffectiveNexaOfferKey(center);
-  const max = getOfferQuota(offerKey, "maxCampus", overrides);
+  const max = isTcf
+    ? getTcfPlanQuota(center.plan_type, "maxCampus", overrides)
+    : getOfferQuota(offerKey, "maxCampus", overrides);
   const occupied = count ?? 0;
-  const offerName = resolveEffectiveNexaOffer(center).name;
+  const offerName = isTcf
+    ? resolveEffectiveTcfPlan(center.plan_type).nameFr
+    : resolveEffectiveNexaOffer(center).name;
 
   if (typeof max === "number" && occupied >= max) {
     return { ok: false, occupied, max, offerName };

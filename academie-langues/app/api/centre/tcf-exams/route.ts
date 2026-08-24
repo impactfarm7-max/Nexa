@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
+import { requireTcfCenter } from "@/app/utils/tcf-center-auth-server";
 import {
   createTcfExamAssignments,
   resolveTcfExamStudentIds,
@@ -36,6 +37,8 @@ export async function GET(req: Request) {
   if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   const profile = await getStaffProfile(user.id);
   if (!profile) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  const tcfError = await requireTcfCenter(profile.center_id);
+  if (tcfError) return tcfError;
 
   const sessionId = new URL(req.url).searchParams.get("session_id");
   if (sessionId) {
@@ -77,6 +80,8 @@ export async function POST(req: Request) {
   if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   const profile = await getStaffProfile(user.id);
   if (!profile) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  const tcfError = await requireTcfCenter(profile.center_id);
+  if (tcfError) return tcfError;
 
   try {
     const body = await req.json();
@@ -162,6 +167,8 @@ export async function PATCH(req: Request) {
   if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
   const profile = await getStaffProfile(user.id);
   if (!profile) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  const tcfError = await requireTcfCenter(profile.center_id);
+  if (tcfError) return tcfError;
 
   const body = await req.json();
   const {

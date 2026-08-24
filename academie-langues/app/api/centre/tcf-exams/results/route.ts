@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
+import { requireTcfCenter } from "@/app/utils/tcf-center-auth-server";
 import { computeExamCompositeScore, computeMonthlyRankings } from "@/app/utils/tcfExamScoring";
 
 const supabaseAdmin = createClient(
@@ -23,6 +24,9 @@ export async function GET(req: Request) {
   if (!profile?.center_id || !STAFF_ROLES.includes(profile.role)) {
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
+
+  const tcfError = await requireTcfCenter(profile.center_id);
+  if (tcfError) return tcfError;
 
   const url = new URL(req.url);
   const sessionId = url.searchParams.get("session_id");
@@ -165,6 +169,9 @@ export async function PATCH(req: Request) {
   if (!profile?.center_id || !STAFF_ROLES.includes(profile.role)) {
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
+
+  const tcfError = await requireTcfCenter(profile.center_id);
+  if (tcfError) return tcfError;
 
   const { assignment_id, status } = await req.json();
   if (!assignment_id || !status) {

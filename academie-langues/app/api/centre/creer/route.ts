@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: pwdCheck.message || PASSWORD_POLICY_HINT }, { status: 400 });
     }
 
-    // tcf_canada | formation_courte | generic — jamais de collapse silencieux vers un autre type
+    // Seuls deux types de centres existent : TCF Canada ou centre libre.
     const type = normalizeCenterType(centerType);
     // Libre → nexa_offer ; TCF → plan_type (Starter/Pro/Ultra/custom sur devis)
     const offer = type === "tcf_canada" ? null : normalizeNexaOffer(nexaOffer);

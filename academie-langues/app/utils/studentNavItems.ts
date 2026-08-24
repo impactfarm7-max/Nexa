@@ -38,7 +38,7 @@ function resolveMode(opts: NavOptions): StudentExperienceMode {
   return resolveStudentExperienceMode(opts.centerId ?? null, opts.centerType ?? null);
 }
 
-/** Navigation TCF / B2C / formation courte (allégée = même liens pour l'instant). */
+/** Navigation TCF / B2C. */
 function getTcfLikeNavItems(centerId: string | null): StudentNavItem[] {
   const navPaths = getStudentNavPaths(centerId);
   return [
@@ -60,8 +60,8 @@ function getPluriannualNavItems(centerId: string | null): StudentNavItem[] {
     { label: "Tableau de bord", shortLabel: "Accueil", labelKey: "navDashboard", shortLabelKey: "navHome", icon: LayoutDashboard, path: navPaths.home },
     { label: "Mon tuteur", shortLabel: "Tuteur", labelKey: "navTutor", shortLabelKey: "navTutorShort", icon: MessageCircle, path: "/tuteur", tutorLockBadge: true },
     { label: "Session Live", shortLabel: "Live", labelKey: "navLive", shortLabelKey: "navLive", icon: Video, path: navPaths.coaching },
-    { label: "Mes cours", shortLabel: "Cours", labelKey: "navCourses", shortLabelKey: "navCoursesShort", icon: BookOpen, path: "/tcf-canada/cours?tab=centre" },
-    { label: "Mes Devoirs", shortLabel: "Devoirs", labelKey: "navHomework", shortLabelKey: "navHomeworkShort", icon: FileText, path: navPaths.missions },
+    { label: "Mes cours", shortLabel: "Cours", labelKey: "navCourses", shortLabelKey: "navCoursesShort", icon: BookOpen, path: "/cours" },
+    { label: "Mes Devoirs", shortLabel: "Devoirs", labelKey: "navHomework", shortLabelKey: "navHomeworkShort", icon: FileText, path: "/missions" },
     { label: "Bibliothèque publique", shortLabel: "Bibliothèque", labelKey: "navPublicLibrary", shortLabelKey: "navLibrary", icon: LibraryBig, path: "/bibliotheque-publique" },
     { label: "Communauté", shortLabel: "Communauté", labelKey: "navCommunity", shortLabelKey: "navCommunity", icon: Users, path: navPaths.communaute },
   ];
@@ -97,11 +97,12 @@ export function getBottomBarPrimaryItems(
   const navPaths = getStudentNavPaths(centerId);
   const items = getStudentNavItems(opts);
   const mode = resolveMode(opts);
+  const missionsPath = mode === "pluriannual" ? "/missions" : navPaths.missions;
 
   if (mode === "pluriannual") {
     return {
       left: items.filter((i) => i.path === navPaths.home || i.path === "/tuteur"),
-      right: items.filter((i) => i.path === navPaths.missions || i.path === navPaths.communaute),
+      right: items.filter((i) => i.path === missionsPath || i.path === navPaths.communaute),
     };
   }
 
@@ -123,11 +124,13 @@ export function getBottomSheetNavItems(
 
   const centerId = opts.centerId ?? null;
   const navPaths = getStudentNavPaths(centerId);
+  const mode = resolveMode(opts);
+  const missionsPath = mode === "pluriannual" ? "/missions" : navPaths.missions;
 
   const primaryPaths = new Set([
     navPaths.home,
     "/tuteur",
-    navPaths.missions,
+    missionsPath,
     navPaths.communaute,
   ]);
 

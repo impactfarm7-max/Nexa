@@ -31,6 +31,7 @@ function CoursPageContent() {
   const lessonParam = searchParams.get("lesson");
   const highlightParam = searchParams.get("highlight");
   const { isPluriannual, loading: centerLoading } = useStudentCenterContext();
+  const courseBasePath = isPluriannual ? "/cours" : "/tcf-canada/cours";
 
   const [mainTab, setMainTab] = useState<MainTab>(() =>
     resolveMainTab(tabParam, false),
@@ -47,7 +48,7 @@ function CoursPageContent() {
   useEffect(() => {
     if (centerLoading || !isPluriannual) return;
     if (tabParam === "nexa" || !tabParam) {
-      router.replace("/tcf-canada/cours?tab=centre", { scroll: false });
+      router.replace("/cours", { scroll: false });
     }
   }, [centerLoading, isPluriannual, tabParam, router]);
 
@@ -67,10 +68,10 @@ function CoursPageContent() {
     setMainTab(tab);
     const url =
       tab === "centre"
-        ? "/tcf-canada/cours?tab=centre"
+        ? `${courseBasePath}?tab=centre`
         : tab === "notes"
-          ? "/tcf-canada/cours?tab=notes"
-          : "/tcf-canada/cours";
+          ? `${courseBasePath}?tab=notes`
+          : courseBasePath;
     router.replace(url, { scroll: false });
   };
 
@@ -78,8 +79,8 @@ function CoursPageContent() {
     if (!highlightParam) return;
     const params = new URLSearchParams(searchParams.toString());
     params.delete("highlight");
-    router.replace(`/tcf-canada/cours?${params.toString()}`, { scroll: false });
-  }, [highlightParam, router, searchParams]);
+    router.replace(`${courseBasePath}?${params.toString()}`, { scroll: false });
+  }, [courseBasePath, highlightParam, router, searchParams]);
 
   const handleNavigateFromNotes = (highlight: CourseHighlight, courseId?: string) => {
     const resolvedCourseId = courseId ?? highlight.course_id ?? undefined;
@@ -88,7 +89,7 @@ function CoursPageContent() {
       if (isPluriannual) return;
       setMainTab("nexa");
       router.replace(
-        `/tcf-canada/cours?tab=nexa&lesson=${highlight.source_id}&highlight=${highlight.id}`,
+        `${courseBasePath}?tab=nexa&lesson=${highlight.source_id}&highlight=${highlight.id}`,
         { scroll: false },
       );
       return;
@@ -101,7 +102,7 @@ function CoursPageContent() {
     if (resolvedCourseId) params.set("course", resolvedCourseId);
     params.set("lesson", highlight.source_id);
     params.set("highlight", highlight.id);
-    router.replace(`/tcf-canada/cours?${params.toString()}`, { scroll: false });
+    router.replace(`${courseBasePath}?${params.toString()}`, { scroll: false });
   };
 
   const centerTabLabel = centerName

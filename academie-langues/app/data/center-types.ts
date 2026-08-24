@@ -1,20 +1,22 @@
 /**
  * Types de centres NEXA.
  * - tcf_canada : formation native (contenu TCF) — face étudiante TCF complète
- * - formation_courte : shell staff type TCF ; face étudiante TCF allégée (plus tard)
- * - generic : formation pluri-annuelle — face étudiante adaptée (sans packs TCF)
+ * - generic : centre libre pouvant proposer des cursus longs et des formations courtes
+ *
+ * `formation_courte` reste accepté en entrée comme ancienne valeur de base de données,
+ * mais est normalisé en `generic`. Une formation courte est un type de programme,
+ * pas un type de centre.
  */
-export const CENTER_TYPES = ["tcf_canada", "formation_courte", "generic"] as const;
+export const CENTER_TYPES = ["tcf_canada", "generic"] as const;
 export type CenterTypeCode = (typeof CENTER_TYPES)[number];
 
 /** Mode d'expérience étudiante dérivé du type de centre. */
-export type StudentExperienceMode = "tcf" | "tcf_light" | "pluriannual" | "b2c";
+export type StudentExperienceMode = "tcf" | "pluriannual" | "b2c";
 
 export function normalizeCenterType(
   raw: string | null | undefined,
 ): CenterTypeCode {
   if (raw === "tcf_canada") return "tcf_canada";
-  if (raw === "formation_courte") return "formation_courte";
   return "generic";
 }
 
@@ -23,24 +25,23 @@ export function isTcfCanadaCenter(centerType: string | null | undefined) {
 }
 
 export function isFormationCourteCenter(centerType: string | null | undefined) {
-  return centerType === "formation_courte";
+  return false;
 }
 
 export function isPluriannualCenter(centerType: string | null | undefined) {
   return normalizeCenterType(centerType) === "generic";
 }
 
-/** Shell staff proche TCF (natif + courte). Contenu / packs TCF = isTcfCanadaCenter uniquement. */
+/** Seul un centre TCF Canada utilise le shell staff TCF. */
 export function usesTcfLikeStaffShell(centerType: string | null | undefined) {
-  return centerType === "tcf_canada" || centerType === "formation_courte";
+  return centerType === "tcf_canada";
 }
 
 /**
  * Expérience UI étudiante.
  * - sans centre → b2c
  * - tcf_canada → tcf
- * - formation_courte → tcf_light (même shell TCF, allégé plus tard)
- * - generic → pluriannual
+ * - generic, y compris l'ancienne valeur formation_courte → pluriannual
  */
 export function resolveStudentExperienceMode(
   centerId: string | null | undefined,
@@ -49,12 +50,11 @@ export function resolveStudentExperienceMode(
   if (!centerId) return "b2c";
   const type = normalizeCenterType(centerType);
   if (type === "tcf_canada") return "tcf";
-  if (type === "formation_courte") return "tcf_light";
   return "pluriannual";
 }
 
 export function usesTcfStudentPacks(mode: StudentExperienceMode): boolean {
-  return mode === "tcf" || mode === "tcf_light" || mode === "b2c";
+  return mode === "tcf" || mode === "b2c";
 }
 
 export function centerTypeLabel(
@@ -65,9 +65,7 @@ export function centerTypeLabel(
   switch (normalizeCenterType(centerType)) {
     case "tcf_canada":
       return en ? "Native training" : "Formation native";
-    case "formation_courte":
-      return en ? "Short program" : "Formation courte";
     default:
-      return en ? "Multi-year training" : "Formation pluri-annuelle";
+      return en ? "Independent training center" : "Centre de formation libre";
   }
 }

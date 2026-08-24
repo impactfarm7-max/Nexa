@@ -19,6 +19,7 @@ export type TcfOfferConfig = {
   entryPrice: number | null;
   minStudents: number;
   maxStudents: number | null;
+  maxCampus: number | null;
   highlight?: boolean;
   featuresFr: string[];
   featuresEn: string[];
@@ -37,6 +38,7 @@ export const TCF_OFFERS: Record<TcfPlanKey, TcfOfferConfig> = {
     entryPrice: 24_000,
     minStudents: 1,
     maxStudents: 3,
+    maxCampus: 1,
     featuresFr: [
       "Gestion des étudiants",
       "Planification cours & devoirs",
@@ -66,6 +68,7 @@ export const TCF_OFFERS: Record<TcfPlanKey, TcfOfferConfig> = {
     entryPrice: 40_000,
     minStudents: 4,
     maxStudents: 6,
+    maxCampus: 1,
     featuresFr: [
       "Gestion du staff",
       "Planning & emploi du temps",
@@ -93,6 +96,7 @@ export const TCF_OFFERS: Record<TcfPlanKey, TcfOfferConfig> = {
     entryPrice: 75_000,
     minStudents: 7,
     maxStudents: 12,
+    maxCampus: 1,
     highlight: true,
     featuresFr: [
       "Gestion financière complète",
@@ -123,6 +127,7 @@ export const TCF_OFFERS: Record<TcfPlanKey, TcfOfferConfig> = {
     entryPrice: null,
     minStudents: 13,
     maxStudents: null,
+    maxCampus: null,
     featuresFr: [
       "Multi-campus",
       "Administration avancée",
@@ -165,4 +170,25 @@ export function tcfPlanLabel(value: unknown, locale: "fr" | "en" = "fr"): string
   const key = normalizeTcfPlan(value);
   if (!key) return locale === "en" ? "Trial" : "Essai";
   return locale === "en" ? TCF_OFFERS[key].nameEn : TCF_OFFERS[key].nameFr;
+}
+
+/** Plan TCF effectif : un centre sans plan explicite démarre sur Access. */
+export function resolveEffectiveTcfPlan(value: unknown): TcfOfferConfig {
+  const key = normalizeTcfPlan(value) || "access";
+  return TCF_OFFERS[key];
+}
+
+/** Quota TCF avec priorité aux dérogations configurées par le superadmin. */
+export function getTcfPlanQuota(
+  planType: unknown,
+  field: "maxStudents" | "maxCampus",
+  overrides?: Record<string, unknown> | null,
+): number | null {
+  if (overrides && field in overrides) {
+    const value = overrides[field];
+    if (value == null) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? Math.trunc(parsed) : resolveEffectiveTcfPlan(planType)[field];
+  }
+  return resolveEffectiveTcfPlan(planType)[field];
 }

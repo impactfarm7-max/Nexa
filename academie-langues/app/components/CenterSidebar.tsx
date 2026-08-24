@@ -130,32 +130,6 @@ const TCF_EXTRA_TRAINER_ITEMS: NavItem[] = [
   { label: "navParametres",   icon: Settings2,     path: "/centre/parametres/entreprise", permKey: "parametres" },
 ];
 
-/* ─── Formation courte : shell type TCF, sans routes / contenu TCF ───────── */
-const SHORT_MANAGER_NAV: NavItem[] = [
-  { label: "navDashboard",     icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
-  { label: "navStaff",         icon: GraduationCap,   path: "/centre/staff",                      permKey: "staff" },
-  { label: "navEtudiants",     icon: Users,           path: "/centre/etudiants",                  permKey: "etudiants" },
-  { label: "navProgrammes",    icon: GitBranch,       path: "/centre/filieres",                   permKey: "filieres" },
-  FORMATION_ITEM,
-  { label: "navExamensNotes",  icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
-  { label: "navFinance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
-  { label: "navRapports",      icon: BarChart3,       path: "/centre/rapports",                   permKey: "rapports" },
-  { label: "navCommunaute",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
-  { label: "navSessionsLive",  icon: Video,           path: "/centre/lives",                      permKey: "lives" },
-  { label: "navAbonnements",   icon: Gem,             path: "/centre/abonnements",                permKey: "abonnements" },
-  { label: "navCreditsIa",     icon: Sparkles,        path: "/centre/credits-ia",                 permKey: "abonnements" },
-  { label: "navParametres",    icon: Settings2,       path: "/centre/parametres/entreprise",      permKey: "parametres" },
-];
-
-const SHORT_EXTRA_TRAINER_ITEMS: NavItem[] = [
-  { label: "navEtudiants",  icon: Users,         path: "/centre/etudiants",             permKey: "etudiants" },
-  { label: "navProgrammes", icon: GitBranch,     path: "/centre/filieres",              permKey: "filieres" },
-  { label: "navFinance",    icon: CreditCard,    path: "/centre/finance",               permKey: "finance" },
-  { label: "navStaff",      icon: GraduationCap, path: "/centre/staff",                 permKey: "staff" },
-  { label: "navRapports",   icon: BarChart3,     path: "/centre/rapports",              permKey: "rapports" },
-  { label: "navParametres", icon: Settings2,     path: "/centre/parametres/entreprise", permKey: "parametres" },
-];
-
 function hasPermForNavItem(item: NavItem, perms: string[]): boolean {
   if (!item.permKey) return true;
   if (perms.includes(item.permKey)) return true;
@@ -487,12 +461,11 @@ function CenterSidebarInner() {
     pathname === path || pathname.startsWith(path + "/");
 
   const isTCF = centerType === "tcf_canada";
-  const isShort = centerType === "formation_courte";
 
   /* Filtrage items manager/staff */
   const buildManagerNav = (): NavItem[] => {
     if (!userRole) return [];
-    const baseNav = isTCF ? TCF_MANAGER_NAV : isShort ? SHORT_MANAGER_NAV : MANAGER_NAV;
+    const baseNav = isTCF ? TCF_MANAGER_NAV : MANAGER_NAV;
     if (isManager) return baseNav;
     return baseNav
       .map((item) => filterNavItemForStaff(item, navPerms))
@@ -504,14 +477,6 @@ function CenterSidebarInner() {
       return {
         defaultItems: TCF_TRAINER_NAV,
         extraItems: TCF_EXTRA_TRAINER_ITEMS.filter((item) =>
-          item.permKey ? staffPermissions.includes(item.permKey) : false
-        ),
-      };
-    }
-    if (isShort) {
-      return {
-        defaultItems: TCF_TRAINER_NAV,
-        extraItems: SHORT_EXTRA_TRAINER_ITEMS.filter((item) =>
           item.permKey ? staffPermissions.includes(item.permKey) : false
         ),
       };
@@ -738,7 +703,7 @@ function CenterSidebarInner() {
           <>
             <SectionLabel label={
               isManager
-                ? (isTCF ? t("centre", "sidebarSectionCentreTcfCanada") : isShort ? t("centre", "sidebarSectionFormationCourte") : t("centre", "sidebarSectionGestionCentre"))
+                ? (isTCF ? t("centre", "sidebarSectionCentreTcfCanada") : t("centre", "sidebarSectionGestionCentre"))
                 : t("centre", "sidebarSectionMonEspace")
             } />
             {buildManagerNav()
@@ -756,7 +721,7 @@ function CenterSidebarInner() {
           const { defaultItems, extraItems } = buildTrainerNav();
           return (
             <>
-              <SectionLabel label={isTCF ? t("centre", "sidebarSectionEspaceFormateurTcf") : isShort ? t("centre", "sidebarSectionEspaceFormateur") : t("centre", "sidebarSectionMonEspace")} />
+              <SectionLabel label={isTCF ? t("centre", "sidebarSectionEspaceFormateurTcf") : t("centre", "sidebarSectionMonEspace")} />
               {defaultItems.map(item =>
                 item.children
                   ? <CoursExpandable key={item.path} item={item} />
@@ -853,16 +818,16 @@ function CreateCenterModal({ onClose, onCreated }: { onClose: () => void; onCrea
           <input required value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ville" className="h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-[#11224E]" />
           <div className="relative">
             <button type="button" onClick={() => setTypeOpen((value) => !value)} className={`flex h-11 w-full items-center justify-between rounded-xl border bg-white px-3 text-left text-sm font-semibold text-[#11224E] transition ${typeOpen ? "border-[#11224E] ring-2 ring-[#11224E]/10" : "border-neutral-200"}`}>
-              <span>{centerType === "tcf_canada" ? "Centre TCF Canada" : centerType === "formation_courte" ? "Formation courte" : "Centre libre"}</span><ChevronDown size={16} className={`transition-transform ${typeOpen ? "rotate-180" : ""}`} />
+              <span>{centerType === "tcf_canada" ? "Centre TCF Canada" : "Centre libre"}</span><ChevronDown size={16} className={`transition-transform ${typeOpen ? "rotate-180" : ""}`} />
             </button>
-            {typeOpen && <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl">{[["generic", "Centre libre"], ["tcf_canada", "Centre TCF Canada"], ["formation_courte", "Formation courte"]].map(([value, label]) => <button key={value} type="button" onClick={() => { setCenterType(value); setTypeOpen(false); }} className={`w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${centerType === value ? "bg-[#11224E] text-white" : "text-[#11224E] hover:bg-neutral-100"}`}>{label}</button>)}</div>}
+            {typeOpen && <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl">{[["generic", "Centre libre"], ["tcf_canada", "Centre TCF Canada"]].map(([value, label]) => <button key={value} type="button" onClick={() => { setCenterType(normalizeCenterType(value)); setTypeOpen(false); }} className={`w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${centerType === value ? "bg-[#11224E] text-white" : "text-[#11224E] hover:bg-neutral-100"}`}>{label}</button>)}</div>}
           </div>
         </div>
         <p className="mt-3 rounded-xl bg-[#F5F7FB] px-3 py-2.5 text-xs leading-relaxed text-neutral-600">Après activation, vous compléterez l’adresse, les contacts, le logo, l’offre et les autres informations dans <strong>Paramètres</strong>.</p>
         {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="h-10 rounded-xl border border-neutral-200 px-4 text-sm font-bold">Annuler</button><button disabled={saving} className="flex h-10 items-center gap-2 rounded-xl bg-[#11224E] px-4 text-sm font-bold text-white disabled:opacity-50">{saving && <Loader2 size={15} className="animate-spin" />}{saving ? "Création…" : "Créer"}</button></div>
       </form>
-      {confirmOpen && <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[#081538]/55 p-4" onMouseDown={() => setConfirmOpen(false)}><div onMouseDown={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"><h3 className="text-lg font-black text-[#11224E]">Confirmer la création</h3><p className="mt-2 text-sm leading-relaxed text-neutral-600">Créer <strong>{name}</strong> à <strong>{city}</strong> comme <strong>{centerType === "tcf_canada" ? "centre TCF Canada" : centerType === "formation_courte" ? "centre de formation courte" : "centre libre"}</strong> ?</p><p className="mt-2 text-xs text-neutral-500">Vous basculerez vers ce centre et son essai gratuit de 7 jours commencera immédiatement.</p><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setConfirmOpen(false)} className="h-10 rounded-xl border border-neutral-200 px-4 text-sm font-bold">Retour</button><button type="button" onClick={() => void createCenter()} className="h-10 rounded-xl bg-[#11224E] px-4 text-sm font-bold text-white">Confirmer</button></div></div></div>}
+      {confirmOpen && <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[#081538]/55 p-4" onMouseDown={() => setConfirmOpen(false)}><div onMouseDown={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"><h3 className="text-lg font-black text-[#11224E]">Confirmer la création</h3><p className="mt-2 text-sm leading-relaxed text-neutral-600">Créer <strong>{name}</strong> à <strong>{city}</strong> comme <strong>{centerType === "tcf_canada" ? "centre TCF Canada" : "centre libre"}</strong> ?</p><p className="mt-2 text-xs text-neutral-500">Vous basculerez vers ce centre et son essai gratuit de 7 jours commencera immédiatement.</p><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setConfirmOpen(false)} className="h-10 rounded-xl border border-neutral-200 px-4 text-sm font-bold">Retour</button><button type="button" onClick={() => void createCenter()} className="h-10 rounded-xl bg-[#11224E] px-4 text-sm font-bold text-white">Confirmer</button></div></div></div>}
     </div>
   );
 }

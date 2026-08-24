@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
+import { requireTcfCenter } from "@/app/utils/tcf-center-auth-server";
 import { sendEmail } from "@/app/utils/email-server";
 
 const supabaseAdmin = createClient(
@@ -23,6 +24,9 @@ export async function POST(req: Request) {
   if (!profile?.center_id || !STAFF_ROLES.includes(profile.role)) {
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
+
+  const tcfError = await requireTcfCenter(profile.center_id);
+  if (tcfError) return tcfError;
 
   const body = await req.json();
   const { certificate_ids, session_id, exam_session_ids, force_resend = false } = body;

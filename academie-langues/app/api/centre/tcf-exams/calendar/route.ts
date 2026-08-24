@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
+import { requireTcfCenter } from "@/app/utils/tcf-center-auth-server";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,6 +23,9 @@ export async function GET(req: Request) {
   if (!profile?.center_id || !STAFF_ROLES.includes(profile.role)) {
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
+
+  const tcfError = await requireTcfCenter(profile.center_id);
+  if (tcfError) return tcfError;
 
   const month = new URL(req.url).searchParams.get("month");
   let start: Date;

@@ -248,7 +248,7 @@ function SyntheseContent() {
               </dl>
             </Panel>
 
-            {!isTcf && report.sections.offre && report.sections.rh && (
+            {report.sections.offre && report.sections.rh && (
               <Panel title={t("centre", "summaryProgramsHr")} href={reportHref("/centre/rapports/filieres-programmes")}>
                 <div className="divide-y divide-neutral-100">
                   <PanelRow icon={<BookOpen size={12} className="text-emerald-600" />} iconBg="bg-emerald-50" label={t("centre", "summaryPublishedPrograms")} value={report.sections.offre.published} />

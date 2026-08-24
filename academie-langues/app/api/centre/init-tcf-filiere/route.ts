@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
+import { requireTcfCenter } from "@/app/utils/tcf-center-auth-server";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +25,9 @@ export async function POST(req: NextRequest) {
   if (profile?.center_id !== centerId) {
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
+
+  const tcfError = await requireTcfCenter(centerId);
+  if (tcfError) return tcfError;
 
   // Vérifier si la filière existe déjà (identifiée par name)
   const { data: existing } = await supabaseAdmin

@@ -133,26 +133,28 @@ export const P0_DETAIL_SLUGS: ReportSlug[] = [
   "retards",
 ];
 
-/** P1 masquées pour les centres TCF Canada (catalogue / RH libre). */
-const TCF_HIDDEN_SLUGS = new Set<ReportSlug>([
-  "filieres-programmes",
-  "effectifs-personnel",
-  "masse-salariale",
-]);
-
 export function filterReportNav(
   centerType: string | null | undefined,
   nav: ReportNavItem[] = REPORT_NAV,
 ) {
   if (!isTcfCanadaCenter(centerType)) return nav;
-  return nav.filter((item) => !TCF_HIDDEN_SLUGS.has(item.slug));
+  return nav.map((item) =>
+    item.slug === "filieres-programmes"
+      ? {
+          ...item,
+          label: "Programme et groupes TCF",
+          shortLabel: "Programme TCF",
+          description: "Programme TCF, groupes et organisation pédagogique",
+        }
+      : item,
+  );
 }
 
 export function isReportHiddenForTcf(
-  slug: ReportSlug,
-  centerType: string | null | undefined,
+  _slug: ReportSlug,
+  _centerType: string | null | undefined,
 ) {
-  return isTcfCanadaCenter(centerType) && TCF_HIDDEN_SLUGS.has(slug);
+  return false;
 }
 
 /** @deprecated use REPORT_NAV */

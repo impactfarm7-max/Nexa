@@ -31,6 +31,7 @@ import {
 import { assertCenterHasStudentSeat } from "@/app/utils/center-student-quota";
 import { sumNamedExtraFees } from "@/app/utils/short-pricing";
 import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
+import { requireTcfCenter } from "@/app/utils/tcf-center-auth-server";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -234,6 +235,15 @@ async function assertCenterAccess(userId: string, centerId: string) {
 
   if (profile?.center_id !== centerId) {
     return { ok: false as const, status: 403, error: "Accès refusé." };
+  }
+  const tcfError = await requireTcfCenter(centerId);
+  if (tcfError) {
+    const payload = await tcfError.json().catch(() => null);
+    return {
+      ok: false as const,
+      status: tcfError.status,
+      error: payload?.error || "Cette fonctionnalité est réservée aux centres TCF Canada.",
+    };
   }
   return { ok: true as const };
 }

@@ -193,18 +193,20 @@ export const REPORT_HUB_CARDS: HubCard[] = [
   },
 ];
 
-const TCF_HIDDEN_HUB_SLUGS = new Set<ReportSlug>([
-  "filieres-programmes",
-  "effectifs-personnel",
-  "masse-salariale",
-]);
-
 export function filterReportHub(
   centerType: string | null | undefined,
   cards: HubCard[] = REPORT_HUB_CARDS,
 ) {
   if (!isTcfCanadaCenter(centerType)) return cards;
-  return cards.filter((c) => !c.slug || !TCF_HIDDEN_HUB_SLUGS.has(c.slug));
+  return cards.map((card) =>
+    card.slug === "filieres-programmes"
+      ? {
+          ...card,
+          label: "Programme et groupes TCF",
+          description: "Programme TCF, groupes et organisation pédagogique",
+        }
+      : card,
+  );
 }
 
 export function hubCardsBySection(centerType?: string | null) {

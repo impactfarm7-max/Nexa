@@ -575,7 +575,6 @@ function assembleSyntheseReport(
 }
 
 export async function buildSyntheseReport(centerId: string, filters: ReportFilters, centerType?: string | null) {
-  const isTcf = isTcfCanadaCenter(centerType);
   /** §8 multi-campus : la synthèse globale ignore campus et filière. */
   const globalFilters: ReportFilters = { ...filters, campusId: null, filiereId: null };
 
@@ -587,13 +586,11 @@ export async function buildSyntheseReport(centerId: string, filters: ReportFilte
     buildExamensReport(centerId, globalFilters, centerType),
   ]);
 
-  const [filieres, personnel, paie] = isTcf
-    ? [null, null, null]
-    : await Promise.all([
-        buildFilieresReport(centerId, globalFilters),
-        buildPersonnelReport(centerId, globalFilters),
-        buildMasseSalarialeReport(centerId, globalFilters),
-      ]);
+  const [filieres, personnel, paie] = await Promise.all([
+    buildFilieresReport(centerId, globalFilters),
+    buildPersonnelReport(centerId, globalFilters),
+    buildMasseSalarialeReport(centerId, globalFilters),
+  ]);
 
   return assembleSyntheseReport(globalFilters, centerType, {
     effectifs,
@@ -608,37 +605,6 @@ export async function buildSyntheseReport(centerId: string, filters: ReportFilte
 }
 
 export async function buildReportsBundle(centerId: string, filters: ReportFilters, centerType?: string | null) {
-  const isTcf = isTcfCanadaCenter(centerType);
-
-  if (isTcf) {
-    const [synthese, effectifs, encaissements, recouvrement, retards, examens, reductions, campuses, filieresOptions] =
-      await Promise.all([
-        buildSyntheseReport(centerId, filters, centerType),
-        buildEffectifsReport(centerId, filters),
-        buildEncaissementsReport(centerId, filters),
-        buildRecouvrementReport(centerId, filters),
-        buildRetardsReport(centerId, filters),
-        buildExamensReport(centerId, filters, centerType),
-        buildReductionsReport(centerId, filters),
-        loadCampuses(centerId),
-        loadFilieres(centerId),
-      ]);
-
-    return {
-      reports: {
-        synthese,
-        "effectifs-apprenants": effectifs,
-        encaissements,
-        recouvrement,
-        retards,
-        "reductions-coupons": reductions,
-        examens,
-      },
-      campuses,
-      filieres: filieresOptions,
-    };
-  }
-
   const [
     synthese,
     effectifs,

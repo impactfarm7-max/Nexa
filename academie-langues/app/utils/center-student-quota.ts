@@ -11,6 +11,8 @@ import {
   resolveEffectiveNexaOfferKey,
 } from "@/app/data/nexaOffers";
 import { CENTER_STAFF_ROLES } from "@/app/utils/student-routes";
+import { isTcfCanadaCenter } from "@/app/data/center-types";
+import { getTcfPlanQuota, resolveEffectiveTcfPlan } from "@/app/data/tcfOffers";
 
 export type QuotaStudentRow = {
   tag_status?: string | null;
@@ -125,7 +127,7 @@ export async function assertCenterHasUserSeat(
 ): Promise<CenterSeatLimitResult> {
   const { data: centerRow } = await client
     .from("centers")
-    .select("nexa_offer, status, created_at, quota_overrides")
+    .select("center_type, plan_type, nexa_offer, status, created_at, trial_ends_at, quota_overrides")
     .eq("id", centerId)
     .maybeSingle();
 
@@ -133,18 +135,28 @@ export async function assertCenterHasUserSeat(
     centerRow?.quota_overrides && typeof centerRow.quota_overrides === "object"
       ? (centerRow.quota_overrides as Record<string, unknown>)
       : null;
+  const isTcf = isTcfCanadaCenter(centerRow?.center_type);
   const offerKey = resolveEffectiveNexaOfferKey(centerRow);
-  const maxUsers = getOfferQuota(offerKey, "maxStudents", overrides);
+  const maxUsers = isTcf
+    ? getTcfPlanQuota(centerRow?.plan_type, "maxStudents", overrides)
+    : getOfferQuota(offerKey, "maxStudents", overrides);
 
-  const occupied = await countOccupiedUserSeats(centerId, client);
+  // Les paliers TCF sont exprimés en étudiants (Access 1-3, Light 4-6,
+  // Advance 7-12). Les comptes staff ne consomment donc pas ces places.
+  // Les offres libres conservent leur pool historique staff + étudiants.
+  const occupied = isTcf
+    ? await countOccupiedStudentSeats(centerId, client)
+    : await countOccupiedUserSeats(centerId, client);
 
   if (typeof maxUsers !== "number" || maxUsers < 0) {
     return { ok: true, occupied, max: null };
   }
 
   if (occupied >= maxUsers) {
-    const offer = resolveEffectiveNexaOffer(centerRow);
-    return { ok: false, occupied, max: maxUsers, offerName: offer.name };
+    const offerName = isTcf
+      ? resolveEffectiveTcfPlan(centerRow?.plan_type).nameFr
+      : resolveEffectiveNexaOffer(centerRow).name;
+    return { ok: false, occupied, max: maxUsers, offerName };
   }
 
   return { ok: true, occupied, max: maxUsers };
