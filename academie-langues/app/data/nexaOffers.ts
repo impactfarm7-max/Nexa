@@ -165,7 +165,7 @@ export const NEXA_OFFERS: Record<Exclude<NexaOfferKey, "custom">, NexaOfferConfi
     courseBuilderPerMonth: null,
     whiteLabel: true,
     pricePerUser: null,
-    entryPrice: 505_000,
+    entryPrice: null,
     monthlyFeeMin: 250 * 1_900,
     monthlyFeeMax: null,
     supportLevel: "account_manager",

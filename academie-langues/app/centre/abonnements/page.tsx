@@ -352,7 +352,7 @@ export default function AbonnementsPage() {
                     </p>
                   ) : (
                     <div className="mt-4">
-                      <p className="whitespace-nowrap text-[clamp(1rem,1.25vw,1.3rem)] font-black leading-none tabular-nums transition-transform duration-300 group-hover:scale-[1.03] origin-left" style={{ color: BLUE }}>
+                      <p className="whitespace-nowrap text-[clamp(0.78rem,1.05vw,1rem)] font-black leading-none tabular-nums transition-transform duration-300 group-hover:scale-[1.02] origin-left" style={{ color: BLUE }}>
                         {perUserLabel} {t("centre", "abonnementsPricePerUser")}
                       </p>
                     </div>
