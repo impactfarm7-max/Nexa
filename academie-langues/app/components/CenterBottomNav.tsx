@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Plus, X, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { peekCenterBootstrap } from "@/app/utils/center-me-cache";
+import { loadCenterBootstrap, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import {
   getCenterBottomBarItems,
   getCenterBottomSheetItems,
@@ -31,6 +31,11 @@ export default function CenterBottomNav() {
     const bootstrap = peekCenterBootstrap();
     const center = bootstrap?.me?.center as { center_type?: string } | undefined;
     setIsTCF(center?.center_type === "tcf_canada");
+
+    void loadCenterBootstrap().then((loaded) => {
+      const loadedCenter = loaded?.me?.center as { center_type?: string } | undefined;
+      setIsTCF(loadedCenter?.center_type === "tcf_canada");
+    });
   }, [pathname]);
 
   if (pathname?.includes("/quiz") || pathname?.startsWith("/centre/communaute")) {
@@ -46,6 +51,8 @@ export default function CenterBottomNav() {
       "/centre/cours/gestion-cours": "bottomCourses", "/centre/cours/devoirs": "bottomAssignments",
       "/centre/examens/examensuniversels": "bottomExams", "/centre/parametres/entreprise": "bottomSettings",
       "/centre/tcf/programme": "bottomTcfProgram", "/centre/lives": "bottomLiveSessions",
+      "/centre/rapports": "bottomReports", "/centre/bibliotheque": "bottomLibrary",
+      "/centre/abonnements": "bottomSubscriptions", "/centre/credits-ia": "bottomCreditsIa",
     };
     const key = keyByPath[item.path];
     return key ? { ...item, label: t("centre", key), shortLabel: item.shortLabel ? t("centre", `${key}Short`) : undefined } : item;

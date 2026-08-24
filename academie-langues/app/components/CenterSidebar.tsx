@@ -48,18 +48,29 @@ type NavItem = {
   children?: NavItem[];
 };
 
+const FORMATION_ITEM: NavItem = {
+  label: "navFormation",
+  icon: BookOpen,
+  path: "/centre/cours",
+  children: [
+    { label: "navCoursConstructeur", icon: PenTool,    path: "/centre/cours/gestion-cours", permKey: "cours" },
+    { label: "navPlanning",          icon: Calendar,   path: "/centre/cours/planning",      permKey: "planning" },
+    { label: "navMissionsDevoirs",   icon: BookMarked, path: "/centre/cours/devoirs",       permKey: "cours" },
+  ],
+};
+
 /* ─── Listes de navigation — Centre Générique ───────────────────────────── */
 const MANAGER_NAV: NavItem[] = [
   { label: "navDashboard",        icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
   { label: "navProgrammes",       icon: GitBranch,       path: "/centre/filieres",                   permKey: "filieres" },
   { label: "navStaff",            icon: GraduationCap,   path: "/centre/staff",                      permKey: "staff" },
   { label: "navEtudiants",        icon: Users,           path: "/centre/etudiants",                  permKey: "etudiants" },
-  { label: "navFinance",          icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
-  { label: "navPlanningHoraire",  icon: Calendar,        path: "/centre/cours/planning",             permKey: "planning" },
-  { label: "navSessionsLive",     icon: Video,           path: "/centre/lives",                      permKey: "lives" },
+  FORMATION_ITEM,
   { label: "navExamensNotes",     icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
+  { label: "navFinance",          icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
   { label: "navRapports",         icon: BarChart3,       path: "/centre/rapports",                   permKey: "rapports" },
   { label: "navCommunaute",       icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
+  { label: "navSessionsLive",     icon: Video,           path: "/centre/lives",                      permKey: "lives" },
   { label: "navBibliotheque",     icon: LibraryBig,      path: "/centre/bibliotheque",               permKey: "bibliotheque" },
   { label: "navAbonnements",      icon: Gem,             path: "/centre/abonnements",                permKey: "abonnements" },
   { label: "navCreditsIa",        icon: Sparkles,        path: "/centre/credits-ia",                 permKey: "abonnements" },
@@ -68,17 +79,7 @@ const MANAGER_NAV: NavItem[] = [
 
 const TRAINER_DEFAULT_NAV: NavItem[] = [
   { label: "navDashboard",  icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
-  {
-    label: "navCours",
-    icon: BookOpen,
-    path: "/centre/cours",
-    permKey: "cours",
-    children: [
-      { label: "navCoursConstructeur", icon: PenTool,    path: "/centre/cours/gestion-cours" },
-      { label: "navMissionsDevoirs",   icon: BookMarked, path: "/centre/cours/devoirs" },
-    ],
-  },
-  { label: "navPlanning",       icon: Calendar,      path: "/centre/cours/planning",             permKey: "planning" },
+  FORMATION_ITEM,
   { label: "navSessionsLive",   icon: Video,         path: "/centre/lives",                      permKey: "lives" },
   { label: "navExamensNotes",   icon: ClipboardList, path: "/centre/examens/examensuniversels",  permKey: "examens" },
   { label: "navCommunaute",     icon: MessageSquare, path: "/centre/communaute",                 permKey: "communaute" },
@@ -94,26 +95,16 @@ const EXTRA_TRAINER_ITEMS: NavItem[] = [
 ];
 
 /* ─── Listes de navigation — Centre TCF Canada ──────────────────────────── */
-const TCF_FORMATION_ITEM: NavItem = {
-  label: "navFormation",
-  icon: BookOpen,
-  path: "/centre/cours",
-  children: [
-    { label: "navCoursConstructeur", icon: PenTool,    path: "/centre/cours/gestion-cours", permKey: "cours" },
-    { label: "navPlanning",          icon: Calendar,   path: "/centre/cours/planning",      permKey: "planning" },
-    { label: "navMissionsDevoirs",   icon: BookMarked, path: "/centre/cours/devoirs",       permKey: "cours" },
-  ],
-};
-
 const TCF_MANAGER_NAV: NavItem[] = [
   { label: "navDashboard",     icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
   { label: "navStaff",         icon: GraduationCap,   path: "/centre/staff",                      permKey: "staff" },
   { label: "navEtudiantsTcf",  icon: Users,           path: "/centre/tcf/etudiants",              permKey: "etudiants" },
   { label: "navProgrammeTcf",  icon: Flag,            path: "/centre/tcf/programme",              permKey: "filieres" },
-  TCF_FORMATION_ITEM,
+  FORMATION_ITEM,
   { label: "navExamensNotes",  icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
   { label: "navFinance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
   { label: "navCommunaute",    icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
+  { label: "navBibliotheque",  icon: LibraryBig,      path: "/centre/bibliotheque",               permKey: "bibliotheque" },
   { label: "navSessionsLive",  icon: Video,           path: "/centre/lives",                      permKey: "lives" },
   { label: "navAbonnements",   icon: Gem,             path: "/centre/abonnements",                permKey: "abonnements" },
   { label: "navCreditsIa",     icon: Sparkles,        path: "/centre/credits-ia",                 permKey: "abonnements" },
@@ -122,7 +113,7 @@ const TCF_MANAGER_NAV: NavItem[] = [
 
 const TCF_TRAINER_NAV: NavItem[] = [
   { label: "navMyDashboard",  icon: LayoutDashboard, path: "/centre/dashboard",                  permKey: null },
-  TCF_FORMATION_ITEM,
+  FORMATION_ITEM,
   { label: "navExamensNotes", icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
   { label: "navSessionsLive", icon: Video,           path: "/centre/lives",                      permKey: "lives" },
   { label: "navCommunaute",   icon: MessageSquare,   path: "/centre/communaute",                 permKey: "communaute" },
@@ -134,6 +125,7 @@ const TCF_EXTRA_TRAINER_ITEMS: NavItem[] = [
   { label: "navFinance",      icon: CreditCard,    path: "/centre/finance",               permKey: "finance" },
   { label: "navStaff",        icon: GraduationCap, path: "/centre/staff",                 permKey: "staff" },
   { label: "navRapports",     icon: BarChart3,     path: "/centre/rapports",              permKey: "rapports" },
+  { label: "navBibliotheque", icon: LibraryBig,    path: "/centre/bibliotheque",          permKey: "bibliotheque" },
   { label: "navParametres",   icon: Settings2,     path: "/centre/parametres/entreprise", permKey: "parametres" },
 ];
 
@@ -143,7 +135,7 @@ const SHORT_MANAGER_NAV: NavItem[] = [
   { label: "navStaff",         icon: GraduationCap,   path: "/centre/staff",                      permKey: "staff" },
   { label: "navEtudiants",     icon: Users,           path: "/centre/etudiants",                  permKey: "etudiants" },
   { label: "navProgrammes",    icon: GitBranch,       path: "/centre/filieres",                   permKey: "filieres" },
-  TCF_FORMATION_ITEM,
+  FORMATION_ITEM,
   { label: "navExamensNotes",  icon: ClipboardList,   path: "/centre/examens/examensuniversels",  permKey: "examens" },
   { label: "navFinance",       icon: CreditCard,      path: "/centre/finance",                    permKey: "finance" },
   { label: "navRapports",      icon: BarChart3,       path: "/centre/rapports",                   permKey: "rapports" },
