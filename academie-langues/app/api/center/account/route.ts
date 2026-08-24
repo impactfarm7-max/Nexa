@@ -11,20 +11,29 @@ async function getAccount(req: Request) {
   const user = await getAuthUser(req);
   if (!user) return { user: null, profile: null, membership: null, center: null, response: NextResponse.json({ error: "Non autorise." }, { status: 401 }) };
 
-  const [{ data: profile, error: profileError }, { data: membership, error: membershipError }] = await Promise.all([
-    supabaseAdmin
-      .from("profiles")
-      .select("id, prenom, nom, email, phone, ville, genre, role, center_id, avatar_url, created_at, last_sign_in_at, tag_status, simulations_completed, coaching_total, coaching_used, pin_hash")
-      .eq("id", user.id)
-      .maybeSingle(),
-    supabaseAdmin
-      .from("center_users")
-      .select("center_id, role, permissions, created_at")
-      .eq("user_id", user.id)
-      .maybeSingle(),
-  ]);
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("id, prenom, nom, email, phone, ville, genre, role, center_id, avatar_url, created_at, last_sign_in_at, tag_status, simulations_completed, coaching_total, coaching_used, pin_hash")
+    .eq("id", user.id)
+    .maybeSingle();
 
-  if (profileError) return { user, profile: null, membership, center: null, response: NextResponse.json({ error: profileError.message }, { status: 500 }) };
+  if (profileError) return { user, profile: null, membership: null, center: null, response: NextResponse.json({ error: profileError.message }, { status: 500 }) };
+
+  let membershipQuery = supabaseAdmin
+    .from("center_users")
+    .select("center_id, role, permissions, created_at")
+    .eq("user_id", user.id);
+
+  // Un responsable peut appartenir à plusieurs centres. Le profil contient le
+  // centre actuellement sélectionné : ne jamais appeler maybeSingle() sur
+  // toutes ses appartenances à la fois.
+  if (profile?.center_id) {
+    membershipQuery = membershipQuery.eq("center_id", profile.center_id);
+  } else {
+    membershipQuery = membershipQuery.order("created_at", { ascending: true }).limit(1);
+  }
+
+  const { data: membership, error: membershipError } = await membershipQuery.maybeSingle();
   if (membershipError) return { user, profile, membership: null, center: null, response: NextResponse.json({ error: membershipError.message }, { status: 500 }) };
 
   const centerId = profile?.center_id || membership?.center_id;

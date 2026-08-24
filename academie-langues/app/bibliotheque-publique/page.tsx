@@ -33,7 +33,7 @@ export default function BibliothequePubliquePage() {
   const { t, locale } = useI18n();
   const dateLocale = locale === "en" ? "en-US" : "fr-FR";
   const router = useRouter();
-  const { loading: centerLoading, isPluriannual } = useStudentCenterContext();
+  const { loading: centerLoading } = useStudentCenterContext();
 
   const [viewingDoc, setViewingDoc] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -42,11 +42,11 @@ export default function BibliothequePubliquePage() {
   const [documents, setDocuments] = useState<any[]>([]);
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState(1);
-
-  useEffect(() => {
-    if (centerLoading || isPluriannual) return;
-    router.replace("/dashboard");
-  }, [centerLoading, isPluriannual, router]);
+  const [purchaseDoc, setPurchaseDoc] = useState<any | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState("mobile_money");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [submittingPurchase, setSubmittingPurchase] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -66,9 +66,13 @@ export default function BibliothequePubliquePage() {
   }, [router]);
 
   const openDocument = async (_storagePath: string, doc: any) => {
-    if (doc.is_paid) {
-      const price = Number(doc.price || 0).toLocaleString(dateLocale);
-      alert(t("dashboard", "bibliothequePublicPaidAlert", { price }));
+    if (doc.is_paid && doc.purchase_status !== "paid") {
+      if (doc.purchase_status === "pending") {
+        setPurchaseError("Votre paiement est en attente de validation par le centre vendeur.");
+      } else {
+        setPurchaseError(null);
+      }
+      setPurchaseDoc(doc);
       return;
     }
     setIsLoadingPdf(true);
@@ -91,6 +95,30 @@ export default function BibliothequePubliquePage() {
       alert(t("dashboard", "bibliothequePublicNetworkError"));
     } finally {
       setIsLoadingPdf(false);
+    }
+  };
+
+  const requestPurchase = async () => {
+    if (!purchaseDoc || submittingPurchase) return;
+    setSubmittingPurchase(true);
+    setPurchaseError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch("/api/bibliotheque/purchases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
+        body: JSON.stringify({ documentId: purchaseDoc.id, paymentMethod, paymentReference }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "Impossible d'enregistrer la demande.");
+      setDocuments((current) => current.map((doc) => doc.id === purchaseDoc.id ? { ...doc, purchase_status: "pending" } : doc));
+      setPurchaseDoc((current: any) => current ? { ...current, purchase_status: "pending" } : current);
+      setPurchaseError("Demande enregistrée. Le centre vendeur doit maintenant confirmer votre paiement.");
+      setPaymentReference("");
+    } catch (error) {
+      setPurchaseError(error instanceof Error ? error.message : "Impossible d'enregistrer la demande.");
+    } finally {
+      setSubmittingPurchase(false);
     }
   };
 
@@ -226,6 +254,33 @@ export default function BibliothequePubliquePage() {
       </main>
 
       <AnimatePresence>
+        {purchaseDoc && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[110] bg-[#11224E]/45 p-4 flex items-center justify-center">
+            <motion.div initial={{ y: 16, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 16, opacity: 0 }} className="w-full max-w-md rounded-2xl bg-white border border-orange-200 p-5 shadow-2xl">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="font-display text-xl font-black" style={{ color: BRAND.blue }}>Acheter ce document</h2>
+                  <p className="mt-1 text-sm text-neutral-600">{purchaseDoc.titre}</p>
+                  <p className="mt-2 font-black text-orange-600">{Number(purchaseDoc.price || 0).toLocaleString(dateLocale)} FCFA</p>
+                </div>
+                <button onClick={() => setPurchaseDoc(null)} className="rounded-lg p-2 hover:bg-neutral-100" aria-label="Fermer"><X size={18} /></button>
+              </div>
+              {purchaseDoc.purchase_status !== "pending" && (
+                <div className="mt-5 space-y-3">
+                  <p className="text-xs text-neutral-500">Effectuez le paiement directement auprès du centre vendeur, puis transmettez les informations ci-dessous.</p>
+                  <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} className="w-full rounded-xl border border-neutral-200 px-3 py-3 text-sm">
+                    <option value="mobile_money">Mobile Money</option><option value="cash">Espèces</option><option value="bank_transfer">Virement bancaire</option><option value="other">Autre</option>
+                  </select>
+                  <input value={paymentReference} onChange={(event) => setPaymentReference(event.target.value)} placeholder="Référence du paiement, si disponible" className="w-full rounded-xl border border-neutral-200 px-3 py-3 text-sm" />
+                  <button onClick={requestPurchase} disabled={submittingPurchase} className="w-full rounded-xl bg-orange-500 py-3 text-sm font-black text-white disabled:opacity-50">
+                    {submittingPurchase ? "Enregistrement…" : "J'ai effectué le paiement"}
+                  </button>
+                </div>
+              )}
+              {purchaseError && <p className="mt-4 rounded-xl bg-orange-50 px-3 py-3 text-sm text-orange-700">{purchaseError}</p>}
+            </motion.div>
+          </motion.div>
+        )}
         {viewingDoc && (
           <motion.div
             initial={{ opacity: 0 }}

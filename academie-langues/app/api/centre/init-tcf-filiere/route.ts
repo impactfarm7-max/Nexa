@@ -18,11 +18,14 @@ export async function POST(req: NextRequest) {
   // Vérifier que l'utilisateur appartient bien à ce centre
   const { data: profile } = await supabaseAdmin
     .from("profiles")
-    .select("center_id")
+    .select("center_id, role")
     .eq("id", user.id)
     .single();
 
-  if (profile?.center_id !== centerId) {
+  if (
+    profile?.center_id !== centerId ||
+    !["center_manager", "campus_manager", "manager", "trainer", "staff"].includes(profile?.role || "")
+  ) {
     return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
   }
 

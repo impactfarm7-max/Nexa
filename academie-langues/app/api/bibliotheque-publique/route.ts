@@ -40,5 +40,18 @@ export async function GET(req: Request) {
     .order("id", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ documents: data || [] });
+  const paidIds = (data || []).filter((doc) => doc.is_paid).map((doc) => doc.id);
+  const { data: purchases } = paidIds.length
+    ? await supabaseAdmin.from("document_purchases")
+      .select("document_id, status")
+      .eq("buyer_id", user.id)
+      .in("document_id", paidIds)
+      .in("status", ["pending", "paid"])
+    : { data: [] as Array<{ document_id: number; status: string }> };
+  const statusByDocument = new Map((purchases || []).map((purchase) => [purchase.document_id, purchase.status]));
+  const documents = (data || []).map(({ storage_path: _storagePath, ...doc }) => ({
+    ...doc,
+    purchase_status: doc.is_paid ? statusByDocument.get(doc.id) || null : "free",
+  }));
+  return NextResponse.json({ documents });
 }

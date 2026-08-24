@@ -66,3 +66,17 @@ COMMENT ON VIEW report_finance_by_filiere IS 'CA et recouvrement par filière';
 COMMENT ON VIEW report_effectifs_by_filiere IS 'Effectifs inscriptions par filière';
 COMMENT ON VIEW report_reductions_by_center IS 'Réductions accordées par centre';
 COMMENT ON VIEW report_coupons_summary IS 'Statistiques coupons promo par centre';
+
+-- Les vues respectent les politiques RLS de leurs tables sources.
+ALTER VIEW report_finance_by_center SET (security_invoker = true);
+ALTER VIEW report_finance_by_filiere SET (security_invoker = true);
+ALTER VIEW report_effectifs_by_filiere SET (security_invoker = true);
+ALTER VIEW report_reductions_by_center SET (security_invoker = true);
+ALTER VIEW report_coupons_summary SET (security_invoker = true);
+
+REVOKE ALL ON report_finance_by_center, report_finance_by_filiere,
+  report_effectifs_by_filiere, report_reductions_by_center,
+  report_coupons_summary FROM anon;
+GRANT SELECT ON report_finance_by_center, report_finance_by_filiere,
+  report_effectifs_by_filiere, report_reductions_by_center,
+  report_coupons_summary TO authenticated;

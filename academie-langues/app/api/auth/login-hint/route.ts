@@ -14,7 +14,7 @@ const GENERIC_RESPONSE = {
  * Ne jamais révéler publiquement l'existence, le rôle ou l'état d'un compte.
  */
 export async function POST(req: Request) {
-  const rate = consumeFixedWindow(`login-hint:${requestIp(req)}`, 20, 15 * 60_000);
+  const rate = await consumeFixedWindow(`login-hint:${requestIp(req)}`, 20, 15 * 60_000);
   if (!rate.allowed) {
     return NextResponse.json(GENERIC_RESPONSE, {
       status: 429,

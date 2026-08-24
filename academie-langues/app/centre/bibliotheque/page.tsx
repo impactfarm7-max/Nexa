@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Upload, Trash2, Loader2, FileText, Globe, Building2, CheckCircle2, Clock, XCircle, X } from "lucide-react";
+import { Upload, Trash2, Loader2, FileText, Globe, Building2, CheckCircle2, Clock, XCircle, X, Banknote } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { BLUE, ORANGE, CenterPageLayout, CenterPageHeader, CenterPageBody } from "../center-page-ui";
@@ -17,6 +17,13 @@ type Doc = {
   status: "pending_review" | "approved" | "rejected";
   rejection_reason: string | null;
   created_at: string;
+};
+
+type Purchase = {
+  id: string; amount: number; currency: string; payment_method: string; payment_reference: string | null;
+  buyer_note: string | null; status: "pending" | "paid" | "rejected" | "refunded"; requested_at: string;
+  bibliotheque_documents: { titre: string } | null;
+  profiles: { prenom: string | null; nom: string | null; email: string | null } | null;
 };
 
 async function authedFetch(path: string, options: RequestInit = {}) {
@@ -50,6 +57,9 @@ export default function CentreBibliothequePage() {
 
   const [loading, setLoading] = useState(true);
   const [docs, setDocs] = useState<Doc[]>([]);
+  const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [purchaseReasons, setPurchaseReasons] = useState<Record<string, string>>({});
+  const [purchaseBusy, setPurchaseBusy] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -63,8 +73,12 @@ export default function CentreBibliothequePage() {
 
   const load = useCallback(async () => {
     try {
-      const json = await authedFetch("/api/centre/bibliotheque");
+      const [json, sales] = await Promise.all([
+        authedFetch("/api/centre/bibliotheque"),
+        authedFetch("/api/centre/bibliotheque/purchases"),
+      ]);
       setDocs(json.documents || []);
+      setPurchases(sales.purchases || []);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -82,6 +96,24 @@ export default function CentreBibliothequePage() {
     setIsPaid(false);
     setPrice("");
     setShowForm(false);
+  };
+
+  const updatePurchase = async (id: string, action: "confirm" | "reject" | "refund") => {
+    setPurchaseBusy(id);
+    setError(null);
+    try {
+      const json = await authedFetch(`/api/centre/bibliotheque/purchases/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, reason: purchaseReasons[id] || "" }),
+      });
+      setPurchases((current) => current.map((purchase) => purchase.id === id ? { ...purchase, ...json.purchase } : purchase));
+      setPurchaseReasons((current) => ({ ...current, [id]: "" }));
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setPurchaseBusy(null);
+    }
   };
 
   const handleUpload = async (e: React.FormEvent) => {
@@ -294,6 +326,39 @@ export default function CentreBibliothequePage() {
             </div>
           )}
         </div>
+
+        <section className="bg-white rounded-2xl border border-black/[0.08] overflow-hidden">
+          <div className="px-5 py-4 border-b border-black/[0.06] flex items-center gap-2">
+            <Banknote size={17} style={{ color: ORANGE }} />
+            <h2 className="font-black text-sm" style={{ color: BLUE }}>{en ? "Document sales" : "Ventes de documents"}</h2>
+          </div>
+          {purchases.length === 0 ? (
+            <div className="py-10 text-center text-sm" style={{ color: "rgba(17,34,78,0.4)" }}>{en ? "No sale request." : "Aucune demande d'achat."}</div>
+          ) : (
+            <div className="divide-y divide-black/[0.06]">
+              {purchases.map((purchase) => (
+                <div key={purchase.id} className="p-5 grid gap-3 lg:grid-cols-[1fr_auto] lg:items-center">
+                  <div>
+                    <p className="font-black text-sm" style={{ color: BLUE }}>{purchase.bibliotheque_documents?.titre || "Document"}</p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      {[purchase.profiles?.prenom, purchase.profiles?.nom].filter(Boolean).join(" ") || purchase.profiles?.email || "Acheteur"} · {Number(purchase.amount).toLocaleString(en ? "en-GB" : "fr-FR")} FCFA · {purchase.payment_method}
+                    </p>
+                    {purchase.payment_reference && <p className="mt-1 text-xs text-neutral-500">Référence : {purchase.payment_reference}</p>}
+                    <span className="mt-2 inline-flex rounded-full bg-neutral-100 px-2 py-1 text-[10px] font-black uppercase">{purchase.status}</span>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                    {(purchase.status === "pending" || purchase.status === "paid") && (
+                      <input value={purchaseReasons[purchase.id] || ""} onChange={(event) => setPurchaseReasons((current) => ({ ...current, [purchase.id]: event.target.value }))} placeholder={purchase.status === "paid" ? "Motif du remboursement" : "Motif si refus"} className="rounded-lg border border-black/[0.1] px-3 py-2 text-xs" />
+                    )}
+                    {purchase.status === "pending" && <button disabled={purchaseBusy === purchase.id} onClick={() => updatePurchase(purchase.id, "confirm")} className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white">Confirmer</button>}
+                    {purchase.status === "pending" && <button disabled={!purchaseReasons[purchase.id] || purchaseBusy === purchase.id} onClick={() => updatePurchase(purchase.id, "reject")} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-black text-red-600 disabled:opacity-40">Refuser</button>}
+                    {purchase.status === "paid" && <button disabled={!purchaseReasons[purchase.id] || purchaseBusy === purchase.id} onClick={() => updatePurchase(purchase.id, "refund")} className="rounded-lg bg-orange-50 px-3 py-2 text-xs font-black text-orange-700 disabled:opacity-40">Rembourser</button>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </CenterPageBody>
     </CenterPageLayout>
   );

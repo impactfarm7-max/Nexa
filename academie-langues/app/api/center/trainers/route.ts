@@ -33,11 +33,20 @@ async function getCenterForUser(req: Request) {
   const user = await getAuthUser(req);
   if (!user) return { user: null, centerId: null, role: null, permissions: [], response: NextResponse.json({ error: "Non autorise." }, { status: 401 }) };
 
-  const { data: membership } = await supabaseAdmin
+  const { data: profile } = await supabaseAdmin
+    .from("profiles")
+    .select("center_id, role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  let membershipQuery = supabaseAdmin
     .from("center_users")
     .select("center_id, role, permissions")
-    .eq("user_id", user.id)
-    .maybeSingle();
+    .eq("user_id", user.id);
+  membershipQuery = profile?.center_id
+    ? membershipQuery.eq("center_id", profile.center_id)
+    : membershipQuery.order("created_at", { ascending: true }).limit(1);
+  const { data: membership } = await membershipQuery.maybeSingle();
 
   if (!membership?.center_id) {
     return { user: null, centerId: null, role: null, permissions: [], response: NextResponse.json({ error: "Compte centre requis." }, { status: 403 }) };
@@ -46,7 +55,7 @@ async function getCenterForUser(req: Request) {
   return {
     user,
     centerId: membership.center_id as string,
-    role: membership.role as string,
+    role: (profile?.role || membership.role) as string,
     permissions: (membership.permissions || []) as string[],
     response: null,
   };

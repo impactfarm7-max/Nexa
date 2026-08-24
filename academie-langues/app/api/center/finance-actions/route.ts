@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-server";
+import { campusAllowed, getCenterStaffContext, requireCenterPermission, supabaseAdmin } from "@/app/utils/center-auth-server";
 import {
   computeCouponDiscount,
   fetchValidCoupon,
@@ -28,10 +28,10 @@ type ApplyCouponBody = {
 
 type Body = DeferBody | DiscountBody | ApplyCouponBody;
 
-async function assertEnrollmentInCenter(enrollmentId: string, centerId: string) {
+async function assertEnrollmentInCenter(enrollmentId: string, centerId: string, allowedCampusIds: string[] | null = null) {
   const { data: enrollment } = await supabaseAdmin
     .from("enrollments")
-    .select("id, filiere_id, filieres(center_id)")
+    .select("id, filiere_id, campus_id, filieres(center_id)")
     .eq("id", enrollmentId)
     .maybeSingle();
 
@@ -53,10 +53,14 @@ async function assertEnrollmentInCenter(enrollmentId: string, centerId: string) 
     return { ok: false as const, error: "Inscription hors de votre centre." };
   }
 
+  if (!campusAllowed(enrollment.campus_id, allowedCampusIds)) {
+    return { ok: false as const, error: "Inscription hors de votre campus." };
+  }
+
   return { ok: true as const, enrollmentId };
 }
 
-async function assertInstallmentInCenter(installmentId: string, centerId: string) {
+async function assertInstallmentInCenter(installmentId: string, centerId: string, allowedCampusIds: string[] | null = null) {
   const { data: inst } = await supabaseAdmin
     .from("enrollment_installments")
     .select("id, enrollment_id")
@@ -67,7 +71,7 @@ async function assertInstallmentInCenter(installmentId: string, centerId: string
     return { ok: false as const, error: "Échéance introuvable." };
   }
 
-  const check = await assertEnrollmentInCenter(inst.enrollment_id, centerId);
+  const check = await assertEnrollmentInCenter(inst.enrollment_id, centerId, allowedCampusIds);
   if (!check.ok) return check;
   return { ok: true as const, enrollmentId: inst.enrollment_id, installmentId };
 }
@@ -75,6 +79,8 @@ async function assertInstallmentInCenter(installmentId: string, centerId: string
 export async function POST(req: Request) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+  const permissionError = await requireCenterPermission(ctx!, "finance");
+  if (permissionError) return permissionError;
 
   let body: Body;
   try {
@@ -104,7 +110,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Date invalide (AAAA-MM-JJ)." }, { status: 400 });
     }
 
-    const check = await assertInstallmentInCenter(installmentId, ctx!.centerId);
+    const check = await assertInstallmentInCenter(installmentId, ctx!.centerId, ctx!.scopedCampusIds);
     if (!check.ok) {
       return NextResponse.json({ error: check.error }, { status: 403 });
     }
@@ -139,7 +145,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const check = await assertEnrollmentInCenter(enrollmentId, ctx!.centerId);
+    const check = await assertEnrollmentInCenter(enrollmentId, ctx!.centerId, ctx!.scopedCampusIds);
     if (!check.ok) {
       return NextResponse.json({ error: check.error }, { status: 403 });
     }
@@ -173,7 +179,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const check = await assertEnrollmentInCenter(enrollmentId, ctx!.centerId);
+    const check = await assertEnrollmentInCenter(enrollmentId, ctx!.centerId, ctx!.scopedCampusIds);
     if (!check.ok) {
       return NextResponse.json({ error: check.error }, { status: 403 });
     }
@@ -248,13 +254,15 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+  const permissionError = await requireCenterPermission(ctx!, "finance");
+  if (permissionError) return permissionError;
 
   const enrollmentId = new URL(req.url).searchParams.get("enrollment_id");
   if (!enrollmentId) {
     return NextResponse.json({ error: "enrollment_id requis." }, { status: 400 });
   }
 
-  const check = await assertEnrollmentInCenter(enrollmentId, ctx!.centerId);
+  const check = await assertEnrollmentInCenter(enrollmentId, ctx!.centerId, ctx!.scopedCampusIds);
   if (!check.ok) {
     return NextResponse.json({ error: check.error }, { status: 403 });
   }

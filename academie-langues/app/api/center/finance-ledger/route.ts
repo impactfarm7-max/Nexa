@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-server";
+import { getCenterStaffContext, requireCenterPermission, supabaseAdmin } from "@/app/utils/center-auth-server";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 
 const FINANCE_COLUMNS =
@@ -8,6 +8,8 @@ const FINANCE_COLUMNS =
 export async function GET(req: Request) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+  const permissionError = await requireCenterPermission(ctx!, "finance");
+  if (permissionError) return permissionError;
 
   const requestedCampusId = new URL(req.url).searchParams.get("campusId");
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-server";
+import { getCenterStaffContext, requireCenterPermission, supabaseAdmin } from "@/app/utils/center-auth-server";
 import { getOfferQuota, resolveEffectiveNexaOffer, resolveEffectiveNexaOfferKey } from "@/app/data/nexaOffers";
 
 const message = (req: Request, fr: string, en: string) => req.headers.get("x-nexa-locale") === "en" ? en : fr;
@@ -7,6 +7,8 @@ const message = (req: Request, fr: string, en: string) => req.headers.get("x-nex
 export async function POST(req: Request) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+  const permissionError = await requireCenterPermission(ctx!, "cours");
+  if (permissionError) return permissionError;
   const body = await req.json().catch(() => ({}));
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const description = typeof body.description === "string" ? body.description.trim() : "";
@@ -16,6 +18,16 @@ export async function POST(req: Request) {
     : [];
   if (!title || !disciplineId) {
     return NextResponse.json({ error: message(req, "Titre et matière requis.", "Title and subject are required.") }, { status: 400 });
+  }
+
+  const { data: discipline } = await supabaseAdmin
+    .from("disciplines")
+    .select("id, filieres!inner(center_id)")
+    .eq("id", disciplineId)
+    .eq("filieres.center_id", ctx!.centerId)
+    .maybeSingle();
+  if (!discipline) {
+    return NextResponse.json({ error: message(req, "Matière invalide pour ce centre.", "Invalid subject for this center.") }, { status: 400 });
   }
 
   const { data: center } = await supabaseAdmin.from("centers")

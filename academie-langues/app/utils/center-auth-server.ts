@@ -20,6 +20,40 @@ export type CenterStaffContext = {
   scopedCampusIds: string[] | null;
 };
 
+const FULL_ACCESS_CENTER_ROLES = new Set(["center_manager", "campus_manager", "manager"]);
+
+export async function requireCenterPermission(
+  ctx: CenterStaffContext,
+  permission: string,
+): Promise<NextResponse | null> {
+  if (FULL_ACCESS_CENTER_ROLES.has(ctx.role)) return null;
+
+  const [{ data: membership }, { data: legacyPermission }] = await Promise.all([
+    supabaseAdmin
+      .from("center_users")
+      .select("permissions")
+      .eq("user_id", ctx.user.id)
+      .eq("center_id", ctx.centerId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("staff_permissions")
+      .select("permission")
+      .eq("profile_id", ctx.user.id)
+      .eq("permission", permission)
+      .maybeSingle(),
+  ]);
+
+  const permissions = Array.isArray(membership?.permissions)
+    ? membership.permissions.map(String)
+    : [];
+  if (permissions.includes(permission) || legacyPermission) return null;
+
+  return NextResponse.json(
+    { error: "Permission insuffisante.", code: "CENTER_PERMISSION_REQUIRED" },
+    { status: 403 },
+  );
+}
+
 export function campusAllowed(campusId: string | null | undefined, allowed: string[] | null): boolean {
   if (!allowed) return true;
   if (!campusId) return false;

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
+import { consumeFixedWindow } from "@/app/utils/fixed-window-rate-limit";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,18 +17,6 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
   "image/gif": "gif",
 };
 const GUEST_TOKEN_RE = /^[a-f0-9-]{36}$/i;
-const uploadWindows = new Map<string, { count: number; startedAt: number }>();
-
-function allowUpload(key: string) {
-  const now = Date.now();
-  const current = uploadWindows.get(key);
-  if (!current || now - current.startedAt > 60 * 60 * 1000) {
-    uploadWindows.set(key, { count: 1, startedAt: now });
-    return true;
-  }
-  current.count += 1;
-  return current.count <= 10;
-}
 
 function hasValidImageSignature(bytes: Buffer, type: string) {
   if (type === "image/png") return bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
@@ -45,7 +34,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Non autorise" }, { status: 401 });
   }
   const actorKey = user ? `user:${user.id}` : `guest:${guestToken}`;
-  if (!allowUpload(actorKey)) {
+  const rate = await consumeFixedWindow(`support-upload:${actorKey}`, 10, 60 * 60 * 1000);
+  if (!rate.allowed) {
     return NextResponse.json({ error: "Trop de fichiers envoyes. Reessayez plus tard." }, { status: 429 });
   }
   const file = formData.get("file");

@@ -59,7 +59,6 @@ export async function GET(req: Request) {
 
   const historicalCenterIds = [...new Set([
     profileRow?.created_by_center_id,
-    typeof user.user_metadata?.center_id === "string" ? user.user_metadata.center_id : null,
   ].filter(Boolean))] as string[];
   if (historicalCenterIds.length > 0) {
     const { data: validHistoricalCenters } = await supabaseAdmin.from("centers").select("id").in("id", historicalCenterIds);

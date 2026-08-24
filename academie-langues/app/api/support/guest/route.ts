@@ -25,7 +25,7 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const token = normalizeToken(searchParams.get("token"));
   if (!token) return NextResponse.json({ error: "Token manquant ou invalide" }, { status: 400 });
-  const rate = consumeFixedWindow(`guest-support-read:${token}:${requestIp(req)}`, 120, 60 * 60 * 1000);
+  const rate = await consumeFixedWindow(`guest-support-read:${token}:${requestIp(req)}`, 120, 60 * 60 * 1000);
   if (!rate.allowed) {
     return NextResponse.json(
       { error: "Trop de requetes. Reessayez plus tard." },
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
   if (!token || (!message && !imageUrl)) {
     return NextResponse.json({ error: "Token et message ou image requis" }, { status: 400 });
   }
-  const rate = consumeFixedWindow(`guest-support:${token}:${requestIp(req)}`, 30, 60 * 60 * 1000);
+  const rate = await consumeFixedWindow(`guest-support:${token}:${requestIp(req)}`, 30, 60 * 60 * 1000);
   if (!rate.allowed) {
     return NextResponse.json(
       { error: "Trop de messages. Reessayez plus tard." },

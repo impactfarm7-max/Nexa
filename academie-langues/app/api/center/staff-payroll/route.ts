@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-server";
+import { getCenterStaffContext, requireCenterPermission, supabaseAdmin } from "@/app/utils/center-auth-server";
 
 type LineType = "prime" | "retenue" | "ajustement";
 type PeriodStatus = "draft" | "validated" | "paid";
@@ -90,6 +90,8 @@ async function loadPeriodBundle(periodId: string) {
 export async function GET(req: Request) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+  const permissionError = await requireCenterPermission(ctx!, "finance");
+  if (permissionError) return permissionError;
 
   const url = new URL(req.url);
   const staffId = url.searchParams.get("staff_id");
@@ -211,6 +213,8 @@ async function refreshPeriodStatus(periodId: string) {
 export async function POST(req: Request) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+  const permissionError = await requireCenterPermission(ctx!, "finance");
+  if (permissionError) return permissionError;
 
   let body: Body;
   try {

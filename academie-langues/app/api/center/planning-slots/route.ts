@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-server";
+import { getCenterStaffContext, requireCenterPermission, supabaseAdmin } from "@/app/utils/center-auth-server";
 
 function isMissing(err: { message?: string; code?: string } | null) {
   if (!err) return false;
@@ -10,6 +10,8 @@ function isMissing(err: { message?: string; code?: string } | null) {
 export async function POST(req: Request) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+  const permissionError = await requireCenterPermission(ctx!, "planning");
+  if (permissionError) return permissionError;
 
   let body: Record<string, unknown>;
   try {
@@ -57,6 +59,13 @@ export async function POST(req: Request) {
   }
 
   if (action === "materialize") {
+    const { data: ownedSlot } = await supabaseAdmin
+      .from("schedule_slots")
+      .select("id")
+      .eq("id", body.slot_id)
+      .eq("center_id", ctx!.centerId)
+      .maybeSingle();
+    if (!ownedSlot) return NextResponse.json({ error: "Créneau introuvable." }, { status: 404 });
     const { data, error: rpcErr } = await supabaseAdmin.rpc("materialize_weekly_slot", {
       p_slot_id: body.slot_id,
       p_from_date: body.from_date || new Date().toISOString().slice(0, 10),
@@ -147,6 +156,15 @@ export async function POST(req: Request) {
     };
 
     if (body.exception_id) {
+      const { data: ownedException } = await supabaseAdmin
+        .from("schedule_exceptions")
+        .select("id, slot_id")
+        .eq("id", body.exception_id)
+        .eq("slot_id", body.slot_id)
+        .maybeSingle();
+      if (!ownedException) {
+        return NextResponse.json({ error: "Exception introuvable pour ce créneau." }, { status: 404 });
+      }
       const { error: uErr } = await supabaseAdmin
         .from("schedule_exceptions")
         .update(payload)
@@ -253,6 +271,8 @@ export async function POST(req: Request) {
 export async function GET(req: Request) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+  const permissionError = await requireCenterPermission(ctx!, "planning");
+  if (permissionError) return permissionError;
 
   const url = new URL(req.url);
   const weekStart = url.searchParams.get("week_start");

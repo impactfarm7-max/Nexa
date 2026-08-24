@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
   const user = await getAuthUser(req);
   if (!user) return NextResponse.json({ valid: false, error: "Non autorisé." }, { status: 401 });
 
-  const rate = consumeFixedWindow(`pin:${user.id}:${requestIp(req)}`, 8, 15 * 60 * 1000);
+  const rate = await consumeFixedWindow(`pin:${user.id}:${requestIp(req)}`, 8, 15 * 60 * 1000);
   if (!rate.allowed) {
     return NextResponse.json(
       { valid: false, error: "Trop de tentatives." },

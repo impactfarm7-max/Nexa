@@ -69,16 +69,26 @@ async function assertLibraryReader(userId: string): Promise<
   return { ok: false, status: 403, error: "Abonnement requis ou expiré." };
 }
 
-function canReadDocument(
+async function canReadDocument(
   doc: {
+    id: number;
     center_id: string | null;
     visibility: string | null;
     status: string | null;
     is_paid: boolean | null;
   },
   profile: ProfileRow,
-): boolean {
-  if (doc.is_paid) return false;
+  userId: string,
+): Promise<boolean> {
+  if (doc.is_paid) {
+    const { data: purchase } = await supabaseAdmin.from("document_purchases")
+      .select("id")
+      .eq("document_id", doc.id)
+      .eq("buyer_id", userId)
+      .eq("status", "paid")
+      .maybeSingle();
+    if (!purchase && profile.role !== "admin" && profile.role !== "superadmin") return false;
+  }
 
   const status = doc.status || "approved";
   if (status !== "approved" && profile.role !== "admin" && profile.role !== "superadmin") {
@@ -134,7 +144,7 @@ export async function GET(
     return NextResponse.json({ error: "Document introuvable." }, { status: 404 });
   }
 
-  if (!canReadDocument(doc, access.profile)) {
+  if (!(await canReadDocument(doc, access.profile, user.id))) {
     return NextResponse.json({ error: "Document non accessible." }, { status: 403 });
   }
 

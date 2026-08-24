@@ -9,6 +9,11 @@ const supabaseAdmin = createClient(
 );
 
 const MANAGER_ROLES = ["center_manager", "campus_manager"];
+const MAX_PDF_SIZE = 25 * 1024 * 1024;
+
+function hasPdfSignature(bytes: Uint8Array) {
+  return bytes.length >= 5 && Buffer.from(bytes.subarray(0, 5)).toString("ascii") === "%PDF-";
+}
 
 async function assertLibreCenterManager(userId: string) {
   const { data: profile } = await supabaseAdmin
@@ -78,12 +83,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Seuls les fichiers PDF sont acceptés." }, { status: 400 });
   }
 
+  if (!file.name.toLowerCase().endsWith(".pdf")) {
+    return NextResponse.json({ error: "Le fichier doit avoir l'extension .pdf." }, { status: 400 });
+  }
+  if (file.size <= 0 || file.size > MAX_PDF_SIZE) {
+    return NextResponse.json({ error: "Le fichier PDF ne doit pas dépasser 25 Mo." }, { status: 413 });
+  }
+  if (isPaid && (!Number.isFinite(price) || price <= 0)) {
+    return NextResponse.json({ error: "Le prix doit être supérieur à zéro." }, { status: 400 });
+  }
+  if (isPaid && visibility !== "public") {
+    return NextResponse.json({ error: "Un document payant doit être public et approuvé par NEXA." }, { status: 400 });
+  }
+
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!hasPdfSignature(bytes)) {
+    return NextResponse.json({ error: "Le contenu du fichier n'est pas un PDF valide." }, { status: 400 });
+  }
+
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
   const storagePath = `centre/${access.centerId}/${Date.now()}-${safeName}`;
 
   const { error: uploadError } = await supabaseAdmin.storage
     .from("ressources_iag")
-    .upload(storagePath, file, { contentType: "application/pdf", upsert: false });
+    .upload(storagePath, bytes, { contentType: "application/pdf", upsert: false });
 
   if (uploadError) {
     return NextResponse.json({ error: `Échec de l'envoi du fichier : ${uploadError.message}` }, { status: 500 });

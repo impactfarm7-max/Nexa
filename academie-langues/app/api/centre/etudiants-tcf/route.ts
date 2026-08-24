@@ -236,6 +236,30 @@ async function assertCenterAccess(userId: string, centerId: string) {
   if (profile?.center_id !== centerId) {
     return { ok: false as const, status: 403, error: "Accès refusé." };
   }
+  const managerRoles = ["center_manager", "campus_manager", "manager"];
+  if (!managerRoles.includes(profile.role)) {
+    if (!['staff', 'trainer'].includes(profile.role)) {
+      return { ok: false as const, status: 403, error: "Accès réservé au personnel autorisé." };
+    }
+    const [{ data: membership }, { data: legacyPermission }] = await Promise.all([
+      supabaseAdmin
+        .from("center_users")
+        .select("permissions")
+        .eq("user_id", userId)
+        .eq("center_id", centerId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("staff_permissions")
+        .select("permission")
+        .eq("profile_id", userId)
+        .eq("permission", "etudiants")
+        .maybeSingle(),
+    ]);
+    const permissions = Array.isArray(membership?.permissions) ? membership.permissions.map(String) : [];
+    if (!permissions.includes("etudiants") && !legacyPermission) {
+      return { ok: false as const, status: 403, error: "Permission étudiants requise." };
+    }
+  }
   const tcfError = await requireTcfCenter(centerId);
   if (tcfError) {
     const payload = await tcfError.json().catch(() => null);
@@ -245,7 +269,7 @@ async function assertCenterAccess(userId: string, centerId: string) {
       error: payload?.error || "Cette fonctionnalité est réservée aux centres TCF Canada.",
     };
   }
-  return { ok: true as const };
+  return { ok: true as const, role: profile.role as string };
 }
 
 function isMissingRelation(error: { code?: string; message?: string } | null | undefined) {

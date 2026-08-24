@@ -4,8 +4,8 @@
 -- <center_id>/... correspondant a SON propre centre (profiles.center_id).
 
 insert into storage.buckets (id, name, public)
-values ('center-documents', 'center-documents', true)
-on conflict (id) do nothing;
+values ('center-documents', 'center-documents', false)
+on conflict (id) do update set public = false;
 
 drop policy if exists "center-documents authenticated upload" on storage.objects;
 create policy "center-documents authenticated upload"
@@ -40,13 +40,11 @@ using (
   )
 );
 
--- Lecture publique conservee (bucket public) car le code actuel affiche le
--- document via une simple URL <a href> stockee en base (getPublicUrl), pas
--- via une URL signee. Si ces documents ne doivent pas etre accessibles a
--- quiconque a le lien, dis-le : il faudra passer bucket public=false +
--- createSignedUrl() cote client (changement de code, pas seulement SQL).
 drop policy if exists "center-documents public read" on storage.objects;
-create policy "center-documents public read"
-on storage.objects for select
-to public
-using (bucket_id = 'center-documents');
+drop policy if exists "center-documents authenticated read" on storage.objects;
+create policy "center-documents authenticated read"
+on storage.objects for select to authenticated
+using (
+  bucket_id = 'center-documents'
+  and (storage.foldername(name))[1] = (public.current_profile_center_id())::text
+);
