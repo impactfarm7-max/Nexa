@@ -27,15 +27,15 @@ export type CenterNavItem = {
 };
 
 const GENERIC_SHEET: CenterNavItem[] = [
-  { label: "Programmes", icon: GitBranch, path: "/centre/filieres" },
   { label: "Staff", icon: GraduationCap, path: "/centre/staff" },
+  { label: "Programmes", icon: GitBranch, path: "/centre/filieres" },
   { label: "Constructeur de cours", icon: PenTool, path: "/centre/cours/gestion-cours" },
   { label: "Planning", icon: Calendar, path: "/centre/cours/planning" },
   { label: "Missions & Devoirs", icon: BookMarked, path: "/centre/cours/devoirs" },
-  { label: "Sessions Live", icon: Video, path: "/centre/lives" },
   { label: "Examens", icon: ClipboardList, path: "/centre/examens/examensuniversels" },
-  { label: "Rapports", icon: BarChart3, path: "/centre/rapports" },
+  { label: "Sessions Live", icon: Video, path: "/centre/lives" },
   { label: "Bibliothèque", icon: LibraryBig, path: "/centre/bibliotheque" },
+  { label: "Rapports", icon: BarChart3, path: "/centre/rapports" },
   { label: "Abonnements", icon: Gem, path: "/centre/abonnements" },
   { label: "Crédits IA", icon: Sparkles, path: "/centre/credits-ia" },
   { label: "Paramètres", icon: Settings2, path: "/centre/parametres/entreprise" },
@@ -50,6 +50,7 @@ const TCF_SHEET: CenterNavItem[] = [
   { label: "Examens", icon: ClipboardList, path: "/centre/examens/examensuniversels" },
   { label: "Sessions Live", icon: Video, path: "/centre/lives" },
   { label: "Bibliothèque", icon: LibraryBig, path: "/centre/bibliotheque" },
+  { label: "Rapports", icon: BarChart3, path: "/centre/rapports" },
   { label: "Abonnements", icon: Gem, path: "/centre/abonnements" },
   { label: "Crédits IA", icon: Sparkles, path: "/centre/credits-ia" },
   { label: "Paramètres", icon: Settings2, path: "/centre/parametres/entreprise" },
