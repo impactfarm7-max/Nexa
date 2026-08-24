@@ -241,7 +241,7 @@ export default function TcfPlanningBoard({ kind, token }: Props) {
       <p className="text-[10px] text-neutral-400 font-medium">
         {kind === "collective"
           ? "Cliquez une carte pour annuler, reporter ou marquer une séance collective comme réalisée."
-          : "Cliquez une demande en « Planifié » pour confirmer, refuser, reporter, basculer — ou annuler / reporter même après confirmation."}
+          : "Cliquez sur une demande au statut « Planifié » pour la confirmer, la refuser, la reporter ou la basculer. Vous pouvez aussi l’annuler ou la reporter après confirmation."}
       </p>
 
       <div

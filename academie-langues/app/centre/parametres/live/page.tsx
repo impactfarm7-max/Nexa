@@ -183,7 +183,7 @@ export default function LiveSettingsPage() {
             <p className="font-black mb-1">Séances collectives en ligne (TCF)</p>
             <p>
               Les séances planifiées en mode <strong>En ligne</strong> utilisent automatiquement la visio NEXA (LiveKit).
-              Les étudiants rejoignent via le lien généré dans les notifications et le forum de classe — pas de Zoom à configurer.
+              Les étudiants utilisent le lien généré dans les notifications et le forum de classe. Aucune configuration Zoom n’est nécessaire.
             </p>
           </div>
         </div>

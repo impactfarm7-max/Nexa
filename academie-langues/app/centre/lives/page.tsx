@@ -456,7 +456,7 @@ export default function CentreLivesPage() {
 
         {livesReady && joinable.length > 0 && (
           <section>
-            <SectionTitle icon={Radio} label={en ? "Live — join now" : "En direct — rejoindre"} accent />
+            <SectionTitle icon={Radio} label={en ? "Join live now" : "Rejoindre le direct"} accent />
             <div className="space-y-3">
               {joinable.map((s) => (
                 <SessionCard

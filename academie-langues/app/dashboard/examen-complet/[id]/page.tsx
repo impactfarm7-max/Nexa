@@ -648,7 +648,7 @@ const [reportSent, setReportSent] = useState(false);
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg" style={{ backgroundColor: BRAND.orange, boxShadow: `0 10px 30px ${BRAND.orange}66` }}>
               <Trophy className="text-white w-8 h-8" />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-2" style={{ color: BRAND.orange }}>TCF Canada — Rapport Officiel NEXA</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] mb-2" style={{ color: BRAND.orange }}>Rapport officiel NEXA du TCF Canada</p>
             <h1 className="text-2xl sm:text-3xl md:text-4xl xl:text-5xl font-display font-black tracking-tight mb-2">
               Examen Officiel {String(examenId).padStart(2, "0")}
             </h1>
@@ -855,7 +855,7 @@ const [reportSent, setReportSent] = useState(false);
         <div className="nexa-student-shell flex flex-wrap justify-between items-center gap-2 sm:gap-3">
         <div className="flex flex-col min-w-0 flex-1">
           <p className="text-[9px] xl:text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 flex-wrap" style={{ color: BRAND.orange }}>
-            TCF Canada — Examen Officiel
+            Examen officiel du TCF Canada
             <span className={`inline-flex items-center gap-1 normal-case font-bold text-[9px] tracking-normal ${
               syncStatus === "saving" ? "text-amber-500" :
               syncStatus === "saved" ? "text-emerald-500" :
@@ -899,7 +899,7 @@ const [reportSent, setReportSent] = useState(false);
             className="bg-emerald-50 border-b border-emerald-200 px-4 py-3 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-emerald-700">
               <RotateCcw size={16} />
-              <p className="text-xs font-bold">Session reprise — vos réponses ont été restaurées.</p>
+              <p className="text-xs font-bold">Session reprise. Vos réponses ont été restaurées.</p>
             </div>
             <button onClick={() => setRestored(false)} className="text-emerald-600 hover:text-emerald-800">
               <X size={14} />
@@ -1042,7 +1042,7 @@ const [reportSent, setReportSent] = useState(false);
             </div>
             <h3 className="font-display font-black text-lg mb-2" style={{ color: BRAND.blue }}>Problème signalé</h3>
             <p className="text-xs text-slate-500 mb-6 font-medium leading-relaxed">
-              L'équipe NEXA a été notifiée. Vous pouvez continuer à essayer l'épreuve, ou soumettre votre copie telle qu'elle est — un enseignant pourra réexaminer la section concernée manuellement.
+              L'équipe NEXA a été notifiée. Vous pouvez continuer l'épreuve ou soumettre votre copie telle quelle. Un enseignant pourra réexaminer manuellement la section concernée.
             </p>
             <div className="space-y-3">
               <button onClick={() => sendProblemReport(true)}

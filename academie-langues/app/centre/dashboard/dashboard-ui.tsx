@@ -254,7 +254,7 @@ export function PendingBanner() {
     <p className="text-[9px] sm:text-[10px] font-black text-amber-700 uppercase tracking-widest leading-snug">
       {locale === "en"
         ? "Pending activation by Nexa. You can configure your space freely."
-        : <>En attente d&apos;activation par Nexa — vous pouvez configurer votre espace librement.</>}
+        : <>En attente d&apos;activation par Nexa. Vous pouvez configurer votre espace librement.</>}
     </p>
   );
 }

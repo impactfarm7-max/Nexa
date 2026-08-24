@@ -1020,7 +1020,7 @@ export default function CenterCoursPage() {
 
           {!activeCourse && (
             <div className="flex items-center gap-2">
-              <button disabled title="Fonctionnalité premium — bientôt disponible" className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-black uppercase tracking-widest bg-neutral-100 text-neutral-400 cursor-not-allowed">
+              <button disabled title="Fonctionnalité premium bientôt disponible" className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-black uppercase tracking-widest bg-neutral-100 text-neutral-400 cursor-not-allowed">
                 <ScanLine size={14} /> Scanner un cours (IA) <Lock size={11} />
               </button>
               <button onClick={() => setCreateOpen(true)} className="flex h-10 items-center gap-2 rounded-xl px-4 text-xs font-black uppercase tracking-widest text-white shadow-md" style={{ backgroundColor: ORANGE }}>
@@ -1112,7 +1112,7 @@ export default function CenterCoursPage() {
                     </button>
                   ) : (
                     <>
-                      <button disabled title="Fonctionnalité premium — bientôt disponible" className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-neutral-100 text-neutral-400 cursor-not-allowed">
+                      <button disabled title="Fonctionnalité premium bientôt disponible" className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest bg-neutral-100 text-neutral-400 cursor-not-allowed">
                         <Sparkles size={13} /> Générer avec l'IA <Lock size={11} />
                       </button>
                       <button onClick={() => setNewQuizOpen(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest text-white shadow-md" style={{ backgroundColor: BLUE }}>
@@ -1405,7 +1405,7 @@ export default function CenterCoursPage() {
                   </select>
                   {isTcfCenter && disciplines.length === 0 && (
                     <p className="text-[10px] font-bold text-amber-600 mt-2">
-                      Rubriques TCF absentes — exécutez <code className="text-[9px]">supabase-tcf-course-disciplines.sql</code> dans Supabase.
+                      Les rubriques TCF sont absentes. Exécutez <code className="text-[9px]">supabase-tcf-course-disciplines.sql</code> dans Supabase.
                     </p>
                   )}
                   {isTcfCenter && disciplineId && disciplines.find((d) => d.id === disciplineId)?.code === TCF_NEUTRAL_DISCIPLINE.code && (

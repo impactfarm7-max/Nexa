@@ -919,7 +919,7 @@ function CreateTCFManualModal({ centerId, onClose, onCreated }: { centerId: stri
               <div>
                 <label className="text-[9px] font-black uppercase text-neutral-400 block mb-1">Date de naissance</label>
                 <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)} className="w-full h-11 px-3 rounded-xl border bg-neutral-50 text-xs font-bold outline-none" style={{ color: BLUE }} />
-                <p className="text-[9px] text-neutral-400 mt-1">Optionnel — complétable plus tard sur le profil étudiant.</p>
+                <p className="text-[9px] text-neutral-400 mt-1">Ce champ est optionnel et peut être complété plus tard sur le profil étudiant.</p>
               </div>
               {error && (
                 <div className="bg-red-50 p-2 rounded-lg">

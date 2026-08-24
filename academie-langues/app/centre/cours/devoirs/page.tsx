@@ -631,7 +631,7 @@ export default function TrainerDevoirsPage() {
               {pendingInbox.length > 0 && (
                 <p className="text-[11px] font-bold text-amber-700 mt-1.5 flex items-center gap-1.5">
                   <AlertTriangle size={12} />
-                  {pendingInbox.length} devoir{pendingInbox.length > 1 ? "s" : ""} à corriger — ouvrez le devoir concerné ci-dessous
+                  {pendingInbox.length} devoir{pendingInbox.length > 1 ? "s" : ""} à corriger. Ouvrez le devoir concerné ci-dessous.
                 </p>
               )}
             </div>

@@ -116,7 +116,7 @@ export default function ResultatEcritPage() {
         <div className="relative z-10 text-center text-white max-w-xl mx-auto">
           <div className="inline-flex items-center gap-2 bg-orange-500/20 border border-orange-500/30 px-4 py-1.5 rounded-full mb-4">
             <Award className="w-4 h-4 text-orange-400" />
-            <span className="text-[11px] font-black uppercase tracking-widest text-orange-400">Série {serieId} — Terminée</span>
+            <span className="text-[11px] font-black uppercase tracking-widest text-orange-400">Série {serieId} terminée</span>
           </div>
           <h1 className={`${STUDENT_TEXT.sectionTitle} mb-1 text-white`}>
             {answeredCount} / {detail.length}

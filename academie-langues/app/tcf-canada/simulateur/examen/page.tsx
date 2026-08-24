@@ -400,7 +400,7 @@ export default function ModeExamen() {
                 Examen expression écrite
               </h2>
               <p className="text-xs xl:text-sm text-neutral-600 mb-3 leading-relaxed">
-                3 tâches en conditions réelles — 60 minutes.
+                3 tâches en conditions réelles pendant 60 minutes.
               </p>
               <div className="flex items-center gap-1.5 mb-3 px-2.5 py-1.5 bg-orange-50/80 border border-orange-100 rounded-lg">
                 <Info size={12} className="text-orange-500 shrink-0" />
@@ -453,7 +453,7 @@ export default function ModeExamen() {
                 {examEligibility?.isExceptional
                   ? `${examEligibility.reason}${imposedExamenId != null ? ` — Officiel ${String(imposedExamenId).padStart(2, "0")}` : ""}`
                   : examCompletAccess.canUse
-                    ? "4 épreuves d&apos;affilée (CE, CO, EE, EO) — 2h45."
+                    ? "4 épreuves d&apos;affilée (CE, CO, EE, EO) pendant 2 h 45."
                     : (examEligibility?.normalAccess?.reason || examCompletAccess.reason || "Accès non disponible.")}
               </p>
               <div className="flex gap-1 mb-3">
@@ -489,7 +489,7 @@ export default function ModeExamen() {
               </p>
               {isCenterStudent && examEligibility?.isExceptional && (
                 <p className="text-[11px] font-medium mt-2" style={{ color: BRAND.orange }}>
-                  Convocation exceptionnelle — sans impact sur vos crédits mensuels.
+                  Cette convocation exceptionnelle n’a aucun impact sur vos crédits mensuels.
                 </p>
               )}
               {isCenterStudent && examEligibility?.scheduledAt && (

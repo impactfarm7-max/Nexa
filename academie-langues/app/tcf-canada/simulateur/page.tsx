@@ -208,7 +208,7 @@ export default function SimulateurMenu() {
         <div className="hidden md:flex items-center gap-2 mb-6 bg-orange-50 border border-orange-100 rounded-2xl px-5 py-3">
           <Clock className="w-4 h-4 text-orange-500 shrink-0" />
           <p className="text-xs text-orange-700 font-bold">
-            Chaque tâche est accessible <span className="font-black">une seule fois par jour</span> — elle se débloque automatiquement à minuit.
+            Chaque tâche est accessible <span className="font-black">une seule fois par jour</span>. Elle se débloque automatiquement à minuit.
           </p>
         </div>
 

@@ -119,7 +119,7 @@ export default function PersonaTabs() {
             <div className="relative order-1 aspect-[4/3] sm:aspect-[16/10] lg:aspect-auto lg:min-h-[480px] bg-[#E8E4DE]">
               <Image
                 src={persona.photo}
-                alt={`${t("landing", "illustration")} — ${persona.label}`}
+                alt={`${t("landing", "illustration")}: ${persona.label}`}
                 fill
                 priority={active === 0}
                 sizes="(max-width: 1024px) 100vw, 50vw"

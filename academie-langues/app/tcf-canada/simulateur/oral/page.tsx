@@ -228,7 +228,7 @@ export default function ModeOral() {
     setAiSpeaking(false);
     setLoading(false);
     setTranscribing(false);
-    setHint("Temps écoulé — correction automatique…");
+    setHint("Temps écoulé. Correction automatique en cours…");
   }, [timer, activeTask, selectedSubject, resultat]);
 
   useEffect(() => {
@@ -239,7 +239,7 @@ export default function ModeOral() {
     setAutoCorrectPending(true);
     mediaRecorderRef.current?.stop();
     setIsRecording(false);
-    setHint("Dialogue terminé — correction automatique…");
+    setHint("Dialogue terminé. Correction automatique en cours…");
   }, [activeTask, selectedSubject, resultat, userTurns]);
 
   // --------- ✅ Interaction Tâche 2 — reçoit le texte directement ---------
@@ -254,7 +254,7 @@ export default function ModeOral() {
 
     if (currentUserTurns >= MAX_TURNS) {
       setAutoCorrectPending(true);
-      setHint("Dialogue terminé — correction automatique…");
+      setHint("Dialogue terminé. Correction automatique en cours…");
       return;
     }
 
@@ -444,8 +444,8 @@ export default function ModeOral() {
     if (activeTask === 2 && (task2Locked || taskTimeUp)) {
       setHint(
         taskTimeUp
-          ? "Temps écoulé — correction en cours…"
-          : "Tous les tours sont utilisés — correction en cours…",
+          ? "Temps écoulé. Correction en cours…"
+          : "Tous les tours sont utilisés. Correction en cours…",
       );
       setTimeout(() => setHint(null), 2500);
       return;
@@ -773,7 +773,7 @@ export default function ModeOral() {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     setTxt([255, 200, 150] as [number, number, number]);
-    doc.text("Simulateur Oral — Rapport de correction", mL + 2, 16.5);
+    doc.text("Rapport de correction du simulateur oral", mL + 2, 16.5);
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
