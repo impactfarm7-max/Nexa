@@ -5,9 +5,6 @@ import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../utils/supabase";
 import { Mail, Lock, Phone, Eye, EyeOff, MessageCircle, X, CheckCircle2, ArrowRight, Clock, ShieldOff } from "lucide-react";
-import { computeTutorUnlockAt } from "@/app/utils/tutor-unlock";
-import { TUTOR_EXCHANGE_QUOTA } from "@/app/utils/tutor-quota";
-import { getTcfCenterQuotas } from "@/app/data/packOffers";
 import { logClientActivity } from "../utils/client-activity";
 import { resolvePostLoginPath, isCenterStaff, isSuperAdmin, isPrivilegedRole } from "../utils/student-routes";
 import { prepareForLogin, isRefreshTokenError } from "../utils/supabase-auth";
@@ -889,79 +886,40 @@ function LoginPageContent() {
 
     if (data.user) {
       const trialEndsAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-      await supabase.from("profiles").upsert({
-        id: data.user.id,
-        prenom: prenom.trim(),
-        nom: nom.trim() || null,
-        phone: fullPhone || null,
-        email: email.trim(),
-        ville: ville.trim() || null,
-        city: ville.trim() || null,
-        country: selectedCountry?.name || null,
-        country_code: dial || null,
-        birth_date: birthDate,
-        role: "student",
-        ...(centerContext ? {
-          center_id: centerContext.id,
-          created_by_center_id: centerContext.id,
-          center_status: "pending_center_approval",
-          subscription_ends_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-          tutor_unlock_at: computeTutorUnlockAt(new Date()),
-          ...getTcfCenterQuotas(3),
-          tag_status: "pending_center_approval",
-        } : {
-          pack_name: "essai",
-          subscription_ends_at: trialEndsAt,
-          tag_status: "actif",
-          ee_total: 9999,
-          ee_used: 0,
-          exam_total: 9999,
-          exam_used: 0,
-          exam_4m_total: 4,
-          exam_4m_used: 0,
-          eo_total: 9999,
-          eo_used: 0,
-          coaching_total: 9999,
-          coaching_used: 0,
-          tutor_ia_total: TUTOR_EXCHANGE_QUOTA,
-          tutor_ia_used: 0,
-        }),
-        simulations_completed: 0,
-        last_sign_in_at: new Date().toISOString(),
-      });
 
-      // Ensure center signup status sticks even if an auth trigger wrote a default first.
-      if (centerContext) {
-        const { error: statusErr } = await supabase.from("profiles").update({
-          center_id: centerContext.id,
-          created_by_center_id: centerContext.id,
-          center_status: "pending_center_approval",
-          tag_status: "pending_center_approval",
-        }).eq("id", data.user.id);
-        if (statusErr) console.error("center signup status update:", statusErr.message);
-      }
-
-      if (centerContext || selectedCountry) {
-        await supabase.from("student_details").upsert({
-          student_id: data.user.id,
-          country: selectedCountry?.name || null,
-          country_code: dial || null,
+      // Ecriture du profil cote serveur (service_role) : `signUp()` ne renvoie
+      // pas toujours de session (ex: confirmation email active), auquel cas un
+      // `supabase.from(...).upsert()` cote client tourne sans authentification
+      // et est bloque en silence par les policies RLS ("to authenticated").
+      let completeErr: string | null = null;
+      try {
+        const res = await fetch("/api/auth/complete-student-signup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: data.user.id,
+            email: email.trim(),
+            prenom: prenom.trim(),
+            nom: nom.trim(),
+            phone: fullPhone,
+            ville: ville.trim(),
+            country: selectedCountry?.name || null,
+            countryCode: dial || null,
+            birthDate,
+            centerId: centerContext?.id || null,
+          }),
         });
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          completeErr = payload?.error || "Erreur lors de la finalisation du compte.";
+        }
+      } catch {
+        completeErr = "Erreur réseau lors de la finalisation du compte.";
       }
 
-      if (centerContext && data.session) {
-        try {
-          await fetch("/api/center/student-classroom", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${data.session.access_token}`,
-            },
-            body: JSON.stringify({ centerId: centerContext.id }),
-          });
-        } catch {
-          // Non bloquant : le centre pourra assigner la salle à l'activation
-        }
+      if (completeErr) {
+        setLoading(false);
+        return showError(completeErr);
       }
 
       logClientActivity("Creation de compte", "Compte client cree depuis la page login");
