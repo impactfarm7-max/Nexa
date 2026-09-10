@@ -18,6 +18,7 @@ import {
 import TypewriterHeroTitle from "@/app/components/landing/TypewriterHeroTitle";
 import LanguageSwitcher from "@/app/components/LanguageSwitcher";
 import AgentContactMenu from "@/app/components/landing/AgentContactMenu";
+import VisitModal from "@/app/components/landing/VisitModal";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
 const ORANGE = BRAND.orange;
@@ -33,6 +34,7 @@ export default function LandingPage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [visitOpen, setVisitOpen] = useState(false);
 
   /* ── Redirection session (inchangé — routes préservées) ── */
   useEffect(() => {
@@ -121,6 +123,13 @@ export default function LandingPage() {
               {t("landing", "discover")}
             </Link>
             <AgentContactMenu />
+            <button
+              type="button"
+              onClick={() => setVisitOpen(true)}
+              className="hidden md:flex items-center h-10 px-4 rounded-xl text-[12px] xl:text-[13px] font-bold border border-black/10 bg-white hover:border-black/20 transition whitespace-nowrap"
+            >
+              Visiter
+            </button>
             <Link href="/login" className="flex items-center h-10 px-4 sm:px-5 rounded-xl text-[12px] xl:text-[13px] font-black text-white transition hover:opacity-90 whitespace-nowrap" style={{ backgroundColor: BRAND.blue }}>
               {t("landing", "login")}
             </Link>
@@ -336,6 +345,8 @@ export default function LandingPage() {
           <p className="text-[10px] text-neutral-300 font-bold">© {new Date().getFullYear()} NEXA</p>
         </div>
       </footer>
+
+      <VisitModal open={visitOpen} onClose={() => setVisitOpen(false)} />
     </div>
   );
 }
