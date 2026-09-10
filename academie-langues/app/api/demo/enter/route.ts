@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
     .eq("role", wantedRole);
 
   if (profilesErr) {
-    return NextResponse.json({ error: profilesErr.message }, { status: 500 });
+    console.error("demo/enter: profiles query failed", profilesErr);
+    return NextResponse.json({ error: "Erreur serveur, réessayez plus tard." }, { status: 500 });
   }
 
   const match = (candidates || []).find(
@@ -64,10 +65,8 @@ export async function POST(req: NextRequest) {
     (linkData as { properties?: { hashed_token?: string } } | null)?.properties?.hashed_token || null;
 
   if (linkError || !hashedToken) {
-    return NextResponse.json(
-      { error: linkError?.message || "Impossible de créer la session de visite." },
-      { status: 500 },
-    );
+    console.error("demo/enter: generateLink failed", linkError);
+    return NextResponse.json({ error: "Erreur serveur, réessayez plus tard." }, { status: 500 });
   }
 
   return NextResponse.json({ token_hash: hashedToken, centerName: match.centers.name });

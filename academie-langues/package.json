@@ -7,7 +7,7 @@
     "build": "next build && node scripts/fix-sw.mjs",
     "start": "next start",
     "lint": "next lint",
-    "test": "node --test \"app/**/*.test.mjs\""
+    "test": "node --experimental-strip-types --test \"app/**/*.test.mjs\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",

@@ -173,6 +173,13 @@ export default function LandingPage() {
                 <Link href="/presentation" onClick={() => setMobileNavOpen(false)} className="flex items-center h-11 px-4 rounded-xl text-sm font-bold border border-black/10 bg-white">
                   {t("landing", "discover")}
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => { setMobileNavOpen(false); setVisitOpen(true); }}
+                  className="flex items-center h-11 px-4 rounded-xl text-sm font-bold border border-black/10 bg-white"
+                >
+                  Visiter
+                </button>
                 <AgentContactMenu mobile />
                 <Link href="/login" onClick={() => setMobileNavOpen(false)} className="flex items-center justify-center h-11 px-4 rounded-xl text-sm font-black text-white" style={{ backgroundColor: BRAND.blue }}>
                   {t("landing", "login")}

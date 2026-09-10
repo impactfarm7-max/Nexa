@@ -65,7 +65,11 @@ export async function middleware(request: NextRequest) {
       .maybeSingle()
     // Fail closed : si la vérification échoue (réseau, RLS, etc.), on bloque
     // plutôt que de laisser passer une écriture non vérifiée.
-    if (profileError || profile?.is_demo_account) {
+    if (profileError) {
+      console.error('middleware: profile check failed', profileError)
+      return NextResponse.json({ error: 'Vérification impossible, réessayez.' }, { status: 403 })
+    }
+    if (profile?.is_demo_account) {
       return NextResponse.json({ error: 'Lecture seule (mode visite).' }, { status: 403 })
     }
   }

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import { Eye, X } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { supabase } from "@/app/utils/supabase";
+import { clearViewAs } from "@/app/utils/view-as";
+import { clearCenterMeCache } from "@/app/utils/center-me-cache";
+import { clearStudentAccessCache } from "@/app/utils/student-access-cache";
 import {
   VISIT_MODE_EVENT,
   clearVisitMode,
@@ -38,6 +41,14 @@ export default function VisitModeBanner() {
   const exit = async () => {
     setExiting(true);
     clearVisitMode();
+    clearCenterMeCache();
+    clearStudentAccessCache();
+    clearViewAs();
+    try {
+      sessionStorage.removeItem("is_unlocked");
+    } catch {
+      // ignore
+    }
     try {
       await supabase.auth.signOut();
     } catch {
