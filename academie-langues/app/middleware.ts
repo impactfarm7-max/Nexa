@@ -52,6 +52,21 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ error: 'Non authentifié' }, { status: 401 })
   }
 
+  // Mode visite (bouton "Visiter" landing) : comptes démo en lecture seule.
+  // Vérifié ici (et pas seulement côté client) car c'est la garantie réelle,
+  // indépendante d'un flag sessionStorage contournable.
+  const isMutatingMethod = !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
+  if (request.nextUrl.pathname.startsWith('/api') && user && isMutatingMethod) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('is_demo_account')
+      .eq('id', user.id)
+      .maybeSingle()
+    if (profile?.is_demo_account) {
+      return NextResponse.json({ error: 'Lecture seule (mode visite).' }, { status: 403 })
+    }
+  }
+
   return response
 }
 
