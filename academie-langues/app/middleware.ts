@@ -44,6 +44,7 @@ export async function middleware(request: NextRequest) {
     '/api/support/guest',
     '/api/pin/',
     '/api/activity',
+    '/api/demo/',
   ];
   const isPublicApi = PUBLIC_API_ROUTES.some(r => request.nextUrl.pathname.startsWith(r));
 
