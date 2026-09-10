@@ -2,9 +2,10 @@
 
 import { useState, type ElementType, type ReactNode } from "react";
 import { ChevronDown, Pencil, Camera, Loader2 } from "lucide-react";
+import { BRAND } from "@/app/utils/brand";
 
-export const P_BLUE = "#11224E";
-export const P_ORANGE = "#eb670e";
+export const P_BLUE = BRAND.blue;
+export const P_ORANGE = BRAND.orange;
 export const P_SURFACE = "#F7F7F6";
 export const P_BORDER = "rgba(17,34,78,0.08)";
 
@@ -65,7 +66,7 @@ export function IdCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-center sm:justify-start gap-1.5">
-            <h1 className="text-[19px] font-extrabold tracking-tight truncate" style={{ color: P_BLUE }}>
+            <h1 className="font-display text-[19px] font-extrabold tracking-tight truncate" style={{ color: P_BLUE }}>
               {name}
             </h1>
             {verified && (
@@ -122,7 +123,7 @@ export function Group({ title, action, children }: { title: string; action?: Rea
   return (
     <section className="space-y-2.5">
       <div className="flex items-center justify-between gap-3 px-1">
-        <h2 className="text-[11px] font-black uppercase tracking-widest" style={{ color: "rgba(17,34,78,0.4)" }}>
+        <h2 className="font-display text-[11px] font-black uppercase tracking-widest" style={{ color: "rgba(17,34,78,0.4)" }}>
           {title}
         </h2>
         {action}
@@ -149,7 +150,7 @@ export function Row({
       <Icon size={16} className="shrink-0" style={{ color: P_ORANGE }} strokeWidth={1.9} />
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-semibold" style={{ color: "rgba(17,34,78,0.4)" }}>{label}</p>
-        <p className="text-[13.5px] font-bold truncate" style={{ color: P_BLUE }}>{value}</p>
+        <p className="font-display text-[13.5px] font-bold truncate" style={{ color: P_BLUE }}>{value}</p>
       </div>
     </div>
   );
@@ -190,7 +191,7 @@ export function EditableRow({
             style={{ color: P_BLUE, borderColor: "rgba(235,103,14,0.4)" }}
           />
         ) : (
-          <p className="text-[13.5px] font-bold truncate" style={{ color: P_BLUE }}>{value}</p>
+          <p className="font-display text-[13.5px] font-bold truncate" style={{ color: P_BLUE }}>{value}</p>
         )}
       </div>
     </div>
@@ -229,7 +230,7 @@ export function AccordionRow({
           <Icon size={16} style={{ color: P_BLUE }} strokeWidth={1.9} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[13.5px] font-bold" style={{ color: P_BLUE }}>{label}</span>
+          <span className="font-display block text-[13.5px] font-bold" style={{ color: P_BLUE }}>{label}</span>
           {description && (
             <span className="block text-[12px] font-medium mt-0.5" style={{ color: "rgba(17,34,78,0.45)" }}>{description}</span>
           )}
@@ -272,7 +273,7 @@ export function ToggleRow({
     >
       <Icon size={16} className="shrink-0" style={{ color: P_ORANGE }} strokeWidth={1.9} />
       <span className="min-w-0 flex-1">
-        <span className="block text-[13.5px] font-bold" style={{ color: P_BLUE }}>{label}</span>
+        <span className="font-display block text-[13.5px] font-bold" style={{ color: P_BLUE }}>{label}</span>
         {description && (
           <span className="block text-[12px] font-medium mt-0.5" style={{ color: "rgba(17,34,78,0.45)" }}>{description}</span>
         )}
@@ -328,7 +329,7 @@ export function ButtonRow({
         <Icon size={16} className="shrink-0" style={{ color }} strokeWidth={1.9} />
       )}
       <span className="min-w-0 flex-1">
-        <span className="block text-[13.5px] font-bold" style={{ color }}>{label}</span>
+        <span className="font-display block text-[13.5px] font-bold" style={{ color }}>{label}</span>
         {description && (
           <span className="block text-[12px] font-medium mt-0.5" style={{ color: "rgba(17,34,78,0.45)" }}>{description}</span>
         )}

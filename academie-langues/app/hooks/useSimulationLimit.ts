@@ -10,12 +10,15 @@ import { isPluriannualCenter } from "@/app/data/center-types";
 
 // Utilitaires de dates pour les Formations et Essais
 function getTodayStr() { return new Date().toISOString().slice(0, 10); }
+// Date (lundi de la semaine courante) au format YYYY-MM-DD : identifie la
+// semaine de façon unique tout en restant une valeur "date" SQL valide.
+// (L'ancien format "YYYY-Www" faisait échouer le PATCH profiles en 400 si
+// weekly_eo_reset_date est typée `date` en base.)
 function getWeekStr() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 3 - (d.getDay() + 6) % 7);
-  const week1 = new Date(d.getFullYear(), 0, 4);
-  return d.getFullYear() + '-W' + (1 + Math.round(((d.getTime() - week1.getTime()) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7));
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
 }
 
 // Caches locaux pour le confort utilisateur

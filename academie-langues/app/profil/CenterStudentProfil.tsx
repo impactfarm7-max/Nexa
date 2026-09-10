@@ -4,9 +4,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  AlertTriangle,
   ArrowLeft,
   Building2,
   Calendar,
+  CheckCircle2,
+  Clock,
   CreditCard,
   Lock,
   LogOut,
@@ -18,6 +21,8 @@ import {
   Save,
   ShieldCheck,
   Smartphone,
+  Target,
+  Timer,
   User,
   Wallet,
 } from "lucide-react";
@@ -502,7 +507,7 @@ export default function CenterStudentProfil() {
           </Link>
           <div className="min-w-0 flex-1">
             <h1
-              className="truncate text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight"
+              className="font-display truncate text-2xl sm:text-3xl font-black tracking-tight leading-tight"
               style={{ color: BRAND.blue }}
             >
               {td("profilMyProfile")}
@@ -512,7 +517,7 @@ export default function CenterStudentProfil() {
             {!isEditing ? (
               <button
                 onClick={startEditing}
-                className="flex h-9 sm:h-10 items-center gap-2 rounded-lg border px-3.5 text-xs font-semibold"
+                className="font-display flex h-9 sm:h-10 items-center gap-2 rounded-lg border px-3.5 text-xs font-bold"
                 style={{ color: BRAND.blue, border: `1.5px solid ${BRAND.blue}` }}
               >
                 <span className="hidden sm:inline">{td("profilEdit")}</span>
@@ -522,14 +527,14 @@ export default function CenterStudentProfil() {
               <>
                 <button
                   onClick={cancelEditing}
-                  className="hidden sm:flex h-9 sm:h-10 items-center rounded-lg border border-black/[0.08] px-3.5 text-xs font-semibold text-neutral-600"
+                  className="font-display hidden sm:flex h-9 sm:h-10 items-center rounded-lg border border-black/[0.08] px-3.5 text-xs font-bold text-neutral-600"
                 >
                   {td("profilCancel")}
                 </button>
                 <button
                   onClick={saveProfile}
                   disabled={saving}
-                  className="flex h-9 sm:h-10 items-center gap-2 rounded-lg px-3.5 text-xs font-semibold text-white disabled:opacity-50"
+                  className="font-display flex h-9 sm:h-10 items-center gap-2 rounded-lg px-3.5 text-xs font-bold text-white disabled:opacity-50"
                   style={{ backgroundColor: BRAND.blue }}
                 >
                   <Save className="h-3.5 w-3.5" />
@@ -579,7 +584,7 @@ export default function CenterStudentProfil() {
       <div className="nexa-student-shell pt-5 md:pt-8 pb-6 max-w-5xl space-y-4">
         <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] gap-4 items-start">
-        <div className="space-y-4 min-w-0">
+        <div className="space-y-4 min-w-0 lg:col-start-1">
         <IdCard
           photoUrl={account.profile.avatar_url}
           photoIcon={User}
@@ -612,14 +617,14 @@ export default function CenterStudentProfil() {
             editing={isEditing} editValue={form.phone} onEditChange={(v) => setForm((c) => ({ ...c, phone: v }))} />
           {isEditing ? (
             <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5">
-              <Building2 size={16} className="shrink-0" style={{ color: "#eb670e" }} strokeWidth={1.9} />
+              <Building2 size={16} className="shrink-0" style={{ color: BRAND.orange }} strokeWidth={1.9} />
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold mb-1" style={{ color: "rgba(17,34,78,0.4)" }}>{td("profilCountry")}</p>
                 <select
                   value={form.countryCode}
                   onChange={(e) => setForm((c) => ({ ...c, countryCode: e.target.value }))}
-                  className="w-full h-8 -mt-1 bg-transparent text-[13.5px] font-bold outline-none border-b"
-                  style={{ color: "#11224E", borderColor: "rgba(235,103,14,0.4)" }}
+                  className="font-display w-full h-8 -mt-1 bg-transparent text-[13.5px] font-bold outline-none border-b"
+                  style={{ color: BRAND.blue, borderColor: "rgba(235,103,14,0.4)" }}
                 >
                   <option value="">{td("profilSelectCountry")}</option>
                   {AFRICA_54.map((c) => (
@@ -640,7 +645,177 @@ export default function CenterStudentProfil() {
         </Group>
         </div>
 
-        <div className="space-y-4 min-w-0">
+        <div className="space-y-4 min-w-0 lg:col-start-2">
+        <Group title={account.isPluriannual ? td("profilMyPath") : td("profilMyOffer")}>
+          <Row icon={Package} label={td("profilActivePack")} value={account.isPluriannual ? td("pluriannualProgram") : packLabel} />
+          <Row icon={Clock} label={td("profilDuration")} value={durationLabel} />
+          <Row icon={Calendar} label={td("profilAccessEnds")} value={formatDateFr(account.profile.subscription_ends_at, locale)} />
+          <Row icon={Timer} label={td("profilDaysLeft")} value={subscriptionDaysLeft != null ? td("profilDaysCount", { count: subscriptionDaysLeft }) : emptyValue} />
+          <Row icon={CheckCircle2} label={td("profilValidatedOn")} value={formatDateFr(account.enrollment?.enrolled_at, locale)} />
+          {account.enrollment?.price_note ? (
+            <Row icon={CreditCard} label={td("profilPaymentNote")} value={account.enrollment.price_note} />
+          ) : null}
+          {!account.isPluriannual && account.nexaQuotas !== null && (
+            <AccordionRow
+              icon={Target}
+              label={td("profilNexaQuotas")}
+              description={`${td("profilNexaQuotasHint")}${account.nexaOffer ? ` (${String(account.nexaOffer).toUpperCase()})` : ""}`}
+              open={acc.isOpen("quotas")}
+              onToggle={() => acc.toggle("quotas")}
+            >
+              <div className="rounded-xl border bg-white overflow-hidden divide-y" style={{ borderColor: "rgba(17,34,78,0.08)" }}>
+                {NEXA_STUDENT_QUOTA_LABELS.map(({ key, label }) => {
+                  const quotas = account.nexaQuotas || NEXA_STUDENT_QUOTAS;
+                  const allocated = quotas[key];
+                  const p = account.profile;
+                  let usage: string | null = null;
+                  if (key === "expressionEcrite" && p.ee_total != null) {
+                    usage = `${Math.max(0, (p.ee_total || 0) - (p.ee_used || 0))} / ${p.ee_total}`;
+                  } else if (key === "modesExamensEe" && p.exam_total != null) {
+                    usage = `${Math.max(0, (p.exam_total || 0) - (p.exam_used || 0))} / ${p.exam_total}`;
+                  } else if (key === "expressionOrale" && p.eo_total != null) {
+                    usage = `${Math.max(0, (p.eo_total || 0) - (p.eo_used || 0))} / ${p.eo_total}`;
+                  } else if (key === "examenBlanc" && p.exam_4m_total != null) {
+                    usage = `${Math.max(0, (p.exam_4m_total || 0) - (p.exam_4m_used || 0))} / ${p.exam_4m_total}`;
+                  } else if (key === "sessionsTuteurIa" && p.tutor_ia_total != null) {
+                    usage = `${Math.max(0, (p.tutor_ia_total || 0) - (p.tutor_ia_used || 0))} / ${p.tutor_ia_total}`;
+                  }
+                  const value =
+                    typeof allocated === "boolean"
+                      ? allocated
+                        ? td("profilIncluded")
+                        : emptyValue
+                      : usage || String(allocated);
+                  return <Row key={key} icon={Target} label={label} value={value} />;
+                })}
+              </div>
+            </AccordionRow>
+          )}
+        </Group>
+
+        <Group title={td("profilFinance")}>
+          {account.finance ? (
+            <>
+              <Row icon={Wallet} label={td("profilFinancialStatus")} value={localizedFinanceStatus(account.finance.financial_status)} />
+              <Row icon={CreditCard} label={td("profilProgramCost")} value={`${account.finance.tuition_fee.toLocaleString(financeLocale)} FCFA`} />
+              <Row icon={CheckCircle2} label={td("profilPaid")} value={`${account.finance.tuition_paid.toLocaleString(financeLocale)} FCFA`} />
+              <Row icon={AlertTriangle} label={td("profilBalanceDue")} value={`${account.finance.remaining.toLocaleString(financeLocale)} FCFA`} />
+              <Row
+                icon={Target}
+                label={td("profilProgress")}
+                value={
+                  account.finance.tuition_fee > 0
+                    ? `${Math.min(100, Math.round((account.finance.tuition_paid / account.finance.tuition_fee) * 100))} %`
+                    : emptyValue
+                }
+              />
+              {(account.finance.discount_amount || 0) > 0 && (
+                <Row
+                  icon={CreditCard}
+                  label={td("profilDiscount")}
+                  value={`−${(account.finance.discount_amount || 0).toLocaleString(financeLocale)} FCFA${account.finance.discount_reason ? `${financeEn ? ": " : " — "}${account.finance.discount_reason}` : ""}`}
+                />
+              )}
+
+              {(account.installments?.length || 0) > 0 && (
+                <AccordionRow
+                  icon={Calendar}
+                  label={td("profilPaymentSchedule")}
+                  open={acc.isOpen("installments")}
+                  onToggle={() => acc.toggle("installments")}
+                >
+                  <div className="space-y-2">
+                    {account.installments!.map((inst) => {
+                      const deferred = !!inst.original_due_date && inst.original_due_date !== inst.due_date;
+                      const sold = inst.status === "paid" || inst.paid_amount >= inst.amount;
+                      return (
+                        <div key={inst.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl border bg-white px-3 py-2.5" style={{ borderColor: "rgba(17,34,78,0.08)" }}>
+                          <div className="min-w-0">
+                            <p className="text-[13.5px] font-bold" style={{ color: "#11224E" }}>
+                              {localizeInstallmentLabel(inst.label, financeEn ? "en" : "fr") || td("profilInstallment")}
+                              {sold ? ` · ${localizedFinanceStatus("paid")}` : deferred ? ` · ${td("profilDeferred")}` : ""}
+                            </p>
+                            <p className="mt-0.5 text-[11px] font-semibold" style={{ color: "rgba(17,34,78,0.45)" }}>
+                              {td("profilInstallment")} : {financeDate(inst.due_date)}
+                              {deferred && inst.original_due_date ? ` · ${td("profilInitially")} ${financeDate(inst.original_due_date)}` : ""}
+                            </p>
+                            {inst.deferral_reason && (
+                              <p className="mt-0.5 text-[11px] font-medium" style={{ color: "rgba(17,34,78,0.45)" }}>{td("profilPausedReasonLabel")} : {inst.deferral_reason}</p>
+                            )}
+                          </div>
+                          <p className="text-[13.5px] font-bold whitespace-nowrap" style={{ color: "#11224E" }}>{inst.amount.toLocaleString(financeLocale)} FCFA</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </AccordionRow>
+              )}
+
+              <AccordionRow
+                icon={CheckCircle2}
+                label={td("profilPaymentHistory")}
+                open={acc.isOpen("payments")}
+                onToggle={() => acc.toggle("payments")}
+              >
+                {account.payments.length > 0 ? (
+                  <div className="space-y-2">
+                    {account.payments.map((payment) => (
+                      <div key={payment.id} className="flex flex-wrap items-start justify-between gap-2 rounded-xl border bg-white px-3 py-2.5" style={{ borderColor: "rgba(17,34,78,0.08)" }}>
+                        <div className="min-w-0">
+                          <p className="text-[13.5px] font-bold whitespace-nowrap" style={{ color: "#11224E" }}>{payment.amount.toLocaleString(financeLocale)} FCFA</p>
+                          <p className="mt-0.5 text-[11px] font-semibold" style={{ color: "rgba(17,34,78,0.45)" }}>
+                            {financeDate(payment.payment_date)}
+                            {payment.payment_method ? ` · ${localizePaymentMethod(payment.payment_method, financeEn ? "en" : "fr")}` : ""}
+                            {payment.receipt_number ? ` · ${payment.receipt_number}` : ""}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[12px] font-medium" style={{ color: "rgba(17,34,78,0.45)" }}>{td("profilNoPaymentsYet")}</p>
+                )}
+              </AccordionRow>
+
+              {(account.financeEvents?.length || 0) > 0 && (
+                <AccordionRow
+                  icon={CreditCard}
+                  label={td("profilDeferralsDiscounts")}
+                  open={acc.isOpen("financeEvents")}
+                  onToggle={() => acc.toggle("financeEvents")}
+                >
+                  <div className="space-y-2">
+                    {account.financeEvents!.map((ev) => (
+                      <div key={ev.id} className="rounded-xl border bg-white px-3 py-2.5" style={{ borderColor: "rgba(17,34,78,0.08)" }}>
+                        <p className="text-[11px] font-semibold" style={{ color: "rgba(17,34,78,0.45)" }}>
+                          {ev.type === "deferral"
+                            ? td("profilDeferral")
+                            : ev.type === "discount"
+                              ? td("profilDiscount")
+                              : ev.type === "payment_note"
+                                ? td("profilPaymentNote")
+                                : ev.type}
+                          {" · "}{financeDate(ev.created_at)}
+                        </p>
+                        <p className="mt-0.5 text-[13.5px] font-bold" style={{ color: "#11224E" }}>
+                          {ev.type === "discount" && ev.amount != null
+                            ? `−${Number(ev.amount).toLocaleString(financeLocale)} FCFA${financeEn ? ": " : " — "}`
+                            : ""}
+                          {ev.reason || emptyValue}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionRow>
+              )}
+            </>
+          ) : (
+            <Row icon={Wallet} label={td("profilFinance")} value={td("profilFinanceUnavailable")} />
+          )}
+        </Group>
+        </div>
+
+        <div className="space-y-4 min-w-0 lg:col-start-1">
         <Group title={td("profilSecurityTitle")}>
           <AccordionRow
             icon={Lock}
@@ -685,262 +860,6 @@ export default function CenterStudentProfil() {
           <ButtonRow icon={LogOut} label={td("profilSignOut")} onClick={() => setLogoutConfirmOpen(true)} tone="danger" />
         </Group>
         <div className="hidden"><DownloadAppButton /></div>
-
-          <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 md:p-6 shadow-sm">
-            <div className="mb-4 sm:mb-6 flex items-start sm:items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: BRAND.orange }}>
-                <Package className="h-5 w-5" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-lg sm:text-xl font-black">
-                  {account.isPluriannual ? td("profilMyPath") : td("profilMyOffer")}
-                </p>
-                <p className="text-[11px] sm:text-xs font-bold text-slate-400">
-                  {account.isPluriannual ? td("profilPathDetails") : td("profilOfferDetails")}
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-orange-100 bg-orange-50/60 p-4 sm:p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-orange-600">
-                {account.isPluriannual ? td("profilActivePath") : td("profilActivePack")}
-              </p>
-              <p className="mt-1 break-words text-xl sm:text-2xl font-black" style={{ color: BRAND.blue }}>
-                {account.isPluriannual ? td("pluriannualProgram") : packLabel}
-              </p>
-              <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-                <Stat label={td("profilDuration")} value={durationLabel} />
-                <Stat label={td("profilAccessEnds")} value={formatDateFr(account.profile.subscription_ends_at, locale)} />
-                <Stat label={td("profilDaysLeft")} value={subscriptionDaysLeft != null ? td("profilDaysCount", { count: subscriptionDaysLeft }) : "—"} />
-                <Stat label={td("profilValidatedOn")} value={formatDateFr(account.enrollment?.enrolled_at, locale)} />
-              </div>
-              {account.enrollment?.price_note ? (
-                <p className="mt-4 text-xs font-bold text-slate-500 break-words">{account.enrollment.price_note}</p>
-              ) : null}
-            </div>
-
-            {!account.isPluriannual && account.nexaQuotas !== null && (
-            <div className="mt-4 rounded-2xl border border-neutral-100 bg-neutral-50/80 p-4 sm:p-5">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilNexaQuotas")}</p>
-              <p className="mt-1 text-[11px] font-bold text-slate-500">
-                {td("profilNexaQuotasHint")}
-                {account.nexaOffer ? ` (${String(account.nexaOffer).toUpperCase()})` : ""}.
-              </p>
-              <div className="mt-4 grid grid-cols-1 gap-2.5 min-[380px]:grid-cols-2">
-                {NEXA_STUDENT_QUOTA_LABELS.map(({ key, label }) => {
-                  const quotas = account.nexaQuotas || NEXA_STUDENT_QUOTAS;
-                  const allocated = quotas[key];
-                  const p = account.profile;
-                  let usage: string | null = null;
-                  if (key === "expressionEcrite" && p.ee_total != null) {
-                    usage = `${Math.max(0, (p.ee_total || 0) - (p.ee_used || 0))} / ${p.ee_total}`;
-                  } else if (key === "modesExamensEe" && p.exam_total != null) {
-                    usage = `${Math.max(0, (p.exam_total || 0) - (p.exam_used || 0))} / ${p.exam_total}`;
-                  } else if (key === "expressionOrale" && p.eo_total != null) {
-                    usage = `${Math.max(0, (p.eo_total || 0) - (p.eo_used || 0))} / ${p.eo_total}`;
-                  } else if (key === "examenBlanc" && p.exam_4m_total != null) {
-                    usage = `${Math.max(0, (p.exam_4m_total || 0) - (p.exam_4m_used || 0))} / ${p.exam_4m_total}`;
-                  } else if (key === "sessionsTuteurIa" && p.tutor_ia_total != null) {
-                    usage = `${Math.max(0, (p.tutor_ia_total || 0) - (p.tutor_ia_used || 0))} / ${p.tutor_ia_total}`;
-                  }
-                  const value =
-                    typeof allocated === "boolean"
-                      ? allocated
-                        ? td("profilIncluded")
-                        : "—"
-                      : usage || String(allocated);
-                  return <Stat key={key} label={label} value={value} />;
-                })}
-              </div>
-            </div>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-neutral-200 bg-white p-4 sm:p-5 md:p-6 shadow-sm">
-            <div className="mb-4 sm:mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-              <div className="flex min-w-0 items-start sm:items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ backgroundColor: BRAND.blue }}>
-                  <Wallet className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-lg sm:text-xl font-black">{td("profilFinance")}</p>
-                  <p className="text-[11px] sm:text-xs font-bold text-slate-400">{td("profilFinanceHint")}</p>
-                </div>
-              </div>
-              {account.finance ? (
-                <span
-                  className={`inline-flex w-fit rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-widest ${
-                    account.finance.financial_status === "paid"
-                      ? "border-emerald-100 bg-emerald-50 text-emerald-700"
-                      : account.finance.financial_status === "late"
-                        ? "border-red-100 bg-red-50 text-red-600"
-                        : "border-orange-100 bg-orange-50 text-orange-600"
-                  }`}
-                >
-                  {localizedFinanceStatus(account.finance.financial_status)}
-                </span>
-              ) : null}
-            </div>
-
-            {account.finance ? (
-              <>
-                <div className="mb-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <FinanceCard label={td("profilProgramCost")} value={`${account.finance.tuition_fee.toLocaleString(financeLocale)} FCFA`} />
-                  <FinanceCard label={td("profilPaid")} value={`${account.finance.tuition_paid.toLocaleString(financeLocale)} FCFA`} accent="emerald" />
-                  <FinanceCard label={td("profilBalanceDue")} value={`${account.finance.remaining.toLocaleString(financeLocale)} FCFA`} accent="red" />
-                </div>
-
-                {(account.finance.discount_amount || 0) > 0 && (
-                  <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">{td("profilDiscount")}</p>
-                    <p className="mt-1 text-sm font-black text-amber-900">
-                      −{(account.finance.discount_amount || 0).toLocaleString(financeLocale)} FCFA
-                      {account.finance.discount_reason ? `${financeEn ? ": " : " — "}${account.finance.discount_reason}` : ""}
-                    </p>
-                  </div>
-                )}
-
-                <div className="mb-5 rounded-2xl border border-neutral-100 bg-neutral-50 px-3 sm:px-4 py-4">
-                  <div className="flex flex-wrap items-end justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilFinancialStatus")}</p>
-                      <p className="mt-1 text-sm font-black text-slate-900">{localizedFinanceStatus(account.finance.financial_status)}</p>
-                    </div>
-                    <div className="text-left sm:text-right">
-                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilProgress")}</p>
-                      <p className="mt-1 text-sm font-black text-slate-900">
-                        {account.finance.tuition_fee > 0
-                          ? `${Math.min(100, Math.round((account.finance.tuition_paid / account.finance.tuition_fee) * 100))} %`
-                          : "—"}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
-                    <div
-                      className="h-full rounded-full transition-all"
-                      style={{
-                        width: `${
-                          account.finance.tuition_fee > 0
-                            ? Math.min(100, Math.round((account.finance.tuition_paid / account.finance.tuition_fee) * 100))
-                            : 0
-                        }%`,
-                        backgroundColor: BRAND.orange,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                {(account.installments?.length || 0) > 0 && (
-                  <div className="mb-5">
-                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilPaymentSchedule")}</p>
-                    <div className="space-y-2">
-                      {account.installments!.map((inst) => {
-                        const deferred = !!inst.original_due_date && inst.original_due_date !== inst.due_date;
-                        const sold = inst.status === "paid" || inst.paid_amount >= inst.amount;
-                        return (
-                          <div key={inst.id} className="rounded-2xl border border-neutral-100 bg-neutral-50 p-3 sm:p-4">
-                            <div className="flex flex-wrap items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="text-sm font-black text-slate-900">{localizeInstallmentLabel(inst.label, financeEn ? "en" : "fr") || td("profilInstallment")}</p>
-                                  {deferred && (
-                                    <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-blue-600">
-                                      {td("profilDeferred")}
-                                    </span>
-                                  )}
-                                  {sold && (
-                                    <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest text-emerald-700">
-                                      {localizedFinanceStatus("paid")}
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="mt-1 text-xs font-bold text-slate-500">
-                                  {td("profilInstallment")} : {financeDate(inst.due_date)}
-                                  {deferred && inst.original_due_date
-                                    ? ` · ${td("profilInitially")} ${financeDate(inst.original_due_date)}`
-                                    : ""}
-                                </p>
-                                {inst.deferral_reason && (
-                                  <p className="mt-0.5 text-[11px] font-medium text-blue-600">{td("profilPausedReasonLabel")} : {inst.deferral_reason}</p>
-                                )}
-                              </div>
-                              <p className="text-sm font-black whitespace-nowrap">{inst.amount.toLocaleString(financeLocale)} FCFA</p>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div>
-                  <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilPaymentHistory")}</p>
-                  {account.payments.length > 0 ? (
-                    <div className="space-y-3">
-                      {account.payments.map((payment) => (
-                        <div
-                          key={payment.id}
-                          className="flex flex-col gap-2 rounded-2xl border border-neutral-100 bg-neutral-50 p-3 sm:p-4 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm font-black whitespace-nowrap">{payment.amount.toLocaleString(financeLocale)} FCFA</p>
-                            <p className="text-xs font-bold text-slate-500 break-words">
-                              {financeDate(payment.payment_date)}
-                              {payment.payment_method ? ` · ${localizePaymentMethod(payment.payment_method, financeEn ? "en" : "fr")}` : ""}
-                            </p>
-                          </div>
-                          <div className="text-left sm:text-right shrink-0">
-                            <span className="inline-flex rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-emerald-700">
-                              {td("profilPaymentRecorded")}
-                            </span>
-                            {payment.receipt_number ? (
-                              <p className="mt-1 text-[10px] font-bold text-slate-400 break-all">{payment.receipt_number}</p>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-6 text-center text-sm font-bold text-slate-500">
-                      {td("profilNoPaymentsYet")}
-                    </p>
-                  )}
-                </div>
-
-                {(account.financeEvents?.length || 0) > 0 && (
-                  <div className="mt-5">
-                    <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-slate-400">{td("profilDeferralsDiscounts")}</p>
-                    <div className="space-y-2">
-                      {account.financeEvents!.map((ev) => (
-                        <div key={ev.id} className="rounded-2xl border border-neutral-100 bg-white px-4 py-3">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                            {ev.type === "deferral"
-                              ? td("profilDeferral")
-                              : ev.type === "discount"
-                                ? td("profilDiscount")
-                                : ev.type === "payment_note"
-                                  ? td("profilPaymentNote")
-                                  : ev.type}
-                            {" · "}{financeDate(ev.created_at)}
-                          </p>
-                          <p className="mt-1 text-sm font-bold text-slate-800">
-                            {ev.type === "discount" && ev.amount != null
-                              ? `−${Number(ev.amount).toLocaleString(financeLocale)} FCFA${financeEn ? ": " : " — "}`
-                              : ""}
-                            {ev.reason || "—"}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="rounded-2xl border border-dashed border-neutral-200 bg-neutral-50 px-4 py-6 text-center text-sm font-bold text-slate-500">
-                {td("profilFinanceUnavailable")}
-              </p>
-            )}
-          </section>
         </div>
         </div>
       </div>
@@ -962,38 +881,3 @@ export default function CenterStudentProfil() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0 rounded-2xl border border-white/80 bg-white/70 px-3 sm:px-4 py-3">
-      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{label}</p>
-      <p className="mt-1 break-words text-sm font-black text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function FinanceCard({
-  label,
-  value,
-  accent = "blue",
-}: {
-  label: string;
-  value: string;
-  accent?: "blue" | "emerald" | "orange" | "red";
-}) {
-  const colors = {
-    blue: "text-blue-700 border-blue-100 bg-blue-50",
-    emerald: "text-emerald-700 border-emerald-100 bg-emerald-50",
-    orange: "text-orange-700 border-orange-100 bg-orange-50",
-    red: "text-red-700 border-red-100 bg-red-50",
-  };
-
-  return (
-    <div className={`min-w-0 overflow-hidden rounded-2xl border p-3 sm:p-4 ${colors[accent]}`}>
-      <div className="mb-2 flex items-center gap-1.5">
-        <CreditCard className="h-3.5 w-3.5 shrink-0" />
-        <p className="truncate text-[9px] font-black uppercase tracking-widest opacity-70">{label}</p>
-      </div>
-      <p className="whitespace-nowrap text-base font-black leading-tight sm:text-sm md:text-base lg:text-lg">{value}</p>
-    </div>
-  );
-}
