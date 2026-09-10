@@ -57,12 +57,14 @@ export async function middleware(request: NextRequest) {
   // indépendante d'un flag sessionStorage contournable.
   const isMutatingMethod = !['GET', 'HEAD', 'OPTIONS'].includes(request.method)
   if (request.nextUrl.pathname.startsWith('/api') && user && isMutatingMethod) {
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('is_demo_account')
       .eq('id', user.id)
       .maybeSingle()
-    if (profile?.is_demo_account) {
+    // Fail closed : si la vérification échoue (réseau, RLS, etc.), on bloque
+    // plutôt que de laisser passer une écriture non vérifiée.
+    if (profileError || profile?.is_demo_account) {
       return NextResponse.json({ error: 'Lecture seule (mode visite).' }, { status: 403 })
     }
   }
