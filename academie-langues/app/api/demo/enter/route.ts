@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const { data: candidates, error: profilesErr } = await supabaseAdmin
     .from("profiles")
-    .select("id, email, role, center_id, centers(name, center_type)")
+    .select("id, email, role, center_id, centers!profiles_center_id_fkey(name, center_type)")
     .eq("is_demo_account", true)
     .eq("role", wantedRole);
 
