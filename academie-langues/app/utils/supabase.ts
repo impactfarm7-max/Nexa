@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { isVisitMode } from "./visit-mode";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() || "";
@@ -37,8 +38,53 @@ const key =
   supabaseKey ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIn0.placeholder";
 
-export const supabase = createClient(url, key, {
+const rawSupabase = createClient(url, key, {
   auth: {
     lock: memoryLock,
   },
 });
+
+const READONLY_ERROR = { message: "Lecture seule (mode visite).", code: "VISIT_MODE_READONLY" } as const;
+
+/** Proxy thenable : toute méthode chaînée renvoie le même stub, `await`/`.then()` résout en erreur. */
+function readonlyStub(): any {
+  const result = { data: null, error: READONLY_ERROR };
+  const stub: any = new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (prop === "then") return (resolve: any) => resolve(result);
+        if (prop === "catch") return () => stub;
+        if (prop === "finally") return (cb?: () => void) => {
+          cb?.();
+          return stub;
+        };
+        return () => stub;
+      },
+    },
+  );
+  return stub;
+}
+
+const BLOCKED_METHODS = ["insert", "update", "upsert", "delete"] as const;
+
+function wrapFrom(client: typeof rawSupabase): typeof rawSupabase["from"] {
+  const originalFrom = client.from.bind(client);
+  return ((table: Parameters<typeof originalFrom>[0]) => {
+    const builder = originalFrom(table);
+    if (!isVisitMode()) return builder;
+    const wrapped: any = builder;
+    for (const method of BLOCKED_METHODS) {
+      wrapped[method] = () => readonlyStub();
+    }
+    return wrapped;
+  }) as typeof originalFrom;
+}
+
+/** Client Supabase applicatif : en mode visite, insert/update/upsert/delete sont bloqués côté UI (garantie réelle = middleware.ts). */
+export const supabase: typeof rawSupabase = new Proxy(rawSupabase, {
+  get(target, prop, receiver) {
+    if (prop === "from") return wrapFrom(target);
+    return Reflect.get(target, prop, receiver);
+  },
+}) as typeof rawSupabase;
