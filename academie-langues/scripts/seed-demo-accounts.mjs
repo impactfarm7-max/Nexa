@@ -91,6 +91,21 @@ async function ensureFiliere(centerId, name, type, createdById) {
   return data.id;
 }
 
+// Etudiant demo : acces total en lecture (quotas larges, abonnement loin dans
+// le futur) pour que rien ne s'affiche verrouille/"essai" pendant la visite.
+// Le blocage en ecriture est garanti ailleurs (proxy.ts + wrapper Supabase
+// client), pas par des quotas restreints ici.
+const FULL_ACCESS_STUDENT_FIELDS = {
+  pack_name: "ebene",
+  subscription_ends_at: new Date(Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toISOString(),
+  ee_total: 9999, ee_used: 0,
+  exam_total: 9999, exam_used: 0,
+  exam_4m_total: 9999, exam_4m_used: 0,
+  eo_total: 9999, eo_used: 0,
+  coaching_total: 9999, coaching_used: 0,
+  tutor_ia_total: 9999, tutor_ia_used: 0,
+};
+
 async function upsertProfile({ id, email, prenom, nom, role, centerId }) {
   const { error } = await sb.from("profiles").upsert({
     id,
@@ -103,6 +118,7 @@ async function upsertProfile({ id, email, prenom, nom, role, centerId }) {
     center_status: "active",
     tag_status: "actif",
     is_demo_account: true,
+    ...(role === "student" ? FULL_ACCESS_STUDENT_FIELDS : {}),
   });
   if (error) fail(`upsert profil ${email}: ${error.message}`);
 }
