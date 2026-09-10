@@ -2,6 +2,7 @@
 
 import CenterSidebar from "@/app/components/CenterSidebar";
 import CenterBottomNav from "@/app/components/CenterBottomNav";
+import VisitModeBanner from "@/app/components/VisitModeBanner";
 
 type CenterAppShellProps = {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ export default function CenterAppShell({
 }: CenterAppShellProps) {
   return (
     <div className={`flex min-h-[100dvh] w-full overflow-x-hidden ${className}`}>
+      <VisitModeBanner />
       <CenterSidebar />
       <main
         style={{ marginLeft: "var(--nexa-center-sidebar-w, 0px)" }}

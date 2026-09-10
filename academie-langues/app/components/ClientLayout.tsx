@@ -20,6 +20,7 @@ import { initPwaInstallCapture } from "@/app/utils/pwa-install";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { isViewAsStudentPreview } from "@/app/utils/view-as";
 import SaViewAsBanner from "./SaViewAsBanner";
+import VisitModeBanner from "./VisitModeBanner";
 
 const EXAM_PASSAGE_KEY = "nexa_exam_passage";
 
@@ -157,6 +158,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     return (
       <>
         <SaViewAsBanner />
+        <VisitModeBanner />
         <SiteAnalyticsTracker />
         {children}
       </>
@@ -224,6 +226,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     return (
       <>
         <SaViewAsBanner />
+        <VisitModeBanner />
         <main className="w-full relative" style={{ minHeight: "100dvh" }}>
           {presenceTracker}
           {mainContent}
@@ -237,6 +240,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <>
       <SaViewAsBanner />
+      <VisitModeBanner />
       <SiteAnalyticsTracker />
       {presenceTracker}
       <div className="flex w-full overflow-x-hidden" style={{ minHeight: "100dvh" }}>
