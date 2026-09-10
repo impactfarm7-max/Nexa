@@ -82,6 +82,9 @@ function wrapFrom(client: typeof rawSupabase): typeof rawSupabase["from"] {
 }
 
 /** Client Supabase applicatif : en mode visite, insert/update/upsert/delete sont bloqués côté UI (garantie réelle = middleware.ts). */
+// Hypothèse fragile : ce Proxy suppose que rpc/channel/schema/functions n'utilisent pas
+// `this` comme identité exacte du client d'origine (pas de champs `#private`/`WeakMap`).
+// Vrai avec la version actuelle de supabase-js — à revérifier lors d'une montée de version.
 export const supabase: typeof rawSupabase = new Proxy(rawSupabase, {
   get(target, prop, receiver) {
     if (prop === "from") return wrapFrom(target);
