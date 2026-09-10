@@ -27,7 +27,6 @@ export default function VisitEnterPage() {
   useEffect(() => {
     if (visitEnterConsumed) return;
     visitEnterConsumed = true;
-    let cancelled = false;
 
     const run = async () => {
       let pending: VisitPending | null = null;
@@ -48,8 +47,6 @@ export default function VisitEnterPage() {
         token_hash: pending.token_hash,
         type: "email",
       });
-
-      if (cancelled) return;
 
       if (otpError) {
         setError(otpError.message || "Impossible d'ouvrir la visite.");
@@ -73,9 +70,6 @@ export default function VisitEnterPage() {
     };
 
     void run();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   return (

@@ -8,6 +8,7 @@ import { Lock, LogOut } from "lucide-react";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { isViewAsStudentPreview } from "@/app/utils/view-as";
 import { readSaViewAs } from "@/app/utils/sa-view-as";
+import { readVisitMode } from "@/app/utils/visit-mode";
 
 export default function PinGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -25,7 +26,7 @@ export default function PinGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const checkSecurity = async () => {
-      if (isViewAsStudentPreview() || readSaViewAs()) {
+      if (isViewAsStudentPreview() || readSaViewAs() || readVisitMode()) {
         setIsUnlocked(true);
         setIsLoading(false);
         return;
