@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Building2, ChevronRight, Inbox, Info, Loader2, Plus, RefreshCcw, Search } from "lucide-react";
 import { superadminFetch } from "../../utils/superadmin-api-client";
 import { useI18n } from "../../i18n/I18nProvider";
+import { centerTypeLabel } from "../../data/center-types";
 import { useActionFeedback } from "../../components/ActionFeedback";
 import { ConfirmDialog } from "../_components/ConfirmDialog";
 import { CenterDetailPanel, type DerivedStatus } from "../_components/CenterDetailPanel";
@@ -76,7 +77,7 @@ export default function SuperadminCentresPage() {
 }
 
 function SuperadminCentresPageContent() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const feedback = useActionFeedback();
   const searchParams = useSearchParams();
   const { centers, loading, error: sharedError, refresh: refreshShared } = useSuperadminCenters<CenterRow>();
@@ -372,7 +373,7 @@ function SuperadminCentresPageContent() {
                           isTcf ? "bg-blue-500/15 text-blue-300" : "bg-violet-500/15 text-violet-300"
                         }`}
                       >
-                        {isTcf ? t("superadmin", "centresTypeTcf") : t("superadmin", "centresTypeNative")}
+                        {centerTypeLabel(center.center_type, locale)}
                       </span>
                     </div>
                     <p className="mt-1 text-[11px] text-slate-500">

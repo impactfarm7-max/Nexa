@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { CENTER_STAFF_ROLES } from "@/app/utils/student-routes";
 import { filterModulePermissions, ensureTcfCommunautePermission, ensureDefaultLivesPermission, TRAINER_DEFAULT_MODULE_PERMISSIONS } from "@/app/data/tcf-teaching-subjects";
-import { normalizeCenterType } from "@/app/data/center-types";
+import { CENTER_TYPES, normalizeCenterType } from "@/app/data/center-types";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -117,7 +117,13 @@ export async function GET(req: Request) {
         const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
         const { data: claimedCenter } = await supabaseAdmin.from("centers").insert({
           name: application.center_name,
-          center_type: normalizeCenterType(application.center_type),
+          // On conserve la valeur brute de la candidature si elle correspond à un
+          // des 5 types de centres actuels ; sinon (ancienne valeur type
+          // "formation_courte") on retombe sur normalizeCenterType() pour ne pas
+          // faire échouer cette réclamation historique.
+          center_type: CENTER_TYPES.includes(application.center_type as (typeof CENTER_TYPES)[number])
+            ? application.center_type
+            : normalizeCenterType(application.center_type),
           city: application.city,
           address: application.address,
           phone: application.phone,

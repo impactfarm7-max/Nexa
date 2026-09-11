@@ -31,8 +31,8 @@ export async function POST(req: NextRequest) {
 
     // 5 types de centres existent : TCF Canada, Centre Libre, École, Université, Entreprise.
     // On conserve la sélection brute de l'utilisateur (validée) plutôt que de la
-    // normaliser avant stockage — normalizeCenterType() sert uniquement à décider
-    // du modèle d'offre ci-dessous, pas à choisir ce qui est écrit en base.
+    // normaliser avant stockage — le modèle d'offre ci-dessous est choisi via un
+    // simple test `type === "tcf_canada"`, sans passer par normalizeCenterType().
     if (!CENTER_TYPES.includes(centerType)) {
       return NextResponse.json({ error: "Type de centre invalide." }, { status: 400 });
     }

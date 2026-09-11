@@ -1,8 +1,8 @@
 export const openingCentre = {
   fr: {
     ouvrirCentreGenericCenterLabel: "Centre de formation", ouvrirCentrePasswordHint: "Au moins 8 caractères, avec une majuscule, une minuscule et un chiffre.", ouvrirCentrePasswordInvalid: "Le mot de passe ne respecte pas les critères de sécurité.",
-    ouvrirCentreHeroLine1: "Trois programmes.", ouvrirCentreHeroLine2: "Une plateforme.", ouvrirCentreHeroLine3: "Un espace conçu", ouvrirCentreHeroLine4: "pour votre", ouvrirCentreHeroLine5: "établissement", ouvrirCentreHeroLine6: "en Afrique",
-    ouvrirCentreHeroSubtitle: "Trois programmes. Une plateforme. Choisissez le modèle qui correspond à votre établissement.",
+    ouvrirCentreHeroLine1: "Cinq programmes.", ouvrirCentreHeroLine2: "Une plateforme.", ouvrirCentreHeroLine3: "Un espace conçu", ouvrirCentreHeroLine4: "pour votre", ouvrirCentreHeroLine5: "établissement", ouvrirCentreHeroLine6: "en Afrique",
+    ouvrirCentreHeroSubtitle: "Cinq programmes. Une plateforme. Choisissez le modèle qui correspond à votre établissement.",
     ouvrirCentreStepLabelProgram: "Programme", ouvrirCentreStepLabelEstablishment: "Établissement", ouvrirCentreStepLabelAccount: "Compte",
     ouvrirCentreStep1Title: "Créez votre centre", ouvrirCentreStep1Subtitle: "Quel programme NEXA souhaitez-vous activer ?",
     ouvrirCentreProgramNativeTitle: "Formation native", ouvrirCentreProgramNativeSubtitle: "Langues & certifications", ouvrirCentreProgramNativeBlurb: "Parcours immersifs prêts à l’emploi pour les certifications linguistiques.", ouvrirCentreProgramNativePoint1: "Contenus prêts", ouvrirCentreProgramNativePoint2: "Suivi mesurable", ouvrirCentreProgramNativePoint3: "Expérience apprenant dédiée",
@@ -22,8 +22,8 @@ export const openingCentre = {
   },
   en: {
     ouvrirCentreGenericCenterLabel: "Training center", ouvrirCentrePasswordHint: "At least 8 characters, including an uppercase letter, a lowercase letter, and a number.", ouvrirCentrePasswordInvalid: "The password does not meet the security requirements.",
-    ouvrirCentreHeroLine1: "Three programs.", ouvrirCentreHeroLine2: "One platform.", ouvrirCentreHeroLine3: "A space built", ouvrirCentreHeroLine4: "for your", ouvrirCentreHeroLine5: "institution", ouvrirCentreHeroLine6: "in Africa",
-    ouvrirCentreHeroSubtitle: "Three programs. One platform. Choose the model that fits your institution.",
+    ouvrirCentreHeroLine1: "Five programs.", ouvrirCentreHeroLine2: "One platform.", ouvrirCentreHeroLine3: "A space built", ouvrirCentreHeroLine4: "for your", ouvrirCentreHeroLine5: "institution", ouvrirCentreHeroLine6: "in Africa",
+    ouvrirCentreHeroSubtitle: "Five programs. One platform. Choose the model that fits your institution.",
     ouvrirCentreStepLabelProgram: "Program", ouvrirCentreStepLabelEstablishment: "Institution", ouvrirCentreStepLabelAccount: "Account", ouvrirCentreStep1Title: "Create your center", ouvrirCentreStep1Subtitle: "Which NEXA program would you like to activate?",
     ouvrirCentreProgramNativeTitle: "Native training", ouvrirCentreProgramNativeSubtitle: "Languages & certifications", ouvrirCentreProgramNativeBlurb: "Ready-to-use immersive pathways for language certifications.", ouvrirCentreProgramNativePoint1: "Ready-made content", ouvrirCentreProgramNativePoint2: "Measurable progress", ouvrirCentreProgramNativePoint3: "Dedicated learner experience",
     ouvrirCentreDiscTcfCanadaTitle: "TCF Canada", ouvrirCentreDiscTcfCanadaBlurb: "Préparation complète CE, CO, EE et EO  -  contenus, packs et tuteur IA inclus.", ouvrirCentreDiscTcfCanadaPoint1: "Packs d’entraînement", ouvrirCentreDiscTcfCanadaPoint2: "Simulateurs d’examen", ouvrirCentreDiscTcfCanadaPoint3: "Coaching vocal IA",

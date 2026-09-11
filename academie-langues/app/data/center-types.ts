@@ -2,6 +2,10 @@
  * Types de centres NEXA.
  * - tcf_canada : formation native (contenu TCF) — face étudiante TCF complète
  * - generic : centre libre pouvant proposer des cursus longs et des formations courtes
+ * - ecole, universite, entreprise : types additionnels (École, Université, Entreprise) —
+ *   à ce jour de simples clones comportementaux de `generic` (mêmes règles d'offre,
+ *   de normalisation et d'expérience étudiante), distingués uniquement pour l'affichage
+ *   (libellés, filtres) et une future spécialisation.
  *
  * `formation_courte` reste accepté en entrée comme ancienne valeur de base de données,
  * mais est normalisé en `generic`. Une formation courte est un type de programme,
