@@ -83,7 +83,7 @@ export async function GET(req: Request) {
       user_id: s.user_id,
       student_name: `${profile?.prenom || ""} ${profile?.nom || ""}`.trim() || "Inconnu",
       answer_text: s.answer_text,
-      file_url: s.file_url,
+      has_file: !!s.file_url,
       file_name: s.file_name,
       status: s.status,
       created_at: s.created_at,

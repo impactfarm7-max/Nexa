@@ -52,7 +52,7 @@ type Submission = {
   user_id?: string;
   student_name: string;
   answer_text: string | null;
-  file_url: string | null;
+  has_file: boolean;
   file_name: string | null;
   status: string;
   created_at: string;
@@ -508,6 +508,33 @@ export default function TrainerDevoirsPage() {
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch {
       alert("Erreur réseau lors du chargement de la pièce jointe.");
+    }
+  };
+
+  // ============================================================
+  // OUVRIR LE FICHIER JOINT D'UNE SOUMISSION ÉTUDIANTE (proxy authentifié)
+  // ============================================================
+  const openSubmissionFile = async (submissionId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert("Session expirée, veuillez vous reconnecter.");
+        return;
+      }
+      const res = await fetch(`/api/missions/attachment?submissionId=${submissionId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error || "Impossible de charger le fichier.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      alert("Erreur réseau lors du chargement du fichier.");
     }
   };
 
@@ -1018,10 +1045,10 @@ export default function TrainerDevoirsPage() {
                                             </div>
                                           </div>
                                           {sub.answer_text && <p className="text-xs text-neutral-600 mt-2 line-clamp-3 leading-relaxed">{sub.answer_text}</p>}
-                                          {sub.file_url && (
-                                            <a href={sub.file_url} target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold mt-2 inline-flex items-center gap-1" style={{ color: ORANGE }}>
+                                          {sub.has_file && (
+                                            <button type="button" onClick={() => openSubmissionFile(sub.id)} className="text-[10px] font-bold mt-2 inline-flex items-center gap-1" style={{ color: ORANGE }}>
                                               <FileText size={10} /> {sub.file_name || "Fichier joint"}
-                                            </a>
+                                            </button>
                                           )}
                                           {!corr && (sub.status === "pending_review" || sub.status === "correcting") && (
                                             <div className="flex gap-2 mt-3 pt-3 border-t border-neutral-100">

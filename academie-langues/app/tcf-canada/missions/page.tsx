@@ -180,6 +180,30 @@ function MissionsPageContent() {
     }
   };
 
+  const openSubmissionFile = async (submissionId: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert(t("dashboard", "missionsNetworkError"));
+        return;
+      }
+      const res = await fetch(`/api/missions/attachment?submissionId=${submissionId}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error || t("dashboard", "missionsNetworkError"));
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      alert(t("dashboard", "missionsNetworkError"));
+    }
+  };
+
   const handleSubmit = async (mission: Mission) => {
     const formats = normalizeSubmissionFormats(mission.submission_formats);
     const text = allowsFormat(formats, "text") ? (answerText[mission.id]?.trim() || "") : "";
@@ -651,10 +675,10 @@ function MissionsPageContent() {
                                 {sub.file_url && (
                                   <div>
                                     <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-2">{t("dashboard", "missionsAttachedFile")}</p>
-                                    <a href={sub.file_url} target="_blank" rel="noopener noreferrer"
+                                    <button type="button" onClick={() => openSubmissionFile(sub.id)}
                                       className="flex items-center gap-2 text-sm font-bold text-[#eb670e] bg-orange-50 border border-orange-200 px-4 py-3 rounded-xl hover:bg-orange-100 transition-colors w-fit">
                                       <FileText className="w-4 h-4" /> {sub.file_name || t("dashboard", "missionsSeeFile")}
-                                    </a>
+                                    </button>
                                   </div>
                                 )}
                               </div>
