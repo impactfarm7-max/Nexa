@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { supabaseAdmin } from "@/app/utils/center-auth-server";
-import { normalizeCenterType } from "@/app/data/center-types";
+import { CENTER_TYPES } from "@/app/data/center-types";
 
 export async function POST(req: Request) {
   const user = await getAuthUser(req);
@@ -16,7 +16,10 @@ export async function POST(req: Request) {
   const isResponsible = ["center_manager", "admin", "manager"].includes(profile?.role || "") || Boolean(ownerMembership);
   if (!isResponsible) return NextResponse.json({ error: "Seul un responsable peut créer un autre centre." }, { status: 403 });
 
-  const type = normalizeCenterType(centerType);
+  if (!CENTER_TYPES.includes(centerType)) {
+    return NextResponse.json({ error: "Type de centre invalide." }, { status: 400 });
+  }
+  const type = centerType as (typeof CENTER_TYPES)[number];
   const trialEndsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
   const base = name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   const slug = `${base || "centre"}-${Date.now().toString(36)}`;
