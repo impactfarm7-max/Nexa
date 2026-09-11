@@ -14,7 +14,7 @@ import {
 import { supabase } from "@/app/utils/supabase";
 import { STAFF_PERMISSION_ROUTES } from "@/app/utils/student-routes";
 import { filterModulePermissions, ensureTcfCommunautePermission, ensureDefaultLivesPermission, TRAINER_DEFAULT_MODULE_PERMISSIONS } from "@/app/data/tcf-teaching-subjects";
-import { normalizeCenterType, type CenterTypeCode } from "@/app/data/center-types";
+import { normalizeCenterType, centerTypeLabel, CENTER_TYPES, type CenterTypeCode } from "@/app/data/center-types";
 import { clearCenterMeCache, getCenterMeCache, loadCenterBootstrap, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import { BRAND } from "@/app/utils/brand";
 import { CenterBrandMark } from "@/app/centre/center-page-ui";
@@ -781,7 +781,8 @@ function CenterSidebarInner() {
 function CreateCenterModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState("");
   const [city, setCity] = useState("");
-  const [centerType, setCenterType] = useState("generic");
+  const { locale } = useI18n();
+  const [centerType, setCenterType] = useState<CenterTypeCode>("generic");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [typeOpen, setTypeOpen] = useState(false);
@@ -818,16 +819,16 @@ function CreateCenterModal({ onClose, onCreated }: { onClose: () => void; onCrea
           <input required value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ville" className="h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-[#11224E]" />
           <div className="relative">
             <button type="button" onClick={() => setTypeOpen((value) => !value)} className={`flex h-11 w-full items-center justify-between rounded-xl border bg-white px-3 text-left text-sm font-semibold text-[#11224E] transition ${typeOpen ? "border-[#11224E] ring-2 ring-[#11224E]/10" : "border-neutral-200"}`}>
-              <span>{centerType === "tcf_canada" ? "Centre TCF Canada" : "Centre libre"}</span><ChevronDown size={16} className={`transition-transform ${typeOpen ? "rotate-180" : ""}`} />
+              <span>{centerTypeLabel(centerType, locale)}</span><ChevronDown size={16} className={`transition-transform ${typeOpen ? "rotate-180" : ""}`} />
             </button>
-            {typeOpen && <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl">{[["generic", "Centre libre"], ["tcf_canada", "Centre TCF Canada"]].map(([value, label]) => <button key={value} type="button" onClick={() => { setCenterType(normalizeCenterType(value)); setTypeOpen(false); }} className={`w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${centerType === value ? "bg-[#11224E] text-white" : "text-[#11224E] hover:bg-neutral-100"}`}>{label}</button>)}</div>}
+            {typeOpen && <div className="absolute left-0 right-0 top-full z-10 mt-1 overflow-hidden rounded-xl border border-neutral-200 bg-white p-1.5 shadow-xl">{CENTER_TYPES.map((value) => <button key={value} type="button" onClick={() => { setCenterType(value); setTypeOpen(false); }} className={`w-full rounded-lg px-3 py-2.5 text-left text-sm font-semibold transition ${centerType === value ? "bg-[#11224E] text-white" : "text-[#11224E] hover:bg-neutral-100"}`}>{centerTypeLabel(value, locale)}</button>)}</div>}
           </div>
         </div>
         <p className="mt-3 rounded-xl bg-[#F5F7FB] px-3 py-2.5 text-xs leading-relaxed text-neutral-600">Après activation, vous compléterez l’adresse, les contacts, le logo, l’offre et les autres informations dans <strong>Paramètres</strong>.</p>
         {error && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         <div className="mt-5 flex justify-end gap-2"><button type="button" onClick={onClose} className="h-10 rounded-xl border border-neutral-200 px-4 text-sm font-bold">Annuler</button><button disabled={saving} className="flex h-10 items-center gap-2 rounded-xl bg-[#11224E] px-4 text-sm font-bold text-white disabled:opacity-50">{saving && <Loader2 size={15} className="animate-spin" />}{saving ? "Création…" : "Créer"}</button></div>
       </form>
-      {confirmOpen && <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[#081538]/55 p-4" onMouseDown={() => setConfirmOpen(false)}><div onMouseDown={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"><h3 className="text-lg font-black text-[#11224E]">Confirmer la création</h3><p className="mt-2 text-sm leading-relaxed text-neutral-600">Créer <strong>{name}</strong> à <strong>{city}</strong> comme <strong>{centerType === "tcf_canada" ? "centre TCF Canada" : "centre libre"}</strong> ?</p><p className="mt-2 text-xs text-neutral-500">Vous basculerez vers ce centre et son essai gratuit de 7 jours commencera immédiatement.</p><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setConfirmOpen(false)} className="h-10 rounded-xl border border-neutral-200 px-4 text-sm font-bold">Retour</button><button type="button" onClick={() => void createCenter()} className="h-10 rounded-xl bg-[#11224E] px-4 text-sm font-bold text-white">Confirmer</button></div></div></div>}
+      {confirmOpen && <div className="fixed inset-0 z-[110] flex items-center justify-center bg-[#081538]/55 p-4" onMouseDown={() => setConfirmOpen(false)}><div onMouseDown={(event) => event.stopPropagation()} className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl"><h3 className="text-lg font-black text-[#11224E]">Confirmer la création</h3><p className="mt-2 text-sm leading-relaxed text-neutral-600">Créer <strong>{name}</strong> à <strong>{city}</strong> comme <strong>{centerTypeLabel(centerType, locale)}</strong> ?</p><p className="mt-2 text-xs text-neutral-500">Vous basculerez vers ce centre et son essai gratuit de 7 jours commencera immédiatement.</p><div className="mt-5 flex justify-end gap-2"><button type="button" onClick={() => setConfirmOpen(false)} className="h-10 rounded-xl border border-neutral-200 px-4 text-sm font-bold">Retour</button><button type="button" onClick={() => void createCenter()} className="h-10 rounded-xl bg-[#11224E] px-4 text-sm font-bold text-white">Confirmer</button></div></div></div>}
     </div>
   );
 }
