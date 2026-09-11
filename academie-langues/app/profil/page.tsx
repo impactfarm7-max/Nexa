@@ -25,6 +25,7 @@ import {
   Layers,
   Globe2,
   Smartphone,
+  Lock,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { logClientActivity } from "../utils/client-activity";
@@ -45,7 +46,11 @@ import {
   Row,
   EditableRow,
   ButtonRow,
+  AccordionRow,
+  PButton,
+  PField,
 } from "@/app/components/profile/ProfileKit";
+import { checkPasswordStrength, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
 
 type Profile = {
   id: string;
@@ -98,6 +103,11 @@ export default function ProfilPage() {
     birth_date: "",
   });
   const [saving, setSaving] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ password: "", confirm: "" });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
 
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
@@ -295,6 +305,32 @@ export default function ProfilPage() {
     }
   };
 
+  const handlePasswordChange = async () => {
+    const strength = checkPasswordStrength(passwordForm.password);
+    if (!strength.ok) {
+      setPasswordError(strength.message || PASSWORD_POLICY_HINT);
+      return;
+    }
+    if (passwordForm.password !== passwordForm.confirm) {
+      setPasswordError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+
+    setPasswordSaving(true);
+    setPasswordError(null);
+    setPasswordMessage(null);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: passwordForm.password });
+      if (error) throw error;
+      setPasswordForm({ password: "", confirm: "" });
+      setPasswordMessage("Votre mot de passe a été mis à jour.");
+    } catch (error) {
+      setPasswordError(error instanceof Error ? error.message : "Impossible de changer le mot de passe.");
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
   const startEditing = () => {
     const countryMatch = profile?.country
       ? AFRICA_54.find((c) => c.name === profile.country || c.dial === profile.country_code)
@@ -482,6 +518,35 @@ export default function ProfilPage() {
           <Row icon={Calendar} label="Date de fin" value={
             profile?.subscription_ends_at && profile.subscription_ends_at !== "null" ? formatDateCourte(profile.subscription_ends_at) : emptyValue
           } />
+        </Group>
+
+        <Group title="Sécurité">
+          <AccordionRow
+            icon={Lock}
+            label="Mot de passe"
+            description="Modifiez le mot de passe de votre compte."
+            open={passwordOpen}
+            onToggle={() => setPasswordOpen((open) => !open)}
+          >
+            {passwordMessage && (
+              <p className="mb-3 rounded-lg border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700">{passwordMessage}</p>
+            )}
+            <p className="mb-3 text-[12px] font-medium" style={{ color: "rgba(17,34,78,0.5)" }}>{PASSWORD_POLICY_HINT}</p>
+            {passwordError && (
+              <p className="mb-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{passwordError}</p>
+            )}
+            <div className="mb-4 grid gap-3 sm:grid-cols-2">
+              <PField label="Nouveau mot de passe" value={passwordForm.password} onChange={(password) => setPasswordForm((form) => ({ ...form, password }))} type="password" />
+              <PField label="Confirmer le mot de passe" value={passwordForm.confirm} onChange={(confirm) => setPasswordForm((form) => ({ ...form, confirm }))} type="password" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <PButton variant="ghost" onClick={() => { setPasswordOpen(false); setPasswordForm({ password: "", confirm: "" }); setPasswordError(null); }} disabled={passwordSaving}>Annuler</PButton>
+              <PButton onClick={() => void handlePasswordChange()} busy={passwordSaving}>
+                <ShieldCheck size={14} />
+                Enregistrer
+              </PButton>
+            </div>
+          </AccordionRow>
         </Group>
 
         <Group title="Session">

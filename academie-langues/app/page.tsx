@@ -201,7 +201,7 @@ export default function LandingPage() {
             aria-hidden
           />
 
-          <p className="text-[15px] sm:text-lg xl:text-xl text-neutral-500 font-medium leading-relaxed max-w-2xl mx-auto mb-7 sm:mb-8">
+          <p className="text-[15px] sm:text-lg xl:text-xl text-neutral-500 font-medium leading-relaxed max-w-3xl mx-auto mb-7 sm:mb-8">
             {t("landing", "heroDescription")}
           </p>
 
@@ -217,7 +217,7 @@ export default function LandingPage() {
               href="/ouvrir-centre"
               className="inline-flex items-center justify-center min-h-12 px-7 sm:px-8 py-3.5 rounded-2xl text-[13px] sm:text-sm font-bold border border-black/10 bg-white text-neutral-700 transition hover:border-black/20 hover:bg-[#FFFBF7] active:scale-[0.98]"
             >
-              {t("landing", "requestCenter")}
+              {t("landing", "createCenter")}
             </Link>
           </div>
         </motion.div>
@@ -233,27 +233,32 @@ export default function LandingPage() {
       <SuiteModulesGrid />
 
       {/* Pont soft vers pages dédiées */}
-      <section className="relative z-10 border-y border-black/6 bg-white py-10 sm:py-12">
-        <div className="nexa-marketing-shell flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-          <div>
+      <section className="relative z-10 py-10 sm:py-12">
+        <div className="nexa-marketing-shell">
+          <div className="relative px-6 py-8 sm:px-10 sm:py-10 border border-black/[0.08] bg-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+            <div
+              className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-16"
+              style={{ backgroundColor: ORANGE }}
+              aria-hidden
+            />
             <h2 className="nexa-marketing-title" style={{ color: BRAND.blue }}>
               {t("landing", "bridgeTitle")}
             </h2>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Link
-              href="/programmes"
-              className="inline-flex items-center justify-center h-11 px-5 rounded-xl text-[13px] font-bold border border-black/10 bg-white hover:border-black/20 transition"
-            >
-              {t("landing", "programs")} →
-            </Link>
-            <Link
-              href="/valeurs"
-              className="inline-flex items-center justify-center h-11 px-5 rounded-xl text-[13px] font-bold text-white transition hover:opacity-90"
-              style={{ backgroundColor: BRAND.blue }}
-            >
-              {t("landing", "values")} →
-            </Link>
+            <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+              <Link
+                href="/programmes"
+                className="inline-flex items-center justify-center min-h-12 px-6 rounded-2xl text-[13px] font-bold border border-black/10 bg-white text-neutral-700 hover:border-black/20 hover:bg-[#FFFBF7] transition active:scale-[0.98]"
+              >
+                {t("landing", "programs")} →
+              </Link>
+              <Link
+                href="/valeurs"
+                className="inline-flex items-center justify-center min-h-12 px-6 rounded-2xl text-[13px] font-black text-white transition hover:opacity-95 active:scale-[0.98]"
+                style={{ backgroundColor: BRAND.blue, boxShadow: `0 12px 32px ${BRAND.blue}28` }}
+              >
+                {t("landing", "values")} →
+              </Link>
+            </div>
           </div>
         </div>
       </section>
@@ -328,7 +333,7 @@ export default function LandingPage() {
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <AgentContactMenu cta />
             <Link href="/ouvrir-centre" className="w-full sm:w-auto inline-flex items-center justify-center h-12 px-8 rounded-2xl text-sm font-black text-white transition hover:opacity-90" style={{ backgroundColor: BRAND.blue }}>
-              {t("landing", "createCenter")}
+              {t("landing", "requestCenter")}
             </Link>
           </div>
         </motion.div>

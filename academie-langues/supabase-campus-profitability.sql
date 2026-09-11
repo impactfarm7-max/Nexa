@@ -31,10 +31,11 @@ DECLARE
   enrollment_campus_id uuid;
   enrollment_center_id uuid;
 BEGIN
-  SELECT campus_id, center_id
+  SELECT e.campus_id, f.center_id
     INTO enrollment_campus_id, enrollment_center_id
-  FROM public.enrollments
-  WHERE id = NEW.enrollment_id;
+  FROM public.enrollments e
+  JOIN public.filieres f ON f.id = e.filiere_id
+  WHERE e.id = NEW.enrollment_id;
 
   IF enrollment_campus_id IS NULL THEN
     RAISE EXCEPTION 'Affectez d''abord cette inscription à un campus avant d''enregistrer un paiement.';
