@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   Building2, ArrowRight, ArrowLeft, Check,
   Loader2, Eye, EyeOff, Award, GraduationCap, Flag,
-  ChevronDown, type LucideIcon,
+  ChevronDown, Layers, School, type LucideIcon,
 } from "lucide-react";
 import { BRAND } from "@/app/utils/brand";
 import {
@@ -38,7 +38,7 @@ const CREAM = "#FFFBF7";
 
 type CenterType = CenterTypeCode | null;
 /** Famille UI — native ouvre une sous-carte ; libre sélectionne generic directement. */
-type ProgramFamily = "native" | "generic" | null;
+type ProgramFamily = "native" | "generic" | "ecole" | "universite" | "entreprise" | null;
 
 const NATIVE_DISCIPLINES: {
   id: Extract<CenterTypeCode, "tcf_canada">;
@@ -86,7 +86,7 @@ const PROGRAMS: {
   {
     family: "generic",
     centerType: "generic",
-    icon: GraduationCap,
+    icon: Layers,
     titleKey: "ouvrirCentreProgramGenericTitle",
     subtitleKey: "ouvrirCentreProgramGenericSubtitle",
     blurbKey: "ouvrirCentreProgramGenericBlurb",
@@ -94,6 +94,48 @@ const PROGRAMS: {
       "ouvrirCentreProgramGenericPoint1",
       "ouvrirCentreProgramGenericPoint2",
       "ouvrirCentreProgramGenericPoint3",
+    ],
+    accent: ORANGE,
+  },
+  {
+    family: "ecole",
+    centerType: "ecole",
+    icon: School,
+    titleKey: "ouvrirCentreProgramEcoleTitle",
+    subtitleKey: "ouvrirCentreProgramEcoleSubtitle",
+    blurbKey: "ouvrirCentreProgramEcoleBlurb",
+    pointKeys: [
+      "ouvrirCentreProgramEcolePoint1",
+      "ouvrirCentreProgramEcolePoint2",
+      "ouvrirCentreProgramEcolePoint3",
+    ],
+    accent: ORANGE,
+  },
+  {
+    family: "universite",
+    centerType: "universite",
+    icon: GraduationCap,
+    titleKey: "ouvrirCentreProgramUniversiteTitle",
+    subtitleKey: "ouvrirCentreProgramUniversiteSubtitle",
+    blurbKey: "ouvrirCentreProgramUniversiteBlurb",
+    pointKeys: [
+      "ouvrirCentreProgramUniversitePoint1",
+      "ouvrirCentreProgramUniversitePoint2",
+      "ouvrirCentreProgramUniversitePoint3",
+    ],
+    accent: ORANGE,
+  },
+  {
+    family: "entreprise",
+    centerType: "entreprise",
+    icon: Building2,
+    titleKey: "ouvrirCentreProgramEntrepriseTitle",
+    subtitleKey: "ouvrirCentreProgramEntrepriseSubtitle",
+    blurbKey: "ouvrirCentreProgramEntrepriseBlurb",
+    pointKeys: [
+      "ouvrirCentreProgramEntreprisePoint1",
+      "ouvrirCentreProgramEntreprisePoint2",
+      "ouvrirCentreProgramEntreprisePoint3",
     ],
     accent: ORANGE,
   },
