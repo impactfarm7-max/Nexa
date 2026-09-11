@@ -44,11 +44,15 @@ export async function POST(req: NextRequest) {
   const signed: Record<string, string | null> = {};
 
   for (const url of urls) {
-    const path = resolveStoragePath("community-files", url);
-    const [centerId, roomId] = path.split("/");
-    const authorized =
-      (isStaff && profile!.center_id === centerId) || memberRoomIds.has(roomId);
-    signed[url] = authorized ? await getSignedStorageUrl("community-files", url, 3600) : null;
+    try {
+      const path = resolveStoragePath("community-files", url);
+      const [centerId, roomId] = path.split("/");
+      const authorized =
+        (isStaff && profile!.center_id === centerId) || memberRoomIds.has(roomId);
+      signed[url] = authorized ? await getSignedStorageUrl("community-files", url, 3600) : null;
+    } catch {
+      signed[url] = null;
+    }
   }
 
   return NextResponse.json({ signed });
