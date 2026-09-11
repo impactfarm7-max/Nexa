@@ -7,7 +7,9 @@
  * mais est normalisé en `generic`. Une formation courte est un type de programme,
  * pas un type de centre.
  */
-export const CENTER_TYPES = ["tcf_canada", "generic"] as const;
+export const CENTER_TYPES = [
+  "tcf_canada", "generic", "ecole", "universite", "entreprise",
+] as const;
 export type CenterTypeCode = (typeof CENTER_TYPES)[number];
 
 /** Mode d'expérience étudiante dérivé du type de centre. */
@@ -62,9 +64,15 @@ export function centerTypeLabel(
   locale: "fr" | "en" = "fr",
 ): string {
   const en = locale === "en";
-  switch (normalizeCenterType(centerType)) {
+  switch (centerType) {
     case "tcf_canada":
       return en ? "Native training" : "Formation native";
+    case "ecole":
+      return en ? "School" : "École";
+    case "universite":
+      return en ? "University" : "Université";
+    case "entreprise":
+      return en ? "Company" : "Entreprise";
     default:
       return en ? "Independent training center" : "Centre de formation libre";
   }
