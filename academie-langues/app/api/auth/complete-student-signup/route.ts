@@ -38,10 +38,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Fenêtre de finalisation expirée." }, { status: 403 });
   }
 
-  // Pas de garde d'idempotence sur center_id : un trigger DB peut deja avoir
-  // copie center_id depuis raw_user_meta_data avant notre appel, alors que le
-  // reste du profil (prenom, ville, pays...) reste a ecrire. L'upsert plus bas
-  // est de toute facon idempotent (rejouable sans effet de bord).
+  // Pas de garde d'idempotence bloquante sur center_id (un trigger DB peut
+  // deja avoir copie center_id depuis raw_user_meta_data avant notre appel,
+  // alors que le reste du profil reste a ecrire) -- mais on refuse un
+  // REJEU avec un centerId DIFFERENT de celui deja enregistre : sans ca,
+  // un appel rejoue dans la fenetre de 5 min avec un autre centerId
+  // rattacherait le compte a un centre arbitraire (IDOR).
+  const { data: existingCenterProfile } = await supabaseAdmin
+    .from("profiles")
+    .select("center_id")
+    .eq("id", userId)
+    .maybeSingle();
+  if (
+    existingCenterProfile?.center_id &&
+    body.centerId &&
+    String(body.centerId).trim() !== existingCenterProfile.center_id
+  ) {
+    return NextResponse.json({ error: "Ce compte est déjà rattaché à un autre centre." }, { status: 409 });
+  }
+
   const prenom = String(body.prenom || "").trim();
   const nom = String(body.nom || "").trim() || null;
   const phone = String(body.phone || "").trim() || null;

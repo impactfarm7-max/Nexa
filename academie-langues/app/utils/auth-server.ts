@@ -216,7 +216,16 @@ export async function checkAndConsumeQuota(
         return { allowed: false, error: "Quota EE épuisé." };
       }
       if (total !== UNLIMITED && !checkOnly) {
-        await supabaseAdmin.from("profiles").update({ ee_used: used + 1 }).eq("id", userId);
+        // Update conditionnel atomique : évite qu'une race entre deux onglets
+        // ne fasse passer deux requêtes avec le même `used` lu en mémoire.
+        const { data: row } = await supabaseAdmin
+          .from("profiles")
+          .update({ ee_used: used + 1 })
+          .eq("id", userId)
+          .lt("ee_used", total)
+          .select("ee_used")
+          .maybeSingle();
+        if (!row) return { allowed: false, error: "Quota EE épuisé." };
       }
     } else if (hasFormationAccess) {
       // Formations : illimité sur le zen entraînement
@@ -265,7 +274,14 @@ export async function checkAndConsumeQuota(
         return { allowed: false, error: "Quota examens EE épuisé." };
       }
       if (total !== UNLIMITED && !checkOnly) {
-        await supabaseAdmin.from("profiles").update({ exam_used: used + 1 }).eq("id", userId);
+        const { data: row } = await supabaseAdmin
+          .from("profiles")
+          .update({ exam_used: used + 1 })
+          .eq("id", userId)
+          .lt("exam_used", total)
+          .select("exam_used")
+          .maybeSingle();
+        if (!row) return { allowed: false, error: "Quota examens EE épuisé." };
       }
     } else {
       return { allowed: false, error: "Pack requis pour accéder aux examens." };
@@ -292,7 +308,14 @@ export async function checkAndConsumeQuota(
         return { allowed: false, error: "Quota EO épuisé." };
       }
       if (total !== UNLIMITED && !checkOnly) {
-        await supabaseAdmin.from("profiles").update({ eo_used: used + 1 }).eq("id", userId);
+        const { data: row } = await supabaseAdmin
+          .from("profiles")
+          .update({ eo_used: used + 1 })
+          .eq("id", userId)
+          .lt("eo_used", total)
+          .select("eo_used")
+          .maybeSingle();
+        if (!row) return { allowed: false, error: "Quota EO épuisé." };
       }
     } else {
       return { allowed: false, error: "Pack requis pour accéder aux simulations EO." };

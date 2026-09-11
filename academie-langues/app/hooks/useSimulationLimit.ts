@@ -175,17 +175,15 @@ export function useSimulationLimit() {
     const serverWeekly = profile.weekly_eo_reset_date === thisWeek ? (profile.weekly_eo_count ?? 0) : 0;
     setWeeklyEOCount(serverWeekly);
 
-    // Mise à jour DB si besoin de reset quotidien
-    const updates: any = {};
-    if (isTrialUser && profile.daily_sim_date !== today) {
-      updates.daily_sim_count = 0; updates.daily_sim_date = today;
-    } else if (!isTrialUser && (resolvedDaily !== (profile.daily_sim_date === today ? profile.daily_sim_count : 0) || profile.daily_sim_date !== today)) {
-      updates.daily_sim_count = resolvedDaily; updates.daily_sim_date = today;
-    }
-    if (profile.weekly_eo_reset_date !== thisWeek) {
-      updates.weekly_eo_count = serverWeekly; updates.weekly_eo_reset_date = thisWeek;
-    }
-    if (Object.keys(updates).length > 0) await supabase.from("profiles").update(updates).eq("id", user.id);
+    // Remarque : ces compteurs (daily_sim_count/date, weekly_eo_count/date,
+    // ee_used pour l'essai) ne sont plus écrits directement en base depuis le
+    // client -- le trigger `protect_profile_security_fields` bloque désormais
+    // toute écriture non service_role sur ces colonnes (un utilisateur pouvait
+    // sinon remettre ses compteurs à zéro à volonté). L'état affiché ici est
+    // dérivé de la dernière valeur serveur connue + repli localStorage pour
+    // la session en cours ; il n'y a pas encore d'application/consommation
+    // serveur pour les paliers "formations"/"essai" (contrairement aux packs,
+    // déjà gérés de façon atomique par checkAndConsumeQuota côté API).
 
     setLoading(false);
   };
@@ -279,42 +277,38 @@ export function useSimulationLimit() {
   // 🔴 DÉCOMPTE DES CRÉDITS
   // ==========================================
 
-  const recordUsage = async (fieldUsed: string, currentValue: number) => {
-    if (isAdmin || !userIdRef.current) return;
-    const newUsed = currentValue + 1;
-    setQuotas(prev => ({ ...prev, [fieldUsed]: newUsed })); 
-    
-    // Correspondance avec le nom des colonnes Supabase
-    const dbColumn = fieldUsed === 'eeUsed' ? 'ee_used' : 
-                     fieldUsed === 'examUsed' ? 'exam_used' : 
-                     fieldUsed === 'exam4mUsed' ? 'exam_4m_used' : 
-                     fieldUsed === 'eoUsed' ? 'eo_used' : 'coaching_used';
-                     
-    await supabase.from("profiles").update({ [dbColumn]: newUsed }).eq("id", userIdRef.current);
+  // La consommation réelle des quotas "pack" (ee/exam/eo/coaching) est faite
+  // de façon atomique côté serveur par checkAndConsumeQuota (app/utils/
+  // auth-server.ts), appelée par les routes /api/simulateur/*. Ces colonnes
+  // sont désormais protégées en base contre toute écriture client directe
+  // (voir supabase-security-hardening-2026-09-11.sql) : les anciens appels
+  // `supabase.from("profiles").update(...)` faits ici dupliquaient cette
+  // consommation (bug de double-décompte) et constituaient par ailleurs une
+  // faille (un utilisateur pouvait remettre ses propres compteurs à zéro).
+  // On ne garde que la mise à jour optimiste de l'état React affiché.
+  const recordUsage = (fieldUsed: string, currentValue: number) => {
+    if (isAdmin) return;
+    setQuotas(prev => ({ ...prev, [fieldUsed]: currentValue + 1 }));
   };
 
-  const recordZenSimulation = async () => {
-    if (isAdmin || !userIdRef.current) return;
+  const recordZenSimulation = () => {
+    if (isAdmin) return;
     if (isPackStudent) {
-      if (quotas.eeTotal !== UNLIMITED) await recordUsage('eeUsed', quotas.eeUsed);
+      if (quotas.eeTotal !== UNLIMITED) recordUsage('eeUsed', quotas.eeUsed);
     } else if (hasFormationAccess) {
       const newCount = dailyZenCount + 1; setDailyZenCount(newCount); lsSet(LS_PREFIX + getTodayStr(), newCount);
-      await supabase.from("profiles").update({ daily_sim_count: newCount, daily_sim_date: getTodayStr() }).eq("id", userIdRef.current);
     } else if (isTrial) {
-      // Essai : incrément journalier + total cumulatif (ee_used)
-      const newDaily = dailyZenCount + 1; setDailyZenCount(newDaily);
-      const newTotal = trialTotalUsed + 1; setTrialTotalUsed(newTotal);
-      await supabase.from("profiles").update({ daily_sim_count: newDaily, daily_sim_date: getTodayStr(), ee_used: newTotal }).eq("id", userIdRef.current);
+      setDailyZenCount(prev => prev + 1);
+      setTrialTotalUsed(prev => prev + 1);
     }
   };
 
-  const recordEOSimulation = async () => {
-    if (isAdmin || !userIdRef.current) return;
+  const recordEOSimulation = () => {
+    if (isAdmin) return;
     if (hasFormationAccess) {
-      const newCount = weeklyEOCount + 1; setWeeklyEOCount(newCount);
-      await supabase.from("profiles").update({ weekly_eo_count: newCount, weekly_eo_reset_date: getWeekStr() }).eq("id", userIdRef.current);
+      setWeeklyEOCount(prev => prev + 1);
     } else if (isPackStudent && quotas.eoTotal !== UNLIMITED) {
-      await recordUsage('eoUsed', quotas.eoUsed);
+      recordUsage('eoUsed', quotas.eoUsed);
     }
   };
 

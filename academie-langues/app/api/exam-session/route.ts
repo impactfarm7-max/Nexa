@@ -3,6 +3,9 @@ import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { generateCertificate } from "@/app/utils/certificate.server";
 import { assertCanStartExam } from "@/app/utils/tcfExamEligibility";
+import { examensComplets } from "@/app/data/examens_complets";
+import { catalogueSeriesCE } from "@/app/data/comprehension_ecrite";
+import { seriesData } from "@/app/data/comprehension_orale";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,6 +21,53 @@ export const maxDuration = 120;
 // écrans, il ne réinitialise jamais ce chrono.
 // ─────────────────────────────────────────────────────────────────────────────
 const TOTAL_DURATION_SEC = 9900; // 2h45
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scores CE/CO recalculés côté serveur à partir des réponses sauvegardées --
+// jamais depuis le body envoyé par le client (c'était la faille : un score
+// falsifié directement dans le body produisait un certificat mensonger).
+// ─────────────────────────────────────────────────────────────────────────────
+const CE_POINTS: Record<string, number> = { A1: 3, A2: 9, B1: 15, B2: 21, C1: 26, C2: 33 };
+const CE_TOTAL = 699;
+
+function getCELevel(score: number): string {
+  if (score >= 600) return "C2";
+  if (score >= 500) return "C1";
+  if (score >= 400) return "B2";
+  if (score >= 300) return "B1";
+  if (score >= 200) return "A2";
+  return "A1";
+}
+
+function getCOLevel(score: number, total: number): string {
+  const p = total > 0 ? score / total : 0;
+  if (p >= 0.9) return "C2";
+  if (p >= 0.75) return "C1";
+  if (p >= 0.6) return "B2";
+  if (p >= 0.45) return "B1";
+  if (p >= 0.3) return "A2";
+  return "A1";
+}
+
+function computeCeCoResults(examenId: number, ceAnswers: Record<number, number> | null, coAnswers: Record<number, string> | null) {
+  const config = examensComplets.find((e) => e.id === examenId);
+  const questionsCE = config ? catalogueSeriesCE.find((s) => s.id === config.sujet_ce)?.questions ?? [] : [];
+  const questionsCO = config ? seriesData[config.sujet_co] ?? [] : [];
+
+  const ce = ceAnswers || {};
+  const scoreCE = questionsCE.reduce((acc, q, i) => acc + (ce[i] === q.reponseCorrecte ? (CE_POINTS[q.niveau] ?? 3) : 0), 0);
+  const correctCE = questionsCE.filter((q, i) => ce[i] === q.reponseCorrecte).length;
+
+  const co = coAnswers || {};
+  const scoreCO = questionsCO.reduce((acc, q, i) => acc + (co[i] === q.correctAnswer ? q.points : 0), 0);
+  const totalCO = questionsCO.reduce((acc, q) => acc + q.points, 0);
+  const correctCO = questionsCO.filter((q, i) => co[i] === q.correctAnswer).length;
+
+  return {
+    ceResult: { score: scoreCE, total: CE_TOTAL, niveau: getCELevel(scoreCE), correctCount: correctCE },
+    coResult: { score: scoreCO, total: totalCO, niveau: getCOLevel(scoreCO, totalCO), correctCount: correctCO },
+  };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/exam-session?examenId=N
@@ -143,8 +193,8 @@ export async function POST(req: Request) {
     if (body.coAnswers !== undefined) updates.co_answers = body.coAnswers;
     if (body.eeAnswers !== undefined) updates.ee_answers = body.eeAnswers;
     if (body.eoData !== undefined) updates.eo_data = body.eoData;
-    if (body.ceResult !== undefined) updates.ce_result = body.ceResult;
-    if (body.coResult !== undefined) updates.co_result = body.coResult;
+    // ce_result/co_result ne sont plus acceptés du client ici : ils sont
+    // recalculés côté serveur au moment du finalize, à partir des réponses.
 
     // Temps restant TOUJOURS recalculé par le serveur à partir de
     // started_at -- le body.timeLeft envoyé par le client est ignoré.
@@ -208,12 +258,17 @@ export async function POST(req: Request) {
 
   // ── FINALIZE : marque la session comme completed
   if (action === "finalize") {
+    // CE/CO recalculés côté serveur à partir des réponses déjà sauvegardées
+    // (session.ce_answers/co_answers) -- jamais depuis body.ceResult/coResult,
+    // que le client ne peut plus influencer.
+    const { ceResult, coResult } = computeCeCoResults(session.examen_id, session.ce_answers, session.co_answers);
+
     const updates: Record<string, any> = {
       status: "completed",
       finished_at: new Date().toISOString(),
+      ce_result: ceResult,
+      co_result: coResult,
     };
-    if (body.ceResult !== undefined) updates.ce_result = body.ceResult;
-    if (body.coResult !== undefined) updates.co_result = body.coResult;
 
     const { error } = await supabaseAdmin
       .from("exam_sessions")
@@ -254,8 +309,8 @@ export async function POST(req: Request) {
           .eq("id", user.id)
           .single();
 
-        const ce = body.ceResult ?? session.ce_result;
-        const co = body.coResult ?? session.co_result;
+        const ce = ceResult;
+        const co = coResult;
         const ee = session.ee_result;
         const eo = session.eo_result;
 
