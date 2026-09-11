@@ -52,6 +52,20 @@ function parseMsg(raw: string): MsgParsed {
   return { type: "text", content: raw };
 }
 
+// Extrait toutes les URLs `community-files` referencees par des marqueurs
+// __img__:/__file__: dans une liste de messages (pour resolution batch en
+// URLs signees).
+function extractAttachmentUrls(rows: any[]): string[] {
+  const urls = new Set<string>();
+  for (const row of rows) {
+    const raw = row?.message;
+    if (typeof raw !== "string") continue;
+    const parsed = parseMsg(raw);
+    if (parsed.type === "image" || parsed.type === "file") urls.add(parsed.content);
+  }
+  return Array.from(urls);
+}
+
 /* ── Avatar ── */
 function Avatar({ url, name, role, size = "w-8 h-8" }: { url?: string | null; name: string; role?: string; size?: string }) {
   const isStaff = role && ["admin", "center_manager", "trainer", "staff", "campus_manager"].includes(role);
@@ -86,6 +100,7 @@ function CommunauteCenterContent() {
   const [newMessage,      setNewMessage]      = useState("");
   const [isSending,       setIsSending]       = useState(false);
   const [editingId,       setEditingId]       = useState<string | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string | null>>({});
   const [searchQuery, setSearchQuery] = useState("");
   const [hubFilter, setHubFilter] = useState<HubFilterId>("all");
 
@@ -399,6 +414,36 @@ function CommunauteCenterContent() {
     return () => { supabase.removeChannel(channel); };
   }, [activeRoom, fetchMessages, ensureMembership, markSeen]);
 
+  /* ── Resolution des URLs signees pour les pieces jointes (images/fichiers) ──
+     Le bucket `community-files` sert des URLs publiques dans le texte des
+     messages (marqueurs __img__:/__file__:). On les resout en une seule
+     requete batch vers l'API, authentifiee, qui renvoie null pour les
+     pieces jointes non autorisees ou introuvables. */
+  useEffect(() => {
+    const urls = extractAttachmentUrls(messages).filter((u) => !(u in signedUrls));
+    if (urls.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      try {
+        const res = await fetch("/api/communaute/signed-urls", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ urls }),
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled || !json?.signed) return;
+        setSignedUrls((prev) => ({ ...prev, ...json.signed }));
+      } catch {
+        // best-effort : en cas d'echec, les pieces jointes concernees restent masquees
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
   /* ── Actions ── */
   const openRoom = (room: any) => {
     setActiveRoom(room);
@@ -501,14 +546,24 @@ function CommunauteCenterContent() {
   const renderMsgContent = (msg: any, isMe: boolean) => {
     const parsed = parseMsg(msg.message);
     if (parsed.type === "image") {
+      const signed = signedUrls[parsed.content];
+      if (signed === null) return null;
+      if (!signed) {
+        return <div className="w-[160px] h-[120px] rounded-xl bg-neutral-100 animate-pulse" />;
+      }
       return (
-        <img src={parsed.content} alt={t("centre", "communityPhoto")} className="max-w-[220px] max-h-[200px] object-cover rounded-xl cursor-pointer hover:opacity-95 transition-opacity"
-          onClick={() => window.open(parsed.content, "_blank")} />
+        <img src={signed} alt={t("centre", "communityPhoto")} className="max-w-[220px] max-h-[200px] object-cover rounded-xl cursor-pointer hover:opacity-95 transition-opacity"
+          onClick={() => window.open(signed, "_blank")} />
       );
     }
     if (parsed.type === "file") {
+      const signed = signedUrls[parsed.content];
+      if (signed === null) return null;
+      if (!signed) {
+        return <div className="w-[180px] h-10 rounded-xl bg-neutral-100 animate-pulse" />;
+      }
       return (
-        <a href={parsed.content} target="_blank" rel="noopener noreferrer"
+        <a href={signed} target="_blank" rel="noopener noreferrer"
           className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-xs font-bold transition-colors ${isMe ? "bg-white/10 border-white/20 text-white hover:bg-white/20" : "bg-neutral-50 border-neutral-200 text-neutral-700 hover:bg-neutral-100"}`}>
           <FileText size={18} className="shrink-0 opacity-80" />
           <span className="truncate max-w-[160px]">{parsed.filename || t("centre", "communityFile")}</span>
