@@ -41,7 +41,7 @@ type CenterRow = {
 };
 
 type StatusFilter = "all" | DerivedStatus;
-type TypeFilter = "all" | "tcf" | "native";
+type TypeFilter = "all" | "tcf" | "generic" | "ecole" | "universite" | "entreprise";
 
 type ConfirmState = {
   type: "resume" | "revoke" | "reject";
@@ -156,8 +156,18 @@ function SuperadminCentresPageContent() {
       } else if (statusFilter !== "all" && c.derived_status !== statusFilter) {
         return false;
       }
-      if (typeFilter === "tcf" && c.center_type !== "tcf_canada") return false;
-      if (typeFilter === "native" && c.center_type === "tcf_canada") return false;
+      if (typeFilter !== "all") {
+        if (typeFilter === "tcf") {
+          if (c.center_type !== "tcf_canada") return false;
+        } else {
+          // Tout ce qui n'est pas explicitement ecole/universite/entreprise retombe
+          // dans "generic" (comportement clone — voir center-types.ts), y compris
+          // les valeurs legacy (null, "formation_courte").
+          const raw = c.center_type && c.center_type !== "tcf_canada" ? c.center_type : "generic";
+          const bucket = ["ecole", "universite", "entreprise"].includes(raw) ? raw : "generic";
+          if (bucket !== typeFilter) return false;
+        }
+      }
       if (q) {
         const hay = `${c.name} ${c.code ?? ""} ${c.city ?? ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
@@ -306,7 +316,10 @@ function SuperadminCentresPageContent() {
         >
           <option value="all">{t("superadmin", "centresFilterTypeAll")}</option>
           <option value="tcf">{t("superadmin", "centresFilterTypeTcf")}</option>
-          <option value="native">{t("superadmin", "centresFilterTypeNative")}</option>
+          <option value="generic">{t("superadmin", "centresFilterTypeGeneric")}</option>
+          <option value="ecole">{t("superadmin", "centresFilterTypeEcole")}</option>
+          <option value="universite">{t("superadmin", "centresFilterTypeUniversite")}</option>
+          <option value="entreprise">{t("superadmin", "centresFilterTypeEntreprise")}</option>
         </select>
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
