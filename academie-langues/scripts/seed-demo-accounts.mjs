@@ -103,6 +103,10 @@ async function upsertProfile({ id, email, prenom, nom, role, centerId }) {
     center_status: "active",
     tag_status: "actif",
     is_demo_account: true,
+    // Le manager demo ne doit jamais retomber sur l'assistant de configuration
+    // du centre (identite/etablissement) : CenterAccessGate y redirige tant que
+    // ce champ n'est pas "completed" (defaut DB : "welcome").
+    ...(role === "center_manager" ? { onboarding_step: "completed" } : {}),
   });
   if (error) fail(`upsert profil ${email}: ${error.message}`);
 }
