@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { fetchCourseIfVisible, getStudentCourseContext } from "@/app/api/student/courses/studentCourseAccess";
+import { getSignedStorageUrl } from "@/app/utils/storage-signed-url.server";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -118,7 +119,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     );
   }
 
-  const upstream = await fetch(media.url);
+  const bucket = media.type === "video_upload" ? "course-videos" : "course-pdfs";
+  const signedUrl = await getSignedStorageUrl(bucket, media.url, 60);
+  if (!signedUrl) {
+    return NextResponse.json({ error: "Fichier introuvable." }, { status: 404 });
+  }
+
+  const upstream = await fetch(signedUrl);
   if (!upstream.ok) {
     return NextResponse.json({ error: "Impossible de charger le fichier." }, { status: 502 });
   }
