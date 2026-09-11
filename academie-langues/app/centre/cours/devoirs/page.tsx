@@ -485,6 +485,33 @@ export default function TrainerDevoirsPage() {
   };
 
   // ============================================================
+  // OUVRIR LA PIÈCE JOINTE D'UN DEVOIR (proxy authentifié)
+  // ============================================================
+  const openAttachment = async (devoir: Devoir) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert("Session expirée, veuillez vous reconnecter.");
+        return;
+      }
+      const res = await fetch(`/api/missions/attachment?missionId=${devoir.id}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error || "Impossible de charger la pièce jointe.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      alert("Erreur réseau lors du chargement de la pièce jointe.");
+    }
+  };
+
+  // ============================================================
   // CHARGER LES SOUMISSIONS D'UN DEVOIR
   // ============================================================
   const loadSubmissions = useCallback(async (devoir: Devoir) => {
@@ -893,8 +920,8 @@ export default function TrainerDevoirsPage() {
                             </div>
                             {d.description && <p className="text-xs text-neutral-500 line-clamp-1 mt-0.5">{d.description}</p>}
                             {d.attachment_url && (
-                              <a href={d.attachment_url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}
-                                className="text-[10px] font-bold mt-1 inline-flex items-center gap-1" style={{ color: ORANGE }}>
+                              <a href="#" onClick={(e) => { e.preventDefault(); e.stopPropagation(); void openAttachment(d); }}
+                                className="text-[10px] font-bold mt-1 inline-flex items-center gap-1 cursor-pointer" style={{ color: ORANGE }}>
                                 <Paperclip size={10} /> {d.attachment_name || "Pièce jointe"}
                               </a>
                             )}

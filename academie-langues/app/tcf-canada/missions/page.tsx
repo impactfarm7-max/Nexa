@@ -156,6 +156,30 @@ function MissionsPageContent() {
     setAttachedFile(prev => ({ ...prev, [missionId]: file }));
   };
 
+  const openAttachment = async (mission: Mission) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert(t("dashboard", "missionsNetworkError"));
+        return;
+      }
+      const res = await fetch(`/api/missions/attachment?missionId=${mission.id}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        alert(body.error || t("dashboard", "missionsNetworkError"));
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      alert(t("dashboard", "missionsNetworkError"));
+    }
+  };
+
   const handleSubmit = async (mission: Mission) => {
     const formats = normalizeSubmissionFormats(mission.submission_formats);
     const text = allowsFormat(formats, "text") ? (answerText[mission.id]?.trim() || "") : "";
@@ -427,8 +451,8 @@ function MissionsPageContent() {
                         ))}
                       </div>
                       {mission.attachment_url && (
-                        <a href={mission.attachment_url} target="_blank" rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-orange-600 bg-orange-50 border border-orange-200 px-2.5 py-1.5 rounded-lg hover:bg-orange-100 transition-colors">
+                        <a href="#" onClick={(e) => { e.preventDefault(); void openAttachment(mission); }}
+                          className="inline-flex items-center gap-1.5 mt-2 text-xs font-semibold text-orange-600 bg-orange-50 border border-orange-200 px-2.5 py-1.5 rounded-lg hover:bg-orange-100 transition-colors cursor-pointer">
                           <Paperclip className="w-3.5 h-3.5" /> {mission.attachment_name || t("dashboard", "missionsAttachment")}
                         </a>
                       )}
