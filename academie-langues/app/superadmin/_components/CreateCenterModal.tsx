@@ -5,7 +5,7 @@ import { X, RefreshCcw, Copy, Check } from "lucide-react";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { checkPasswordStrength } from "@/app/utils/password-policy";
 
-type CenterTypeChoice = "generic" | "tcf_canada";
+type CenterTypeChoice = "generic" | "tcf_canada" | "ecole" | "universite" | "entreprise";
 
 function secureRandomChars(alphabet: string, length: number): string {
   const bytes = new Uint32Array(length);
@@ -131,11 +131,14 @@ export function CreateCenterModal({
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-2">
+        <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {(
             [
               ["generic", "centresTypeNative"],
               ["tcf_canada", "centresTypeTcf"],
+              ["ecole", "centresTypeEcole"],
+              ["universite", "centresTypeUniversite"],
+              ["entreprise", "centresTypeEntreprise"],
             ] as const
           ).map(([value, labelKey]) => (
             <button
