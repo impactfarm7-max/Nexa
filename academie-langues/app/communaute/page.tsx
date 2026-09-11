@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Send, Users, ShieldCheck, Lock, Trash2, Pencil, Pin, X, Check,
   ChevronDown, MessageCircle, Settings, Hash, GraduationCap, Megaphone, Search, PanelLeft, ArrowLeft,
+  FileText, Download,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { logClientActivity } from "@/app/utils/client-activity";
@@ -17,6 +18,31 @@ import RoomSettingsDrawer from "./RoomSettingsDrawer";
 import ConversationsInbox from "./ConversationsInbox";
 const EDIT_WINDOW_MS = 2 * 60 * 1000;
 const PIN_DURATION_DAYS = [15, 30];
+
+type MsgParsed = { type: "text" | "image" | "file"; content: string; filename?: string };
+
+function parseMsg(raw: string): MsgParsed {
+  if (raw.startsWith("__img__:")) return { type: "image", content: raw.slice(8) };
+  if (raw.startsWith("__file__:")) {
+    const idx = raw.indexOf("::", 9);
+    return { type: "file", content: raw.slice(9, idx < 0 ? undefined : idx), filename: idx >= 0 ? raw.slice(idx + 2) : "" };
+  }
+  return { type: "text", content: raw };
+}
+
+// Extrait toutes les URLs `community-files` referencees par des marqueurs
+// __img__:/__file__: dans une liste de messages (pour resolution batch en
+// URLs signees).
+function extractAttachmentUrls(rows: any[]): string[] {
+  const urls = new Set<string>();
+  for (const row of rows) {
+    const raw = row?.message;
+    if (typeof raw !== "string") continue;
+    const parsed = parseMsg(raw);
+    if (parsed.type === "image" || parsed.type === "file") urls.add(parsed.content);
+  }
+  return Array.from(urls);
+}
 
 function isMessagePinned(msg: any) {
   if (!msg.pinned) return false;
@@ -98,6 +124,7 @@ function CommunauteContent() {
   const [activeRoom, setActiveRoom] = useState<CommunityRoom | null>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(true);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string | null>>({});
   const [roomMemberRoles, setRoomMemberRoles] = useState<Record<string, string>>({});
 
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -282,6 +309,36 @@ function CommunauteContent() {
     };
   }, [activeRoom, fetchMessages]);
 
+  // ── Resolution des URLs signees pour les pieces jointes (images/fichiers) ──
+  // Le bucket `community-files` sert des URLs publiques dans le texte des
+  // messages (marqueurs __img__:/__file__:). On les resout en une seule
+  // requete batch vers l'API, authentifiee, qui renvoie null pour les
+  // pieces jointes non autorisees ou introuvables.
+  useEffect(() => {
+    const urls = extractAttachmentUrls(messages).filter((u) => !(u in signedUrls));
+    if (urls.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      try {
+        const res = await fetch("/api/communaute/signed-urls", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ urls }),
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled || !json?.signed) return;
+        setSignedUrls((prev) => ({ ...prev, ...json.signed }));
+      } catch {
+        // best-effort : en cas d'echec, les pieces jointes concernees restent masquees
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
+
   // ── Permissions dérivées de la salle active ──
   const myRoomRole = activeRoom?.role;
   const isReadOnly = activeRoom?.type === "announcement" && myRoomRole === "member";
@@ -386,6 +443,57 @@ function CommunauteContent() {
     setMessages((prev) => sortMessages(prev.map((m) => (m.id === msg.id ? { ...m, pinned: nextPinned, pinned_at: pinnedAt, pinned_by: pinnedBy, pinned_until: pinnedUntil } : m))));
     const { error } = await supabase.from("community_messages").update({ pinned: nextPinned, pinned_at: pinnedAt, pinned_by: pinnedBy, pinned_until: pinnedUntil }).eq("id", msg.id);
     if (error && activeRoom) fetchMessages(activeRoom.id);
+  };
+
+  // Libelle lisible pour les apercus (epingles, reponses) : evite d'afficher
+  // le marqueur brut __img__:/__file__: en texte.
+  const previewLabel = (raw: string) => {
+    const parsed = parseMsg(raw);
+    if (parsed.type === "image") return t("centre", "communityPhoto");
+    if (parsed.type === "file") return parsed.filename || t("centre", "communityFile");
+    return parsed.content;
+  };
+
+  // Rendu du contenu d'un message : texte brut, ou image/fichier resolu via
+  // l'URL signee (si non disponible/non autorisee, on masque plutot que de
+  // pointer vers une URL cassee).
+  const renderMsgContent = (msg: any, isMe: boolean, showChevron: boolean) => {
+    const parsed = parseMsg(msg.message);
+    if (parsed.type === "image") {
+      const signed = signedUrls[parsed.content];
+      if (signed === null) return null;
+      if (!signed) {
+        return <div className="w-[160px] h-[120px] rounded-xl bg-slate-100 animate-pulse" />;
+      }
+      return (
+        <img
+          src={signed}
+          alt={t("centre", "communityPhoto")}
+          className="max-w-[220px] max-h-[200px] object-cover rounded-xl cursor-pointer hover:opacity-95 transition-opacity"
+          onClick={() => window.open(signed, "_blank")}
+        />
+      );
+    }
+    if (parsed.type === "file") {
+      const signed = signedUrls[parsed.content];
+      if (signed === null) return null;
+      if (!signed) {
+        return <div className="w-[180px] h-10 rounded-xl bg-slate-100 animate-pulse" />;
+      }
+      return (
+        <a
+          href={signed}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border text-xs font-bold transition-colors ${isMe ? "bg-white/10 border-white/20 text-white hover:bg-white/20" : "bg-neutral-50 border-neutral-200 text-neutral-700 hover:bg-neutral-100"}`}
+        >
+          <FileText size={18} className="shrink-0 opacity-80" />
+          <span className="truncate max-w-[160px]">{parsed.filename || t("centre", "communityFile")}</span>
+          <Download size={13} className="shrink-0 opacity-60" />
+        </a>
+      );
+    }
+    return <span className={showChevron ? (isMe ? "pl-5" : "pr-7") : ""}>{parsed.content}</span>;
   };
 
   const getPinnedMessages = () => messages.filter(isMessagePinned);
@@ -527,7 +635,7 @@ function CommunauteContent() {
                       <p className="text-[10px] text-neutral-400">{formatTime(msg.created_at, locale)}</p>
                     </div>
                   </div>
-                  <p className="text-sm text-neutral-700 line-clamp-2 leading-relaxed group-hover:text-neutral-900">{msg.message}</p>
+                  <p className="text-sm text-neutral-700 line-clamp-2 leading-relaxed group-hover:text-neutral-900">{previewLabel(msg.message)}</p>
                 </button>
               ))}
             </div>
@@ -806,7 +914,7 @@ function CommunauteContent() {
                 <p className="text-xs font-black text-orange-700 uppercase tracking-wider">
                   {t("dashboard", "communautePinnedCount", { count: getPinnedMessages().length })}
                 </p>
-                <p className="text-sm font-semibold text-orange-900 line-clamp-1">{getPinnedMessages()[getPinnedMessages().length - 1]?.message}</p>
+                <p className="text-sm font-semibold text-orange-900 line-clamp-1">{(() => { const last = getPinnedMessages()[getPinnedMessages().length - 1]; return last ? previewLabel(last.message) : ""; })()}</p>
               </div>
               <ChevronDown size={16} className="text-orange-700 group-hover:translate-y-0.5 transition-transform shrink-0" />
             </button>
@@ -874,7 +982,7 @@ function CommunauteContent() {
                         <div className={`mb-2 ${isMe ? "mr-12" : "ml-12"}`}>
                           <div className="border-l-4 border-slate-300 bg-slate-50 rounded-r px-3 py-2">
                             <p className="text-[10px] font-bold text-slate-500">{msg.replied_to.profiles?.prenom || t("dashboard", "sidebarDefaultStudentName")}</p>
-                            <p className="text-sm text-slate-600 line-clamp-2">{msg.replied_to.message}</p>
+                            <p className="text-sm text-slate-600 line-clamp-2">{previewLabel(msg.replied_to.message)}</p>
                           </div>
                         </div>
                       )}
@@ -931,7 +1039,7 @@ function CommunauteContent() {
                               onTouchEnd={handleTouchEnd}
                               onTouchMove={handleTouchEnd}
                             >
-                              <span className={showChevron ? (isMe ? "pl-5" : "pr-7") : ""}>{msg.message}</span>
+                              {renderMsgContent(msg, isMe, showChevron)}
 
                               {canOpenMenu && (
                                 <>
@@ -1031,7 +1139,7 @@ function CommunauteContent() {
                 <div className="flex items-start justify-between bg-slate-50 border-l-4 border-slate-400 rounded-r-2xl pl-4 pr-3 py-3">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-slate-600">{t("dashboard", "communauteReplyTo")} {repliedToMessage.profiles?.prenom || t("dashboard", "sidebarDefaultStudentName")}</p>
-                    <p className="text-sm text-slate-700 line-clamp-2 leading-relaxed mt-1">{repliedToMessage.message}</p>
+                    <p className="text-sm text-slate-700 line-clamp-2 leading-relaxed mt-1">{previewLabel(repliedToMessage.message)}</p>
                   </div>
                   <button onClick={() => setRepliedToMessage(null)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-500 shrink-0 ml-3"><X size={13} /></button>
                 </div>
