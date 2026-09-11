@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { normalizeCenterType } from "@/app/data/center-types";
+import { CENTER_TYPES } from "@/app/data/center-types";
 import { normalizeNexaOffer } from "@/app/data/nexaOffers";
 import { normalizeTcfPlan } from "@/app/data/tcfOffers";
 import { checkPasswordStrength, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
@@ -29,9 +29,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: pwdCheck.message || PASSWORD_POLICY_HINT }, { status: 400 });
     }
 
-    // Seuls deux types de centres existent : TCF Canada ou centre libre.
-    const type = normalizeCenterType(centerType);
-    // Libre → nexa_offer ; TCF → plan_type (Starter/Pro/Ultra/custom sur devis)
+    // 5 types de centres existent : TCF Canada, Centre Libre, École, Université, Entreprise.
+    // On conserve la sélection brute de l'utilisateur (validée) plutôt que de la
+    // normaliser avant stockage — normalizeCenterType() sert uniquement à décider
+    // du modèle d'offre ci-dessous, pas à choisir ce qui est écrit en base.
+    if (!CENTER_TYPES.includes(centerType)) {
+      return NextResponse.json({ error: "Type de centre invalide." }, { status: 400 });
+    }
+    const type = centerType as (typeof CENTER_TYPES)[number];
+    // Libre/École/Université/Entreprise → nexa_offer ; TCF → plan_type (Starter/Pro/Ultra/custom sur devis)
     const offer = type === "tcf_canada" ? null : normalizeNexaOffer(nexaOffer);
     const tcfPlan = type === "tcf_canada" ? normalizeTcfPlan(planType) : null;
 
