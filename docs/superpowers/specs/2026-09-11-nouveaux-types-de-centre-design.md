@@ -61,7 +61,14 @@ contrainte `CHECK` en base (confirmé par grep sur les fichiers
 `supabase-*.sql` du repo) — les nouvelles valeurs s'écrivent
 directement, aucune modification de schéma requise.
 
-### 2. Correctif des 3 chemins d'écriture
+### 2. Correctif des chemins d'écriture
+
+Note (trouvé pendant la rédaction du plan d'implémentation) : il existe
+en réalité **4** endroits qui créent un centre, pas 3 — un 4e sélecteur
+binaire existe dans `app/superadmin/_components/CreateCenterModal.tsx`
+(création de centre depuis le superadmin, poste vers la même route
+`/api/centre/creer`). Il est traité au même titre que les 3 autres dans
+le plan d'implémentation.
 
 **Bug existant, bloquant pour cette feature** : deux routes
 collapsent la sélection utilisateur vers `"generic"`/`"tcf_canada"`
