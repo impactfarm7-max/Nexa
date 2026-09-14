@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import {
   Camera, Loader2, CheckCircle2, FileUp, X, Plus, Trash2,
   ChevronUp, ChevronDown, PenLine, Stamp, Building2, ScrollText,
-  Globe2, Signature,
+  Globe2, Signature, Hash,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
@@ -195,6 +195,9 @@ export default function EntrepriseSettingsPage() {
   const [removedSigIds, setRemovedSigIds] = useState<string[]>([]);
   const [stampUrl, setStampUrl] = useState<string | null>(null);
 
+  // --- Matricule étudiant ---
+  const [studentIdPrefix, setStudentIdPrefix] = useState("");
+
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); return; }
@@ -208,9 +211,13 @@ export default function EntrepriseSettingsPage() {
     if (!cId) { setLoading(false); return; }
 
     const { data: center, error: cErr } = await supabase
-      .from("centers").select("name, center_type").eq("id", cId).single();
+      .from("centers").select("name, center_type, student_id_prefix").eq("id", cId).single();
     if (cErr) console.error("centers:", cErr.message);
-    if (center) { setDisplayName(center.name || ""); setCenterType(center.center_type || "generic"); }
+    if (center) {
+      setDisplayName(center.name || "");
+      setCenterType(center.center_type || "generic");
+      setStudentIdPrefix(center.student_id_prefix || "");
+    }
 
     const { data: b, error: bErr } = await supabase
       .from("center_branding").select("*").eq("center_id", cId).maybeSingle();
@@ -394,7 +401,10 @@ export default function EntrepriseSettingsPage() {
     const fullPhone = phoneLocal.trim() ? `${dialOf(country)} ${phoneLocal.trim()}`.trim() : null;
 
     const { error: e1 } = await supabase
-      .from("centers").update({ name: displayName.trim() }).eq("id", centerId);
+      .from("centers").update({
+        name: displayName.trim(),
+        student_id_prefix: studentIdPrefix.trim() || null,
+      }).eq("id", centerId);
     if (e1) { alert(t("centre", "companyDisplayNameError", { message: e1.message })); setSaving(false); return; }
 
     const { error: e2 } = await supabase.from("center_branding").upsert({
@@ -658,6 +668,35 @@ export default function EntrepriseSettingsPage() {
             <div className="h-11 rounded-xl border border-neutral-200 bg-neutral-50 flex items-center px-3.5 text-sm text-neutral-400">{t("centre", "companyNoStamp")}</div>
           )}
         </div>
+      </Section>
+
+      {/* ===================== MATRICULES ÉTUDIANTS ===================== */}
+      <Section icon={Hash} title={t("centre", "matriculeSectionTitle")}
+        description={t("centre", "matriculeSectionDescription")}>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setStudentIdPrefix("")} disabled={isLocked}
+            className={`flex-1 h-11 rounded-xl border text-sm font-bold transition ${
+              !studentIdPrefix.trim() ? "border-[#11224E] bg-[#11224E]/5 text-[#11224E]" : "border-neutral-200 text-neutral-500"
+            }`}>
+            {t("centre", "matriculeModeGenerated")}
+          </button>
+          <button type="button" onClick={() => setStudentIdPrefix(studentIdPrefix || "ETU")} disabled={isLocked}
+            className={`flex-1 h-11 rounded-xl border text-sm font-bold transition ${
+              studentIdPrefix.trim() ? "border-[#11224E] bg-[#11224E]/5 text-[#11224E]" : "border-neutral-200 text-neutral-500"
+            }`}>
+            {t("centre", "matriculeModeCustom")}
+          </button>
+        </div>
+        {studentIdPrefix.trim() !== "" && (
+          <Field label={t("centre", "matriculePrefixLabel")} value={studentIdPrefix}
+            onChange={setStudentIdPrefix} placeholder={t("centre", "matriculePrefixPlaceholder")} disabled={isLocked} />
+        )}
+        <p className="text-xs text-neutral-500 font-medium">
+          {t("centre", "matriculePreviewLabel")} :{" "}
+          <span className="font-bold text-[#11224E]">
+            {(studentIdPrefix.trim() || "ETU")}-{new Date().getFullYear()}-0001
+          </span>
+        </p>
       </Section>
 
       {/* Barre d'action collante */}
