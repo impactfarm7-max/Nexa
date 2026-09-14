@@ -689,7 +689,7 @@ function CenterSidebarInner() {
               })}
               {switchError && <p className="mx-1 mt-1 rounded-lg bg-red-50 px-2.5 py-2 text-[11px] font-semibold text-red-700">{switchError}</p>}
             </div>
-            {canManage && <button type="button" onClick={() => { setBranchMenuOpen(false); setCreateCenterOpen(true); }} className="flex w-full items-center gap-2 border-t border-neutral-100 px-4 py-3 text-[12px] font-bold text-[#11224E] hover:bg-neutral-50"><Plus size={14} /> Créer un autre centre</button>}
+            {canManage && <button type="button" onClick={() => { setBranchMenuOpen(false); setCreateCenterOpen(true); }} className="flex w-full items-center gap-2 border-t border-neutral-100 px-4 py-3 text-[12px] font-bold text-[#11224E] hover:bg-neutral-50"><Plus size={14} /> Créer une nouvelle structure</button>}
           </div>
         )}
       </div>
@@ -813,7 +813,7 @@ function CreateCenterModal({ onClose, onCreated }: { onClose: () => void; onCrea
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#081538]/50 p-4" onMouseDown={onClose}>
       <form onSubmit={submit} onMouseDown={(event) => event.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4"><div><h2 className="text-xl font-black text-[#11224E]">Créer un autre centre</h2><p className="mt-1 text-sm text-neutral-500">Un essai gratuit de 7 jours démarrera immédiatement.</p></div><button type="button" onClick={onClose} className="rounded-lg p-2 text-neutral-400 hover:bg-neutral-100">×</button></div>
+        <div className="flex items-start justify-between gap-4"><div><h2 className="text-xl font-black text-[#11224E]">Créer une nouvelle structure</h2><p className="mt-1 text-sm text-neutral-500">Un essai gratuit de 7 jours démarrera immédiatement.</p></div><button type="button" onClick={onClose} className="rounded-lg p-2 text-neutral-400 hover:bg-neutral-100">×</button></div>
         <div className="mt-5 space-y-3">
           <input required value={name} onChange={(event) => setName(event.target.value)} placeholder="Nom du centre" className="h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-[#11224E]" />
           <input required value={city} onChange={(event) => setCity(event.target.value)} placeholder="Ville" className="h-11 w-full rounded-xl border border-neutral-200 px-3 text-sm outline-none focus:border-[#11224E]" />
