@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  Hash,
   Lock,
   LogOut,
   Mail,
@@ -71,6 +72,7 @@ type StudentAccount = {
     prenom: string | null;
     nom: string | null;
     email: string | null;
+    matricule: string | null;
     phone: string | null;
     ville: string | null;
     city: string | null;
@@ -613,6 +615,7 @@ export default function CenterStudentProfil() {
           <EditableRow icon={User} label={td("profilLastName")} value={account.profile.nom || emptyValue}
             editing={isEditing} editValue={form.nom} onEditChange={(v) => setForm((c) => ({ ...c, nom: v }))} />
           <Row icon={Mail} label={td("profilEmail")} value={account.profile.email || account.user.email || emptyValue} />
+          <Row icon={Hash} label={td("profilMatricule")} value={account.profile.matricule || emptyValue} />
           <EditableRow icon={Phone} label={td("profilPhoneWhatsapp")} value={savedForm.phone || emptyValue}
             editing={isEditing} editValue={form.phone} onEditChange={(v) => setForm((c) => ({ ...c, phone: v }))} />
           {isEditing ? (

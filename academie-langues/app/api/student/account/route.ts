@@ -22,7 +22,7 @@ async function getStudentAccount(req: Request) {
   const { data: profileRaw, error: profileError } = await supabaseAdmin
     .from("profiles")
     .select(
-      "id, prenom, nom, email, phone, ville, city, country, country_code, region, birth_date, genre, role, center_id, avatar_url, created_at, center_status, tag_status, access_pause_reason, pack_name, subscription_ends_at, ee_total, ee_used, exam_total, exam_used, exam_4m_total, exam_4m_used, eo_total, eo_used, coaching_total, coaching_used, tutor_ia_total, tutor_ia_used, tutor_unlock_at",
+      "id, prenom, nom, email, phone, ville, city, country, country_code, region, birth_date, genre, role, center_id, avatar_url, created_at, center_status, tag_status, access_pause_reason, pack_name, subscription_ends_at, ee_total, ee_used, exam_total, exam_used, exam_4m_total, exam_4m_used, eo_total, eo_used, coaching_total, coaching_used, tutor_ia_total, tutor_ia_used, tutor_unlock_at, matricule",
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -34,7 +34,7 @@ async function getStudentAccount(req: Request) {
     const fallback = await supabaseAdmin
       .from("profiles")
       .select(
-        "id, prenom, nom, email, phone, ville, city, country, country_code, region, birth_date, genre, role, center_id, avatar_url, created_at, center_status, tag_status, pack_name, subscription_ends_at, ee_total, ee_used, exam_total, exam_used, exam_4m_total, exam_4m_used, eo_total, eo_used, coaching_total, coaching_used, tutor_ia_total, tutor_ia_used, tutor_unlock_at",
+        "id, prenom, nom, email, phone, ville, city, country, country_code, region, birth_date, genre, role, center_id, avatar_url, created_at, center_status, tag_status, pack_name, subscription_ends_at, ee_total, ee_used, exam_total, exam_used, exam_4m_total, exam_4m_used, eo_total, eo_used, coaching_total, coaching_used, tutor_ia_total, tutor_ia_used, tutor_unlock_at, matricule",
       )
       .eq("id", user.id)
       .maybeSingle();
