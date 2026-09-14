@@ -39,11 +39,25 @@ function FooterInner({ step, centerType, onSave, saving, hidden }: Props) {
     }
   };
 
+  // L'onboarding est déjà marqué "completed" à la création du centre
+  // (voir handleConfigureCentre dans app/ouvrir-centre/page.tsx) — sauter
+  // cette étape ne bloque donc l'accès à rien, c'est un pur raccourci UX.
+  const handleSkip = () => {
+    router.push("/centre/dashboard");
+  };
+
   return (
     <div
       className="fixed bottom-0 right-0 z-50 bg-white border-t border-neutral-200 px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-end gap-3"
       style={{ left: "var(--nexa-center-sidebar-w, 0px)" }}
     >
+      <button
+        onClick={handleSkip}
+        disabled={saving}
+        className="h-10 w-full sm:w-auto px-4 rounded-xl text-xs font-bold text-neutral-500 flex items-center justify-center gap-2 hover:text-neutral-700 hover:bg-neutral-100 transition-colors disabled:opacity-50"
+      >
+        {t("common", "setupSkip")}
+      </button>
       <button
         onClick={handleNext}
         disabled={saving}

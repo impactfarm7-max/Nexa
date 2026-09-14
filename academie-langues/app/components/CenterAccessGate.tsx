@@ -139,7 +139,7 @@ export default function CenterAccessGate({
 
   if (!useShell) {
     if (!ready) {
-      return <CenterRouteSkeleton mode="center" />;
+      return <CenterRouteSkeleton mode="center" contentOnly />;
     }
     return <>{children}</>;
   }
