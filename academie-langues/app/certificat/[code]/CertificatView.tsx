@@ -6,6 +6,7 @@ const BRAND = { blue: "#11224E", orange: "#F87B1B" };
 
 type Cert = {
   student_prenom: string;
+  student_matricule: string | null;
   discipline_code: string;
   issued_at: string;
   certificate_code: string;
@@ -40,6 +41,12 @@ export function CertificatValid({ cert }: { cert: Cert }) {
             <span className="font-bold text-slate-900">{t("marketing", "certificatCandidateLabel")} </span>
             {cert.student_prenom}
           </p>
+          {cert.student_matricule && (
+            <p className="text-sm">
+              <span className="font-bold text-slate-900">{t("marketing", "certificatMatriculeLabel")} </span>
+              {cert.student_matricule}
+            </p>
+          )}
           <p className="text-sm">
             <span className="font-bold text-slate-900">{t("marketing", "certificatSubjectLabel")} </span>
             {cert.discipline_code}
