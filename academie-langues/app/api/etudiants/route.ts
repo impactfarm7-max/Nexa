@@ -33,6 +33,11 @@ import {
 } from "@/app/utils/coupon.server";
 import { getPublicSiteUrl } from "@/app/utils/public-site-url";
 import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
+import {
+  resolveStudentIdPrefix,
+  generateMatricule,
+  syncImportedMatriculeCounter,
+} from "@/app/utils/student-matricule.server";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -326,13 +331,15 @@ export async function POST(req: NextRequest) {
     let centerTypeRaw: string | null = null;
     let centerQuotaOverrides: Record<string, unknown> | null = null;
     let centerOfferKey: NexaOfferKey = "decouverte";
+    let centerStudentIdPrefix: string = resolveStudentIdPrefix(null);
     if (callerCenterId) {
       const { data: centerRow } = await supabaseAdmin
         .from("centers")
-        .select("nexa_offer, status, created_at, center_type, quota_overrides")
+        .select("nexa_offer, status, created_at, center_type, quota_overrides, student_id_prefix")
         .eq("id", callerCenterId)
         .maybeSingle();
       centerTypeRaw = centerRow?.center_type ?? null;
+      centerStudentIdPrefix = resolveStudentIdPrefix(centerRow?.student_id_prefix ?? null);
       centerOfferKey = resolveEffectiveNexaOfferKey(centerRow);
       centerQuotaOverrides =
         centerRow?.quota_overrides && typeof centerRow.quota_overrides === "object"
@@ -491,6 +498,22 @@ export async function POST(req: NextRequest) {
         }
       : getNexaB2bProfileQuotas(centerQuotaOverrides, 1, centerOfferKey);
 
+    // ---- 5b. Résoudre le matricule ----
+    const importedMatricule = typeof body.matricule === "string" ? body.matricule.trim() : "";
+    let matricule: string | null = null;
+    if (callerCenterId) {
+      if (importedMatricule) {
+        matricule = importedMatricule;
+        await syncImportedMatriculeCounter(
+          supabaseAdmin, callerCenterId, centerStudentIdPrefix, importedMatricule,
+        );
+      } else {
+        matricule = await generateMatricule(
+          supabaseAdmin, callerCenterId, centerStudentIdPrefix, new Date().getFullYear(),
+        );
+      }
+    }
+
     // ---- 6. Renseigner le profil ----
     // Le trigger on_auth_user_created peut pré-créer la ligne avec un tag_status
     // indésirable (ex. revoque) — on force toujours active/normal (fallback actif).
@@ -500,6 +523,7 @@ export async function POST(req: NextRequest) {
       nom,
       email: normalizedEmail,
       phone: phone || null,
+      matricule,
       role: "student",
       center_id: callerCenterId,
       center_status: "active",
@@ -536,6 +560,12 @@ export async function POST(req: NextRequest) {
 
     if (profErr) {
       await supabaseAdmin.auth.admin.deleteUser(newStudentId);
+      if (profErr.message.includes("profiles_matricule_center_unique")) {
+        return NextResponse.json(
+          { error: `Le matricule "${matricule}" est déjà utilisé dans ce centre.` },
+          { status: 409 },
+        );
+      }
       return NextResponse.json({ error: "Échec du profil : " + profErr.message }, { status: 500 });
     }
 
