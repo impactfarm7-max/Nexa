@@ -28,7 +28,7 @@ const MAX_ROWS = 150;
 const TEMPLATE_HEADERS = [
   "prenom", "nom", "email", "telephone", "programme", "campus", "niveau",
   "classe", "genre", "date_naissance", "pays", "region", "duree_mois", "coupon",
-  "annee_scolaire", "tuteur_nom", "tuteur_lien", "tuteur_tel",
+  "annee_scolaire", "tuteur_nom", "tuteur_lien", "tuteur_tel", "matricule",
 ];
 
 type FiliereOption = {
@@ -73,6 +73,7 @@ type ParsedRow = {
   guardianName: string;
   guardianRelation: string;
   guardianPhone: string;
+  matricule: string;
   error?: string;
 };
 
@@ -169,7 +170,7 @@ function unwrapCampus(raw: unknown): CampusOption | null {
 function downloadTemplate() {
   const example = [
     "Jean", "DUPONT", "jean.dupont@example.com", "690000000",
-    "", "", "1", "", "Homme", "2005-03-12", "CM", "", "", "", "", "", "", "",
+    "", "", "1", "", "Homme", "2005-03-12", "CM", "", "", "", "", "", "", "", "",
   ];
   const csv = [TEMPLATE_HEADERS.join(";"), example.join(";")].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -362,6 +363,7 @@ export default function ImportStudentsCsvModal({
       guardianName: cell(headers, raw, "tuteur_nom", "guardian_name"),
       guardianRelation: cell(headers, raw, "tuteur_lien", "guardian_relation"),
       guardianPhone: cell(headers, raw, "tuteur_tel", "guardian_phone", "tuteur_telephone"),
+      matricule: cell(headers, raw, "matricule", "student_id", "registration_number"),
     }));
     setRows(revalidate(parsed));
   };
@@ -496,6 +498,7 @@ export default function ImportStudentsCsvModal({
         }
 
         if (row.coupon) body.coupon_code = row.coupon.toUpperCase();
+        if (row.matricule) body.matricule = row.matricule;
 
         const res = await fetch("/api/etudiants", {
           method: "POST",
