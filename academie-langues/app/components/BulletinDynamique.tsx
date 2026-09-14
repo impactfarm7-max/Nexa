@@ -70,6 +70,7 @@ export default function BulletinDynamique({
   const [signatures, setSignatures] = useState<{ id: string; label: string }[]>([]);
   const [studentName, setStudentName] = useState("");
   const [studentClasse, setStudentClasse] = useState("");
+  const [studentMatricule, setStudentMatricule] = useState("");
   const [periods, setPeriods] = useState<PeriodCol[]>([]);
   const [matieres, setMatieres] = useState<MatiereRow[]>([]);
   const [rawGrades, setRawGrades] = useState<RawGrade[]>([]);
@@ -90,7 +91,7 @@ export default function BulletinDynamique({
     (async () => {
       const { data: enr } = await supabase
         .from("enrollments")
-        .select("student_id, groupe_id, filieres(center_id), profiles:student_id(prenom, nom), groupes:groupe_id(nom)")
+        .select("student_id, groupe_id, filieres(center_id), profiles:student_id(prenom, nom, matricule), groupes:groupe_id(nom)")
         .eq("id", enrollmentId)
         .single();
 
@@ -98,6 +99,7 @@ export default function BulletinDynamique({
       const prenom = (enr as any)?.profiles?.prenom || "";
       const nom = (enr as any)?.profiles?.nom || "";
       setStudentName(`${prenom} ${nom}`.trim());
+      setStudentMatricule((enr as any)?.profiles?.matricule || "");
       setStudentClasse((enr as any)?.groupes?.nom || "");
 
       if (!centerId) { setLoading(false); return; }
@@ -466,6 +468,11 @@ export default function BulletinDynamique({
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "bulletinLearner")}</p>
             <p className="font-extrabold text-sm tracking-tight" style={{ color: BLUE }}>{studentName}</p>
+            {studentMatricule && (
+              <p className="text-[11px] text-neutral-500 font-semibold mt-0.5">
+                {t("centre", "bulletinMatricule")} : {studentMatricule}
+              </p>
+            )}
             <p className="text-xs text-neutral-500 font-medium mt-1">
               {enrollmentLabel}
               {niveauAnnee != null ? ` — ${t("centre", "bulletinLevel")} ${niveauAnnee}` : ""}
