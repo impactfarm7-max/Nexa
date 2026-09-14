@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
       nom: ownerNom.trim(),
       email: ownerEmail.trim().toLowerCase(),
       phone: phone?.trim() || null,
+      ville: city.trim(),
       role: "center_manager",
       center_id: center.id,
       onboarding_step: "welcome",

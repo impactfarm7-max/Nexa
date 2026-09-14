@@ -1,5 +1,7 @@
 /**
- * Crée/rafraîchit les 4 comptes démo publics (bouton "Visiter" landing).
+ * Crée/rafraîchit les 10 comptes démo publics (bouton "Visiter" landing) --
+ * 1 manager + 1 étudiant par type de centre (Libre, TCF Canada, École,
+ * Université, Entreprise).
  * Idempotent : rejouable sans dupliquer (upsert par email).
  * Usage: node --env-file=.env.local scripts/seed-demo-accounts.mjs
  */
@@ -157,6 +159,33 @@ async function main() {
     filiereType: "cursus",
     managerEmail: "demo-tcf-centre@nexa-demo.app",
     studentEmail: "demo-tcf-etudiant@nexa-demo.app",
+  });
+
+  await seedCenter({
+    centerName: "École Démo",
+    centerType: "ecole",
+    filiereName: "Classe de 3ème",
+    filiereType: "cursus",
+    managerEmail: "demo-ecole-centre@nexa-demo.app",
+    studentEmail: "demo-ecole-etudiant@nexa-demo.app",
+  });
+
+  await seedCenter({
+    centerName: "Université Démo",
+    centerType: "universite",
+    filiereName: "Licence Informatique",
+    filiereType: "cursus",
+    managerEmail: "demo-universite-centre@nexa-demo.app",
+    studentEmail: "demo-universite-etudiant@nexa-demo.app",
+  });
+
+  await seedCenter({
+    centerName: "Entreprise Démo",
+    centerType: "entreprise",
+    filiereName: "Onboarding Nouveaux Employés",
+    filiereType: "cursus",
+    managerEmail: "demo-entreprise-centre@nexa-demo.app",
+    studentEmail: "demo-entreprise-etudiant@nexa-demo.app",
   });
 
   ok("Seed terminé.");

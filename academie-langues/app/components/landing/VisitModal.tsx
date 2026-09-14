@@ -2,16 +2,29 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Building2, GraduationCap, Loader2, Check } from "lucide-react";
+import { X, Building2, GraduationCap, School, Briefcase, Loader2, Check } from "lucide-react";
 import { BRAND } from "@/app/utils/brand";
 
-type CenterKind = "libre" | "tcf";
+type CenterKind = "libre" | "tcf" | "ecole" | "universite" | "entreprise";
 type ViewAs = "center" | "student";
 
 const CENTER_LABEL: Record<CenterKind, string> = {
   libre: "Centre Libre",
   tcf: "Centre TCF Canada",
+  ecole: "École",
+  universite: "Université",
+  entreprise: "Entreprise",
 };
+
+const CENTER_ICON: Record<CenterKind, typeof Building2> = {
+  libre: Building2,
+  tcf: Building2,
+  ecole: School,
+  universite: GraduationCap,
+  entreprise: Briefcase,
+};
+
+const CENTER_OPTIONS: CenterKind[] = ["libre", "tcf", "ecole", "universite", "entreprise"];
 
 export default function VisitModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [step, setStep] = useState<1 | 2>(1);
@@ -155,26 +168,22 @@ export default function VisitModal({ open, onClose }: { open: boolean; onClose: 
                 transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
                 className="grid grid-cols-1 gap-3"
               >
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.015 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => pickCenterKind("libre")}
-                  className={optionClass(false)}
-                >
-                  <Building2 className="h-5 w-5 shrink-0" style={{ color: BRAND.orange }} />
-                  <span className="text-sm font-bold text-neutral-700">Centre Libre</span>
-                </motion.button>
-                <motion.button
-                  type="button"
-                  whileHover={{ scale: 1.015 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => pickCenterKind("tcf")}
-                  className={optionClass(false)}
-                >
-                  <Building2 className="h-5 w-5 shrink-0" style={{ color: BRAND.orange }} />
-                  <span className="text-sm font-bold text-neutral-700">Centre TCF Canada</span>
-                </motion.button>
+                {CENTER_OPTIONS.map((kind) => {
+                  const Icon = CENTER_ICON[kind];
+                  return (
+                    <motion.button
+                      key={kind}
+                      type="button"
+                      whileHover={{ scale: 1.015 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => pickCenterKind(kind)}
+                      className={optionClass(false)}
+                    >
+                      <Icon className="h-5 w-5 shrink-0" style={{ color: BRAND.orange }} />
+                      <span className="text-sm font-bold text-neutral-700">{CENTER_LABEL[kind]}</span>
+                    </motion.button>
+                  );
+                })}
               </motion.div>
             ) : (
               <motion.div

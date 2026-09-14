@@ -8,8 +8,16 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 );
 
-type CenterKind = "libre" | "tcf";
+type CenterKind = "libre" | "tcf" | "ecole" | "universite" | "entreprise";
 type ViewAs = "center" | "student";
+
+const CENTER_TYPE_BY_KIND: Record<CenterKind, string> = {
+  libre: "generic",
+  tcf: "tcf_canada",
+  ecole: "ecole",
+  universite: "universite",
+  entreprise: "entreprise",
+};
 
 export async function POST(req: NextRequest) {
   const rate = await consumeFixedWindow(`demo-enter:${requestIp(req)}`, 20, 15 * 60 * 1000);
@@ -22,14 +30,14 @@ export async function POST(req: NextRequest) {
 
   const body = (await req.json().catch(() => ({}))) as { centerKind?: CenterKind; viewAs?: ViewAs };
   const { centerKind, viewAs } = body;
-  if (centerKind !== "libre" && centerKind !== "tcf") {
+  if (!centerKind || !CENTER_TYPE_BY_KIND[centerKind]) {
     return NextResponse.json({ error: "Type de centre invalide." }, { status: 400 });
   }
   if (viewAs !== "center" && viewAs !== "student") {
     return NextResponse.json({ error: "Rôle invalide." }, { status: 400 });
   }
 
-  const wantedCenterType = centerKind === "tcf" ? "tcf_canada" : "generic";
+  const wantedCenterType = CENTER_TYPE_BY_KIND[centerKind];
   const wantedRole = viewAs === "center" ? "center_manager" : "student";
 
   const { data: candidates, error: profilesErr } = await supabaseAdmin
