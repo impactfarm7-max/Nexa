@@ -74,6 +74,7 @@ type StudentRow = {
   nom: string;
   email: string;
   phone: string | null;
+  matricule: string | null;
   avatar_url: string | null;
   birth_date: string | null;     // YYYY-MM-DD
   genre: string | null;
@@ -500,7 +501,7 @@ export default function CenterStudentsPage() {
   }
 
   const filtered = students.filter((s) => {
-    const matchSearch   = !search || `${s.prenom} ${s.nom} ${s.email}`.toLowerCase().includes(search.toLowerCase());
+    const matchSearch   = !search || `${s.prenom} ${s.nom} ${s.email} ${s.matricule || ""}`.toLowerCase().includes(search.toLowerCase());
     const matchFiliere  = !filiereFilter || s.enrollments.some((e) => e.filiere_id === filiereFilter);
     const matchCampus   = !campusFilter || s.enrollments.some((e) => e.campus_id === campusFilter);
     const matchStatus   = statusFilter === "all" || s.center_status === statusFilter;
@@ -763,6 +764,9 @@ export default function CenterStudentsPage() {
                             {`${s.prenom || ""} ${s.nom || ""}`.trim().toUpperCase()}
                           </p>
                           <p className="text-[11px] text-neutral-400 font-medium mt-0.5 truncate">{s.email || "—"}</p>
+                          {s.matricule && (
+                            <p className="text-[10px] text-neutral-400 font-semibold mt-0.5 truncate">{s.matricule}</p>
+                          )}
                         </td>
                         <td className="px-4 py-3.5 text-[12px] font-medium text-neutral-600 uppercase">
                           {primaryEnr?.filiere_name_raw ? primaryEnr.filiere_name_raw.toUpperCase() : "—"}
@@ -871,6 +875,7 @@ export default function CenterStudentsPage() {
                     enrollmentId={selectedEnrollment?.id}
                     studentName={`${selectedStudent.prenom || ""} ${selectedStudent.nom || ""}`.trim().toUpperCase()}
                     studentEmail={selectedStudent.email}
+                    studentMatricule={selectedStudent.matricule}
                     studentPhone={selectedStudent.phone}
                     avatarUrl={selectedStudent.avatar_url}
                     enrollmentInfo={selectedEnrollment ? {

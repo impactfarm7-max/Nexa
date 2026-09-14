@@ -72,6 +72,7 @@ type Props = {
   enrollmentId?: string | null;
   studentName: string;
   studentEmail: string;
+  studentMatricule: string | null;
   studentPhone: string | null;
   avatarUrl: string | null;
   enrollmentInfo: {
@@ -123,6 +124,7 @@ export default function StudentIdentityTab({
   enrollmentId,
   studentName,
   studentEmail,
+  studentMatricule,
   studentPhone,
   avatarUrl,
   enrollmentInfo,
@@ -545,6 +547,7 @@ export default function StudentIdentityTab({
           <div className="min-w-0 flex-1 space-y-1">
             <p className="font-extrabold text-lg truncate" style={{ color: BLUE }}>{studentName}</p>
             <p className="text-sm text-neutral-500 font-medium truncate">{studentEmail}</p>
+            {studentMatricule && <p className="text-sm text-neutral-500 font-medium">{studentMatricule}</p>}
             {studentPhone && <p className="text-sm text-neutral-500 font-medium">{studentPhone}</p>}
             {details.country && (
               <p className="text-sm text-neutral-500 font-medium flex items-center gap-1.5 pt-1">

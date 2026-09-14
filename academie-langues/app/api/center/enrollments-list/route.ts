@@ -72,11 +72,12 @@ export async function GET(req: Request) {
     center_status: string | null;
     birth_date?: string | null;
     genre?: string | null;
+    matricule?: string | null;
   };
 
   const profilesRes = await supabaseAdmin
     .from("profiles")
-    .select("id, prenom, nom, email, phone, avatar_url, center_status, birth_date, genre")
+    .select("id, prenom, nom, email, phone, avatar_url, center_status, birth_date, genre, matricule")
     .eq("center_id", ctx!.centerId)
     .eq("role", "student")
     .order("nom");
@@ -85,7 +86,7 @@ export async function GET(req: Request) {
   if (profilesRes.error && /birth_date|genre/i.test(profilesRes.error.message)) {
     const fallback = await supabaseAdmin
       .from("profiles")
-      .select("id, prenom, nom, email, phone, avatar_url, center_status")
+      .select("id, prenom, nom, email, phone, avatar_url, center_status, matricule")
       .eq("center_id", ctx!.centerId)
       .eq("role", "student")
       .order("nom");
@@ -148,6 +149,7 @@ export async function GET(req: Request) {
       nom: p.nom,
       email: p.email,
       phone: p.phone,
+      matricule: p.matricule ?? null,
       avatar_url: p.avatar_url,
       birth_date: p.birth_date ?? null,
       genre: p.genre ?? null,
