@@ -24,6 +24,7 @@ import { canManagePinProtectedZones } from "@/app/utils/student-routes";
 import { checkPasswordStrength, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
 import { initPwaInstallCapture, isIosDevice, isPwaInstalled, promptPwaInstall } from "@/app/utils/pwa-install";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { isStructureType } from "@/app/data/center-types";
 import {
   BLUE,
   ORANGE,
@@ -71,12 +72,17 @@ type CenterAccount = {
     code: string | null;
     city: string | null;
     status: string;
+    center_type?: string | null;
   };
 };
 
 const STAFF_ROLE_KEYS: Record<string, string> = {
   admin: "profileRoleAdministrator", center_manager: "profileRoleCenterDirector", campus_manager: "profileRoleCampusDirector",
   trainer: "accountRoleTrainer", staff: "profileRoleAdministrativeAgent",
+};
+const STAFF_ROLE_KEYS_STRUCTURE: Record<string, string> = {
+  ...STAFF_ROLE_KEYS,
+  center_manager: "profileRoleStructureDirector",
 };
 
 const PIN_TOGGLES: { key: keyof PinSettings; labelKey: string; descriptionKey: string }[] = [
@@ -95,12 +101,14 @@ export default function CenterProfilPage() {
   const { t, locale } = useI18n();
   const en = locale === "en";
   const acc = useAccordion();
-  const staffRoleLabel = (profileRole?: string | null, membershipRole?: string | null) => {
-    if (profileRole && STAFF_ROLE_KEYS[profileRole]) return t("centre", STAFF_ROLE_KEYS[profileRole]);
+  const staffRoleLabel = (profileRole?: string | null, membershipRole?: string | null, centerType?: string | null) => {
+    const isStructure = isStructureType(centerType);
+    const roleKeys = isStructure ? STAFF_ROLE_KEYS_STRUCTURE : STAFF_ROLE_KEYS;
+    if (profileRole && roleKeys[profileRole]) return t("centre", roleKeys[profileRole]);
     if (membershipRole === "owner") return t("centre", "accountRoleOwner");
     if (membershipRole === "manager") return t("centre", "accountRoleAdmin");
     if (membershipRole === "staff") return t("centre", "accountRoleTrainer");
-    return t("centre", "profileCenterStaff");
+    return t("centre", isStructure ? "profileStructureStaff" : "profileCenterStaff");
   };
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -226,7 +234,7 @@ export default function CenterProfilPage() {
     return account?.profile?.email || account?.user.email || t("centre", "profileMyProfile");
   }, [account, t]);
 
-  const roleLabel = staffRoleLabel(account?.profile?.role, account?.membership?.role);
+  const roleLabel = staffRoleLabel(account?.profile?.role, account?.membership?.role, account?.center?.center_type);
   const canManageProtectedZones = canManagePinProtectedZones(account?.profile?.role);
   const statusLabel = account?.profile?.tag_status || (account?.center.status === "active" ? t("centre", "campusActive") : t("centre", "summarySuspended"));
 

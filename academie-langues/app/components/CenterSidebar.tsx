@@ -14,7 +14,7 @@ import {
 import { supabase } from "@/app/utils/supabase";
 import { STAFF_PERMISSION_ROUTES } from "@/app/utils/student-routes";
 import { filterModulePermissions, ensureTcfCommunautePermission, ensureDefaultLivesPermission, TRAINER_DEFAULT_MODULE_PERMISSIONS } from "@/app/data/tcf-teaching-subjects";
-import { normalizeCenterType, centerTypeLabel, CENTER_TYPES, type CenterTypeCode } from "@/app/data/center-types";
+import { normalizeCenterType, centerTypeLabel, isStructureType, CENTER_TYPES, type CenterTypeCode } from "@/app/data/center-types";
 import { clearCenterMeCache, getCenterMeCache, loadCenterBootstrap, peekCenterBootstrap } from "@/app/utils/center-me-cache";
 import { BRAND } from "@/app/utils/brand";
 import { CenterBrandMark } from "@/app/centre/center-page-ui";
@@ -192,6 +192,7 @@ function readSidebarCache(t: (ns: "centre", key: string) => string, locale: "fr"
     centerId: center.id,
     centerName: center.name || "Mon Établissement",
     centerType,
+    isStructure: isStructureType(center.center_type),
     planType: resolvePlanLabel(center, t, locale),
     userRole: role,
     staffPermissions,
@@ -211,6 +212,7 @@ function CenterSidebarInner() {
   const [centerId,          setCenterId]          = useState<string | null>(null);
   const [centerName,        setCenterName]        = useState("Mon Établissement");
   const [centerType,        setCenterType]        = useState<CenterTypeCode | null>(null);
+  const [isStructure,       setIsStructure]       = useState(false);
   const [logoUrl,           setLogoUrl]           = useState<string | null>(null);
   const [planType,          setPlanType]          = useState("");
   const [isCollapsed,       setIsCollapsed]       = useState(false);
@@ -257,6 +259,7 @@ function CenterSidebarInner() {
       setCenterId(cached.centerId);
       setCenterName(cached.centerName);
       setCenterType(cached.centerType);
+      setIsStructure(cached.isStructure);
       setPlanType(cached.planType);
       setUserRole(cached.userRole);
       setStaffPermissions(cached.staffPermissions);
@@ -269,6 +272,7 @@ function CenterSidebarInner() {
       setCenterId(fresh.centerId);
       setCenterName(fresh.centerName);
       setCenterType(fresh.centerType);
+      setIsStructure(fresh.isStructure);
       setPlanType(fresh.planType);
       setUserRole(fresh.userRole);
       setStaffPermissions(fresh.staffPermissions);
@@ -399,6 +403,7 @@ function CenterSidebarInner() {
         setCenterName(center.name);
         setPlanType(resolvePlanLabel(center, t, lang));
         setCenterType(normalizeCenterType(center.center_type));
+        setIsStructure(isStructureType(center.center_type));
         setBranches([{ id: profile.center_id, name: center.name }]);
         setActiveBranchId(profile.center_id);
       }
@@ -703,7 +708,7 @@ function CenterSidebarInner() {
           <>
             <SectionLabel label={
               isManager
-                ? (isTCF ? t("centre", "sidebarSectionCentreTcfCanada") : t("centre", "sidebarSectionGestionCentre"))
+                ? (isTCF ? t("centre", "sidebarSectionCentreTcfCanada") : t("centre", isStructure ? "sidebarSectionGestionStructure" : "sidebarSectionGestionCentre"))
                 : t("centre", "sidebarSectionMonEspace")
             } />
             {buildManagerNav()

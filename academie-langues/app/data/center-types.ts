@@ -30,6 +30,19 @@ export function isTcfCanadaCenter(centerType: string | null | undefined) {
   return centerType === "tcf_canada";
 }
 
+const STRUCTURE_TYPES = ["ecole", "universite", "entreprise"];
+
+/**
+ * Vrai pour école/université/entreprise — les 3 types dont le vocabulaire
+ * d'identité ("structure") diverge de "centre" (réservé à tcf_canada et
+ * generic, qui utilisent bien le mot "centre" dans leur propre identité).
+ * Attend la valeur BRUTE de center_type, pas le résultat de
+ * normalizeCenterType() (qui les collapse tous en "generic").
+ */
+export function isStructureType(centerType: string | null | undefined) {
+  return !!centerType && STRUCTURE_TYPES.includes(centerType);
+}
+
 export function isFormationCourteCenter(centerType: string | null | undefined) {
   return false;
 }

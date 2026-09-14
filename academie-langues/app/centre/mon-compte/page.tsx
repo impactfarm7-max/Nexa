@@ -22,6 +22,7 @@ import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { LogoutConfirmDialog } from "@/app/components/LogoutConfirmDialog";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { isStructureType } from "@/app/data/center-types";
 import {
   BLUE,
   ORANGE,
@@ -65,6 +66,7 @@ type CenterAccount = {
     email: string | null;
     status: string;
     created_at: string | null;
+    center_type?: string | null;
   };
 };
 
@@ -83,12 +85,13 @@ function formatDate(value?: string | null, locale = "fr") {
 export default function CenterAccountPage() {
   const router = useRouter();
   const { t, locale } = useI18n();
-  const roleLabel = (profileRole?: string | null, membershipRole?: string | null) => {
-    if (profileRole === "student") return t("centre", "accountRoleStudent");
+  const roleLabel = (profileRole?: string | null, membershipRole?: string | null, centerType?: string | null) => {
+    const isStructure = isStructureType(centerType);
+    if (profileRole === "student") return t("centre", isStructure ? "accountRoleStructureStudent" : "accountRoleStudent");
     if (profileRole === "trainer" || membershipRole === "staff") return t("centre", "accountRoleTrainer");
     if (membershipRole === "owner") return t("centre", "accountRoleOwner");
-    if (membershipRole === "manager" || profileRole === "center_manager") return t("centre", "accountRoleAdmin");
-    return t("centre", "accountRoleMember");
+    if (membershipRole === "manager" || profileRole === "center_manager") return t("centre", isStructure ? "accountRoleStructureAdmin" : "accountRoleAdmin");
+    return t("centre", isStructure ? "accountRoleStructureMember" : "accountRoleMember");
   };
   const [account, setAccount] = useState<CenterAccount | null>(null);
   const [loading, setLoading] = useState(true);
@@ -248,7 +251,7 @@ export default function CenterAccountPage() {
               <div className="min-w-0">
                 <p className="truncate text-lg font-extrabold" style={{ color: BLUE }}>{displayName}</p>
                 <p className="mt-1 text-[13px] font-semibold" style={{ color: ORANGE }}>
-                  {roleLabel(account.profile?.role, account.membership?.role)}
+                  {roleLabel(account.profile?.role, account.membership?.role, account.center?.center_type)}
                 </p>
               </div>
             </div>
@@ -334,7 +337,7 @@ export default function CenterAccountPage() {
           </section>
 
           <section className="grid gap-3 md:grid-cols-3">
-            <MiniCard icon={ShieldCheck} label={t("centre", "accountRole")} value={roleLabel(account.profile?.role, account.membership?.role)} />
+            <MiniCard icon={ShieldCheck} label={t("centre", "accountRole")} value={roleLabel(account.profile?.role, account.membership?.role, account.center?.center_type)} />
             <MiniCard icon={BadgeCheck} label={t("centre", "settingsStatus")} value={account.profile?.tag_status || account.center.status || t("centre", "campusActiveLower")} />
             <MiniCard icon={GraduationCap} label={t("centre", "accountSimulations")} value={String(account.profile?.simulations_completed || 0)} />
           </section>

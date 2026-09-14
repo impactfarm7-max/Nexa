@@ -41,7 +41,7 @@ async function getAccount(req: Request) {
 
   const { data: center, error: centerError } = await supabaseAdmin
     .from("centers")
-    .select("id, name, code, city, address, phone, email, status, created_at")
+    .select("id, name, code, city, address, phone, email, status, created_at, center_type")
     .eq("id", centerId)
     .maybeSingle();
 
