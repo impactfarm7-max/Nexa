@@ -458,6 +458,7 @@ export default function StudentIdentityTab({
       await downloadAttestationReussitePdf({
         locale,
         studentName: studentName,
+        studentMatricule,
         programName: enrollmentInfo?.filiere_name || null,
         niveauLabel: enrollmentInfo?.niveau_annee != null ? `${t("centre", "identityLevel")} ${enrollmentInfo.niveau_annee}` : null,
         classeLabel: enrollmentInfo?.groupe_nom || null,

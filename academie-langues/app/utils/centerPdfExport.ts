@@ -1135,6 +1135,7 @@ export async function downloadClassGradeSheetPdf(params: ClassGradeSheetPdfParam
 export type AttestationReussitePdfParams = {
   locale?: "fr" | "en";
   studentName: string;
+  studentMatricule?: string | null;
   programName?: string | null;
   niveauLabel?: string | null;
   classeLabel?: string | null;
@@ -1193,6 +1194,7 @@ export async function downloadAttestationReussitePdf(params: AttestationReussite
 
   y += 6;
   const details: string[] = [];
+  if (params.studentMatricule) details.push(`${isEn ? "Student ID" : "Matricule"} : ${params.studentMatricule}`);
   if (params.programName) details.push(`${isEn ? "Program" : "Programme"} : ${params.programName}`);
   if (params.niveauLabel) details.push(`${isEn ? "Level" : "Niveau"} : ${params.niveauLabel}`);
   if (params.classeLabel) details.push(`${isEn ? "Class" : "Classe"} : ${params.classeLabel}`);

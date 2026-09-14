@@ -89,6 +89,7 @@ type Period    = { id: string; name: string };
 type ExportStudentRow = {
   nom: string;
   prenom: string;
+  matricule: string;
   email: string;
   telephone: string;
   filiere: string;
@@ -112,7 +113,7 @@ function calcAge(iso: string | null, unit = "ans"): string {
 }
 
 type StudentExportLabels = {
-  title: string; lastName: string; firstName: string; email: string; phone: string; program: string; status: string;
+  title: string; lastName: string; firstName: string; matricule: string; email: string; phone: string; program: string; status: string;
   active: string; suspended: string; revoked: string; pending: string;
   allStatuses: string; allPrograms: string; filter: string; generatedOn: string; search: string; lines: string;
 };
@@ -129,6 +130,7 @@ function toStudentExportRows(list: StudentRow[], labels: StudentExportLabels): E
   return list.map((s) => ({
     nom: (s.nom || "").toUpperCase(),
     prenom: (s.prenom || "").toUpperCase(),
+    matricule: s.matricule || "",
     email: s.email || "",
     telephone: s.phone || "",
     filiere: (s.enrollments[0]?.filiere_name_raw || "").toUpperCase(),
@@ -167,10 +169,10 @@ function studentsPdfFilename() {
 }
 
 function downloadStudentsCsv(rows: ExportStudentRow[], labels: StudentExportLabels) {
-  const header = [labels.lastName, labels.firstName, labels.email, labels.phone, labels.program, labels.status];
+  const header = [labels.lastName, labels.firstName, labels.matricule, labels.email, labels.phone, labels.program, labels.status];
   const lines = [
     header,
-    ...rows.map((r) => [r.nom, r.prenom, r.email, r.telephone, r.filiere, r.statut]),
+    ...rows.map((r) => [r.nom, r.prenom, r.matricule, r.email, r.telephone, r.filiere, r.statut]),
   ];
   const csv = lines
     .map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";"))
@@ -208,8 +210,8 @@ async function buildStudentsPdfDoc(rows: ExportStudentRow[], filterCaption: stri
 
   autoTable(doc, {
     startY: 40,
-    head: [[labels.lastName, labels.firstName, labels.email, labels.phone, labels.program, labels.status]],
-    body: rows.map((r) => [r.nom, r.prenom, r.email, r.telephone, r.filiere, r.statut]),
+    head: [[labels.lastName, labels.firstName, labels.matricule, labels.email, labels.phone, labels.program, labels.status]],
+    body: rows.map((r) => [r.nom, r.prenom, r.matricule, r.email, r.telephone, r.filiere, r.statut]),
     styles: { font: "helvetica", fontSize: 8, cellPadding: 2, overflow: "linebreak", textColor: [40, 40, 40] },
     headStyles: { fillColor: blue, textColor: 255, fontStyle: "bold" },
     alternateRowStyles: { fillColor: [250, 250, 248] },
@@ -258,6 +260,7 @@ export default function CenterStudentsPage() {
   const router = useRouter();
   const exportLabels: StudentExportLabels = {
     title: t("centre", "studentsTitle"), lastName: t("centre", "enrollmentLastName"), firstName: t("centre", "enrollmentFirstName"),
+    matricule: t("centre", "studentMatriculeLabel"),
     email: t("centre", "accountEmail"), phone: t("centre", "accountPhone"), program: t("centre", "enrollmentProgram"), status: t("centre", "settingsStatus"),
     active: t("centre", "summaryActive"), suspended: t("centre", "summarySuspended"), revoked: t("centre", "studentsRevokedPlural"),
     pending: t("centre", "studentsPendingApproval"),
