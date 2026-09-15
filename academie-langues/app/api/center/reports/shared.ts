@@ -74,6 +74,7 @@ export type FinanceSummaryRow = {
   student_id: string;
   prenom: string;
   nom: string;
+  matricule: string | null;
   center_status: string | null;
   filiere_name: string;
   niveau_annee: number | null;
@@ -100,7 +101,7 @@ export async function loadFinanceSummary(centerId: string) {
     .eq("center_id", centerId);
   if (error) throw new Error(error.message);
 
-  const rows = (data || []) as Omit<FinanceSummaryRow, "campus_id">[];
+  const rows = (data || []) as Omit<FinanceSummaryRow, "campus_id" | "matricule">[];
   const enrollmentIds = rows.map((r) => r.enrollment_id).filter(Boolean);
   const campusByEnrollment = new Map<string, string | null>();
   const enrolledAtByEnrollment = new Map<string, string | null>();
@@ -117,10 +118,21 @@ export async function loadFinanceSummary(centerId: string) {
     }
   }
 
+  const studentIds = [...new Set(rows.map((r) => r.student_id).filter(Boolean))];
+  const matriculeByStudent = new Map<string, string | null>();
+  if (studentIds.length > 0) {
+    const { data: profRows } = await supabaseAdmin
+      .from("profiles")
+      .select("id, matricule")
+      .in("id", studentIds);
+    for (const p of profRows || []) matriculeByStudent.set(p.id, p.matricule ?? null);
+  }
+
   return rows.map((row) => ({
     ...row,
     campus_id: campusByEnrollment.get(row.enrollment_id) ?? null,
     enrolled_at: row.enrolled_at ?? enrolledAtByEnrollment.get(row.enrollment_id) ?? null,
+    matricule: matriculeByStudent.get(row.student_id) ?? null,
   })) as FinanceSummaryRow[];
 }
 

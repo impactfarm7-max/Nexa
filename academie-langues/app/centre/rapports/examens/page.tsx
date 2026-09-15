@@ -38,6 +38,7 @@ type ExamensReport = {
     type: string;
     status: string;
     student?: string;
+    matricule?: string | null;
   }[];
 };
 
@@ -62,6 +63,7 @@ function ExamensContent() {
           t("centre", "reportsExamStatus"),
         ]
       : [
+          t("centre", "studentMatriculeLabel"),
           t("centre", "reportsExamLearner"),
           t("centre", "reportsExamNumber"),
           t("centre", "reportsDate"),
@@ -75,7 +77,7 @@ function ExamensContent() {
       report.rows.map((r) =>
         report.source === "tcf"
           ? [r.title, r.examenId, r.date, r.heure, r.type, r.status]
-          : [r.student || "—", r.examenId, r.date, r.heure, r.type, r.status],
+          : [r.matricule || "—", r.student || "—", r.examenId, r.date, r.heure, r.type, r.status],
       ),
     );
   }, [report, t, periodLabel]);
@@ -189,6 +191,7 @@ function ExamensContent() {
                     { key: "status", label: t("centre", "reportsExamStatus") },
                   ]
                 : [
+                    { key: "matricule", label: t("centre", "studentMatriculeLabel") },
                     { key: "student", label: t("centre", "reportsExamLearner") },
                     { key: "title", label: t("centre", "reportsExamExam") },
                     { key: "date", label: t("centre", "reportsDate") },
@@ -198,6 +201,7 @@ function ExamensContent() {
             rows={report.rows.map((r) => ({
               title: r.title,
               student: r.student || "—",
+              matricule: r.matricule || "—",
               date: r.date,
               heure: r.heure,
               type: r.type,

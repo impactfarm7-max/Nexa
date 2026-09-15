@@ -26,6 +26,7 @@ type RecouvrementReport = {
   byFiliere: { label: string; ca: number; encaisse: number; reste: number; taux: number }[];
   rows: {
     student: string;
+    matricule: string | null;
     filiere: string;
     niveau: number | null;
     classe: string | null;
@@ -57,8 +58,9 @@ function RecouvrementContent() {
     if (!report) return;
     downloadCsv(
       `recouvrement-${periodLabel.replace(/\s+/g, "-")}.csv`,
-      [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "enrollmentLevel"), t("centre", "enrollmentClass"), t("centre", "recoveryRevenue"), t("centre", "recoveryCollected"), t("centre", "summaryBalance"), t("centre", "settingsStatus")],
+      [t("centre", "studentMatriculeLabel"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "enrollmentLevel"), t("centre", "enrollmentClass"), t("centre", "recoveryRevenue"), t("centre", "recoveryCollected"), t("centre", "summaryBalance"), t("centre", "settingsStatus")],
       report.rows.map((r) => [
+        r.matricule || "—",
         r.student,
         r.filiere,
         r.niveau ?? "",
@@ -89,8 +91,8 @@ function RecouvrementContent() {
         },
         {
           title: t("centre", "recoveryTopUnpaid"),
-          columns: [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance")],
-          rows: report.rows.map((r) => [r.student, r.filiere, fmtFCFA(r.reste)]),
+          columns: [t("centre", "studentMatriculeLabel"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance")],
+          rows: report.rows.map((r) => [r.matricule || "—", r.student, r.filiere, fmtFCFA(r.reste)]),
         },
       ],
       filename: `recouvrement-${periodLabel.replace(/\s+/g, "-")}.pdf`,
@@ -171,6 +173,7 @@ function RecouvrementContent() {
           <ReportBreakdownTable
             title={t("centre", "recoveryTop20Unpaid")}
             columns={[
+              { key: "matricule", label: t("centre", "studentMatriculeLabel") },
               { key: "student", label: t("centre", "enrollmentLearner") },
               { key: "filiere", label: t("centre", "enrollmentProgram") },
               { key: "reste", label: t("centre", "summaryBalance"), align: "right" },
@@ -178,6 +181,7 @@ function RecouvrementContent() {
               { key: "statut", label: t("centre", "settingsStatus") },
             ]}
             rows={report.rows.map((row) => ({
+              matricule: row.matricule || "—",
               student: row.student,
               filiere: row.filiere,
               reste: fmtFCFA(row.reste),

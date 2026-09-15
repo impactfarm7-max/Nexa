@@ -20,7 +20,7 @@ type EncaissementsReport = {
   byPeriod: { date: string; amount: number }[];
   byFiliere: { label: string; amount: number; count: number }[];
   byMode: { label: string; amount: number; count: number }[];
-  rows: { date: string; student: string; filiere: string; amount: number; method: string }[];
+  rows: { date: string; student: string; matricule: string | null; filiere: string; amount: number; method: string }[];
 };
 
 function EncaissementsContent() {
@@ -44,8 +44,8 @@ function EncaissementsContent() {
     if (!report) return;
     downloadCsv(
       `encaissements-${periodLabel.replace(/\s+/g, "-")}.csv`,
-      [t("centre", "reportsDate"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "collectionsMethod")],
-      report.rows.map((r) => [r.date, r.student, r.filiere, r.amount, methodLabel(r.method)]),
+      [t("centre", "reportsDate"), t("centre", "studentMatriculeLabel"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "collectionsMethod")],
+      report.rows.map((r) => [r.date, r.matricule || "—", r.student, r.filiere, r.amount, methodLabel(r.method)]),
     );
   }, [report, t, periodLabel]);
 
@@ -62,8 +62,8 @@ function EncaissementsContent() {
       sections: [
         {
           title: t("centre", "collectionsJournalShort"),
-          columns: [t("centre", "reportsDate"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "collectionsMethod")],
-          rows: report.rows.map((r) => [r.date, r.student, r.filiere, fmtFCFA(r.amount), methodLabel(r.method)]),
+          columns: [t("centre", "reportsDate"), t("centre", "studentMatriculeLabel"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "collectionsMethod")],
+          rows: report.rows.map((r) => [r.date, r.matricule || "—", r.student, r.filiere, fmtFCFA(r.amount), methodLabel(r.method)]),
         },
       ],
       filename: `encaissements-${periodLabel.replace(/\s+/g, "-")}.pdf`,
@@ -143,12 +143,13 @@ function EncaissementsContent() {
             title={t("centre", "collectionsJournal")}
             columns={[
               { key: "date", label: t("centre", "reportsDate") },
+              { key: "matricule", label: t("centre", "studentMatriculeLabel") },
               { key: "student", label: t("centre", "enrollmentLearner") },
               { key: "filiere", label: t("centre", "enrollmentProgram") },
               { key: "amount", label: t("centre", "collectionsAmount"), align: "right" },
               { key: "method", label: t("centre", "collectionsMethod") },
             ]}
-            rows={report.rows.map((row) => ({ ...row, amount: fmtFCFA(row.amount), method: methodLabel(row.method) }))}
+            rows={report.rows.map((row) => ({ ...row, matricule: row.matricule || "—", amount: fmtFCFA(row.amount), method: methodLabel(row.method) }))}
           />
         </>
       )}

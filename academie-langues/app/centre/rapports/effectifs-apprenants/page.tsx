@@ -33,6 +33,7 @@ type EffectifsReport = {
   rows: {
     prenom: string;
     nom: string;
+    matricule: string | null;
     filiere: string;
     niveau: number | null;
     classe: string;
@@ -89,8 +90,9 @@ function EffectifsContent() {
         },
         {
           title: t("centre", "enrollmentList"),
-          columns: [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "enrollmentClass"), t("centre", "settingsStatus")],
+          columns: [t("centre", "studentMatriculeLabel"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "enrollmentClass"), t("centre", "settingsStatus")],
           rows: report.rows.map((r) => [
+            r.matricule || "—",
             `${r.prenom} ${r.nom}`.trim(),
             r.filiere,
             r.classe,
@@ -192,6 +194,7 @@ function EffectifsContent() {
           <ReportBreakdownTable
             title={t("centre", "enrollmentDetailedList")}
             columns={[
+              { key: "matricule", label: t("centre", "studentMatriculeLabel") },
               { key: "name", label: t("centre", "enrollmentLearner") },
               { key: "filiere", label: t("centre", "enrollmentProgram") },
               { key: "niveau", label: t("centre", "enrollmentLevelShort") },
@@ -199,6 +202,7 @@ function EffectifsContent() {
               { key: "status", label: t("centre", "settingsStatus") },
             ]}
             rows={report.rows.map((row) => ({
+              matricule: row.matricule || "—",
               name: `${row.prenom} ${row.nom}`.trim(),
               filiere: row.filiere,
               niveau: row.niveau ?? "—",

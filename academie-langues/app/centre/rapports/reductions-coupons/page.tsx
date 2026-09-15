@@ -31,7 +31,7 @@ type ReductionsReport = {
     active: boolean;
     expiresAt: string;
   }[];
-  rows: { student: string; filiere: string; amount: number; reason: string; enrolledAt: string }[];
+  rows: { student: string; matricule: string | null; filiere: string; amount: number; reason: string; enrolledAt: string }[];
 };
 
 function ReductionsContent() {
@@ -47,8 +47,8 @@ function ReductionsContent() {
     if (!report) return;
     downloadCsv(
       `reductions-${periodLabel.replace(/\s+/g, "-")}.csv`,
-      [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "discountReason"), t("centre", "discountEnrollment")],
-      report.rows.map((r) => [r.student, r.filiere, r.amount, r.reason, r.enrolledAt]),
+      [t("centre", "studentMatriculeLabel"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "discountReason"), t("centre", "discountEnrollment")],
+      report.rows.map((r) => [r.matricule || "—", r.student, r.filiere, r.amount, r.reason, r.enrolledAt]),
     );
   }, [report, t, periodLabel]);
 
@@ -70,8 +70,8 @@ function ReductionsContent() {
         },
         {
           title: t("centre", "discountDetail"),
-          columns: [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "discountReason")],
-          rows: report.rows.map((r) => [r.student, r.filiere, fmtFCFA(r.amount), r.reason]),
+          columns: [t("centre", "studentMatriculeLabel"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "collectionsAmount"), t("centre", "discountReason")],
+          rows: report.rows.map((r) => [r.matricule || "—", r.student, r.filiere, fmtFCFA(r.amount), r.reason]),
         },
       ],
       filename: `reductions-${periodLabel.replace(/\s+/g, "-")}.pdf`,
@@ -149,13 +149,14 @@ function ReductionsContent() {
           <ReportBreakdownTable
             title={t("centre", "discountRecords")}
             columns={[
+              { key: "matricule", label: t("centre", "studentMatriculeLabel") },
               { key: "student", label: t("centre", "enrollmentLearner") },
               { key: "filiere", label: t("centre", "enrollmentProgram") },
               { key: "amount", label: t("centre", "collectionsAmount"), align: "right" },
               { key: "reason", label: t("centre", "discountReason") },
               { key: "enrolledAt", label: t("centre", "discountEnrollment") },
             ]}
-            rows={report.rows.map((r) => ({ ...r, amount: fmtFCFA(r.amount) }))}
+            rows={report.rows.map((r) => ({ ...r, matricule: r.matricule || "—", amount: fmtFCFA(r.amount) }))}
           />
         </>
       )}

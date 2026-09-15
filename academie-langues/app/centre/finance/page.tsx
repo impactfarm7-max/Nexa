@@ -53,6 +53,7 @@ import {
 type FinanceRow = {
   enrollment_id: string;
   student_id: string;
+  matricule?: string | null;
   prenom: string;
   nom: string;
   phone: string | null;
@@ -1191,7 +1192,8 @@ export default function CenterFinancePage() {
                       <p className="text-[13px] font-semibold leading-snug truncate uppercase" style={{ color: BLUE }}>
                         {r.prenom} {r.nom}
                       </p>
-                      {r.phone && <p className="text-[11px] text-neutral-400 font-medium mt-1 truncate">{r.phone}</p>}
+                      {r.matricule && <p className="text-[11px] text-neutral-400 font-semibold mt-1 truncate">{r.matricule}</p>}
+                      {r.phone && <p className="text-[11px] text-neutral-400 font-medium mt-0.5 truncate">{r.phone}</p>}
                     </td>
                     <td className="px-4 py-4 min-w-0 align-top">
                       <p className="text-[12px] font-medium text-neutral-600 leading-snug truncate uppercase">{r.filiere_name}</p>
@@ -1270,6 +1272,7 @@ export default function CenterFinancePage() {
                       <CenterTableRow key={r.enrollment_id} index={i}>
                         <td className="px-4 py-4 min-w-0">
                           <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: BLUE }}>{r.prenom} {r.nom}</p>
+                          {r.matricule && <p className="text-[11px] text-neutral-400 font-semibold mt-0.5 truncate">{r.matricule}</p>}
                         </td>
                         <td className="px-4 py-4 min-w-0 align-top">
                           <p className="text-[12px] text-neutral-600 leading-snug truncate uppercase">{r.filiere_name}</p>

@@ -26,6 +26,17 @@ export async function GET(req: Request) {
 
   const rows = records || [];
   const enrollmentIds = rows.map((r: { enrollment_id: string }) => r.enrollment_id).filter(Boolean);
+  const studentIds = [...new Set(rows.map((r: { student_id: string }) => r.student_id).filter(Boolean))];
+  let matriculeByStudent: Record<string, string | null> = {};
+  if (studentIds.length > 0) {
+    const { data: profRows } = await supabaseAdmin
+      .from("profiles")
+      .select("id, matricule")
+      .in("id", studentIds);
+    matriculeByStudent = Object.fromEntries(
+      (profRows || []).map((p: { id: string; matricule: string | null }) => [p.id, p.matricule ?? null]),
+    );
+  }
   let discountByEnrollment: Record<string, { discount_amount: number; discount_reason: string | null; campus_id: string | null }> = {};
   if (enrollmentIds.length > 0) {
     const { data: discRows } = await supabaseAdmin
@@ -52,11 +63,12 @@ export async function GET(req: Request) {
     requestedCampusId && campusList.some((c) => c.id === requestedCampusId) ? requestedCampusId : null;
   const allowedIds = campusId ? [campusId] : ctx!.scopedCampusIds;
 
-  let enriched = rows.map((r: { enrollment_id: string; coupon_discount?: number }) => ({
+  let enriched = rows.map((r: { enrollment_id: string; student_id: string; coupon_discount?: number }) => ({
     ...r,
     campus_id: discountByEnrollment[r.enrollment_id]?.campus_id ?? null,
     discount_amount: discountByEnrollment[r.enrollment_id]?.discount_amount ?? (Number(r.coupon_discount) || 0),
     discount_reason: discountByEnrollment[r.enrollment_id]?.discount_reason ?? null,
+    matricule: matriculeByStudent[r.student_id] ?? null,
   }));
   if (allowedIds?.length) {
     enriched = enriched.filter((r) => r.campus_id && allowedIds.includes(r.campus_id));

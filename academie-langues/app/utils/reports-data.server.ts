@@ -50,7 +50,7 @@ type EnrollRow = {
 async function loadEnrollments(centerId: string) {
   const { data: profiles } = await supabaseAdmin
     .from("profiles")
-    .select("id, prenom, nom, center_status")
+    .select("id, prenom, nom, matricule, center_status")
     .eq("center_id", centerId)
     .eq("role", "student");
 
@@ -129,6 +129,7 @@ export async function buildEffectifsReport(centerId: string, filters: ReportFilt
     return {
       prenom: p?.prenom || "",
       nom: p?.nom || "",
+      matricule: p?.matricule || null,
       filiere: e.filieres?.name || "—",
       filiereId: e.filiere_id,
       niveau: e.niveaux?.annee ?? null,
@@ -243,6 +244,7 @@ export async function buildRecouvrementReport(centerId: string, filters: ReportF
       .slice(0, 20)
       .map((r) => ({
       student: `${r.prenom} ${r.nom}`.trim(),
+      matricule: r.matricule,
       filiere: r.filiere_name,
       niveau: r.niveau_annee,
       classe: r.groupe_nom,
@@ -264,7 +266,7 @@ export async function buildEncaissementsReport(centerId: string, filters: Report
         filiere_id,
         campus_id,
         filieres(name),
-        profiles:student_id(prenom, nom)
+        profiles:student_id(prenom, nom, matricule)
       )
     `)
     .eq("center_id", centerId)
@@ -285,7 +287,7 @@ export async function buildEncaissementsReport(centerId: string, filters: Report
       filiere_id: string;
       campus_id: string | null;
       filieres: { name?: string } | null;
-      profiles: { prenom?: string; nom?: string } | null;
+      profiles: { prenom?: string; nom?: string; matricule?: string | null } | null;
     };
   }[];
 
@@ -331,6 +333,7 @@ export async function buildEncaissementsReport(centerId: string, filters: Report
     rows: payments.map((p) => ({
       date: p.payment_date.slice(0, 10),
       student: `${p.enrollments?.profiles?.prenom || ""} ${p.enrollments?.profiles?.nom || ""}`.trim(),
+      matricule: p.enrollments?.profiles?.matricule ?? null,
       filiere: p.enrollments?.filieres?.name || "—",
       amount: Number(p.amount) || 0,
       method: p.payment_method,
@@ -407,6 +410,7 @@ export async function buildRetardsReport(centerId: string, filters: ReportFilter
     ),
     rows: lateRows.map((r) => ({
       student: `${r.prenom} ${r.nom}`.trim(),
+      matricule: r.matricule,
       filiere: r.filiere_name,
       reste: r.reste_a_payer,
       agingBucket: r.aging_bucket,
@@ -1202,7 +1206,7 @@ export async function buildExamensReport(
 
   const { data: profiles } = await supabaseAdmin
     .from("profiles")
-    .select("id, prenom, nom")
+    .select("id, prenom, nom, matricule")
     .eq("center_id", centerId)
     .eq("role", "student");
 
@@ -1299,6 +1303,7 @@ export async function buildExamensReport(
         type: rtl(loc, "Simulateur", "Simulator"),
         status: STATUS_UI[s.status] || s.status,
         student: p ? `${p.prenom || ""} ${p.nom || ""}`.trim() : "—",
+        matricule: p?.matricule ?? null,
       };
     }),
   };
@@ -1344,6 +1349,7 @@ export async function buildReductionsReport(centerId: string, filters: ReportFil
       const amount = disc?.discount_amount ?? 0;
       return {
         student: `${r.prenom} ${r.nom}`.trim(),
+        matricule: r.matricule,
         filiere: r.filiere_name,
         amount,
         reason: disc?.discount_reason || "—",

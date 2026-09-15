@@ -82,6 +82,7 @@ type StudentGradeRow = {
   student_id: string;
   prenom: string;
   nom: string;
+  matricule: string | null;
   existing_grade_id: string | null;
   existing_score: number | null;
   new_score: string;
@@ -617,7 +618,7 @@ export default function GradeBookPage() {
 
     let enrollQuery = supabase
       .from("enrollments")
-      .select("id, student_id, profiles:student_id(prenom, nom)")
+      .select("id, student_id, profiles:student_id(prenom, nom, matricule)")
       .eq("filiere_id", selectedSubject.filiere_id)
       .eq("groupe_id", selectedGroupeId)
       .eq("status", "active");
@@ -693,6 +694,7 @@ export default function GradeBookPage() {
         student_id: e.student_id,
         prenom: e.profiles?.prenom || "",
         nom: e.profiles?.nom || "",
+        matricule: e.profiles?.matricule || null,
         existing_grade_id: grade?.id || null,
         existing_score: grade?.score ?? null,
         new_score: grade?.score?.toString() || "",
@@ -1793,9 +1795,14 @@ export default function GradeBookPage() {
                             >
                               {initials(row.nom, row.prenom)}
                             </div>
-                            <p className="text-sm font-semibold truncate" style={{ color: BLUE }}>
-                              {row.nom} {row.prenom}
-                            </p>
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold truncate" style={{ color: BLUE }}>
+                                {row.nom} {row.prenom}
+                              </p>
+                              {row.matricule && (
+                                <p className="text-[10px] text-neutral-400 font-semibold truncate">{row.matricule}</p>
+                              )}
+                            </div>
                           </div>
 
                           <div className="flex justify-center">

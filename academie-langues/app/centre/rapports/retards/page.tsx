@@ -21,6 +21,7 @@ type RetardsReport = {
   byFiliere: { label: string; amount: number; count: number }[];
   rows: {
     student: string;
+    matricule: string | null;
     filiere: string;
     reste: number;
     agingBucket: string;
@@ -46,8 +47,9 @@ function RetardsContent() {
     if (!report) return;
     downloadCsv(
       `retards-${periodLabel.replace(/\s+/g, "-")}.csv`,
-      [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance"), t("centre", "overdueAging"), t("centre", "recoveryNextDueDate"), t("centre", "overdueLateInstallments")],
+      [t("centre", "studentMatriculeLabel"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance"), t("centre", "overdueAging"), t("centre", "recoveryNextDueDate"), t("centre", "overdueLateInstallments")],
       report.rows.map((r) => [
+        r.matricule || "—",
         r.student,
         r.filiere,
         r.reste,
@@ -71,8 +73,9 @@ function RetardsContent() {
       sections: [
         {
           title: t("centre", "overdueList"),
-          columns: [t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance"), t("centre", "overdueAging")],
+          columns: [t("centre", "studentMatriculeLabel"), t("centre", "enrollmentLearner"), t("centre", "enrollmentProgram"), t("centre", "summaryBalance"), t("centre", "overdueAging")],
           rows: report.rows.map((r) => [
+            r.matricule || "—",
             r.student,
             r.filiere,
             fmtFCFA(r.reste),
@@ -170,6 +173,7 @@ function RetardsContent() {
           <ReportBreakdownTable
             title={t("centre", "overdueList")}
             columns={[
+              { key: "matricule", label: t("centre", "studentMatriculeLabel") },
               { key: "student", label: t("centre", "enrollmentLearner") },
               { key: "filiere", label: t("centre", "enrollmentProgram") },
               { key: "reste", label: t("centre", "summaryBalance"), align: "right" },
@@ -177,6 +181,7 @@ function RetardsContent() {
               { key: "nextDue", label: t("centre", "overdueNextDueShort") },
             ]}
             rows={report.rows.map((row) => ({
+              matricule: row.matricule || "—",
               student: row.student,
               filiere: row.filiere,
               reste: fmtFCFA(row.reste),
