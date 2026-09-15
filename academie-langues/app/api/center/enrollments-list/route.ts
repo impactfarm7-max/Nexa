@@ -80,6 +80,7 @@ export async function GET(req: Request) {
     .select("id, prenom, nom, email, phone, avatar_url, center_status, birth_date, genre, matricule")
     .eq("center_id", ctx!.centerId)
     .eq("role", "student")
+    .order("matricule", { nullsFirst: false })
     .order("nom");
 
   let profileRows: ProfileRow[];

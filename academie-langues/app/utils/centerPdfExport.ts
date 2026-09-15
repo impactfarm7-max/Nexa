@@ -438,6 +438,7 @@ export type TcfDossierStudent = {
   prenom: string;
   nom: string;
   email: string;
+  matricule?: string | null;
   phone: string | null;
   country: string | null;
   region: string | null;
@@ -526,6 +527,7 @@ export async function downloadTcfDossierPdf(
   };
 
   writeSection("Inscription", [
+    ...(student.matricule ? [["Matricule", student.matricule] as [string, string]] : []),
     ["Email", student.email],
     ["Téléphone", student.phone || "—"],
     ["Localisation", [student.city, student.region, student.country].filter(Boolean).join(" · ") || "—"],

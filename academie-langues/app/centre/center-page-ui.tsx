@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ElementType, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Noto_Sans } from "next/font/google";
-import { Check, ChevronDown, Filter, Search } from "lucide-react";
+import { Calendar, Check, ChevronDown, ChevronLeft, ChevronRight, Filter, Search } from "lucide-react";
 import { BRAND } from "@/app/utils/brand";
 import { ACTION_TONE } from "@/app/utils/action-tones";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -380,6 +380,195 @@ export function CenterSelect({
         <ChevronDown size={size === "sm" ? 13 : 15} className={`shrink-0 text-neutral-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {typeof document !== "undefined" && menu ? createPortal(menu, document.body) : null}
+    </div>
+  );
+}
+
+/** Sélecteur de date custom — même chrome que CenterSelect (portail + calendrier aux couleurs NEXA). */
+export function CenterDatePicker({
+  value,
+  onChange,
+  max,
+  min,
+  placeholder,
+  locale = "fr",
+  size = "lg",
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  max?: string;
+  min?: string;
+  placeholder?: string;
+  locale?: "fr" | "en";
+  size?: "sm" | "md" | "lg";
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
+  const selectedDate = value ? new Date(`${value}T00:00:00`) : null;
+  const [viewDate, setViewDate] = useState<Date>(selectedDate ?? new Date());
+
+  useEffect(() => {
+    if (open) setViewDate(selectedDate ?? new Date());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const update = () => {
+      const el = rootRef.current;
+      const panel = panelRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const width = Math.max(r.width, 280);
+      const panelH = panel?.offsetHeight ?? 320;
+      let top = r.bottom + 6;
+      if (top + panelH > window.innerHeight - 8) top = Math.max(8, r.top - panelH - 6);
+      let left = r.left;
+      if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - width);
+      setPos({ top, left, width });
+    };
+    update();
+    window.addEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (rootRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const heightCls = size === "sm" ? "h-8 text-[12px]" : size === "lg" ? "h-12 text-base" : "h-10 text-sm";
+  const padCls = size === "sm" ? "px-2.5" : size === "lg" ? "px-4" : "px-3";
+  const intlLocale = locale === "en" ? "en-US" : "fr-FR";
+
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const display = selectedDate
+    ? selectedDate.toLocaleDateString(intlLocale, { day: "2-digit", month: "2-digit", year: "numeric" })
+    : (placeholder || (locale === "en" ? "dd/mm/yyyy" : "jj/mm/aaaa"));
+
+  const monthLabel = viewDate.toLocaleDateString(intlLocale, { month: "long", year: "numeric" });
+  const weekDays = locale === "en" ? ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"] : ["Lu", "Ma", "Me", "Je", "Ve", "Sa", "Di"];
+
+  const startOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  const daysInMonth = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 0).getDate();
+  const firstWeekday = (startOfMonth.getDay() + 6) % 7;
+  const cells: (Date | null)[] = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(viewDate.getFullYear(), viewDate.getMonth(), d));
+
+  const todayStr = fmt(new Date());
+  const maxDate = max ? new Date(`${max}T00:00:00`) : null;
+  const minDate = min ? new Date(`${min}T00:00:00`) : null;
+
+  const panel = open ? (
+    <div
+      ref={panelRef}
+      className="fixed z-[100] rounded-xl border border-black/[0.08] bg-white shadow-xl p-3"
+      style={{ top: pos.top, left: pos.left, width: pos.width }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <div className="flex items-center justify-between mb-2 px-1">
+        <button
+          type="button"
+          onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))}
+          className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-black/[0.05] text-neutral-500 cursor-pointer"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="text-sm font-bold text-[#11224E] capitalize">{monthLabel}</span>
+        <button
+          type="button"
+          onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))}
+          className="w-7 h-7 rounded-md flex items-center justify-center hover:bg-black/[0.05] text-neutral-500 cursor-pointer"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+      <div className="grid grid-cols-7 gap-1 mb-1">
+        {weekDays.map((wd) => (
+          <div key={wd} className="h-7 flex items-center justify-center text-[10px] font-bold text-neutral-400 uppercase">
+            {wd}
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+        {cells.map((d, i) => {
+          if (!d) return <div key={`empty-${i}`} />;
+          const dStr = fmt(d);
+          const isSelected = value === dStr;
+          const isToday = dStr === todayStr;
+          const disabled = !!((maxDate && d > maxDate) || (minDate && d < minDate));
+          return (
+            <button
+              key={dStr}
+              type="button"
+              disabled={disabled}
+              onClick={() => { onChange(dStr); setOpen(false); }}
+              className={`h-8 rounded-md text-[12px] font-semibold flex items-center justify-center transition-colors ${
+                isSelected
+                  ? "text-white"
+                  : disabled
+                    ? "text-neutral-300 cursor-not-allowed"
+                    : isToday
+                      ? "text-[#eb670e] hover:bg-black/[0.05] cursor-pointer"
+                      : "text-neutral-700 hover:bg-black/[0.05] cursor-pointer"
+              }`}
+              style={isSelected ? { backgroundColor: "#11224E" } : undefined}
+            >
+              {d.getDate()}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-black/[0.06] px-1">
+        <button
+          type="button"
+          onClick={() => { onChange(""); setOpen(false); }}
+          className="text-[11px] font-bold text-neutral-400 hover:text-neutral-600 cursor-pointer"
+        >
+          {locale === "en" ? "Clear" : "Effacer"}
+        </button>
+        <button
+          type="button"
+          onClick={() => { const now = new Date(); onChange(fmt(now)); setViewDate(now); setOpen(false); }}
+          disabled={!!(maxDate && new Date() > maxDate)}
+          className="text-[11px] font-bold hover:opacity-80 disabled:opacity-30 cursor-pointer"
+          style={{ color: "#eb670e" }}
+        >
+          {locale === "en" ? "Today" : "Aujourd'hui"}
+        </button>
+      </div>
+    </div>
+  ) : null;
+
+  return (
+    <div ref={rootRef} className="relative min-w-0">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`w-full ${heightCls} ${padCls} rounded-lg border border-black/[0.08] bg-white font-semibold outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10 inline-flex items-center justify-between gap-2 transition-colors cursor-pointer`}
+      >
+        <span className={`truncate text-left ${selectedDate ? "text-neutral-800" : "text-neutral-400"}`}>{display}</span>
+        <Calendar size={size === "sm" ? 13 : 15} className="shrink-0 text-neutral-400" />
+      </button>
+      {typeof document !== "undefined" && panel ? createPortal(panel, document.body) : null}
     </div>
   );
 }

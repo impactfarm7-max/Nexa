@@ -51,6 +51,7 @@ type TCFStudent = {
   email: string;
   phone: string | null;
   avatar_url: string | null;
+  matricule: string | null;
   center_status: string | null;
   tag_status: string | null;
   access_pause_reason: string | null;
@@ -192,7 +193,7 @@ function financeStatusLabel(status: string | null): string {
 
 function exportStudentsCSV(list: TCFStudent[], tabKey: string) {
   const header = [
-    "Statut", "Prénom", "Nom", "Email", "Téléphone", "Pays", "Région", "Ville",
+    "Statut", "Matricule", "Prénom", "Nom", "Email", "Téléphone", "Pays", "Région", "Ville",
     "Date naissance", "Âge", "Inscrit le", "Validé le", "Fin accès", "Durée", "Pack",
     "Tarif FCFA", "Catalogue FCFA", "Payé FCFA", "Reste FCFA", "Statut finance", "Note tarif",
   ].join(";");
@@ -200,6 +201,7 @@ function exportStudentsCSV(list: TCFStudent[], tabKey: string) {
     const reste = Math.max(0, (s.tuition_fee || 0) - (s.tuition_paid || 0));
     return [
       statusLabel(s),
+      s.matricule || "",
       s.prenom || "",
       s.nom || "",
       s.email || "",
@@ -303,12 +305,13 @@ export default function CenterTCFStudentsPage() {
       city: string | null;
       ville: string | null;
       birth_date: string | null;
+      matricule: string | null;
     };
 
     let profilesData: ProfileRow[] | null = null;
     const { data: profilesWithReason, error: profilesErr } = await supabase
       .from("profiles")
-      .select("id, tag_status, center_status, access_pause_reason, country, region, city, ville, birth_date")
+      .select("id, tag_status, center_status, access_pause_reason, country, region, city, ville, birth_date, matricule")
       .in("id", ids);
 
     if (!profilesErr) {
@@ -316,7 +319,7 @@ export default function CenterTCFStudentsPage() {
     } else {
       const { data: profilesFallback } = await supabase
         .from("profiles")
-        .select("id, tag_status, center_status, country, region, city, ville, birth_date")
+        .select("id, tag_status, center_status, country, region, city, ville, birth_date, matricule")
         .in("id", ids);
       profilesData = (profilesFallback || []).map((p) => ({ ...p, access_pause_reason: null }));
     }
@@ -373,6 +376,7 @@ export default function CenterTCFStudentsPage() {
         tag_status: s.tag_status ?? p?.tag_status ?? null,
         center_status: s.center_status ?? p?.center_status ?? null,
         access_pause_reason: p?.access_pause_reason ?? null,
+        matricule: p?.matricule ?? null,
         country: p?.country ?? null,
         region: p?.region ?? null,
         city: p?.city ?? p?.ville ?? null,
@@ -419,7 +423,7 @@ export default function CenterTCFStudentsPage() {
 
   const filtered = students.filter(s => {
     const eff = effectiveStatus(s);
-    const matchSearch = `${s.prenom} ${s.nom} ${s.email}`.toLowerCase().includes(search.toLowerCase());
+    const matchSearch = `${s.prenom} ${s.nom} ${s.email} ${s.matricule || ""}`.toLowerCase().includes(search.toLowerCase());
     if (activeTab === "pending") return matchSearch && eff === "pending";
     if (activeTab === "active") return matchSearch && (eff === "active" || eff === "expired");
     if (activeTab === "paused") return matchSearch && eff === "paused";
@@ -675,6 +679,9 @@ export default function CenterTCFStudentsPage() {
                     <div className="min-w-0">
                       <p className="font-black text-[13px] truncate" style={{ color: BLUE }}>{s.prenom} {s.nom}</p>
                       <p className="text-[10px] text-neutral-400 truncate">{s.email}</p>
+                      {s.matricule && (
+                        <p className="text-[10px] text-neutral-400 font-semibold truncate">{s.matricule}</p>
+                      )}
                       {formatStudentLocation(s) && (
                         <p className="text-[10px] text-neutral-500 truncate">{formatStudentLocation(s)}</p>
                       )}
@@ -1480,13 +1487,14 @@ function StudentDossierModal({ student, docConfig, onClose }: { student: TCFStud
           <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Dossier étudiant</span>
         </div>
         <h3 className="text-lg font-black mb-1" style={{ color: BLUE }}>{student.prenom} {student.nom}</h3>
-        <p className="text-xs text-neutral-400 mb-5">{statusLabel(student)}</p>
+        <p className="text-xs text-neutral-400 mb-5">{statusLabel(student)}{student.matricule ? ` · ${student.matricule}` : ""}</p>
 
         <div className="space-y-5">
           <section className="bg-neutral-50 border rounded-xl p-4">
             <p className="text-[9px] font-black uppercase text-neutral-400 tracking-widest mb-2 flex items-center gap-1">
               <User size={10} /> Inscription
             </p>
+            {student.matricule && <DossierField label="Matricule" value={student.matricule} />}
             <DossierField label="Email" value={student.email} />
             <DossierField label="Téléphone" value={student.phone || "—"} />
             <DossierField label="Pays" value={student.country || "—"} />

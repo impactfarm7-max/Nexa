@@ -288,6 +288,7 @@ export default function CenterStudentsPage() {
   const [shareBusy,          setShareBusy]          = useState(false);
   const [waPhoneOpen,        setWaPhoneOpen]        = useState(false);
   const [waPhone,            setWaPhone]            = useState("");
+  const [hasAiCredits,       setHasAiCredits]       = useState(false);
 
   const selectedStudent   = students.find((s) => s.id === selectedStudentId) ?? null;
   const selectedEnrollment = selectedStudent?.enrollments.find((e) => e.id === selectedEnrollmentId) ?? null;
@@ -356,6 +357,31 @@ export default function CenterStudentsPage() {
       if (!hadCache) void loadStudents(bootstrap.centerId);
     })();
   }, [loadStudents]);
+
+  /* Visibilité raccourci "Crédits IA" — masqué tant que le centre n'a aucun stock */
+  useEffect(() => {
+    if (!centerId) return;
+    let cancelled = false;
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || cancelled) return;
+      try {
+        const res = await fetch("/api/centre/credits", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        const wallet = json?.wallet as Record<string, number> | undefined;
+        const total = wallet
+          ? Object.values(wallet).reduce((sum, n) => sum + (Number(n) || 0), 0)
+          : 0;
+        if (!cancelled) setHasAiCredits(total > 0);
+      } catch {
+        if (!cancelled) setHasAiCredits(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [centerId]);
 
   // ── stats ─────────────────────────────────────────────────────────────────
   const filiereStats = useMemo(() => {
@@ -742,8 +768,8 @@ export default function CenterStudentsPage() {
                 />
               ) : (
                 <CenterDataTable
-                  columns={[t("centre", "enrollmentLastName"), t("centre", "enrollmentProgram"), t("centre", "settingsStatus"), t("centre", "discountEnrollment"), t("centre", "financeActions")]}
-                  columnWidths={[undefined, "18%", "14%", "16%", "10.75rem"]}
+                  columns={[t("centre", "studentMatriculeLabel"), t("centre", "enrollmentLastName"), t("centre", "enrollmentProgram"), t("centre", "settingsStatus"), t("centre", "discountEnrollment"), t("centre", "financeActions")]}
+                  columnWidths={["10%", undefined, "18%", "14%", "16%", "10.75rem"]}
                 >
                   {filtered.map((s, i) => {
                     const primaryEnr = s.enrollments[0];
@@ -762,14 +788,14 @@ export default function CenterStudentsPage() {
 
                     return (
                       <CenterTableRow key={s.id} index={i}>
+                        <td className="px-4 py-3.5 text-[12px] font-semibold text-neutral-500 whitespace-nowrap">
+                          {s.matricule || "—"}
+                        </td>
                         <td className="px-4 py-3.5 min-w-0 print:break-inside-avoid">
                           <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: BLUE }}>
                             {`${s.prenom || ""} ${s.nom || ""}`.trim().toUpperCase()}
                           </p>
                           <p className="text-[11px] text-neutral-400 font-medium mt-0.5 truncate">{s.email || "—"}</p>
-                          {s.matricule && (
-                            <p className="text-[10px] text-neutral-400 font-semibold mt-0.5 truncate">{s.matricule}</p>
-                          )}
                         </td>
                         <td className="px-4 py-3.5 text-[12px] font-medium text-neutral-600 uppercase">
                           {primaryEnr?.filiere_name_raw ? primaryEnr.filiere_name_raw.toUpperCase() : "—"}
@@ -786,14 +812,16 @@ export default function CenterStudentsPage() {
                           <span className="print:hidden inline-flex items-center gap-1">
                             <TableBtnPreview onClick={() => setViewingStudent(s)} label={locale === "en" ? "Preview" : "Aperçu"} />
                             <TableBtnModify onClick={() => selectStudent(s)} label={locale === "en" ? "Edit" : "Modifier"} />
-                            <button
-                              type="button"
-                              onClick={() => router.push(`/centre/credits-ia?beneficiary=${s.id}`)}
-                              title={t("centre", "creditsIaAddShortcut")}
-                              className="h-7 w-7 inline-flex items-center justify-center rounded-md text-neutral-600 border border-black/[0.08] bg-white hover:bg-black/[0.03] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
-                            >
-                              <Sparkles size={13} style={{ color: ORANGE }} />
-                            </button>
+                            {hasAiCredits && (
+                              <button
+                                type="button"
+                                onClick={() => router.push(`/centre/credits-ia?beneficiary=${s.id}`)}
+                                title={t("centre", "creditsIaAddShortcut")}
+                                className="h-7 w-7 inline-flex items-center justify-center rounded-md text-neutral-600 border border-black/[0.08] bg-white hover:bg-black/[0.03] transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+                              >
+                                <Sparkles size={13} style={{ color: ORANGE }} />
+                              </button>
+                            )}
                           </span>
                         </TableActions>
                       </CenterTableRow>

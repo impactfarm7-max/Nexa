@@ -523,6 +523,7 @@ export async function POST(req: NextRequest) {
       nom,
       email: normalizedEmail,
       phone: phone || null,
+      ville: typeof body.ville === "string" ? (body.ville.trim() || null) : null,
       matricule,
       role: "student",
       center_id: callerCenterId,

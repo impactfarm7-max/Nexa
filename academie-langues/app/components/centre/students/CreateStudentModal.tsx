@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   Plus, X, Loader2, CheckCircle2, AlertTriangle,
-  ChevronRight, Globe, Phone, Lock, MapPin
+  ChevronRight, Globe, Phone, Lock, MapPin, Hash
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { AFRICA_54, findAfricaCountry } from "@/app/data/africa-54";
@@ -24,7 +24,7 @@ import { isPluriannualCenter } from "@/app/data/center-types";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { localizeCountryName } from "@/app/utils/countryI18n";
 import { fetchUsableCoupons, type CouponListItem } from "@/app/utils/coupon.client";
-import { CenterSelect } from "@/app/centre/center-page-ui";
+import { CenterSelect, CenterDatePicker } from "@/app/centre/center-page-ui";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -77,6 +77,8 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   const [phone, setPhone] = useState("");
   const [genre, setGenre] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [ville, setVille] = useState("");
+  const [nextMatricule, setNextMatricule] = useState("");
   const [countryCode, setCountryCode] = useState("CM");
   const [phoneCode, setPhoneCode] = useState("+237");
   const [region, setRegion] = useState("");
@@ -135,6 +137,23 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
           cursus_fee_mode: isCursusFeeMode(f.cursus_fee_mode) ? f.cursus_fee_mode : null,
         })),
       );
+    })();
+  }, [centerId]);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      try {
+        const res = await fetch("/api/centre/next-matricule", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (json?.matricule) setNextMatricule(json.matricule);
+      } catch {
+        // aperçu non bloquant
+      }
     })();
   }, [centerId]);
 
@@ -372,6 +391,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         campus_id: campusId || null,
         tuition_fee: parseFloat(tuitionFee) || 0,
         locale: isLibreCenter ? locale : "fr",
+        ville: ville.trim() || null,
       };
       if (isLibreCenter) {
         body.genre = genre.trim();
@@ -514,6 +534,13 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
               <input type="email" placeholder={locale === "en" ? "john.smith@example.com" : "jean.dupont@example.com"} value={email} onChange={(e) => setEmail(e.target.value)} className={FIELD_INPUT} />
             </div>
 
+            <div>
+              <label className={FIELD_LABEL_INLINE}><Hash size={14} /> {t("centre", "studentMatriculeLabel")}</label>
+              <div className={`${FIELD_INPUT} flex items-center bg-neutral-50 text-neutral-500 cursor-not-allowed`}>
+                {nextMatricule || "…"}
+              </div>
+            </div>
+
             {isLibreCenter && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
@@ -533,11 +560,11 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                 </div>
                 <div>
                   <label className={FIELD_LABEL}>{t("centre", "createStudentBirthDate")}</label>
-                  <input
-                    type="date"
+                  <CenterDatePicker
+                    size="lg"
                     value={birthDate}
-                    onChange={(e) => setBirthDate(e.target.value)}
-                    className={FIELD_INPUT}
+                    onChange={setBirthDate}
+                    locale={locale}
                     max={new Date().toISOString().slice(0, 10)}
                   />
                 </div>
@@ -585,6 +612,11 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                 </div>
                 <input type="tel" placeholder="6XX XXX XXX" value={phone} onChange={(e) => setPhone(e.target.value.replace(/[^\d\s]/g, ""))} className={`flex-1 ${FIELD_INPUT}`} />
               </div>
+            </div>
+
+            <div>
+              <label className={FIELD_LABEL_INLINE}><MapPin size={14} /> {t("centre", "identityCity")} <span className="font-normal text-neutral-400">{t("centre", "createStudentOptional")}</span></label>
+              <input type="text" placeholder={locale === "en" ? "e.g. Douala" : "ex. Douala"} value={ville} onChange={(e) => setVille(e.target.value)} className={FIELD_INPUT} />
             </div>
 
             {/* Responsable légal / Tuteur — entièrement optionnel */}
