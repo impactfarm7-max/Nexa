@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ClipboardList, BookOpen, ArrowRight, Lock, Calendar, Trophy } from "lucide-react";
+import { BookOpen, ArrowRight, Lock, Calendar, Trophy } from "lucide-react";
 import Link from "next/link";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { supabase } from "@/app/utils/supabase";
@@ -148,21 +148,12 @@ export default function ExamensHubPage() {
               />
             </>
           ) : (
-            <>
-              <HubCard
-                title={t("centre", "examensGradebook")}
-                description={t("centre", "examensGradebookDesc")}
-                href="/centre/examens/notes"
-                icon={<BookOpen className="h-6 w-6" style={{ color: BLUE }} />}
-              />
-              <HubCard
-                title={t("centre", "examensOrganization")}
-                description={t("centre", "examensOrganizationDesc")}
-                icon={<ClipboardList className="h-6 w-6 text-neutral-400" />}
-                disabled
-                disabledHint={t("centre", "examensTcfOnly")}
-              />
-            </>
+            <HubCard
+              title={t("centre", "examensGradebook")}
+              description={t("centre", "examensGradebookDesc")}
+              href="/centre/examens/notes"
+              icon={<BookOpen className="h-6 w-6" style={{ color: BLUE }} />}
+            />
           )}
         </div>
       </CenterPageBody>

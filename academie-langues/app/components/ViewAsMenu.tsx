@@ -174,7 +174,7 @@ export default function ViewAsMenu({ variant = "light" }: { variant?: Variant })
         style={variant === "light" ? { borderColor: `${BLUE}22` } : undefined}
       >
         <Eye size={variant === "student" ? 16 : 14} className="shrink-0" />
-        <span className="truncate max-w-[9rem] sm:max-w-[11rem]">{t("centre", "viewAsLabel")}</span>
+        <span className="hidden sm:inline truncate max-w-[9rem] sm:max-w-[11rem]">{t("centre", "viewAsLabel")}</span>
         <ChevronDown size={14} className={`shrink-0 opacity-60 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {typeof document !== "undefined" && menu ? createPortal(menu, document.body) : null}
