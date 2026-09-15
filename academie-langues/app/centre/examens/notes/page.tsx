@@ -1395,7 +1395,7 @@ export default function GradeBookPage() {
                 ? t("centre", "notesProgramSelectedHelp")
                 : t("centre", "notesSelectProgramHelp")}
             </p>
-            {filieres.length === 0 ? (
+            {selectedFiliereId ? null : filieres.length === 0 ? (
               <div className="text-center py-16 text-neutral-400">
                 <GitBranch size={40} className="mx-auto mb-3 opacity-40" />
                 <p className="text-xs font-bold uppercase tracking-wider">{t("centre", "notesNoProgramSubject")}</p>
