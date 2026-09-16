@@ -535,6 +535,7 @@ export default function GradeBookPage() {
         }
       }
       setNiveaux(nivs);
+      if (nivs.length === 1) setSelectedNiveauId(nivs[0].id);
 
       const niveauIds = (byNiveau || []).map((n: { id: string }) => n.id);
       let niveauGroupes: GroupeOption[] = [];
@@ -1253,7 +1254,7 @@ export default function GradeBookPage() {
                       setSubjectMenuOpen(false);
                     }}
                   >
-                    {n.nom?.trim() || (n.annee != null ? t("centre", "notesLevelAbbrNumber", { number: n.annee }) : n.mois != null ? t("centre", "notesMonthsAbbr", { count: n.mois }) : t("centre", "planningLevel"))}
+                    {n.nom?.trim() || (n.annee != null ? t("centre", "notesLevelAbbrNumber", { number: n.annee }) : n.mois ? t("centre", "notesMonthsAbbr", { count: n.mois }) : t("centre", "planningLevel"))}
                   </FilterPill>
                 ))}
               </div>
@@ -1291,14 +1292,14 @@ export default function GradeBookPage() {
             {selectedGroupeId && (
               <>
                 <span className="w-px h-4 bg-black/[0.08] shrink-0" />
-                <div className="relative min-w-[200px] max-w-xs flex-1" ref={subjectPickerRef}>
-                  <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider block mb-1">
+                <div className="relative min-w-[200px] max-w-xs flex-1 flex items-center gap-1.5" ref={subjectPickerRef}>
+                  <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider shrink-0">
                     {t("centre", "planningSubject")}
                   </span>
                   {subjectsForContext.length === 0 ? (
                     <span className="text-[10px] text-neutral-400 italic">{t("centre", "notesNoSubject")}</span>
                   ) : (
-                    <div className="relative">
+                    <div className="relative flex-1 min-w-0">
                       <button
                         type="button"
                         onClick={() => setSubjectMenuOpen((o) => !o)}
@@ -1367,19 +1368,31 @@ export default function GradeBookPage() {
               <>
                 <span className="w-px h-4 bg-black/[0.08] shrink-0" />
                 <div className="flex items-center gap-1.5">
-                  <Calendar size={12} className="text-neutral-400" />
-                  <select
-                    value={selectedPeriodId}
-                    onChange={(e) => setSelectedPeriodId(e.target.value)}
-                    className="h-8 px-2.5 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 outline-none focus:border-[#11224E]/40"
-                  >
-                    <option value="">{t("centre", "notesPeriodEllipsis")}</option>
-                    {periods.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.parent_name ? `${p.parent_name} → ` : ""}{p.name}
-                      </option>
-                    ))}
-                  </select>
+                  <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider shrink-0">
+                    {t("centre", "notesPeriodLabel")}
+                  </span>
+                  {periods.length === 0 ? (
+                    <a
+                      href="/centre/parametres/periodes"
+                      className="text-[10px] font-semibold whitespace-nowrap hover:underline"
+                      style={{ color: ORANGE }}
+                    >
+                      {t("centre", "notesNoPeriod")} · {t("centre", "notesCreatePeriod")}
+                    </a>
+                  ) : (
+                    <select
+                      value={selectedPeriodId}
+                      onChange={(e) => setSelectedPeriodId(e.target.value)}
+                      className="h-8 px-2.5 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 outline-none focus:border-[#11224E]/40"
+                    >
+                      <option value="">{t("centre", "notesPeriodEllipsis")}</option>
+                      {periods.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.parent_name ? `${p.parent_name} → ` : ""}{p.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </>
             )}
