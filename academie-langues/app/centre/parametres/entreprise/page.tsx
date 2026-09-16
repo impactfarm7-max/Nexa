@@ -5,13 +5,14 @@ import { useSearchParams } from "next/navigation";
 import {
   Camera, Loader2, CheckCircle2, FileUp, X, Plus, Trash2,
   ChevronUp, ChevronDown, PenLine, Stamp, Building2, ScrollText,
-  Globe2, Signature, Hash,
+  Globe2, Signature, Hash, GraduationCap,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import SetupBanner from "@/app/components/SetupBanner";
 import SetupFooter from "@/app/components/SetupFooter";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 
 const BLUE = "#11224E";
 const ORANGE = "#F87B1B";
@@ -198,6 +199,9 @@ export default function EntrepriseSettingsPage() {
   // --- Matricule étudiant ---
   const [studentIdPrefix, setStudentIdPrefix] = useState("");
 
+  // --- Seuil de validation LMD (universités) ---
+  const [lmdThresholdPct, setLmdThresholdPct] = useState("");
+
   const load = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setLoading(false); return; }
@@ -211,12 +215,15 @@ export default function EntrepriseSettingsPage() {
     if (!cId) { setLoading(false); return; }
 
     const { data: center, error: cErr } = await supabase
-      .from("centers").select("name, center_type, student_id_prefix").eq("id", cId).single();
+      .from("centers").select("name, center_type, student_id_prefix, lmd_validation_threshold_pct").eq("id", cId).single();
     if (cErr) console.error("centers:", cErr.message);
     if (center) {
       setDisplayName(center.name || "");
       setCenterType(center.center_type || "generic");
       setStudentIdPrefix(center.student_id_prefix || "");
+      setLmdThresholdPct(
+        center.lmd_validation_threshold_pct != null ? String(center.lmd_validation_threshold_pct) : ""
+      );
     }
 
     const { data: b, error: bErr } = await supabase
@@ -404,6 +411,7 @@ export default function EntrepriseSettingsPage() {
       .from("centers").update({
         name: displayName.trim(),
         student_id_prefix: studentIdPrefix.trim() || null,
+        lmd_validation_threshold_pct: lmdThresholdPct.trim() ? Math.max(0, Math.min(100, Number(lmdThresholdPct))) : null,
       }).eq("id", centerId);
     if (e1) { alert(t("centre", "companyDisplayNameError", { message: e1.message })); setSaving(false); return; }
 
@@ -698,6 +706,29 @@ export default function EntrepriseSettingsPage() {
           </span>
         </p>
       </Section>
+
+      {/* ===================== SEUIL DE VALIDATION LMD (UNIVERSITÉS) ===================== */}
+      {centerType === "universite" && (
+        <Section icon={GraduationCap} title={t("centre", "lmdThresholdSectionTitle")} description={t("centre", "lmdThresholdSectionDescription")}>
+          <div className="max-w-xs">
+            <label className="text-xs font-semibold text-neutral-600 block mb-1.5">{t("centre", "lmdThresholdLabel")}</label>
+            <input
+              type="number"
+              min={0}
+              max={100}
+              placeholder="50"
+              value={lmdThresholdPct}
+              onChange={(e) => setLmdThresholdPct(e.target.value)}
+              className="w-full h-11 px-3 rounded-lg border border-black/[0.08] bg-white font-semibold text-sm outline-none focus:border-[#11224E]/40 focus:ring-2 focus:ring-[#11224E]/10"
+            />
+            <p className="text-[11px] text-neutral-400 mt-1.5">
+              {t("centre", "lmdThresholdPreview", {
+                value: String(resolveLmdValidationThreshold(lmdThresholdPct.trim() ? Number(lmdThresholdPct) : null) / 5),
+              })}
+            </p>
+          </div>
+        </Section>
+      )}
 
       {/* Barre d'action collante */}
       <div
