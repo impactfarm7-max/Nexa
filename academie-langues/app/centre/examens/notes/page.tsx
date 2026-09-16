@@ -1235,7 +1235,7 @@ export default function GradeBookPage() {
         </div>
 
         {selectedFiliereId && (
-          <div className="nexa-center-shell pb-2.5 flex items-center gap-2 flex-wrap">
+          <div className="nexa-center-shell pb-3 flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-2 sm:flex-wrap">
             {niveaux.length > 0 && (
               <div className="flex gap-1 flex-wrap items-center">
                 <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">{t("centre", "planningLevel")}</span>
@@ -1262,7 +1262,7 @@ export default function GradeBookPage() {
 
             {(selectedNiveauId || niveaux.length === 0) && (
               <>
-                {niveaux.length > 0 && <span className="w-px h-4 bg-black/[0.08] shrink-0" />}
+                {niveaux.length > 0 && <span className="hidden sm:block w-px h-4 bg-black/[0.08] shrink-0" />}
                 <div className="flex gap-1 flex-wrap items-center">
                   <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">{t("centre", "identityClass")}</span>
                   {groupes.length === 0 ? (
@@ -1291,8 +1291,8 @@ export default function GradeBookPage() {
 
             {selectedGroupeId && (
               <>
-                <span className="w-px h-4 bg-black/[0.08] shrink-0" />
-                <div className="relative min-w-[200px] max-w-xs flex-1 flex items-center gap-1.5" ref={subjectPickerRef}>
+                <span className="hidden sm:block w-px h-4 bg-black/[0.08] shrink-0" />
+                <div className="relative w-full sm:min-w-[220px] sm:max-w-xs sm:flex-1 flex items-center gap-1.5" ref={subjectPickerRef}>
                   <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider shrink-0">
                     {t("centre", "planningSubject")}
                   </span>
@@ -1366,15 +1366,15 @@ export default function GradeBookPage() {
 
             {selectedGroupeId && selectedSubjectId && (
               <>
-                <span className="w-px h-4 bg-black/[0.08] shrink-0" />
-                <div className="flex items-center gap-1.5">
+                <span className="hidden sm:block w-px h-4 bg-black/[0.08] shrink-0" />
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider shrink-0">
                     {t("centre", "notesPeriodLabel")}
                   </span>
                   {periods.length === 0 ? (
                     <a
                       href="/centre/parametres/periodes"
-                      className="text-[10px] font-semibold whitespace-nowrap hover:underline"
+                      className="text-[10px] font-semibold hover:underline"
                       style={{ color: ORANGE }}
                     >
                       {t("centre", "notesNoPeriod")} · {t("centre", "notesCreatePeriod")}
