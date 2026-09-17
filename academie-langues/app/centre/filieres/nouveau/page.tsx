@@ -90,6 +90,8 @@ type SemestreDraft = {
   id?: string | null;
   ordre: number;
   credits_cible: string;
+  /** Salles de classe du semestre — uniquement pour les filières LMD (centre universite). */
+  classes: ClasseDraft[];
 };
 type NiveauDraft = {
   id?: string | null;
@@ -138,7 +140,7 @@ function defaultNiveau(numero: number, withDefaultSemestres = false): NiveauDraf
   };
 }
 function defaultSemestre(ordre: number): SemestreDraft {
-  return { ordre, credits_cible: "30" };
+  return { ordre, credits_cible: "30", classes: [] };
 }
 function semestreKey(niveauNumero: number, ordre: number) {
   return `${niveauNumero}:${ordre}`;
@@ -786,6 +788,7 @@ function NouveauProgrammeForm() {
   // --- Niveaux (cursus) ---
   const [niveaux, setNiveaux] = useState<NiveauDraft[]>([defaultNiveau(1)]);
   const [expandedNiveau, setExpandedNiveau] = useState<number>(1);
+  const [expandedSemestreOrdre, setExpandedSemestreOrdre] = useState<number>(1);
 
   // --- Formation courte ---
   const [pricingMode, setPricingMode] = useState<ShortPricingMode>("forfaitaire");
@@ -942,8 +945,8 @@ function NouveauProgrammeForm() {
       const niveauIds = (nivRows || []).map((n: { id: string }) => n.id);
       setInitialNiveauIds(niveauIds);
       const { data: grpRows } = niveauIds.length
-        ? await supabase.from("groupes").select("id, nom, niveau_id").in("niveau_id", niveauIds)
-        : { data: [] as { id: string; nom: string; niveau_id: string }[] };
+        ? await supabase.from("groupes").select("id, nom, niveau_id, semestre_id").in("niveau_id", niveauIds)
+        : { data: [] as { id: string; nom: string; niveau_id: string; semestre_id: string | null }[] };
       setInitialClasseIds((grpRows || []).map((g: { id: string }) => g.id));
 
       const anneeByNiveauId: Record<string, number> = {};
@@ -984,7 +987,14 @@ function NouveauProgrammeForm() {
           matieres: [],
           semestres: (semestresByNiveauId[n.id] || [])
             .sort((a, b) => a.ordre - b.ordre)
-            .map((s) => ({ id: s.id, ordre: s.ordre, credits_cible: s.credits_cible != null ? String(s.credits_cible) : "" })),
+            .map((s) => ({
+              id: s.id,
+              ordre: s.ordre,
+              credits_cible: s.credits_cible != null ? String(s.credits_cible) : "",
+              classes: (grpRows || [])
+                .filter((g: { semestre_id: string | null }) => g.semestre_id === s.id)
+                .map((g: { id: string; nom: string }) => ({ id: g.id, nom: g.nom })),
+            })),
           tuition_fee: tuition,
           fees: parsed.fees,
           installments: parsed.installments,
@@ -1172,6 +1182,37 @@ function NouveauProgrammeForm() {
     if (!n) return;
     if (editLocked && n.classes[idx]?.id) return;
     updateNiveau(numero, { classes: n.classes.filter((_, i) => i !== idx) });
+  };
+
+  // --- Salles de classe par semestre (LMD uniquement) ---
+  const updateSemestreClasses = (numero: number, ordre: number, classes: ClasseDraft[]) => {
+    const n = niveaux.find((x) => x.numero === numero);
+    if (!n) return;
+    updateNiveau(numero, { semestres: n.semestres.map((s) => (s.ordre === ordre ? { ...s, classes } : s)) });
+  };
+  const setClassesCountSemestre = (numero: number, ordre: number, count: number) => {
+    const n = niveaux.find((x) => x.numero === numero);
+    const s = n?.semestres.find((x) => x.ordre === ordre);
+    if (!n || !s) return;
+    const min = editLocked ? s.classes.filter((c) => c.id).length : 0;
+    const target = Math.max(min, count);
+    let next = [...s.classes];
+    while (next.length < target) next.push({ id: null, nom: `${en ? "Classroom" : "Salle"} ${next.length + 1}` });
+    if (next.length > target) next = next.slice(0, target);
+    updateSemestreClasses(numero, ordre, next);
+  };
+  const renameClasseSemestre = (numero: number, ordre: number, idx: number, val: string) => {
+    const n = niveaux.find((x) => x.numero === numero);
+    const s = n?.semestres.find((x) => x.ordre === ordre);
+    if (!s) return;
+    updateSemestreClasses(numero, ordre, s.classes.map((c, i) => (i === idx ? { ...c, nom: val } : c)));
+  };
+  const removeClasseSemestre = (numero: number, ordre: number, idx: number) => {
+    const n = niveaux.find((x) => x.numero === numero);
+    const s = n?.semestres.find((x) => x.ordre === ordre);
+    if (!s) return;
+    if (editLocked && s.classes[idx]?.id) return;
+    updateSemestreClasses(numero, ordre, s.classes.filter((_, i) => i !== idx));
   };
   const addMatiereToNiveau = (numero: number) => {
     const n = niveaux.find((x) => x.numero === numero);
@@ -1751,7 +1792,7 @@ function NouveauProgrammeForm() {
       return idByKey;
     }
 
-    async function saveClasses(list: ClasseDraft[], niveauId: string | null, attachFiliereId?: string | null) {
+    async function saveClasses(list: ClasseDraft[], niveauId: string | null, attachFiliereId?: string | null, semestreId?: string | null) {
       for (const c of list) {
         if (!c.nom.trim()) continue;
         if (c.id) {
@@ -1764,6 +1805,7 @@ function NouveauProgrammeForm() {
             patch.filiere_id = attachFiliereId;
             patch.niveau_id = null;
           }
+          if (isUniversityLmd) patch.semestre_id = semestreId ?? null;
           const { error } = await supabase.from("groupes").update(patch).eq("id", c.id);
       if (error) throw new Error(`${en ? "Classroom" : "Classe"} : ${error.message}`);
         } else {
@@ -1772,6 +1814,7 @@ function NouveauProgrammeForm() {
                 niveau_id: niveauId,
                 nom: c.nom.trim(),
                 created_by: userId,
+                ...(isUniversityLmd ? { semestre_id: semestreId ?? null } : {}),
               }
             : {
                 filiere_id: attachFiliereId || filiereId,
@@ -1810,12 +1853,17 @@ function NouveauProgrammeForm() {
         }).eq("id", niveauId);
         if (ne) throw new Error(en ? `Level ${n.numero}: ${ne.message}` : `Niveau ${n.numero} : ${ne.message}`);
 
-        await saveClasses(n.classes, niveauId);
-        n.classes.forEach((c) => c.id && keptClasseIds.push(c.id));
-
         if (isUniversityLmd) {
           const idByKey = await saveNiveauSemestres(niveauId, n.numero, n.semestres);
           Object.assign(semestreIdByKey, idByKey);
+          for (const s of n.semestres) {
+            const semestreId = idByKey[semestreKey(n.numero, s.ordre)];
+            await saveClasses(s.classes, niveauId, undefined, semestreId);
+            s.classes.forEach((c) => c.id && keptClasseIds.push(c.id));
+          }
+        } else {
+          await saveClasses(n.classes, niveauId);
+          n.classes.forEach((c) => c.id && keptClasseIds.push(c.id));
         }
       }
 
@@ -2035,16 +2083,26 @@ function NouveauProgrammeForm() {
           }).eq("id", niveauId);
           if (updateErr) throw new Error(en ? `Settings for level ${n.numero} were not saved: ${updateErr.message}` : `Paramètres du niveau ${n.numero} non enregistrés : ${updateErr.message}`);
 
-          for (const classe of n.classes) {
-            const classeNom = classe.nom.trim();
-            const { data: newGroupe, error: gErr } = await supabase.from("groupes").insert({ niveau_id: niveauId, nom: classeNom, created_by: userId }).select("id").single();
-            if (gErr || !newGroupe) throw new Error(en ? `Classroom “${classeNom}” was not created: ${gErr?.message}` : `Salle « ${classeNom} » non créée : ${gErr?.message}`);
-            await supabase.rpc("ensure_groupe_room", { p_groupe_id: newGroupe.id, p_center_id: centerId });
-          }
-
           if (isUniversityLmd) {
             const idByKey = await saveNewNiveauSemestres(niveauId as string, n.numero, n.semestres);
             Object.assign(semestreIdByKey, idByKey);
+            for (const s of n.semestres) {
+              const semestreId = idByKey[semestreKey(n.numero, s.ordre)];
+              for (const classe of s.classes) {
+                const classeNom = classe.nom.trim();
+                if (!classeNom) continue;
+                const { data: newGroupe, error: gErr } = await supabase.from("groupes").insert({ niveau_id: niveauId, semestre_id: semestreId ?? null, nom: classeNom, created_by: userId }).select("id").single();
+                if (gErr || !newGroupe) throw new Error(en ? `Classroom “${classeNom}” was not created: ${gErr?.message}` : `Salle « ${classeNom} » non créée : ${gErr?.message}`);
+                await supabase.rpc("ensure_groupe_room", { p_groupe_id: newGroupe.id, p_center_id: centerId });
+              }
+            }
+          } else {
+            for (const classe of n.classes) {
+              const classeNom = classe.nom.trim();
+              const { data: newGroupe, error: gErr } = await supabase.from("groupes").insert({ niveau_id: niveauId, nom: classeNom, created_by: userId }).select("id").single();
+              if (gErr || !newGroupe) throw new Error(en ? `Classroom “${classeNom}” was not created: ${gErr?.message}` : `Salle « ${classeNom} » non créée : ${gErr?.message}`);
+              await supabase.rpc("ensure_groupe_room", { p_groupe_id: newGroupe.id, p_center_id: centerId });
+            }
           }
         }
 
@@ -2980,7 +3038,37 @@ function NouveauProgrammeForm() {
                   </button>
                 ))}
               </div>
-              {niveauActuel && (
+              {niveauActuel && isUniversityLmd && niveauActuel.semestres.length > 0 && (
+                <>
+                  <div className="flex gap-1.5 flex-wrap mb-2">
+                    {niveauActuel.semestres.map((s) => (
+                      <button
+                        key={s.ordre}
+                        type="button"
+                        onClick={() => setExpandedSemestreOrdre(s.ordre)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase ${expandedSemestreOrdre === s.ordre ? "text-white" : "bg-neutral-100 text-neutral-500"}`}
+                        style={expandedSemestreOrdre === s.ordre ? { backgroundColor: ORANGE } : {}}
+                      >
+                        {en ? "Semester" : "Semestre"} {s.ordre}
+                        {s.classes.length === 0 && <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-amber-400 align-middle" />}
+                      </button>
+                    ))}
+                  </div>
+                  {(() => {
+                    const semestreActuel = niveauActuel.semestres.find((s) => s.ordre === expandedSemestreOrdre) || niveauActuel.semestres[0];
+                    return (
+                      <ClassroomsBlock
+                        classes={semestreActuel.classes}
+                        onSetCount={(n) => setClassesCountSemestre(niveauActuel.numero, semestreActuel.ordre, n)}
+                        onRename={(idx, val) => renameClasseSemestre(niveauActuel.numero, semestreActuel.ordre, idx, val)}
+                        editLocked={editLocked}
+                        niveauLabel={`${en ? "Level" : "Niveau"} ${niveauActuel.numero} · ${en ? "Semester" : "Semestre"} ${semestreActuel.ordre}`}
+                      />
+                    );
+                  })()}
+                </>
+              )}
+              {niveauActuel && !isUniversityLmd && (
                 <ClassroomsBlock
                   classes={niveauActuel.classes}
                   onSetCount={(n) => setClassesCountNiveau(niveauActuel.numero, n)}

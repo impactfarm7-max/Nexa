@@ -336,9 +336,20 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
     if (needsSemestre && !semestreId) { setGroupes([]); setGroupeId(""); return; }
 
     (async () => {
-      let query = supabase.from("groupes").select("id, nom, is_default_signup, semestre_id");
-      query = needsSemestre ? query.eq("semestre_id", semestreId) : query.eq("niveau_id", niveauId);
-      const { data } = await query;
+      let data: GroupeOption[] | null = null;
+      if (needsSemestre) {
+        const bySemestre = await supabase.from("groupes").select("id, nom, is_default_signup, semestre_id").eq("semestre_id", semestreId);
+        data = bySemestre.data;
+        // Repli : le constructeur de programmes ne rattache pas encore les salles à un semestre
+        // (seulement au niveau) — sans ce repli, une filière LMD n'aurait jamais de salle sélectionnable.
+        if (!data || data.length === 0) {
+          const byNiveau = await supabase.from("groupes").select("id, nom, is_default_signup, semestre_id").eq("niveau_id", niveauId);
+          data = byNiveau.data;
+        }
+      } else {
+        const res = await supabase.from("groupes").select("id, nom, is_default_signup, semestre_id").eq("niveau_id", niveauId);
+        data = res.data;
+      }
       setGroupes(data || []);
       setGroupeId(
         data?.find((g) => g.is_default_signup)?.id
