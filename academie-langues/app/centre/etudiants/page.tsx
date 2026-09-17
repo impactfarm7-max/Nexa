@@ -66,6 +66,8 @@ type Enrollment = {
   tuition_fee: number;
   status: "draft" | "active" | "completed" | "cancelled";
   enrolled_at: string | null;
+  /** Résumé crédits LMD (centre universite) — null si l'inscription n'est pas rattachée à un semestre. */
+  creditsStatus: { totalCredits: number; acquiredCredits: number } | null;
 };
 
 type StudentRow = {
@@ -790,6 +792,11 @@ export default function CenterStudentsPage() {
                       <CenterTableRow key={s.id} index={i}>
                         <td className="px-4 py-3.5 text-[12px] font-semibold text-neutral-500 whitespace-nowrap">
                           {s.matricule || "—"}
+                          {primaryEnr?.creditsStatus && (
+                            <p className="text-[10px] text-neutral-400 font-medium mt-0.5">
+                              {primaryEnr.creditsStatus.acquiredCredits}/{primaryEnr.creditsStatus.totalCredits} cr.
+                            </p>
+                          )}
                         </td>
                         <td className="px-4 py-3.5 min-w-0 print:break-inside-avoid">
                           <p className="text-[13px] font-semibold leading-snug truncate" style={{ color: BLUE }}>

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-server";
+import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
+import { computeEnrollmentCreditsStatus } from "@/app/utils/lmd-credits.server";
 
 type EnrollRow = {
   id: string;
@@ -17,6 +19,7 @@ type EnrollRow = {
   academic_year: string | null;
   passage_decision: string | null;
   passage_reason: string | null;
+  semestre_id: string | null;
   filieres: { name?: string; type?: string; duree_valeur?: number | null; duree_unite?: string | null } | null;
   niveaux: { annee?: number; mois?: number; semaines?: number; jours?: number } | null;
   groupes: { nom?: string } | null;
@@ -109,13 +112,13 @@ export async function GET(req: Request) {
       .select(`
         id, student_id, status, filiere_id, niveau_id, groupe_id, campus_id,
         tuition_fee, enrolled_at, duration_value, duration_unit, duration_months,
-        academic_year, passage_decision, passage_reason,
+        academic_year, passage_decision, passage_reason, semestre_id,
         filieres(name, type, duree_valeur, duree_unite),
         niveaux(annee, mois, semaines, jours),
         groupes(nom)
       `)
       .in("student_id", studentIds);
-    if (res.error && /passage_reason/i.test(res.error.message)) {
+    if (res.error && /passage_reason|semestre_id/i.test(res.error.message)) {
       const fallback = await supabaseAdmin
         .from("enrollments")
         .select(`
@@ -130,7 +133,7 @@ export async function GET(req: Request) {
       if (fallback.error) {
         return NextResponse.json({ error: fallback.error.message }, { status: 500 });
       }
-      enrollRows = (fallback.data || []).map((e) => ({ ...e, passage_reason: null })) as EnrollRow[];
+      enrollRows = (fallback.data || []).map((e) => ({ ...e, passage_reason: null, semestre_id: null })) as EnrollRow[];
     } else if (res.error) {
       return NextResponse.json({ error: res.error.message }, { status: 500 });
     } else {
@@ -142,7 +145,14 @@ export async function GET(req: Request) {
     enrollRows = enrollRows.filter((e) => e.campus_id && allowedCampusIds.includes(e.campus_id));
   }
 
-  const students = profileRows.map((p) => {
+  const { data: centerRow } = await supabaseAdmin
+    .from("centers")
+    .select("lmd_validation_threshold_pct")
+    .eq("id", ctx!.centerId)
+    .maybeSingle();
+  const lmdThresholdPct = resolveLmdValidationThreshold(centerRow?.lmd_validation_threshold_pct ?? null);
+
+  const students = await Promise.all(profileRows.map(async (p) => {
     const ses = enrollRows.filter((e) => e.student_id === p.id);
     return {
       id: p.id,
@@ -155,7 +165,7 @@ export async function GET(req: Request) {
       birth_date: p.birth_date ?? null,
       genre: p.genre ?? null,
       center_status: p.center_status ?? "active",
-      enrollments: ses.map((e) => {
+      enrollments: await Promise.all(ses.map(async (e) => {
         const niv = e.niveaux;
         const isShort = e.filieres?.type === "formation_courte" || (niv != null && niv.annee == null);
         let dur = "";
@@ -183,10 +193,12 @@ export async function GET(req: Request) {
           tuition_fee: Number(e.tuition_fee) || 0,
           status: e.status ?? "draft",
           enrolled_at: e.enrolled_at,
+          creditsStatus: e.semestre_id ? await computeEnrollmentCreditsStatus(supabaseAdmin, e.id, e.semestre_id, lmdThresholdPct) : null,
         };
-      }),
+      })),
     };
-  }).filter((s) => !allowedCampusIds?.length || s.enrollments.length > 0);
+  }));
+  const filteredStudents = students.filter((s) => !allowedCampusIds?.length || s.enrollments.length > 0);
 
-  return NextResponse.json({ students, campuses: campusList });
+  return NextResponse.json({ students: filteredStudents, campuses: campusList });
 }

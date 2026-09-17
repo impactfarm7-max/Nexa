@@ -11,6 +11,7 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  GraduationCap,
   Hash,
   Lock,
   LogOut,
@@ -154,6 +155,8 @@ type StudentAccount = {
     created_at: string;
     payload: Record<string, unknown> | null;
   }>;
+  /** Résumé crédits LMD (centre universite) — null si l'inscription n'est pas rattachée à un semestre. */
+  creditsStatus?: { totalCredits: number; acquiredCredits: number } | null;
 };
 
 export default function CenterStudentProfil() {
@@ -616,6 +619,13 @@ export default function CenterStudentProfil() {
             editing={isEditing} editValue={form.nom} onEditChange={(v) => setForm((c) => ({ ...c, nom: v }))} />
           <Row icon={Mail} label={td("profilEmail")} value={account.profile.email || account.user.email || emptyValue} />
           <Row icon={Hash} label={td("profilMatricule")} value={account.profile.matricule || emptyValue} />
+          {account.creditsStatus && (
+            <Row
+              icon={GraduationCap}
+              label={t("centre", "lmdCreditsSummary")}
+              value={`${account.creditsStatus.acquiredCredits}/${account.creditsStatus.totalCredits}`}
+            />
+          )}
           <EditableRow icon={Phone} label={td("profilPhoneWhatsapp")} value={savedForm.phone || emptyValue}
             editing={isEditing} editValue={form.phone} onEditChange={(v) => setForm((c) => ({ ...c, phone: v }))} />
           {isEditing ? (

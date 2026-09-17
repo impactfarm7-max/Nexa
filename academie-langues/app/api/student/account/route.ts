@@ -5,6 +5,8 @@ import { computeTutorUnlockAt, getTutorUnlockState } from "@/app/utils/tutor-unl
 import { resolveAfricaCountry, resolveStudentRegion } from "@/app/data/africa-54";
 import { resolveEffectiveNexaOffer, resolveNexaStudentQuotas } from "@/app/data/nexaOffers";
 import { isPluriannualCenter } from "@/app/data/center-types";
+import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
+import { computeEnrollmentCreditsStatus } from "@/app/utils/lmd-credits.server";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,13 +57,13 @@ async function getStudentAccount(req: Request) {
   const [{ data: center, error: centerError }, { data: enrollment }, { data: details }] = await Promise.all([
     supabaseAdmin
       .from("centers")
-      .select("id, name, code, city, status, created_at, nexa_offer, center_type, quota_overrides")
+      .select("id, name, code, city, status, created_at, nexa_offer, center_type, quota_overrides, lmd_validation_threshold_pct")
       .eq("id", profile.center_id)
       .maybeSingle(),
     supabaseAdmin
       .from("enrollments")
       .select(
-        "id, status, tuition_fee, catalog_tuition_fee, duration_value, duration_unit, duration_months, enrolled_at, price_note",
+        "id, status, tuition_fee, catalog_tuition_fee, duration_value, duration_unit, duration_months, enrolled_at, price_note, semestre_id",
       )
       .eq("student_id", user.id)
       .in("status", ["active", "draft"])
@@ -229,6 +231,15 @@ async function getStudentAccount(req: Request) {
     tutorUnlockAt = computeTutorUnlockAt(fallbackStart);
   }
 
+  const creditsStatus = enrollment?.semestre_id
+    ? await computeEnrollmentCreditsStatus(
+        supabaseAdmin,
+        enrollment.id,
+        enrollment.semestre_id,
+        resolveLmdValidationThreshold((center as { lmd_validation_threshold_pct?: number | null }).lmd_validation_threshold_pct ?? null),
+      )
+    : null;
+
   return {
     user,
     profile: enrichedProfile,
@@ -246,6 +257,7 @@ async function getStudentAccount(req: Request) {
         ),
     nexaOffer: resolveEffectiveNexaOffer(center).key,
     isPluriannual: isPluriannualCenter((center as { center_type?: string } | null)?.center_type),
+    creditsStatus,
     response: null,
   };
 }
@@ -254,7 +266,7 @@ export async function GET(req: Request) {
   const result = await getStudentAccount(req);
   if (result.response) return result.response;
 
-  const { user, profile, center, enrollment, finance, payments, installments, financeEvents, tutor, nexaQuotas, nexaOffer, isPluriannual } = result;
+  const { user, profile, center, enrollment, finance, payments, installments, financeEvents, tutor, nexaQuotas, nexaOffer, isPluriannual, creditsStatus } = result;
 
   return NextResponse.json({
     user: { id: user!.id, email: user!.email, created_at: user!.created_at },
@@ -269,6 +281,7 @@ export async function GET(req: Request) {
     nexaQuotas,
     nexaOffer,
     isPluriannual,
+    creditsStatus,
   });
 }
 
