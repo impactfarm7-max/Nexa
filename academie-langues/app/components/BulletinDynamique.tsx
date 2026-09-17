@@ -17,6 +17,7 @@ import {
   formatGradeList,
 } from "@/app/utils/gradeObservations";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { computeCreditsStatus, computeUeFinalStatus, isRattrapageGrade, resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -46,6 +47,8 @@ type MatiereRow = {
   grade_weights: Record<string, number> | null;
   scores: Record<string, number | null>;
   averages: Record<string, number | null>;
+  /** UE d'une filière LMD (centre universite) uniquement. */
+  credits: number | null;
 };
 
 type Props = {
@@ -76,6 +79,7 @@ export default function BulletinDynamique({
   const [rawGrades, setRawGrades] = useState<RawGrade[]>([]);
   const [selectedPeriodFilter, setSelectedPeriodFilter] = useState<string>("all");
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [lmdThresholdPct, setLmdThresholdPct] = useState<number | null>(null);
 
   const isCursus = niveauAnnee != null;
   const observationLabel = (score: number | null) => {
@@ -104,12 +108,14 @@ export default function BulletinDynamique({
 
       if (!centerId) { setLoading(false); return; }
 
-      const [exportConfig, { data: sigRows }] = await Promise.all([
+      const [exportConfig, { data: sigRows }, { data: centerRow }] = await Promise.all([
         fetchDocumentExportConfig(supabase, centerId),
         supabase.from("bulletin_signatures").select("id, name, title, label").eq("center_id", centerId).order("display_order"),
+        supabase.from("centers").select("lmd_validation_threshold_pct").eq("id", centerId).maybeSingle(),
       ]);
       setDocConfig(exportConfig);
       setSignatures(filterSignatures(sigRows || [], exportConfig.signatureIds, locale));
+      setLmdThresholdPct(centerRow?.lmd_validation_threshold_pct ?? null);
 
       const { data: periodData } = await supabase.rpc("get_center_periods", { p_center_id: centerId });
       const activePeriods: PeriodCol[] = (periodData || [])
@@ -133,14 +139,14 @@ export default function BulletinDynamique({
 
       let fmQuery = supabase
         .from("filiere_matieres")
-        .select("id, coefficient, max_score, grade_weights, exam_disciplines(name)")
+        .select("id, coefficient, max_score, grade_weights, credits, exam_disciplines(name)")
         .eq("filiere_id", enrollData?.filiere_id || "");
       if (enrollData?.niveau_id) fmQuery = fmQuery.eq("niveau_id", enrollData.niveau_id);
       let { data: fmData, error: fmErr } = await fmQuery;
       if (fmErr) {
         let fb = supabase
           .from("filiere_matieres")
-          .select("id, coefficient, max_score, exam_disciplines(name)")
+          .select("id, coefficient, max_score, credits, exam_disciplines(name)")
           .eq("filiere_id", enrollData?.filiere_id || "");
         if (enrollData?.niveau_id) fb = fb.eq("niveau_id", enrollData.niveau_id);
         fmData = (await fb).data as typeof fmData;
@@ -154,6 +160,7 @@ export default function BulletinDynamique({
         grade_weights: parseGradeWeights(fm.grade_weights),
         scores: {},
         averages: {},
+        credits: fm.credits != null ? Number(fm.credits) : null,
       }));
 
       let loadedRaw: RawGrade[] = [];
@@ -305,6 +312,22 @@ export default function BulletinDynamique({
       const finale = matiereOverall(m);
       const finale20 =
         finale === null ? null : normalizeScore(finale, m.max_score, 20);
+
+      let lmdStatus: { validated: boolean } | null = null;
+      if (m.credits != null) {
+        const normalGrades = grades.filter((g) => !isRattrapageGrade(g.title));
+        const rattrapageGrades = grades.filter((g) => isRattrapageGrade(g.title));
+        const normalScore = averageGradesOnScale(normalGrades, m.max_score, m.grade_weights);
+        const rattrapageScore = averageGradesOnScale(rattrapageGrades, m.max_score, null);
+        lmdStatus = computeUeFinalStatus({
+          normalScore,
+          normalMaxScore: m.max_score,
+          rattrapageScore,
+          rattrapageMaxScore: m.max_score,
+          thresholdPct: resolveLmdValidationThreshold(lmdThresholdPct),
+        });
+      }
+
       return {
         id: m.filiere_matiere_id,
         matiereName: m.matiere_name,
@@ -314,10 +337,21 @@ export default function BulletinDynamique({
         finaleText: finale !== null ? finale.toFixed(1) : "—",
         finale20,
         observation: observationLabel(finale20),
+        credits: m.credits,
+        lmdValidated: lmdStatus?.validated ?? false,
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- matiereOverall / filter dérivés
-  }, [matieres, rawGrades, leafPeriodsForAvg, selectedPeriodFilter, leafIdSet]);
+  }, [matieres, rawGrades, leafPeriodsForAvg, selectedPeriodFilter, leafIdSet, lmdThresholdPct]);
+
+  const hasLmdCredits = matieres.some((m) => m.credits != null);
+  const creditsStatus = useMemo(() => {
+    if (!hasLmdCredits) return null;
+    return computeCreditsStatus(
+      matieres.filter((m) => m.credits != null).map((m) => ({ filiere_matiere_id: m.filiere_matiere_id, credits: m.credits! })),
+      tableRows.filter((r) => r.credits != null).map((r) => ({ filiere_matiere_id: r.id, validated: r.lmdValidated })),
+    );
+  }, [hasLmdCredits, matieres, tableRows]);
 
   const moyenneGenerale = weightedMean(
     matieres.map((m) => {
@@ -510,6 +544,11 @@ export default function BulletinDynamique({
                     <span className="block text-[10px] font-semibold text-neutral-400 normal-case mt-0.5">
                       {r.coeffLabel}
                     </span>
+                    {r.credits != null && (
+                      <span className={`block text-[10px] font-bold normal-case mt-0.5 ${r.lmdValidated ? "text-emerald-600" : "text-neutral-400"}`}>
+                        {r.credits} cr. — {r.lmdValidated ? t("centre", "lmdValidatedBadge") : t("centre", "lmdNotValidatedBadge")}
+                      </span>
+                    )}
                   </td>
                   <td className="p-2.5 border border-neutral-200 font-medium text-neutral-700 align-top">
                     {r.principalText}
@@ -552,6 +591,11 @@ export default function BulletinDynamique({
               </tr>
             </tfoot>
           </table>
+          {hasLmdCredits && creditsStatus && (
+            <p className="text-xs font-bold mt-2" style={{ color: BLUE }}>
+              {t("centre", "lmdCreditsTotal", { acquired: String(creditsStatus.acquiredCredits), total: String(creditsStatus.totalCredits) })}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap justify-around gap-6 mt-12 pt-6 text-center border-t border-black/[0.06]">
