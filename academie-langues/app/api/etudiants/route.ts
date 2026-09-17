@@ -162,6 +162,7 @@ export async function POST(req: NextRequest) {
       prenom, nom, phone,
       filiere_id, niveau_id, groupe_id, campus_id, tuition_fee,
     } = body;
+    const semestre_id = typeof body.semestre_id === "string" && body.semestre_id ? body.semestre_id : null;
     const normalizedEmail = String(body.email || "").trim().toLowerCase();
 
     if (!prenom || !nom || !normalizedEmail || !filiere_id) {
@@ -588,6 +589,7 @@ export async function POST(req: NextRequest) {
     }
 
     const enrollmentPatch: Record<string, unknown> = { status: "active" };
+    if (semestre_id) enrollmentPatch.semestre_id = semestre_id;
     if (isShortFiliere) {
       if (shortCatalogTotal != null) enrollmentPatch.catalog_tuition_fee = shortCatalogTotal;
       if (shortDurationValue != null) enrollmentPatch.duration_value = shortDurationValue;

@@ -51,7 +51,7 @@ type FiliereOption = {
   payment_plan: unknown;
 };
 type NiveauOption = { id: string; annee: number; tuition_fee: number | null; payment_plan?: unknown };
-type GroupeOption = { id: string; nom: string; is_default_signup?: boolean | null };
+type GroupeOption = { id: string; nom: string; is_default_signup?: boolean | null; semestre_id?: string | null };
 type CampusOption = { id: string; name: string; city: string | null };
 
 type Props = {
@@ -95,6 +95,8 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   const [filiereId, setFiliereId] = useState("");
   const [niveaux, setNiveaux] = useState<NiveauOption[]>([]);
   const [niveauId, setNiveauId] = useState("");
+  const [semestres, setSemestres] = useState<{ id: string; niveau_id: string; ordre: number }[]>([]);
+  const [semestreId, setSemestreId] = useState("");
   const [groupes, setGroupes] = useState<GroupeOption[]>([]);
   const [groupeId, setGroupeId] = useState("");
   const [campuses, setCampuses] = useState<CampusOption[]>([]);
@@ -177,6 +179,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   // QUAND LA FILIÈRE CHANGE → niveaux + campus + prix
   // ============================================================
   const selectedFiliere = filieres.find((f) => f.id === filiereId);
+  const semestresForNiveau = semestres.filter((s) => s.niveau_id === niveauId);
   const isShort = selectedFiliere?.type === "formation_courte";
   const shortMode: ShortPricingMode =
     isShort && isShortPricingMode(selectedFiliere?.pricing_mode)
@@ -236,8 +239,14 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
           .order("annee");
         setNiveaux(data || []);
         setGroupes([]);
-        setNiveauId(""); setGroupeId("");
+        setNiveauId(""); setGroupeId(""); setSemestreId("");
         setAcademicYear(defaultAcademicYear());
+
+        const niveauIdsForSem = (data || []).map((n) => n.id);
+        const { data: semRows } = niveauIdsForSem.length
+          ? await supabase.from("semestres").select("id, niveau_id, ordre").in("niveau_id", niveauIdsForSem).order("ordre")
+          : { data: [] as { id: string; niveau_id: string; ordre: number }[] };
+        setSemestres(semRows || []);
         const feeMode = isCursusFeeMode(selectedFiliere.cursus_fee_mode)
           ? selectedFiliere.cursus_fee_mode
           : "par_niveau";
@@ -274,7 +283,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         }
         setGroupes(rows);
         setNiveaux([]);
-        setNiveauId("");
+        setNiveauId(""); setSemestreId(""); setSemestres([]);
         setGroupeId(
           rows.find((g) => g.is_default_signup)?.id
           || (rows.length === 1 ? rows[0].id : ""),
@@ -323,12 +332,13 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   useEffect(() => {
     if (selectedFiliere?.type !== "cursus") return;
     if (!niveauId) { setGroupes([]); setGroupeId(""); return; }
+    const needsSemestre = semestres.some((s) => s.niveau_id === niveauId);
+    if (needsSemestre && !semestreId) { setGroupes([]); setGroupeId(""); return; }
 
     (async () => {
-      const { data } = await supabase
-        .from("groupes")
-        .select("id, nom, is_default_signup")
-        .eq("niveau_id", niveauId);
+      let query = supabase.from("groupes").select("id, nom, is_default_signup, semestre_id");
+      query = needsSemestre ? query.eq("semestre_id", semestreId) : query.eq("niveau_id", niveauId);
+      const { data } = await query;
       setGroupes(data || []);
       setGroupeId(
         data?.find((g) => g.is_default_signup)?.id
@@ -351,7 +361,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
       niveauTuition: niveau?.tuition_fee ?? null,
       extraFees: extras,
     })));
-  }, [niveauId, niveaux, selectedFiliere]);
+  }, [niveauId, niveaux, selectedFiliere, semestres, semestreId]);
 
   // ============================================================
   // VALIDATION
@@ -365,6 +375,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   );
   const canSubmit = canGoStep2 && filiereId
     && (selectedFiliere?.type !== "cursus" || niveauId)
+    && (semestresForNiveau.length === 0 || Boolean(semestreId))
     && (campuses.length <= 1 || campusId)
     && (groupes.length <= 1 || Boolean(groupeId))
     && (!isShort || shortMode !== "mensuel" || durationMonths >= 1);
@@ -387,6 +398,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         phone: fullPhone,
         filiere_id: filiereId,
         niveau_id: niveauId || null,
+        semestre_id: semestreId || null,
         groupe_id: groupeId || null,
         campus_id: campusId || null,
         tuition_fee: parseFloat(tuitionFee) || 0,
@@ -727,11 +739,27 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
                 <CenterSelect
                   size="lg"
                   value={niveauId}
-                  onChange={setNiveauId}
+                  onChange={(v) => { setNiveauId(v); setSemestreId(""); }}
                   placeholder={t("centre", "createStudentChooseLevel")}
                   options={[
                     { value: "", label: t("centre", "createStudentChooseLevel") },
                     ...niveaux.map((n) => ({ value: n.id, label: `${t("centre", "identityLevel")} ${n.annee}` })),
+                  ]}
+                />
+              </div>
+            )}
+
+            {selectedFiliere?.type === "cursus" && semestresForNiveau.length > 0 && (
+              <div>
+                <label className={FIELD_LABEL}>{t("centre", "lmdSemestreFilterLabel")} *</label>
+                <CenterSelect
+                  size="lg"
+                  value={semestreId}
+                  onChange={setSemestreId}
+                  placeholder={t("centre", "identitySelect")}
+                  options={[
+                    { value: "", label: t("centre", "identitySelect") },
+                    ...semestresForNiveau.map((s) => ({ value: s.id, label: t("centre", "lmdSemestreLabel", { number: String(s.ordre) }) })),
                   ]}
                 />
               </div>
