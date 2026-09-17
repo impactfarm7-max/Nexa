@@ -22,6 +22,7 @@ import {
   scoreToneTextClass,
 } from "@/app/utils/gradesCalc";
 import { downloadClassGradeSheetPdf } from "@/app/utils/centerPdfExport";
+import { computeUeFinalStatus, isRattrapageGrade, resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { ACTION_TONE } from "@/app/utils/action-tones";
@@ -41,7 +42,7 @@ type FiliereOption = {
   student_count: number;
 };
 type NiveauOption = { id: string; annee: number | null; mois: number | null; nom: string | null };
-type GroupeOption = { id: string; nom: string; niveau_id: string | null; filiere_id: string | null };
+type GroupeOption = { id: string; nom: string; niveau_id: string | null; filiere_id: string | null; semestre_id?: string | null };
 
 type TeachingSubject = {
   filiere_matiere_id: string;
@@ -54,6 +55,9 @@ type TeachingSubject = {
   coefficient: number;
   max_score: number;
   grade_weights: Record<string, number> | null;
+  /** UE d'une filière LMD (centre universite) uniquement. */
+  semestre_id: string | null;
+  credits: number | null;
 };
 
 type PeriodOption = {
@@ -106,6 +110,8 @@ function mapSubject(fm: any, filiereMatiereId?: string): TeachingSubject {
     coefficient: Number(fm?.coefficient) > 0 ? Number(fm.coefficient) : 1,
     max_score: Number(fm?.max_score) > 0 ? Number(fm.max_score) : 20,
     grade_weights: parseGradeWeights(fm?.grade_weights),
+    semestre_id: fm?.semestre_id || null,
+    credits: fm?.credits != null ? Number(fm.credits) : null,
   };
 }
 
@@ -222,6 +228,11 @@ export default function GradeBookPage() {
   const [selectedSubjectId, setSelectedSubjectId] = useState("");
   const [selectedPeriodId, setSelectedPeriodId] = useState("");
 
+  // --- LMD (parcours université) ---
+  const [semestres, setSemestres] = useState<{ id: string; niveau_id: string; ordre: number; credits_cible: number | null }[]>([]);
+  const [selectedSemestreId, setSelectedSemestreId] = useState("");
+  const [lmdThresholdPct, setLmdThresholdPct] = useState<number | null>(null);
+
   const [periods, setPeriods] = useState<PeriodOption[]>([]);
   const [studentRows, setStudentRows] = useState<StudentGradeRow[]>([]);
   const [suplColumns, setSuplColumns] = useState<SuplColumn[]>([]);
@@ -256,6 +267,8 @@ export default function GradeBookPage() {
   const selectedSubject = allSubjects.find((s) => s.filiere_matiere_id === selectedSubjectId) || null;
   const bareme = selectedSubject?.max_score || 20;
   const subjectWeights = selectedSubject?.grade_weights ?? null;
+  const isUniversityLmd = centerType === "universite" && semestres.length > 0;
+  const semestresForSelectedNiveau = semestres.filter((s) => s.niveau_id === selectedNiveauId);
 
   const formulaHint = useMemo(() => {
     if (!hasCustomGradeWeights(subjectWeights)) {
@@ -318,10 +331,11 @@ export default function GradeBookPage() {
     if (!selectedFiliereId) return [];
     return allSubjects.filter((s) => {
       if (s.filiere_id !== selectedFiliereId) return false;
+      if (isUniversityLmd) return s.semestre_id === selectedSemestreId;
       if (selectedNiveauId && s.niveau_id && s.niveau_id !== selectedNiveauId) return false;
       return true;
     });
-  }, [allSubjects, selectedFiliereId, selectedNiveauId]);
+  }, [allSubjects, selectedFiliereId, selectedNiveauId, isUniversityLmd, selectedSemestreId]);
 
   const filteredSubjectsForPicker = useMemo(() => {
     const q = subjectQuery.trim().toLowerCase();
@@ -361,10 +375,11 @@ export default function GradeBookPage() {
 
       const { data: center } = await supabase
         .from("centers")
-        .select("center_type")
+        .select("center_type, lmd_validation_threshold_pct")
         .eq("id", cId)
         .maybeSingle();
       setCenterType(center?.center_type ?? null);
+      setLmdThresholdPct(center?.lmd_validation_threshold_pct ?? null);
 
       if (isTcfCanadaCenter(center?.center_type)) {
         setLoading(false);
@@ -384,13 +399,13 @@ export default function GradeBookPage() {
       );
 
       const fmSelectBase = `
-        id, filiere_id, niveau_id, annee, discipline_id, coefficient, max_score,
+        id, filiere_id, niveau_id, annee, discipline_id, coefficient, max_score, semestre_id, credits,
         exam_disciplines(id, name),
         filieres(name, center_id, type),
         niveaux(annee)
       `;
       const fmSelectWithWeights = `
-        id, filiere_id, niveau_id, annee, discipline_id, coefficient, max_score, grade_weights,
+        id, filiere_id, niveau_id, annee, discipline_id, coefficient, max_score, grade_weights, semestre_id, credits,
         exam_disciplines(id, name),
         filieres(name, center_id, type),
         niveaux(annee)
@@ -513,14 +528,23 @@ export default function GradeBookPage() {
       setNiveaux([]);
       setAllGroupes([]);
       setGroupes([]);
+      setSemestres([]);
+      setSelectedSemestreId("");
       return;
     }
     (async () => {
       const [{ data: nivRows }, { data: byFiliere }, { data: byNiveau }] = await Promise.all([
         supabase.from("niveaux").select("id, annee, mois, nom").eq("filiere_id", selectedFiliereId).order("annee"),
-        supabase.from("groupes").select("id, nom, niveau_id, filiere_id").eq("filiere_id", selectedFiliereId),
+        supabase.from("groupes").select("id, nom, niveau_id, filiere_id, semestre_id").eq("filiere_id", selectedFiliereId),
         supabase.from("niveaux").select("id").eq("filiere_id", selectedFiliereId),
       ]);
+
+      const niveauIdListForSem = (nivRows || []).map((n: { id: string }) => n.id);
+      const { data: semRows } = niveauIdListForSem.length
+        ? await supabase.from("semestres").select("id, niveau_id, ordre, credits_cible").in("niveau_id", niveauIdListForSem).order("ordre")
+        : { data: [] as { id: string; niveau_id: string; ordre: number; credits_cible: number | null }[] };
+      setSemestres(semRows || []);
+      setSelectedSemestreId("");
 
       // Formateur : uniquement les niveaux où il a une matière assignée
       let nivs = nivRows || [];
@@ -542,7 +566,7 @@ export default function GradeBookPage() {
       if (niveauIds.length > 0) {
         const { data: gNiv } = await supabase
           .from("groupes")
-          .select("id, nom, niveau_id, filiere_id")
+          .select("id, nom, niveau_id, filiere_id, semestre_id")
           .in("niveau_id", niveauIds);
         niveauGroupes = gNiv || [];
       }
@@ -573,6 +597,11 @@ export default function GradeBookPage() {
 
   useEffect(() => {
     if (!selectedFiliereId) { setGroupes([]); return; }
+    if (isUniversityLmd) {
+      if (!selectedSemestreId) { setGroupes([]); return; }
+      setGroupes(allGroupes.filter((g) => g.semestre_id === selectedSemestreId));
+      return;
+    }
     if (!selectedNiveauId) {
       if (niveaux.length === 0) setGroupes(allGroupes);
       else setGroupes([]);
@@ -585,7 +614,7 @@ export default function GradeBookPage() {
           (g) => g.niveau_id === selectedNiveauId || (!g.niveau_id && g.filiere_id === selectedFiliereId),
         );
     setGroupes(next);
-  }, [selectedNiveauId, allGroupes, selectedFiliereId, niveaux.length]);
+  }, [selectedNiveauId, allGroupes, selectedFiliereId, niveaux.length, isUniversityLmd, selectedSemestreId]);
 
   useEffect(() => {
     if (!selectedSubject) return;
@@ -607,6 +636,7 @@ export default function GradeBookPage() {
   const contextReady =
     !!selectedFiliereId
     && (niveaux.length === 0 || !!selectedNiveauId)
+    && (!isUniversityLmd || !!selectedSemestreId)
     && !!selectedGroupeId
     && !!selectedSubjectId
     && !!selectedPeriodId;
@@ -1245,6 +1275,7 @@ export default function GradeBookPage() {
                     active={selectedNiveauId === n.id}
                     onClick={() => {
                       setSelectedNiveauId(n.id);
+                      setSelectedSemestreId("");
                       setSelectedGroupeId("");
                       setSelectedSubjectId("");
                       setSelectedPeriodId("");
@@ -1260,7 +1291,33 @@ export default function GradeBookPage() {
               </div>
             )}
 
-            {(selectedNiveauId || niveaux.length === 0) && (
+            {isUniversityLmd && selectedNiveauId && (
+              <>
+                <span className="hidden sm:block w-px h-4 bg-black/[0.08] shrink-0" />
+                <div className="flex gap-1 flex-wrap items-center">
+                  <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">{t("centre", "lmdSemestreFilterLabel")}</span>
+                  {semestresForSelectedNiveau.map((s) => (
+                    <FilterPill
+                      key={s.id}
+                      active={selectedSemestreId === s.id}
+                      onClick={() => {
+                        setSelectedSemestreId(s.id);
+                        setSelectedGroupeId("");
+                        setSelectedSubjectId("");
+                        setStudentRows([]);
+                        setSuplColumns([]);
+                        setSubjectQuery("");
+                        setSubjectMenuOpen(false);
+                      }}
+                    >
+                      {t("centre", "lmdSemestreLabel", { number: String(s.ordre) })}
+                    </FilterPill>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {(isUniversityLmd ? !!selectedSemestreId : (selectedNiveauId || niveaux.length === 0)) && (
               <>
                 {niveaux.length > 0 && <span className="hidden sm:block w-px h-4 bg-black/[0.08] shrink-0" />}
                 <div className="flex gap-1 flex-wrap items-center">
@@ -1818,7 +1875,7 @@ export default function GradeBookPage() {
                             </div>
                           </div>
 
-                          <div className="flex justify-center">
+                          <div className="flex flex-col items-center gap-1">
                             <input
                               type="number"
                               min={0}
@@ -1830,6 +1887,26 @@ export default function GradeBookPage() {
                               readOnly={notesLocked}
                               className={scoreFieldClass(row.new_score, bareme, row.dirty, notesLocked)}
                             />
+                            {isUniversityLmd && selectedSubject?.credits != null && (() => {
+                              const rattrapageCol = suplColumns.find((c) => isRattrapageGrade(c.title));
+                              const rattrapageCell = rattrapageCol ? row.extras.find((ex) => ex.colKey === rattrapageCol.colKey && !ex.deleted) : undefined;
+                              const status = computeUeFinalStatus({
+                                normalScore: row.new_score.trim() ? Number(row.new_score) : null,
+                                normalMaxScore: bareme,
+                                rattrapageScore: rattrapageCell?.score.trim() ? Number(rattrapageCell.score) : null,
+                                rattrapageMaxScore: bareme,
+                                thresholdPct: resolveLmdValidationThreshold(lmdThresholdPct),
+                              });
+                              return (
+                                <span
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap ${
+                                    status.validated ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-400"
+                                  }`}
+                                >
+                                  {selectedSubject.credits} cr. · {status.validated ? t("centre", "lmdValidatedBadge") : t("centre", "lmdNotValidatedBadge")}
+                                </span>
+                              );
+                            })()}
                           </div>
 
                           {suplColumns.map((col) => {
