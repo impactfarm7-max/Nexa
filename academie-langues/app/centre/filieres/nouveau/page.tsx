@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   GitBranch, ArrowLeft, Plus, Trash2, Loader2, CheckCircle2,
   BookOpen, Layers, Clock, X, UserCheck, Tag, CalendarDays,
-  MapPin, Monitor, Users, Lock, Pencil, UserPlus, Phone, Mail, Shield, Download, Gauge
+  MapPin, Monitor, Users, Lock, Pencil, UserPlus, Phone, Mail, Shield, Download, Gauge, GraduationCap
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
@@ -75,10 +75,21 @@ type MatiereDraft = {
   fm_id?: string | null;
   initialFormateurIds?: string[];
   existingByNiveau?: Record<number, { fm_id: string; initialFormateurIds: string[] }>;
+  /** Comme existingByNiveau mais clé par semestre (LMD) — une matière peut avoir une UE distincte par semestre. */
+  existingBySemestre?: Record<string, { fm_id: string; initialFormateurIds: string[] }>;
   /** Poids dans la moyenne générale */
   coefficient: number | string;
   /** Barème de notation (ex. 20, 100) */
   max_score: number | string;
+  /** Crédits ECTS — uniquement rempli pour les UE d'un centre universite (LMD). */
+  credits?: number | string;
+  /** Semestres concernés — clés `${niveauNumero}:${semestreOrdre}` (LMD uniquement, remplace niveauNumeros). */
+  semestreKeys?: string[];
+};
+type SemestreDraft = {
+  id?: string | null;
+  ordre: number;
+  credits_cible: string;
 };
 type NiveauDraft = {
   id?: string | null;
@@ -86,6 +97,8 @@ type NiveauDraft = {
   nom?: string;
   classes: ClasseDraft[];
   matieres: MatiereDraft[];
+  /** Semestres du niveau — uniquement pour les filières LMD (centre universite). */
+  semestres: SemestreDraft[];
   tuition_fee: string;
   fees: FeeDraft[];
   installments: PaymentInstallment[];
@@ -109,11 +122,12 @@ function slugify(s: string) {
 function generateId() {
   return Math.random().toString(36).substring(2, 9);
 }
-function defaultNiveau(numero: number): NiveauDraft {
+function defaultNiveau(numero: number, withDefaultSemestres = false): NiveauDraft {
   return {
     numero,
     classes: [],
     matieres: [],
+    semestres: withDefaultSemestres ? [defaultSemestre(1), defaultSemestre(2)] : [],
     tuition_fee: "",
     fees: [],
     installments: [],
@@ -122,6 +136,12 @@ function defaultNiveau(numero: number): NiveauDraft {
     feesLocked: false,
     seuil_passage: "",
   };
+}
+function defaultSemestre(ordre: number): SemestreDraft {
+  return { ordre, credits_cible: "30" };
+}
+function semestreKey(niveauNumero: number, ordre: number) {
+  return `${niveauNumero}:${ordre}`;
 }
 function defaultMatiere(): MatiereDraft {
   return {
@@ -796,6 +816,12 @@ function NouveauProgrammeForm() {
   const [existingFilieres, setExistingFilieres] = useState<{ id: string; name: string }[]>([]);
   const [created, setCreated] = useState<{ id: string; name: string; updated?: boolean } | null>(null);
 
+  // --- LMD (parcours université) ---
+  const [centerType, setCenterType] = useState<string | null>(null);
+  /** false uniquement en édition d'une filière université déjà existante, sans semestres (créée avant ce chantier). */
+  const [filiereIsLmdEligible, setFiliereIsLmdEligible] = useState(true);
+  const isUniversityLmd = centerType === "universite" && type === "cursus" && filiereIsLmdEligible;
+
   // --- Mode édition (réconciliation) ---
   const [editLocked, setEditLocked] = useState(false);
   const [initialNiveauIds, setInitialNiveauIds] = useState<string[]>([]);
@@ -807,7 +833,7 @@ function NouveauProgrammeForm() {
     if (type !== "cursus") return;
     setNiveaux((prev) => {
       const next: NiveauDraft[] = [];
-      for (let i = 1; i <= nbNiveaux; i++) next.push(prev.find((n) => n.numero === i) || defaultNiveau(i));
+      for (let i = 1; i <= nbNiveaux; i++) next.push(prev.find((n) => n.numero === i) || defaultNiveau(i, isUniversityLmd));
       return next;
     });
     setMatieresProgram((prev) =>
@@ -816,7 +842,16 @@ function NouveauProgrammeForm() {
         niveauNumeros: (m.niveauNumeros || []).filter((n) => n <= nbNiveaux),
       })),
     );
-  }, [nbNiveaux, type]);
+  }, [nbNiveaux, type, isUniversityLmd]);
+
+  // Amorce les semestres par défaut dès que le centre est identifié comme universite LMD
+  // (le centerType arrive après le premier rendu, donc l'effet ci-dessus l'a déjà manqué pour les niveaux existants).
+  useEffect(() => {
+    if (!isUniversityLmd) return;
+    setNiveaux((prev) =>
+      prev.map((n) => (n.semestres.length > 0 ? n : { ...n, semestres: [defaultSemestre(1), defaultSemestre(2)] })),
+    );
+  }, [isUniversityLmd]);
 
   // Auto-sélection campus si un seul
   useEffect(() => {
@@ -874,7 +909,7 @@ function NouveauProgrammeForm() {
 
     const { data: matRows } = await supabase
       .from("filiere_matieres")
-      .select("id, niveau_id, annee, discipline_id, coefficient, max_score, exam_disciplines(name)")
+      .select("id, niveau_id, annee, discipline_id, coefficient, max_score, credits, semestre_id, exam_disciplines(name)")
       .eq("filiere_id", filiereId);
     const fmIds = (matRows || []).map((m: { id: string }) => m.id);
     setInitialMatiereIds(fmIds);
@@ -894,6 +929,8 @@ function NouveauProgrammeForm() {
       discipline_id: string;
       coefficient?: number | null;
       max_score?: number | null;
+      credits?: number | null;
+      semestre_id?: string | null;
     }>;
 
     if (f.type === "cursus") {
@@ -911,6 +948,21 @@ function NouveauProgrammeForm() {
 
       const anneeByNiveauId: Record<string, number> = {};
       for (const n of nivRows || []) anneeByNiveauId[(n as { id: string }).id] = (n as { annee: number }).annee;
+
+      const { data: semRows } = niveauIds.length
+        ? await supabase.from("semestres").select("id, niveau_id, ordre, credits_cible").in("niveau_id", niveauIds).order("ordre")
+        : { data: [] as { id: string; niveau_id: string; ordre: number; credits_cible: number | null }[] };
+      const semestresByNiveauId: Record<string, { id: string; ordre: number; credits_cible: number | null }[]> = {};
+      const semestreOrdreById: Record<string, number> = {};
+      const semestreKeyById: Record<string, string> = {};
+      for (const s of semRows || []) {
+        (semestresByNiveauId[s.niveau_id] ||= []).push({ id: s.id, ordre: s.ordre, credits_cible: s.credits_cible });
+        semestreOrdreById[s.id] = s.ordre;
+        semestreKeyById[s.id] = semestreKey(anneeByNiveauId[s.niveau_id], s.ordre);
+      }
+      // Une filière université n'est LMD que si elle a déjà des semestres (créée après ce chantier) —
+      // une filière existante avant ce chantier n'est jamais migrée automatiquement.
+      setFiliereIsLmdEligible((semRows || []).length > 0);
 
       const loaded: NiveauDraft[] = (nivRows || []).map((n: {
         id: string;
@@ -930,6 +982,9 @@ function NouveauProgrammeForm() {
             .filter((g: { niveau_id: string }) => g.niveau_id === n.id)
             .map((g: { id: string; nom: string }) => ({ id: g.id, nom: g.nom })),
           matieres: [],
+          semestres: (semestresByNiveauId[n.id] || [])
+            .sort((a, b) => a.ordre - b.ordre)
+            .map((s) => ({ id: s.id, ordre: s.ordre, credits_cible: s.credits_cible != null ? String(s.credits_cible) : "" })),
           tuition_fee: tuition,
           fees: parsed.fees,
           installments: parsed.installments,
@@ -953,13 +1008,21 @@ function NouveauProgrammeForm() {
             newDisciplineName: "",
             formateurIds: formByFm[m.id] || [],
             niveauNumeros: [],
+            semestreKeys: [],
             existingByNiveau: {},
+            existingBySemestre: {},
             coefficient: Number(m.coefficient) > 0 ? Number(m.coefficient) : 1,
             max_score: Number(m.max_score) > 0 ? Number(m.max_score) : 20,
+            credits: m.credits != null ? m.credits : "",
           };
         }
         const draft = byDisc[m.discipline_id];
         if (annee != null && !draft.niveauNumeros!.includes(annee)) draft.niveauNumeros!.push(annee);
+        if (m.semestre_id && semestreKeyById[m.semestre_id]) {
+          const sKey = semestreKeyById[m.semestre_id];
+          if (!draft.semestreKeys!.includes(sKey)) draft.semestreKeys!.push(sKey);
+          draft.existingBySemestre![sKey] = { fm_id: m.id, initialFormateurIds: formByFm[m.id] || [] };
+        }
         draft.existingByNiveau![annee] = {
           fm_id: m.id,
           initialFormateurIds: formByFm[m.id] || [],
@@ -1037,6 +1100,7 @@ function NouveauProgrammeForm() {
     ]);
 
     setTrainers(trainerRows || []);
+    setCenterType(center?.center_type ?? null);
     setDisciplines(
       filterDisciplinesForCenterProgram(discRows || [], center?.center_type, cId).map((d) => ({
         id: d.id,
@@ -1265,7 +1329,8 @@ function NouveauProgrammeForm() {
       return en ? `The subject “${discName}” is already included in this program.` : `La matière « ${discName} » est déjà présente dans ce programme.`;
     }
 
-    if (forCursus && !(m.niveauNumeros || []).length) return en ? "Select at least one level." : "Sélectionnez au moins un niveau.";
+    if (forCursus && isUniversityLmd && !(m.semestreKeys || []).length) return en ? "Select at least one semester." : "Sélectionnez au moins un semestre.";
+    if (forCursus && !isUniversityLmd && !(m.niveauNumeros || []).length) return en ? "Select at least one level." : "Sélectionnez au moins un niveau.";
     return null;
   };
 
@@ -1372,6 +1437,15 @@ function NouveauProgrammeForm() {
     if (has && editLocked && m.existingByNiveau?.[numero]) return;
     updateMatiereProgram(key, {
       niveauNumeros: has ? nums.filter((n) => n !== numero) : [...nums, numero].sort((a, b) => a - b),
+    });
+  };
+  const toggleMatiereSemestre = (key: string, semKey: string) => {
+    const m = draftMatiereProgram?.key === key ? draftMatiereProgram : matieresProgram.find((x) => x.key === key);
+    if (!m) return;
+    const keys = m.semestreKeys || [];
+    const has = keys.includes(semKey);
+    updateMatiereProgram(key, {
+      semestreKeys: has ? keys.filter((k) => k !== semKey) : [...keys, semKey],
     });
   };
   const toggleFormateurProgram = (key: string, formateurId: string) => {
@@ -1603,15 +1677,16 @@ function NouveauProgrammeForm() {
       annee: number,
       fmId?: string | null,
       initialFormateurIds?: string[],
+      semestreId?: string | null,
     ) {
       const coeff = Number(m.coefficient) > 0 ? Number(m.coefficient) : 1;
       const maxScore = Number(m.max_score) > 0 ? Number(m.max_score) : 20;
+      const credits = isUniversityLmd && m.credits !== undefined && String(m.credits).trim() ? Number(m.credits) : null;
 
       if (fmId) {
-        const { error: metaErr } = await supabase
-          .from("filiere_matieres")
-          .update({ coefficient: coeff, max_score: maxScore })
-          .eq("id", fmId);
+        const patch: Record<string, unknown> = { coefficient: coeff, max_score: maxScore };
+        if (isUniversityLmd) { patch.credits = credits; patch.semestre_id = semestreId ?? null; }
+        const { error: metaErr } = await supabase.from("filiere_matieres").update(patch).eq("id", fmId);
         if (metaErr) throw new Error(en ? `Maximum score / coefficient: ${metaErr.message}` : `Barème / coeff. : ${metaErr.message}`);
         const initial = initialFormateurIds || [];
         const toAdd = m.formateurIds.filter((f) => !initial.includes(f));
@@ -1638,6 +1713,7 @@ function NouveauProgrammeForm() {
           obligatoire: true,
           coefficient: coeff,
           max_score: maxScore,
+          ...(isUniversityLmd ? { credits, semestre_id: semestreId ?? null } : {}),
         })
         .select("id").single();
       if (fe || !fm) throw new Error(en ? `Subject not saved: ${fe?.message || "rejected"}` : `Matière non enregistrée : ${fe?.message || "refus"}`);
@@ -1646,6 +1722,33 @@ function NouveauProgrammeForm() {
         if (error) throw new Error(en ? `Trainer assignment: ${error.message}` : `Habilitation : ${error.message}`);
       }
       return fm.id as string;
+    }
+
+    /** Crée/actualise les semestres d'un niveau LMD et renvoie une map `${niveauNumero}:${ordre}` -> semestre_id. */
+    async function saveNiveauSemestres(niveauId: string, niveauNumero: number, semestres: SemestreDraft[]): Promise<Record<string, string>> {
+      const { data: existingSemestres } = await supabase.from("semestres").select("id, ordre").eq("niveau_id", niveauId);
+      const keepIds = new Set<string>();
+      const idByKey: Record<string, string> = {};
+      for (const s of semestres) {
+        const creditsCible = s.credits_cible.trim() ? Number(s.credits_cible) : null;
+        let semestreId = s.id;
+        if (semestreId) {
+          await supabase.from("semestres").update({ ordre: s.ordre, credits_cible: creditsCible }).eq("id", semestreId);
+        } else {
+          const { data: createdSem, error } = await supabase
+            .from("semestres")
+            .insert({ niveau_id: niveauId, ordre: s.ordre, credits_cible: creditsCible })
+            .select("id").single();
+          if (error || !createdSem) throw new Error(en ? `Semester ${s.ordre} (level ${niveauNumero}): ${error?.message || "failed"}` : `Semestre ${s.ordre} (niveau ${niveauNumero}) : ${error?.message || "échec"}`);
+          semestreId = createdSem.id;
+        }
+        keepIds.add(semestreId!);
+        idByKey[semestreKey(niveauNumero, s.ordre)] = semestreId!;
+      }
+      for (const existing of existingSemestres || []) {
+        if (!keepIds.has(existing.id)) await supabase.from("semestres").delete().eq("id", existing.id);
+      }
+      return idByKey;
     }
 
     async function saveClasses(list: ClasseDraft[], niveauId: string | null, attachFiliereId?: string | null) {
@@ -1687,6 +1790,7 @@ function NouveauProgrammeForm() {
       const keptClasseIds: string[] = [];
       const keptMatiereIds: string[] = [];
       const niveauIdByAnnee: Record<number, string> = {};
+      const semestreIdByKey: Record<string, string> = {};
 
       for (const n of niveaux) {
         let niveauId = n.id ?? null;
@@ -1708,15 +1812,35 @@ function NouveauProgrammeForm() {
 
         await saveClasses(n.classes, niveauId);
         n.classes.forEach((c) => c.id && keptClasseIds.push(c.id));
+
+        if (isUniversityLmd) {
+          const idByKey = await saveNiveauSemestres(niveauId, n.numero, n.semestres);
+          Object.assign(semestreIdByKey, idByKey);
+        }
       }
 
-      for (const m of matieresProgram) {
-        for (const annee of m.niveauNumeros || []) {
-          const niveauId = niveauIdByAnnee[annee];
-          if (!niveauId) continue;
-          const existing = m.existingByNiveau?.[annee];
-          const savedId = await saveMatiereRow(m, niveauId, annee, existing?.fm_id ?? null, existing?.initialFormateurIds);
-          if (savedId) keptMatiereIds.push(savedId);
+      if (isUniversityLmd) {
+        for (const m of matieresProgram) {
+          for (const semKey of m.semestreKeys || []) {
+            const semestreId = semestreIdByKey[semKey];
+            if (!semestreId) continue;
+            const niveauNumero = Number(semKey.split(":")[0]);
+            const niveauId = niveauIdByAnnee[niveauNumero];
+            if (!niveauId) continue;
+            const existing = m.existingBySemestre?.[semKey];
+            const savedId = await saveMatiereRow(m, niveauId, niveauNumero, existing?.fm_id ?? null, existing?.initialFormateurIds, semestreId);
+            if (savedId) keptMatiereIds.push(savedId);
+          }
+        }
+      } else {
+        for (const m of matieresProgram) {
+          for (const annee of m.niveauNumeros || []) {
+            const niveauId = niveauIdByAnnee[annee];
+            if (!niveauId) continue;
+            const existing = m.existingByNiveau?.[annee];
+            const savedId = await saveMatiereRow(m, niveauId, annee, existing?.fm_id ?? null, existing?.initialFormateurIds);
+            if (savedId) keptMatiereIds.push(savedId);
+          }
         }
       }
 
@@ -1855,9 +1979,12 @@ function NouveauProgrammeForm() {
         formateurIds: string[],
         rawCoeff: number | string = 1,
         rawMaxScore: number | string = 20,
+        semestreId?: string | null,
+        rawCredits?: number | string,
       ) {
         const coeff = Number(rawCoeff) > 0 ? Number(rawCoeff) : 1;
         const maxScore = Number(rawMaxScore) > 0 ? Number(rawMaxScore) : 20;
+        const credits = isUniversityLmd && rawCredits !== undefined && String(rawCredits).trim() ? Number(rawCredits) : null;
         const { data: fm, error: fmErr } = await supabase
           .from("filiere_matieres")
           .insert({
@@ -1868,6 +1995,7 @@ function NouveauProgrammeForm() {
             obligatoire: true,
             coefficient: coeff,
             max_score: maxScore,
+            ...(isUniversityLmd ? { credits, semestre_id: semestreId ?? null } : {}),
           })
           .select("id").single();
         if (fmErr || !fm) throw new Error(en ? `Subject not saved: ${fmErr?.message || "insertion rejected"}` : `Matière non enregistrée : ${fmErr?.message || "insertion refusée"}`);
@@ -1877,8 +2005,24 @@ function NouveauProgrammeForm() {
         }
       }
 
+      /** Crée les semestres d'un niveau LMD (création pure, pas de diffing) et renvoie une map `${niveauNumero}:${ordre}` -> semestre_id. */
+      async function saveNewNiveauSemestres(niveauId: string, niveauNumero: number, semestres: SemestreDraft[]): Promise<Record<string, string>> {
+        const idByKey: Record<string, string> = {};
+        for (const s of semestres) {
+          const creditsCible = s.credits_cible.trim() ? Number(s.credits_cible) : null;
+          const { data: createdSem, error } = await supabase
+            .from("semestres")
+            .insert({ niveau_id: niveauId, ordre: s.ordre, credits_cible: creditsCible })
+            .select("id").single();
+          if (error || !createdSem) throw new Error(en ? `Semester ${s.ordre} (level ${niveauNumero}): ${error?.message || "failed"}` : `Semestre ${s.ordre} (niveau ${niveauNumero}) : ${error?.message || "échec"}`);
+          idByKey[semestreKey(niveauNumero, s.ordre)] = createdSem.id;
+        }
+        return idByKey;
+      }
+
       if (type === "cursus") {
         const niveauIdByAnnee: Record<number, string> = {};
+        const semestreIdByKey: Record<string, string> = {};
         for (const n of niveaux) {
           const { data: niveauId, error: nivErr } = await supabase.rpc("ensure_niveau", { p_filiere_id: filiereId, p_annee: n.numero });
           if (nivErr || !niveauId) throw new Error(en ? `Level ${n.numero} was not created: ${nivErr?.message || "failed"}` : `Niveau ${n.numero} non créé : ${nivErr?.message || "échec"}`);
@@ -1897,22 +2041,51 @@ function NouveauProgrammeForm() {
             if (gErr || !newGroupe) throw new Error(en ? `Classroom “${classeNom}” was not created: ${gErr?.message}` : `Salle « ${classeNom} » non créée : ${gErr?.message}`);
             await supabase.rpc("ensure_groupe_room", { p_groupe_id: newGroupe.id, p_center_id: centerId });
           }
+
+          if (isUniversityLmd) {
+            const idByKey = await saveNewNiveauSemestres(niveauId as string, n.numero, n.semestres);
+            Object.assign(semestreIdByKey, idByKey);
+          }
         }
 
-        for (const m of matieresProgram) {
-          const disciplineId = await resolveDisciplineId(m);
-          if (!disciplineId) continue;
-          for (const annee of m.niveauNumeros || []) {
-            const niveauId = niveauIdByAnnee[annee];
-            if (!niveauId) continue;
-            await saveMatiereAndFormateurs(
-              disciplineId,
-              niveauId,
-              annee,
-              m.formateurIds,
-              m.coefficient,
-              m.max_score,
-            );
+        if (isUniversityLmd) {
+          for (const m of matieresProgram) {
+            const disciplineId = await resolveDisciplineId(m);
+            if (!disciplineId) continue;
+            for (const semKey of m.semestreKeys || []) {
+              const semestreId = semestreIdByKey[semKey];
+              if (!semestreId) continue;
+              const niveauNumero = Number(semKey.split(":")[0]);
+              const niveauId = niveauIdByAnnee[niveauNumero];
+              if (!niveauId) continue;
+              await saveMatiereAndFormateurs(
+                disciplineId,
+                niveauId,
+                niveauNumero,
+                m.formateurIds,
+                m.coefficient,
+                m.max_score,
+                semestreId,
+                m.credits,
+              );
+            }
+          }
+        } else {
+          for (const m of matieresProgram) {
+            const disciplineId = await resolveDisciplineId(m);
+            if (!disciplineId) continue;
+            for (const annee of m.niveauNumeros || []) {
+              const niveauId = niveauIdByAnnee[annee];
+              if (!niveauId) continue;
+              await saveMatiereAndFormateurs(
+                disciplineId,
+                niveauId,
+                annee,
+                m.formateurIds,
+                m.coefficient,
+                m.max_score,
+              );
+            }
           }
         }
       } else {
@@ -2496,6 +2669,67 @@ function NouveauProgrammeForm() {
           </ProgramSection>
         )}
 
+        {isUniversityLmd && (
+          <ProgramSection
+            icon={GraduationCap}
+            title={en ? "Semesters and credits" : "Semestres et crédits"}
+            description={en ? "Number of semesters per level (configurable), and the target ECTS credits per semester." : "Nombre de semestres par niveau (configurable), et la cible de crédits ECTS par semestre."}
+          >
+            <div className="flex gap-1.5 flex-wrap mb-4">
+              {niveaux.map((n) => (
+                <button
+                  key={n.numero}
+                  type="button"
+                  onClick={() => setExpandedNiveau(n.numero)}
+                  className={`px-4 h-11 rounded-lg text-sm font-semibold ${
+                    expandedNiveau === n.numero ? "text-white" : "bg-white text-neutral-600 border border-black/[0.08]"
+                  }`}
+                  style={expandedNiveau === n.numero ? { backgroundColor: BLUE } : undefined}
+                >
+                  {en ? "Level" : "Niveau"} {n.numero}
+                </button>
+              ))}
+            </div>
+            {niveauActuel && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <label className={FIELD_LABEL}>{en ? "Number of semesters" : "Nombre de semestres"}</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={niveauActuel.semestres.length}
+                    onChange={(e) => {
+                      const count = Math.max(1, Math.min(4, parseInt(e.target.value.replace(/[^0-9]/g, "")) || 1));
+                      const next = Array.from({ length: count }, (_, i) => niveauActuel.semestres[i] || defaultSemestre(i + 1));
+                      updateNiveau(niveauActuel.numero, { semestres: next });
+                    }}
+                    className={`${FIELD_INPUT_SM} w-20 text-center`}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {niveauActuel.semestres.map((s, idx) => (
+                    <div key={s.id || idx}>
+                      <label className={FIELD_LABEL}>{en ? "Semester" : "Semestre"} {s.ordre} — {en ? "credits target" : "cible crédits"}</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={s.credits_cible}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, "");
+                          const nextSemestres = niveauActuel.semestres.map((sem, i) => (i === idx ? { ...sem, credits_cible: raw } : sem));
+                          updateNiveau(niveauActuel.numero, { semestres: nextSemestres });
+                        }}
+                        placeholder="30"
+                        className={FIELD_INPUT_SM}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </ProgramSection>
+        )}
+
         <ProgramSection icon={Tag} title={en ? "Pricing" : "Tarification"} description={en ? "Training price, additional fees, total, and payment schedule." : "Prix de formation, frais supplémentaires intitulés, total et échéancier."}>
           {type === "formation_courte" ? (
             <>
@@ -2776,8 +3010,11 @@ function NouveauProgrammeForm() {
                       <div className="min-w-0">
                         <p className="text-xs font-black truncate" style={{ color: BLUE }}>{matiereDisplayName(m)}</p>
                         <p className="text-[10px] text-neutral-400 font-medium mt-0.5">
-                          {en ? "Levels" : "Niv."} {(m.niveauNumeros || []).join(", ") || "—"}
+                          {isUniversityLmd
+                            ? `${en ? "Semesters" : "Sem."} ${(m.semestreKeys || []).map((k) => k.split(":")[1]).join(", ") || "—"}`
+                            : `${en ? "Levels" : "Niv."} ${(m.niveauNumeros || []).join(", ") || "—"}`}
                           {` · /${m.max_score || 20} · ×${m.coefficient || 1}`}
+                          {isUniversityLmd && m.credits !== undefined && m.credits !== "" ? ` · ${m.credits} cr.` : ""}
                           {m.formateurIds.length > 0 ? ` · ${m.formateurIds.length} formateur${m.formateurIds.length > 1 ? "s" : ""}` : " · formateur optionnel"}
                         </p>
                       </div>
@@ -2844,25 +3081,45 @@ function NouveauProgrammeForm() {
                     </div>
                   )}
                   <div>
-                    <p className="text-[9px] font-black uppercase text-neutral-400 mb-2">{en ? "Applicable levels" : "Niveaux concernés"}</p>
+                    <p className="text-[9px] font-black uppercase text-neutral-400 mb-2">
+                      {isUniversityLmd ? (en ? "Applicable semesters" : "Semestres concernés") : (en ? "Applicable levels" : "Niveaux concernés")}
+                    </p>
                     <div className="flex flex-wrap gap-2">
-                      {niveaux.map((n) => {
-                        const checked = (draftMatiereProgram.niveauNumeros || []).includes(n.numero);
-                        return (
-                          <button
-                            key={n.numero}
-                            type="button"
-                            onClick={() => toggleMatiereNiveau(draftMatiereProgram.key!, n.numero)}
-                            className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${checked ? "text-white border-transparent" : "bg-white border-neutral-200 text-neutral-500"}`}
-                            style={checked ? { backgroundColor: BLUE } : {}}
-                          >
-                            {en ? "Level" : "Niv."} {n.numero}
-                          </button>
-                        );
-                      })}
+                      {isUniversityLmd
+                        ? niveaux.flatMap((n) =>
+                            n.semestres.map((s) => {
+                              const key = semestreKey(n.numero, s.ordre);
+                              const checked = (draftMatiereProgram.semestreKeys || []).includes(key);
+                              return (
+                                <button
+                                  key={key}
+                                  type="button"
+                                  onClick={() => toggleMatiereSemestre(draftMatiereProgram.key!, key)}
+                                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${checked ? "text-white border-transparent" : "bg-white border-neutral-200 text-neutral-500"}`}
+                                  style={checked ? { backgroundColor: BLUE } : {}}
+                                >
+                                  {en ? "Lvl" : "Niv."} {n.numero} · {en ? "Sem." : "Sem."} {s.ordre}
+                                </button>
+                              );
+                            }),
+                          )
+                        : niveaux.map((n) => {
+                            const checked = (draftMatiereProgram.niveauNumeros || []).includes(n.numero);
+                            return (
+                              <button
+                                key={n.numero}
+                                type="button"
+                                onClick={() => toggleMatiereNiveau(draftMatiereProgram.key!, n.numero)}
+                                className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase border ${checked ? "text-white border-transparent" : "bg-white border-neutral-200 text-neutral-500"}`}
+                                style={checked ? { backgroundColor: BLUE } : {}}
+                              >
+                                {en ? "Level" : "Niv."} {n.numero}
+                              </button>
+                            );
+                          })}
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={isUniversityLmd ? "grid grid-cols-3 gap-3" : "grid grid-cols-2 gap-3"}>
                     <div>
                       <p className={FIELD_LABEL}>{en ? "Maximum score" : "Barème (sur)"}</p>
                       <input
@@ -2891,6 +3148,22 @@ function NouveauProgrammeForm() {
                         className={FIELD_INPUT}
                       />
                     </div>
+                    {isUniversityLmd && (
+                      <div>
+                        <p className={FIELD_LABEL}>{en ? "ECTS credits" : "Crédits ECTS"}</p>
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          value={draftMatiereProgram.credits === 0 ? "" : (draftMatiereProgram.credits ?? "")}
+                          onChange={(e) => {
+                            const raw = e.target.value.replace(/[^0-9]/g, "");
+                            updateMatiereProgram(draftMatiereProgram.key!, { credits: raw === "" ? "" : Number(raw) });
+                          }}
+                          placeholder="6"
+                          className={FIELD_INPUT}
+                        />
+                      </div>
+                    )}
                   </div>
                   <FormateursBlock
                     trainers={trainers}
