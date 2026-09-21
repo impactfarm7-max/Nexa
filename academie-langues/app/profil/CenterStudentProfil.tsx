@@ -622,7 +622,7 @@ export default function CenterStudentProfil() {
           {account.creditsStatus && (
             <Row
               icon={GraduationCap}
-              label={t("centre", "lmdCreditsSummary")}
+              label={locale === "en" ? "Program credits" : "Crédits du parcours"}
               value={`${account.creditsStatus.acquiredCredits}/${account.creditsStatus.totalCredits}`}
             />
           )}

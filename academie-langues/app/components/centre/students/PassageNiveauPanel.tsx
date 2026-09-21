@@ -31,6 +31,8 @@ type Preview = {
   has_next_niveau: boolean;
   can_decide: boolean;
   can_reopen_ajourne: boolean;
+  lmd?: { level: { totalCredits: number; acquiredCredits: number; pendingCount: number; failedCount: number }; debtCount: number; complete: boolean } | null;
+  progression_semesters?: { admis: { id: string; nom: string | null; ordre: number }[]; redouble: { id: string; nom: string | null; ordre: number }[] } | null;
 };
 
 type Props = {
@@ -47,6 +49,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
   const [academicYear, setAcademicYear] = useState("");
   const [reason, setReason] = useState("");
   const [doneMsg, setDoneMsg] = useState("");
+  const [targetSemesters, setTargetSemesters] = useState({ admis: "", redouble: "" });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -68,6 +71,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
       setPreview(data);
       setAcademicYear(data.proposed_academic_year || "");
       setReason("");
+      setTargetSemesters({ admis: "", redouble: "" });
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("centre", "passageError"));
       setPreview(null);
@@ -80,6 +84,10 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
 
   const decide = async (decision: PassageDecision) => {
     if (!preview?.can_decide) return;
+    if (decision !== "ajourne" && preview.progression_semesters?.[decision].length && !targetSemesters[decision]) {
+      setError(locale === "en" ? "Select the target semester for this decision." : "Choisissez le semestre cible pour cette décision.");
+      return;
+    }
     if (decision === "admis" && !preview.has_next_niveau) {
       setError(t("centre", "passageNoNextLevel"));
       return;
@@ -105,6 +113,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
           decision,
           reason: reason.trim() || undefined,
           academic_year: academicYear.trim() || undefined,
+          semestre_id: decision === "ajourne" ? null : targetSemesters[decision] || null,
         }),
       });
       const data = await res.json();
@@ -207,7 +216,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
           </h2>
         </div>
         <p className="text-sm text-neutral-500 mt-3 leading-relaxed font-medium">
-          {t("centre", "passageDescription", { level: preview.niveau_annee != null ? ` ${preview.niveau_annee}` : "" })}
+          {preview.lmd ? (locale === "en" ? "A proposal based on this level's UE credits. The final decision is yours." : "Une proposition fondée sur les crédits des UE du niveau. Vous confirmez la décision finale.") : t("centre", "passageDescription", { level: preview.niveau_annee != null ? ` ${preview.niveau_annee}` : "" })}
         </p>
       </div>
 
@@ -215,7 +224,11 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
         className="space-y-5 w-full min-w-0 rounded-xl border border-black/[0.06] p-5 sm:p-6"
         style={{ backgroundColor: SURFACE }}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {preview.lmd ? <div className="rounded-xl border border-black/[0.06] bg-white p-4 space-y-2">
+          <p className="font-bold">{locale === "en" ? "Level credits" : "Crédits du niveau"} : {preview.lmd.level.acquiredCredits}/{preview.lmd.level.totalCredits}</p>
+          <p className="text-sm">{preview.lmd.level.pendingCount} {locale === "en" ? "UE awaiting assessment" : "UE à évaluer"} · {preview.lmd.level.failedCount} {locale === "en" ? "failed UE" : "UE non validées"}</p>
+          {preview.lmd.complete && <p className="text-sm text-emerald-700">{locale === "en" ? "All program UE validated. Review the diploma below." : "Toutes les UE du parcours sont validées. Examinez la délivrance du diplôme ci-dessous."}</p>}
+        </div> : <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="rounded-xl border border-black/[0.06] bg-white p-4">
             <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "passageAverage")}</p>
             <p className="text-xl font-extrabold tracking-tight mt-1" style={{ color: BLUE }}>
@@ -228,7 +241,7 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
               {preview.seuil_passage != null ? preview.seuil_passage : t("centre", "passageUndefined")}
             </p>
           </div>
-        </div>
+        </div>}
 
         {preview.suggestion && preview.can_decide && (
           <p className="text-sm font-medium text-neutral-600">
@@ -285,6 +298,13 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
                 placeholder={t("centre", "passageReasonPlaceholder")}
               />
             </div>
+            {preview.progression_semesters && (["admis", "redouble"] as const).map(decision => preview.progression_semesters![decision].length > 0 && <label key={decision} className={FIELD_LABEL}>
+              {decision === "admis" ? (locale === "en" ? "Semester if admitted" : "Semestre en cas d'admission") : (locale === "en" ? "Semester if repeating" : "Semestre en cas de redoublement")}
+              <select className={FIELD_INPUT} value={targetSemesters[decision]} disabled={saving} onChange={e => setTargetSemesters({ ...targetSemesters, [decision]: e.target.value })}>
+                <option value="">{locale === "en" ? "Select" : "Choisir"}</option>
+                {preview.progression_semesters![decision].sort((a,b) => a.ordre-b.ordre).map(s => <option key={s.id} value={s.id}>{s.nom || `${locale === "en" ? "Semester" : "Semestre"} ${s.ordre}`}</option>)}
+              </select>
+            </label>)}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"

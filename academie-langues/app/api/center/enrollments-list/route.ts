@@ -151,6 +151,13 @@ export async function GET(req: Request) {
     .eq("id", ctx!.centerId)
     .maybeSingle();
   const lmdThresholdPct = resolveLmdValidationThreshold(centerRow?.lmd_validation_threshold_pct ?? null);
+  const creditSummaries = new Map<string, ReturnType<typeof computeEnrollmentCreditsStatus>>();
+  const creditsFor = (enrollment: EnrollRow) => {
+    if (ctx!.centerType !== "universite" || enrollment.filieres?.type !== "cursus") return null;
+    const key = `${enrollment.student_id}:${enrollment.filiere_id}`;
+    if (!creditSummaries.has(key)) creditSummaries.set(key, computeEnrollmentCreditsStatus(supabaseAdmin, enrollment.id, lmdThresholdPct));
+    return creditSummaries.get(key)!;
+  };
 
   const students = await Promise.all(profileRows.map(async (p) => {
     const ses = enrollRows.filter((e) => e.student_id === p.id);
@@ -193,7 +200,7 @@ export async function GET(req: Request) {
           tuition_fee: Number(e.tuition_fee) || 0,
           status: e.status ?? "draft",
           enrolled_at: e.enrolled_at,
-          creditsStatus: e.semestre_id ? await computeEnrollmentCreditsStatus(supabaseAdmin, e.id, e.semestre_id, lmdThresholdPct) : null,
+          creditsStatus: await creditsFor(e),
         };
       })),
     };

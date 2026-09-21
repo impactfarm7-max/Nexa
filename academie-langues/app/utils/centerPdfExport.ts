@@ -973,6 +973,7 @@ export type BulletinNotesPdfParams = {
   niveauLabel?: string | null;
   classeLabel?: string | null;
   moyenneGenerale: string;
+  creditsSummary?: string;
   /** En-têtes colonnes après « Matière » (périodes / moy. groupes / Moy. gén.) */
   columnHeaders: string[];
   rows: {
@@ -1014,6 +1015,10 @@ export async function downloadBulletinNotesPdf(params: BulletinNotesPdfParams) {
   doc.setTextColor(...cfg.blueRgb);
   doc.text(`${isEn ? "Overall average" : "Moyenne générale"} (/20) : ${params.moyenneGenerale}`, 14, y);
   y += 8;
+  if (params.creditsSummary) {
+    doc.text(params.creditsSummary, 14, y);
+    y += 7;
+  }
 
   autoTable(doc, {
     startY: y,

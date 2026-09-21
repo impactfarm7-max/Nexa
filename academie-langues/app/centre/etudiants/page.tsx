@@ -17,6 +17,7 @@ import ImportStudentsCsvModal from "@/app/components/centre/students/ImportStude
 import StudentIdentityTab from "@/app/components/centre/students/StudentIdentityTab";
 import StudentFinanceTab from "@/app/components/centre/students/StudentFinanceTab";
 import PassageNiveauPanel from "@/app/components/centre/students/PassageNiveauPanel";
+import LmdAcademicPanel from "@/app/components/centre/students/LmdAcademicPanel";
 import BulletinDynamique from "@/app/components/BulletinDynamique";
 import {
   passageDecisionLabel,
@@ -794,7 +795,7 @@ export default function CenterStudentsPage() {
                           {s.matricule || "—"}
                           {primaryEnr?.creditsStatus && (
                             <p className="text-[10px] text-neutral-400 font-medium mt-0.5">
-                              {primaryEnr.creditsStatus.acquiredCredits}/{primaryEnr.creditsStatus.totalCredits} cr.
+                              {primaryEnr.creditsStatus.acquiredCredits}/{primaryEnr.creditsStatus.totalCredits} cr. · {locale === "en" ? "Program" : "Parcours"}
                             </p>
                           )}
                         </td>
@@ -1417,6 +1418,8 @@ function GradesTab({
           onDone={() => { onPassageDone?.(); }}
         />
       )}
+
+      <LmdAcademicPanel enrollmentId={enrollment.id} onChanged={() => { void load(); onPassageDone?.(); }} />
 
       <section className="grid grid-cols-1 lg:grid-cols-[minmax(180px,240px)_minmax(0,1fr)] gap-5 sm:gap-8 py-8 border-b border-black/[0.06] first:pt-2 last:border-b-0">
         <div className="lg:sticky lg:top-4 self-start min-w-0">

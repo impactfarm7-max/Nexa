@@ -17,7 +17,8 @@ import {
   formatGradeList,
 } from "@/app/utils/gradeObservations";
 import { useI18n } from "@/app/i18n/I18nProvider";
-import { computeCreditsStatus, computeUeFinalStatus, isRattrapageGrade, resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
+import { computeCreditsStatus, resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
+import { evaluateLmdUe } from "@/app/utils/lmd-results";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -309,24 +310,12 @@ export default function BulletinDynamique({
       const grades = gradesForMatiereInFilter(m.filiere_matiere_id);
       const principal = grades.filter((g) => isPrincipalGrade(g.title));
       const supl = grades.filter((g) => !isPrincipalGrade(g.title));
-      const finale = matiereOverall(m);
+      const lmdStatus = m.credits != null
+        ? evaluateLmdUe(grades, m.max_score, m.grade_weights, resolveLmdValidationThreshold(lmdThresholdPct))
+        : null;
+      const finale = lmdStatus ? lmdStatus.finalScore : matiereOverall(m);
       const finale20 =
         finale === null ? null : normalizeScore(finale, m.max_score, 20);
-
-      let lmdStatus: { validated: boolean } | null = null;
-      if (m.credits != null) {
-        const normalGrades = grades.filter((g) => !isRattrapageGrade(g.title));
-        const rattrapageGrades = grades.filter((g) => isRattrapageGrade(g.title));
-        const normalScore = averageGradesOnScale(normalGrades, m.max_score, m.grade_weights);
-        const rattrapageScore = averageGradesOnScale(rattrapageGrades, m.max_score, null);
-        lmdStatus = computeUeFinalStatus({
-          normalScore,
-          normalMaxScore: m.max_score,
-          rattrapageScore,
-          rattrapageMaxScore: m.max_score,
-          thresholdPct: resolveLmdValidationThreshold(lmdThresholdPct),
-        });
-      }
 
       return {
         id: m.filiere_matiere_id,
@@ -355,10 +344,10 @@ export default function BulletinDynamique({
 
   const moyenneGenerale = weightedMean(
     matieres.map((m) => {
-      const raw = matiereOverall(m);
+      const raw = tableRows.find(row => row.id === m.filiere_matiere_id)?.finale20 ?? null;
       if (raw === null) return { value: null as number | null, weight: m.coefficient };
       return {
-        value: normalizeScore(raw, m.max_score, 20),
+        value: raw,
         weight: m.coefficient,
       };
     }),
@@ -383,10 +372,11 @@ export default function BulletinDynamique({
         niveauLabel: niveauAnnee != null ? `${t("centre", "bulletinLevel")} ${niveauAnnee}` : null,
         classeLabel: studentClasse || null,
         moyenneGenerale: moyenneGenerale !== null ? moyenneGenerale.toFixed(2) : "—",
+        creditsSummary: creditsStatus ? t("centre", "lmdCreditsTotal", { acquired: String(creditsStatus.acquiredCredits), total: String(creditsStatus.totalCredits) }) : undefined,
         columnHeaders: [t("centre", "bulletinPrimaryGrades"), t("centre", "bulletinAdditionalGrades"), t("centre", "bulletinFinalGrade"), t("centre", "bulletinObservation")],
         rows: tableRows.map((r) => ({
           matiereName: r.matiereName,
-          coeffLabel: r.coeffLabel,
+          coeffLabel: r.credits != null ? `${r.coeffLabel}\n${r.credits} cr. — ${r.lmdValidated ? t("centre", "lmdValidatedBadge") : t("centre", "lmdNotValidatedBadge")}` : r.coeffLabel,
           cells: [r.principalText, r.suplText, r.finaleText, r.observation],
         })),
         config: docConfig || undefined,

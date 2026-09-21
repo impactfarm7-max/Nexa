@@ -19,6 +19,8 @@ import {
   sumPaymentPlanFees,
 } from "@/app/utils/short-pricing";
 import { parseGradeWeights } from "@/app/utils/gradesCalc";
+import { loadLmdProgress } from "@/app/utils/lmd-progress.server";
+import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 
 type PassageLocale = "fr" | "en";
 
@@ -247,6 +249,23 @@ export async function POST(req: NextRequest) {
       })),
     );
 
+    // Validate the LMD destination before closing the current enrollment.
+    let targetSemestreId: string | null = null;
+    if (ctx!.centerType === "universite" && decision !== "ajourne") {
+      let destinationLevel = source.niveau_id;
+      if (decision === "admis") {
+        const { data: nextLevel, error: nextError } = await supabaseAdmin.from("niveaux").select("id").eq("filiere_id", source.filiere_id).eq("annee", (niveau.annee ?? 0) + 1).maybeSingle();
+        if (nextError || !nextLevel) return jsonErr(locale, 400, "Niveau suivant introuvable.", "Next level not found.");
+        destinationLevel = nextLevel.id;
+      }
+      const { data: semesters, error: semesterError } = await supabaseAdmin.from("semestres").select("id").eq("niveau_id", destinationLevel);
+      if (semesterError) return jsonErr(locale, 500, "Impossible de vérifier le semestre cible.", "Unable to verify target semester.");
+      if (semesters?.length) {
+        targetSemestreId = semesters.find(s => s.id === body.semestre_id)?.id || null;
+        if (!targetSemestreId) return jsonErr(locale, 400, "Choisissez le semestre de la nouvelle inscription.", "Choose the new enrollment semester.");
+      }
+    }
+
     // Clôturer la source
     const closePayload: Record<string, unknown> = {
       status: "completed",
@@ -348,12 +367,16 @@ export async function POST(req: NextRequest) {
     });
 
     const resolvedCampus = campusId || source.campus_id;
-    const resolvedGroupe = await resolveSignupGroupeId(
+    let resolvedGroupe = targetSemestreId ? null : await resolveSignupGroupeId(
       supabaseAdmin,
       source.filiere_id,
       groupeId || null,
       targetNiveauId,
     );
+    if (targetSemestreId) {
+      const { data: semesterGroups } = await supabaseAdmin.from("groupes").select("id").eq("filiere_id", source.filiere_id).eq("semestre_id", targetSemestreId);
+      resolvedGroupe = semesterGroups?.find(g => g.id === groupeId)?.id || (semesterGroups?.length === 1 ? semesterGroups[0].id : null);
+    }
 
     const { data: newEnrollmentId, error: enrollErr } = await supabaseAdmin.rpc(
       "enroll_student",
@@ -397,6 +420,7 @@ export async function POST(req: NextRequest) {
       .update({
         status: "active",
         previous_enrollment_id: enrollmentId,
+        ...(targetSemestreId ? { semestre_id: targetSemestreId } : {}),
         academic_year: academicYear || null,
         tuition_fee: tuition,
       })
@@ -539,9 +563,20 @@ export async function GET(req: NextRequest) {
     })),
   );
 
-  const suggestion = suggestPassage(moyenne, niveau?.seuil_passage);
+  let lmdProgress = null;
+  if (ctx!.centerType === "universite") {
+    try {
+      const { data: center, error: thresholdError } = await supabaseAdmin.from("centers").select("lmd_validation_threshold_pct").eq("id", ctx!.centerId).single();
+      if (thresholdError) throw thresholdError;
+      lmdProgress = await loadLmdProgress(supabaseAdmin, enrollmentId, resolveLmdValidationThreshold(center.lmd_validation_threshold_pct));
+    } catch {
+      return jsonErr(locale, 500, "Impossible de calculer les crédits LMD.", "Unable to calculate LMD credits.");
+    }
+  }
+  const suggestion = lmdProgress ? lmdProgress.suggestion : suggestPassage(moyenne, niveau?.seuil_passage);
 
   let hasNextNiveau = false;
+  let nextNiveauId: string | null = null;
   if (niveau?.annee != null) {
     const { data: nextNiv } = await supabaseAdmin
       .from("niveaux")
@@ -550,6 +585,7 @@ export async function GET(req: NextRequest) {
       .eq("annee", niveau.annee + 1)
       .maybeSingle();
     hasNextNiveau = !!nextNiv;
+    nextNiveauId = nextNiv?.id || null;
   }
 
   return NextResponse.json({
@@ -564,6 +600,11 @@ export async function GET(req: NextRequest) {
     seuil_passage: niveau?.seuil_passage ?? null,
     moyenne,
     suggestion,
+    lmd: lmdProgress ? { level: lmdProgress.level, debtCount: lmdProgress.debts.length, complete: lmdProgress.complete } : null,
+    progression_semesters: lmdProgress ? {
+      admis: lmdProgress.semesters.filter(s => s.niveau_id === nextNiveauId),
+      redouble: lmdProgress.semesters.filter(s => s.niveau_id === source.niveau_id),
+    } : null,
     has_next_niveau: hasNextNiveau,
     can_decide: !source.passage_decision && source.status !== "cancelled",
     can_reopen_ajourne: source.passage_decision === "ajourne",

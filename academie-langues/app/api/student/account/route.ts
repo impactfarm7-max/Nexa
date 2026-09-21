@@ -231,11 +231,10 @@ async function getStudentAccount(req: Request) {
     tutorUnlockAt = computeTutorUnlockAt(fallbackStart);
   }
 
-  const creditsStatus = enrollment?.semestre_id
+  const creditsStatus = enrollment && center.center_type === "universite"
     ? await computeEnrollmentCreditsStatus(
         supabaseAdmin,
         enrollment.id,
-        enrollment.semestre_id,
         resolveLmdValidationThreshold((center as { lmd_validation_threshold_pct?: number | null }).lmd_validation_threshold_pct ?? null),
       )
     : null;

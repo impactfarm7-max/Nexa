@@ -22,7 +22,8 @@ import {
   scoreToneTextClass,
 } from "@/app/utils/gradesCalc";
 import { downloadClassGradeSheetPdf } from "@/app/utils/centerPdfExport";
-import { computeUeFinalStatus, isRattrapageGrade, resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
+import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
+import { evaluateLmdUe } from "@/app/utils/lmd-results";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { ACTION_TONE } from "@/app/utils/action-tones";
@@ -1888,15 +1889,12 @@ export default function GradeBookPage() {
                               className={scoreFieldClass(row.new_score, bareme, row.dirty, notesLocked)}
                             />
                             {isUniversityLmd && selectedSubject?.credits != null && (() => {
-                              const rattrapageCol = suplColumns.find((c) => isRattrapageGrade(c.title));
-                              const rattrapageCell = rattrapageCol ? row.extras.find((ex) => ex.colKey === rattrapageCol.colKey && !ex.deleted) : undefined;
-                              const status = computeUeFinalStatus({
-                                normalScore: row.new_score.trim() ? Number(row.new_score) : null,
-                                normalMaxScore: bareme,
-                                rattrapageScore: rattrapageCell?.score.trim() ? Number(rattrapageCell.score) : null,
-                                rattrapageMaxScore: bareme,
-                                thresholdPct: resolveLmdValidationThreshold(lmdThresholdPct),
-                              });
+                              const grades = row.new_score.trim() ? [{ score: Number(row.new_score), max_score: bareme, title: null as string | null }] : [];
+                              for (const col of suplColumns) {
+                                const cell = row.extras.find(ex => ex.colKey === col.colKey && !ex.deleted);
+                                if (cell?.score.trim()) grades.push({ score: Number(cell.score), max_score: bareme, title: col.title });
+                              }
+                              const status = evaluateLmdUe(grades, bareme, subjectWeights, resolveLmdValidationThreshold(lmdThresholdPct));
                               return (
                                 <span
                                   className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap ${
