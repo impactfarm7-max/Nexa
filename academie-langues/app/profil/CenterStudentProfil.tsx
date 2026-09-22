@@ -11,6 +11,8 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
+  Download,
+  FileText,
   GraduationCap,
   Hash,
   Lock,
@@ -65,6 +67,12 @@ import {
   PButton,
   useAccordion,
 } from "@/app/components/profile/ProfileKit";
+import {
+  downloadAttestationScolaritePdf,
+  downloadReleveNotesLmdPdf,
+  type ReleveNotesLmdRow,
+} from "@/app/utils/centerPdfExport";
+import type { DocumentExportConfig } from "@/app/utils/documentConfig";
 
 type StudentAccount = {
   user: { id: string; email: string | null; created_at: string | null };
@@ -159,6 +167,36 @@ type StudentAccount = {
   creditsStatus?: { totalCredits: number; acquiredCredits: number } | null;
 };
 
+type LmdUeResult = {
+  id: string;
+  semestre_id: string;
+  niveau_id: string;
+  credits: number;
+  name?: string;
+  validated: boolean;
+  assessed: boolean;
+  finalScore: number | null;
+  finalMaxScore: number;
+};
+
+type LmdProgressData = {
+  progress: {
+    results: LmdUeResult[];
+    semesters: { id: string; niveau_id: string; ordre: number; nom?: string | null }[];
+  } | null;
+  niveaux: { id: string; annee: number | null }[];
+  diploma: { number: string; issuedAt: string; acquiredCredits: number; totalCredits: number } | null;
+  studentName: string;
+  matricule: string | null;
+  centerName: string;
+  programName: string;
+  releveConfig: Partial<DocumentExportConfig>;
+  releveSignatures: { id: string; label: string; signatureUrl?: string | null }[];
+  attestationConfig: Partial<DocumentExportConfig>;
+  attestationSignatures: { id: string; label: string; signatureUrl?: string | null }[];
+  stampUrl: string | null;
+} | null;
+
 export default function CenterStudentProfil() {
   const { t, locale } = useI18n();
   const td = (key: string, values?: Record<string, string | number>) => t("dashboard", key, values);
@@ -196,6 +234,11 @@ export default function CenterStudentProfil() {
   const [logoutBusy, setLogoutBusy] = useState(false);
   const [canInstallApp, setCanInstallApp] = useState(false);
   const [installBusy, setInstallBusy] = useState(false);
+  const [lmdDocs, setLmdDocs] = useState<LmdProgressData>(null);
+  const [lmdDocsLoading, setLmdDocsLoading] = useState(false);
+  const [docScope, setDocScope] = useState<"semestre" | "niveau" | "parcours">("semestre");
+  const [docScopeId, setDocScopeId] = useState<string>("");
+  const [downloadingDoc, setDownloadingDoc] = useState<"releve" | "scolarite" | "diplome" | null>(null);
   const acc = useAccordion();
   const financeEn = locale === "en" && !isTcfCanadaCenter(account?.center.center_type);
   const financeLocale = financeEn ? "en-US" : "fr-FR";
@@ -258,6 +301,123 @@ export default function CenterStudentProfil() {
   useEffect(() => {
     void loadAccount();
   }, []);
+
+  useEffect(() => {
+    if (account?.center.center_type !== "universite") return;
+    (async () => {
+      setLmdDocsLoading(true);
+      try {
+        const headers = await authHeaders();
+        if (!headers) return;
+        const res = await fetch(`/api/student/lmd-progress?locale=${locale}`, { headers });
+        const json = await readJson(res);
+        if (!res.ok) return;
+        setLmdDocs(json as LmdProgressData);
+        const semesters = (json as LmdProgressData)?.progress?.semesters || [];
+        setDocScopeId(semesters.slice(-1)[0]?.id || "");
+      } finally {
+        setLmdDocsLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ne relance que si le type de centre change
+  }, [account?.center.center_type]);
+
+  const lmdScopeRows = (): ReleveNotesLmdRow[] => {
+    const results = lmdDocs?.progress?.results || [];
+    const filtered = docScope === "parcours"
+      ? results
+      : docScope === "niveau"
+        ? results.filter((r) => r.niveau_id === docScopeId)
+        : results.filter((r) => r.semestre_id === docScopeId);
+    return filtered.map((r) => ({
+      matiereName: r.name || "UE",
+      credits: r.credits,
+      finalScore: r.finalScore,
+      finalMaxScore: r.finalMaxScore,
+      validated: r.validated,
+      assessed: r.assessed,
+    }));
+  };
+
+  const lmdScopeLabel = () => {
+    if (docScope === "parcours") return locale === "en" ? "Full program" : "Parcours complet";
+    if (docScope === "niveau") {
+      const annee = lmdDocs?.niveaux.find((n) => n.id === docScopeId)?.annee;
+      return annee != null ? `${locale === "en" ? "Level" : "Niveau"} ${annee}` : "";
+    }
+    const sem = lmdDocs?.progress?.semesters.find((s) => s.id === docScopeId);
+    return sem ? `${locale === "en" ? "Semester" : "Semestre"} ${sem.ordre}` : "";
+  };
+
+  const downloadReleve = async () => {
+    if (!lmdDocs || downloadingDoc) return;
+    setDownloadingDoc("releve");
+    try {
+      const rows = lmdScopeRows();
+      const totalCredits = rows.reduce((n, r) => n + r.credits, 0);
+      const acquiredCredits = rows.filter((r) => r.validated).reduce((n, r) => n + r.credits, 0);
+      await downloadReleveNotesLmdPdf({
+        locale: locale === "en" ? "en" : "fr",
+        studentName: lmdDocs.studentName,
+        studentMatricule: lmdDocs.matricule,
+        programName: lmdDocs.programName,
+        scopeLabel: lmdScopeLabel(),
+        acquiredCredits,
+        totalCredits,
+        rows,
+        config: lmdDocs.releveConfig,
+        signatures: lmdDocs.releveSignatures,
+        stampUrl: lmdDocs.stampUrl,
+      });
+    } finally {
+      setDownloadingDoc(null);
+    }
+  };
+
+  const downloadScolarite = async () => {
+    if (!lmdDocs || downloadingDoc) return;
+    setDownloadingDoc("scolarite");
+    try {
+      const niveauId = lmdDocs.progress?.results[0]?.niveau_id;
+      const annee = lmdDocs.niveaux.find((n) => n.id === niveauId)?.annee;
+      await downloadAttestationScolaritePdf({
+        locale: locale === "en" ? "en" : "fr",
+        studentName: lmdDocs.studentName,
+        studentMatricule: lmdDocs.matricule,
+        programName: lmdDocs.programName,
+        niveauLabel: annee != null ? `${locale === "en" ? "Level" : "Niveau"} ${annee}` : null,
+        config: lmdDocs.attestationConfig,
+        signatures: lmdDocs.attestationSignatures,
+        stampUrl: lmdDocs.stampUrl,
+      });
+    } finally {
+      setDownloadingDoc(null);
+    }
+  };
+
+  const downloadDiplome = async () => {
+    if (!lmdDocs?.diploma || downloadingDoc) return;
+    setDownloadingDoc("diplome");
+    try {
+      const { jsPDF } = await import("jspdf");
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+      const center = (text: string, y: number, size = 12) => {
+        pdf.setFontSize(size);
+        pdf.text(text, pdf.internal.pageSize.getWidth() / 2, y, { align: "center" });
+      };
+      const diploma = lmdDocs.diploma;
+      center(lmdDocs.centerName, 20);
+      center(locale === "en" ? "DIPLOMA" : "DIPLÔME", 24, 16);
+      center(lmdDocs.programName, 40, 13);
+      center(lmdDocs.studentName, 55, 15);
+      center(`${diploma.acquiredCredits}/${diploma.totalCredits} ${locale === "en" ? "credits" : "crédits"}`, 68, 11);
+      center(`${locale === "en" ? "Issued on" : "Délivré le"} ${new Date(diploma.issuedAt).toLocaleDateString(locale === "en" ? "en-GB" : "fr-FR")}`, 80, 9);
+      center(diploma.number, 92, 8);
+      pdf.save(`${diploma.number}.pdf`);
+    } finally {
+      setDownloadingDoc(null);
+    }
+  };
 
   useEffect(() => {
     initPwaInstallCapture();
@@ -656,6 +816,109 @@ export default function CenterStudentProfil() {
           {account.profile.genre ? <Row icon={User} label={td("profilGender")} value={account.profile.genre} /> : null}
           <Row icon={Calendar} label={td("profilMemberSince")} value={formatDateFr(account.profile.created_at || account.user.created_at, locale)} />
         </Group>
+
+        {account.center.center_type === "universite" && (
+          <Group title={locale === "en" ? "Documents" : "Documents"}>
+            <div className="px-4 sm:px-5 py-3.5 space-y-3">
+              {lmdDocsLoading ? (
+                <p className="text-[13px] font-medium" style={{ color: "rgba(17,34,78,0.5)" }}>
+                  {locale === "en" ? "Loading…" : "Chargement…"}
+                </p>
+              ) : !lmdDocs?.progress ? (
+                <p className="text-[13px] font-medium" style={{ color: "rgba(17,34,78,0.5)" }}>
+                  {locale === "en" ? "No academic record yet." : "Aucun parcours disponible pour l'instant."}
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(["semestre", "niveau", "parcours"] as const).map((scope) => (
+                      <button
+                        key={scope}
+                        type="button"
+                        onClick={() => {
+                          setDocScope(scope);
+                          if (scope === "niveau") setDocScopeId(lmdDocs.niveaux.slice(-1)[0]?.id || "");
+                          else if (scope === "semestre") setDocScopeId(lmdDocs.progress!.semesters.slice(-1)[0]?.id || "");
+                          else setDocScopeId("");
+                        }}
+                        className="h-7 px-2.5 rounded-lg text-xs font-semibold border transition-colors"
+                        style={
+                          docScope === scope
+                            ? { backgroundColor: BRAND.blue, borderColor: BRAND.blue, color: "#fff" }
+                            : { backgroundColor: "#fff", borderColor: "rgba(17,34,78,0.12)", color: BRAND.blue }
+                        }
+                      >
+                        {scope === "semestre"
+                          ? (locale === "en" ? "Semester" : "Semestre")
+                          : scope === "niveau"
+                            ? (locale === "en" ? "Year" : "Année")
+                            : (locale === "en" ? "Full program" : "Parcours complet")}
+                      </button>
+                    ))}
+                  </div>
+                  {docScope !== "parcours" && (
+                    <select
+                      value={docScopeId}
+                      onChange={(e) => setDocScopeId(e.target.value)}
+                      className="w-full h-9 px-2.5 rounded-lg border text-[13px] font-semibold outline-none"
+                      style={{ borderColor: "rgba(17,34,78,0.12)", color: BRAND.blue }}
+                    >
+                      {docScope === "niveau"
+                        ? lmdDocs.niveaux.map((n) => (
+                            <option key={n.id} value={n.id}>
+                              {locale === "en" ? "Level" : "Niveau"} {n.annee}
+                            </option>
+                          ))
+                        : lmdDocs.progress.semesters.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {locale === "en" ? "Semester" : "Semestre"} {s.ordre}
+                            </option>
+                          ))}
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    onClick={downloadReleve}
+                    disabled={downloadingDoc !== null || (docScope !== "parcours" && !docScopeId)}
+                    className="w-full flex items-center justify-center gap-2 h-10 rounded-lg text-[13px] font-bold disabled:opacity-50"
+                    style={{ backgroundColor: BRAND.orange, color: "#fff" }}
+                  >
+                    <FileText size={15} />
+                    {downloadingDoc === "releve"
+                      ? (locale === "en" ? "Generating…" : "Génération…")
+                      : (locale === "en" ? "Download transcript" : "Télécharger le relevé de notes")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadScolarite}
+                    disabled={downloadingDoc !== null}
+                    className="w-full flex items-center justify-center gap-2 h-10 rounded-lg text-[13px] font-bold border disabled:opacity-50"
+                    style={{ borderColor: BRAND.blue, color: BRAND.blue }}
+                  >
+                    <Download size={15} />
+                    {downloadingDoc === "scolarite"
+                      ? (locale === "en" ? "Generating…" : "Génération…")
+                      : (locale === "en" ? "Download enrollment certificate" : "Télécharger l'attestation de scolarité")}
+                  </button>
+                  {lmdDocs.diploma && (
+                    <button
+                      type="button"
+                      onClick={downloadDiplome}
+                      disabled={downloadingDoc !== null}
+                      className="w-full flex items-center justify-center gap-2 h-10 rounded-lg text-[13px] font-bold border disabled:opacity-50"
+                      style={{ borderColor: "#047857", color: "#047857" }}
+                    >
+                      <GraduationCap size={15} />
+                      {downloadingDoc === "diplome"
+                        ? (locale === "en" ? "Generating…" : "Génération…")
+                        : (locale === "en" ? "Download diploma" : "Télécharger le diplôme")}
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </Group>
+        )}
         </div>
 
         <div className="space-y-4 min-w-0 lg:col-start-2">

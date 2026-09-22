@@ -1233,3 +1233,189 @@ export async function downloadAttestationReussitePdf(params: AttestationReussite
   doc.save(`${isEn ? "certificate_of_achievement" : "attestation_reussite"}_${safe}.pdf`);
 }
 
+// ── Attestation de scolarité (LMD, self-service étudiant) ───────────────────
+
+export type AttestationScolaritePdfParams = {
+  locale?: "fr" | "en";
+  studentName: string;
+  studentMatricule?: string | null;
+  programName?: string | null;
+  niveauLabel?: string | null;
+  semestreLabel?: string | null;
+  academicYear?: string | null;
+  issuedAt?: string | null;
+  config?: Partial<DocumentExportConfig>;
+  signatures?: { id: string; label: string; signatureUrl?: string | null }[];
+  stampUrl?: string | null;
+};
+
+export async function downloadAttestationScolaritePdf(params: AttestationScolaritePdfParams) {
+  const isEn = params.locale === "en";
+  const title = params.config?.title?.trim() || (isEn ? "Certificate of enrollment" : "Attestation de scolarité");
+  const { doc, startY, cfg } = await createDoc(title, { ...params.config, title });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = startY + 10;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(40, 40, 40);
+
+  const legal = cfg.legalName || (isEn ? "the institution" : "l'établissement");
+  const body = [
+    isEn ? `I, the undersigned representative of ${legal}, certify that:` : `Je soussigné(e), représentant(e) de ${legal}, atteste que :`,
+    "",
+    `${params.studentName}`,
+    "",
+    isEn ? "is duly enrolled in the program below for the current academic year." : "est régulièrement inscrit(e) au programme ci-dessous pour l'année académique en cours.",
+  ];
+
+  for (const line of body) {
+    if (!line) {
+      y += 4;
+      continue;
+    }
+    if (line === params.studentName) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(14);
+      doc.setTextColor(...cfg.blueRgb);
+      doc.text(line.toUpperCase(), pageWidth / 2, y, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(40, 40, 40);
+      y += 10;
+      continue;
+    }
+    const wrapped = doc.splitTextToSize(line, pageWidth - 40);
+    doc.text(wrapped, pageWidth / 2, y, { align: "center" });
+    y += wrapped.length * 6 + 2;
+  }
+
+  y += 6;
+  const details: string[] = [];
+  if (params.studentMatricule) details.push(`${isEn ? "Student ID" : "Matricule"} : ${params.studentMatricule}`);
+  if (params.programName) details.push(`${isEn ? "Program" : "Programme"} : ${params.programName}`);
+  if (params.niveauLabel) details.push(`${isEn ? "Level" : "Niveau"} : ${params.niveauLabel}`);
+  if (params.semestreLabel) details.push(`${isEn ? "Semester" : "Semestre"} : ${params.semestreLabel}`);
+  if (params.academicYear) details.push(`${isEn ? "Academic year" : "Année académique"} : ${params.academicYear}`);
+  details.push(`${isEn ? "Issue date" : "Date d'émission"} : ${params.issuedAt || new Date().toLocaleDateString(isEn ? "en-GB" : "fr-FR")}`);
+
+  doc.setFontSize(10);
+  doc.setTextColor(60, 60, 60);
+  for (const d of details) {
+    doc.text(d, pageWidth / 2, y, { align: "center" });
+    y += 6;
+  }
+
+  y += 8;
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(9);
+  doc.setTextColor(100, 100, 100);
+  doc.text(
+    isEn ? "Official document issued by the center. Valid when presented with an identity document." : "Document officiel généré par le centre. Valable sur présentation d'une pièce d'identité.",
+    pageWidth / 2,
+    y,
+    { align: "center", maxWidth: pageWidth - 40 },
+  );
+
+  await addPdfSignatures(doc, cfg, params.signatures, params.stampUrl);
+  addPdfFooter(doc, cfg);
+  const safe = params.studentName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || (isEn ? "learner" : "apprenant");
+  doc.save(`${isEn ? "certificate_of_enrollment" : "attestation_scolarite"}_${safe}.pdf`);
+}
+
+// ── Relevé de notes officiel LMD (self-service étudiant) ────────────────────
+
+export type ReleveNotesLmdRow = {
+  matiereName: string;
+  credits: number;
+  finalScore: number | null;
+  finalMaxScore: number;
+  validated: boolean;
+  assessed: boolean;
+};
+
+export type ReleveNotesLmdPdfParams = {
+  locale?: "fr" | "en";
+  studentName: string;
+  studentMatricule?: string | null;
+  programName?: string | null;
+  scopeLabel: string;
+  academicYear?: string | null;
+  acquiredCredits: number;
+  totalCredits: number;
+  rows: ReleveNotesLmdRow[];
+  config?: Partial<DocumentExportConfig>;
+  signatures?: { id: string; label: string; signatureUrl?: string | null }[];
+  stampUrl?: string | null;
+};
+
+export async function downloadReleveNotesLmdPdf(params: ReleveNotesLmdPdfParams) {
+  const isEn = params.locale === "en";
+  const title = params.config?.title?.trim() || (isEn ? "Official transcript" : "Relevé de notes officiel");
+  const { doc, autoTable, startY, cfg } = await createDoc(title, { ...params.config, title });
+
+  let y = startY;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.setTextColor(...cfg.blueRgb);
+  doc.text(params.studentName, 14, y);
+  y += 5;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(80, 80, 80);
+  const meta = [
+    params.studentMatricule ? `${isEn ? "Student ID" : "Matricule"} : ${params.studentMatricule}` : null,
+    params.programName,
+    params.scopeLabel,
+    params.academicYear,
+  ].filter(Boolean).join(" — ");
+  if (meta) {
+    doc.text(meta, 14, y);
+    y += 6;
+  }
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...cfg.blueRgb);
+  doc.text(
+    `${isEn ? "Credits earned" : "Crédits acquis"} : ${params.acquiredCredits} / ${params.totalCredits}`,
+    14,
+    y,
+  );
+  y += 8;
+
+  const statusLabel = (row: ReleveNotesLmdRow) => {
+    if (!row.assessed) return isEn ? "Pending" : "En attente";
+    return row.validated ? (isEn ? "Passed" : "Validée") : (isEn ? "Failed" : "Non validée");
+  };
+
+  autoTable(doc, {
+    startY: y,
+    head: [[
+      isEn ? "Course unit" : "Unité d'enseignement",
+      isEn ? "Credits" : "Crédits",
+      isEn ? "Score" : "Note",
+      isEn ? "Status" : "Statut",
+    ]],
+    body: params.rows.map((r) => [
+      r.matiereName,
+      String(r.credits),
+      r.finalScore !== null ? `${r.finalScore.toFixed(2)}/${r.finalMaxScore}` : "—",
+      statusLabel(r),
+    ]),
+    styles: { fontSize: 8.5, cellPadding: 2, valign: "middle" },
+    headStyles: { fillColor: cfg.blueRgb, textColor: 255, fontSize: 8 },
+    columnStyles: {
+      0: { cellWidth: 80, fontStyle: "bold" },
+      1: { halign: "center", cellWidth: 22 },
+      2: { halign: "center", cellWidth: 28 },
+      3: { halign: "center" },
+    },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+  });
+
+  await addPdfSignatures(doc, cfg, params.signatures, params.stampUrl);
+  addPdfFooter(doc, cfg);
+  const safe = params.studentName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || (isEn ? "learner" : "apprenant");
+  doc.save(`${isEn ? "official_transcript" : "releve_notes_officiel"}_${safe}.pdf`);
+}
+

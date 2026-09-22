@@ -44,6 +44,22 @@ test("later recovery settles historical debt without copying the original normal
 test("a recovery alone without any normal assessment cannot acquire credits", () => {
   assert.equal(computeLmdProgress([ue], [grade(18, "e2", "Rattrapage")], 50, "n1", []).acquiredCredits, 0);
 });
+test("transcript shows the validating recovery score, not the failed normal score", () => {
+  const result = computeLmdProgress([ue], [grade(8), grade(12, "e1", "Rattrapage")], 50, "n1", []);
+  const row = result.results.find(r => r.id === "u1");
+  assert.equal(row.finalScore, 12);
+  assert.equal(row.finalMaxScore, 20);
+});
+test("transcript shows the failed normal score when no recovery clears the threshold", () => {
+  const result = computeLmdProgress([ue], [grade(8)], 50, "n1", []);
+  const row = result.results.find(r => r.id === "u1");
+  assert.equal(row.finalScore, 8);
+});
+test("unassessed UE has a null transcript score", () => {
+  const result = computeLmdProgress([ue], [], 50, "n1", []);
+  const row = result.results.find(r => r.id === "u1");
+  assert.equal(row.finalScore, null);
+});
 test("UE without configured credits are not silently omitted from graduation checks", () => {
   const result = computeLmdProgress([{ ...ue, credits: 0, creditsConfigured: false }], [grade(16)], 50, "n1", []);
   assert.equal(result.complete, false);

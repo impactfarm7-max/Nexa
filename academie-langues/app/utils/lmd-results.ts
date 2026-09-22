@@ -33,7 +33,12 @@ export function computeLmdProgress(ues: LmdUe[], grades: LmdGrade[], thresholdPc
     });
     const validated = statuses.some(s => s.validated);
     const assessed = statuses.some(s => s.finalScore !== null);
-    return { ...ue, validated, assessed, debt: past.has(ue.semestre_id) && assessed && !validated };
+    // Transcript shows the validating attempt's score, or the best assessed attempt otherwise.
+    const shown = statuses.find(s => s.validated)
+      || statuses.filter(s => s.finalScore !== null).sort((a, b) => (b.finalScore ?? -1) - (a.finalScore ?? -1))[0]
+      || null;
+    return { ...ue, validated, assessed, debt: past.has(ue.semestre_id) && assessed && !validated,
+      finalScore: shown?.finalScore ?? null, finalMaxScore: shown?.finalMaxScore ?? ue.max_score };
   });
   const sum = (rows: typeof results) => ({
     totalCredits: rows.reduce((n, ue) => n + ue.credits, 0),
