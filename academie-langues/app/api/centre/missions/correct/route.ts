@@ -63,6 +63,54 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
     }
 
+    // Re-fetch mission UE for trainer scope (join may omit filiere_matiere_id)
+    if (profile.role === "trainer") {
+      const { data: center } = await supabaseAdmin
+        .from("centers")
+        .select("center_type")
+        .eq("id", profile.center_id)
+        .maybeSingle();
+      if (center?.center_type === "universite") {
+        const { data: fullMission } = await supabaseAdmin
+          .from("missions")
+          .select("filiere_matiere_id, formateur_id")
+          .eq("id", mission.id)
+          .maybeSingle();
+        const { getTrainerAcademicScope, assertTrainerUe, studentInTrainerScope } = await import(
+          "@/app/utils/trainerAcademicScope.server"
+        );
+        const scope = await getTrainerAcademicScope(supabaseAdmin, user.id, profile.center_id);
+        if (scope.empty) {
+          return NextResponse.json({ error: "Hors de votre périmètre." }, { status: 403 });
+        }
+        const own = fullMission?.formateur_id === user.id;
+        const ueOk = fullMission?.filiere_matiere_id
+          ? !assertTrainerUe(scope, fullMission.filiere_matiere_id)
+          : false;
+        if (!own && !ueOk) {
+          return NextResponse.json({ error: "Hors de votre périmètre (UE)." }, { status: 403 });
+        }
+        const { data: enrRows } = await supabaseAdmin
+          .from("enrollments")
+          .select("groupe_id, filieres(center_id)")
+          .eq("student_id", submission.user_id)
+          .in("status", ["active", "completed"]);
+        const inCenter = (enrRows || []).filter((e) => {
+          const f = e.filieres as { center_id?: string } | { center_id?: string }[] | null;
+          const c = Array.isArray(f) ? f[0]?.center_id : f?.center_id;
+          return c === profile.center_id;
+        });
+        if (
+          !studentInTrainerScope(
+            scope,
+            inCenter.map((e) => e.groupe_id),
+          )
+        ) {
+          return NextResponse.json({ error: "Hors de votre périmètre (promotion)." }, { status: 403 });
+        }
+      }
+    }
+
     if (action === "manual") {
       const parsedNote = Number(note);
       if (!Number.isFinite(parsedNote) || parsedNote < 0 || parsedNote > 20) {

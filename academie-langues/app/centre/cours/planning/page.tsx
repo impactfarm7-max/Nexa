@@ -8,6 +8,7 @@ import {
   Printer, Filter, CalendarDays, SlidersHorizontal, Sparkles, ChevronDown,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
+import { loadClientTrainerScope } from "@/app/utils/trainerAcademicScope.client";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import TcfPlanningBoard, { type TcfPlanningKind } from "@/app/components/centre/TcfPlanningBoard";
 import EstablishmentPlanningBoard from "@/app/components/centre/EstablishmentPlanningBoard";
@@ -52,6 +53,7 @@ type WeekSlot = {
   end_time: string;
   title: string;
   discipline_name: string | null;
+  formateur_id?: string | null;
   formateur_prenom: string | null;
   room_name: string | null;
   mode: string;
@@ -133,6 +135,11 @@ export default function CenterPlanningPage() {
   const [filtersExpanded, setFiltersExpanded] = useState(true);
   const [smartClassFilter, setSmartClassFilter] = useState<"all" | "free_rooms" | "no_formateur" | "cancelled">("all");
   const [centerRooms, setCenterRooms] = useState<string[]>([]);
+  /** Formateur univ : promotions / disciplines autorisées (null = pas de filtre). */
+  const [trainerScopeIds, setTrainerScopeIds] = useState<{
+    groupeIds: Set<string>;
+    disciplineIds: Set<string>;
+  } | null>(null);
 
   // ── init ─────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -141,7 +148,7 @@ export default function CenterPlanningPage() {
       if (!session) { setLoading(false); return; }
       setUserId(session.user.id);
       setSessionToken(session.access_token);
-      const { data: profile } = await supabase.from("profiles").select("center_id").eq("id", session.user.id).single();
+      const { data: profile } = await supabase.from("profiles").select("center_id, role").eq("id", session.user.id).single();
       const cId = profile?.center_id ?? null;
       setCenterId(cId);
       if (cId) {
@@ -150,8 +157,24 @@ export default function CenterPlanningPage() {
           supabase.from("profiles").select("id, prenom, nom").eq("center_id", cId).eq("role", "trainer"),
           supabase.from("centers").select("center_type").eq("id", cId).single(),
         ]);
-        setFilieres(filData ?? []);
-        setTrainers(trainData ?? []);
+        let filieresList = filData ?? [];
+        const isUnivTrainer = profile?.role === "trainer" && centerRow?.center_type === "universite";
+        if (isUnivTrainer) {
+          const scope = await loadClientTrainerScope(session.user.id, cId);
+          filieresList = filieresList.filter((f) => scope.filiereIds.has(f.id));
+          setTrainerScopeIds(
+            scope.empty
+              ? { groupeIds: new Set(), disciplineIds: new Set() }
+              : { groupeIds: scope.groupeIds, disciplineIds: scope.disciplineIds },
+          );
+          setSelectedTrainerId(session.user.id);
+        } else {
+          setTrainerScopeIds(null);
+        }
+        setFilieres(filieresList);
+        setTrainers(isUnivTrainer
+          ? (trainData ?? []).filter((t) => t.id === session.user.id)
+          : (trainData ?? []));
         setCenterType(centerRow?.center_type || "generic");
         const { data: roomRows } = await supabase
           .from("schedule_slots")
@@ -206,20 +229,28 @@ export default function CenterPlanningPage() {
         });
       }
       const merged = Array.from(map.values()).sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
-      setAllFiliereGroupes(merged);
-      setGroupes(merged);
+      const scopedGroupes = trainerScopeIds
+        ? merged.filter((g) => trainerScopeIds.groupeIds.has(g.id))
+        : merged;
+      setAllFiliereGroupes(scopedGroupes);
+      setGroupes(scopedGroupes);
 
       const discMap = new Map<string, string>();
       for (const m of matData ?? []) {
         const d = (m as any).exam_disciplines;
-        if (d) discMap.set(d.id, d.name);
+        if (d) {
+          if (trainerScopeIds && !trainerScopeIds.disciplineIds.has(d.id)) continue;
+          discMap.set(d.id, d.name);
+        }
       }
       setDisciplines(Array.from(discMap.entries()).map(([id, name]) => ({ id, name })));
-      setSelectedNiveauId(""); setSelectedGroupeId(""); setSelectedTrainerId(""); setSelectedRoom("");
+      setSelectedNiveauId(""); setSelectedGroupeId("");
+      if (!trainerScopeIds) setSelectedTrainerId("");
+      setSelectedRoom("");
       setFiltersExpanded(true);
       setSmartClassFilter("all");
     })();
-  }, [selectedFiliereId]);
+  }, [selectedFiliereId, trainerScopeIds]);
 
   // Filtrer classes par niveau (centres libres)
   useEffect(() => {
@@ -288,12 +319,16 @@ export default function CenterPlanningPage() {
         .filter((id) => !slotIdsFromRpc.includes(id));
 
       if (missingIds.length > 0) {
-        const { data: missingSlots } = await supabase
+        let missingQuery = supabase
           .from("schedule_slots")
           .select("id, day_of_week, start_time, end_time, title, room_name, mode, online_link, formateur_id, groupe_id, specific_date")
           .eq("center_id", centerId)
           .eq("filiere_id", selectedFiliereId)
           .in("id", missingIds);
+        if (trainerScopeIds && selectedTrainerId) {
+          missingQuery = missingQuery.eq("formateur_id", selectedTrainerId);
+        }
+        const { data: missingSlots } = await missingQuery;
 
         const formateurIds = Array.from(
           new Set((missingSlots ?? []).map((s) => s.formateur_id).filter(Boolean) as string[]),
@@ -333,6 +368,7 @@ export default function CenterPlanningPage() {
             end_time: s.end_time,
             title: s.title || "",
             discipline_name: null,
+            formateur_id: s.formateur_id ?? null,
             formateur_prenom: s.formateur_id ? (prenomById.get(s.formateur_id) ?? null) : null,
             room_name: s.room_name,
             mode: s.mode || "presentiel",
@@ -362,6 +398,16 @@ export default function CenterPlanningPage() {
       });
     }
 
+    if (trainerScopeIds) {
+      rows = rows.filter((r) => {
+        const gids = bySlot.get(r.slot_id) || [];
+        const all = [...gids, ...(r.groupe_id ? [r.groupe_id] : [])];
+        if (!all.some((gid) => trainerScopeIds.groupeIds.has(gid))) return false;
+        if (selectedTrainerId && r.formateur_id && r.formateur_id !== selectedTrainerId) return false;
+        return true;
+      });
+    }
+
     const seen = new Set<string>();
     rows = rows.filter((r) => {
       const key = `${r.slot_id}|${r.actual_date}|${fmt5(r.start_time)}`;
@@ -372,7 +418,7 @@ export default function CenterPlanningPage() {
 
     setWeekSlots(rows);
     setWeekLoading(false);
-  }, [centerId, centerType, selectedFiliereId, selectedNiveauId, selectedTrainerId, selectedGroupeId, weekStart]);
+  }, [centerId, centerType, selectedFiliereId, selectedNiveauId, selectedTrainerId, selectedGroupeId, weekStart, trainerScopeIds]);
 
   useEffect(() => { if (selectedFiliereId) loadWeek(); }, [loadWeek, selectedFiliereId]);
 
@@ -501,7 +547,7 @@ export default function CenterPlanningPage() {
                       planningView === "classe" ? "bg-white text-[#11224E] font-semibold shadow-sm" : "text-neutral-500"
                     }`}
                   >
-                    {t("centre", "planningClass")}
+                    {centerType === "universite" ? t("centre", "univPromotion") : t("centre", "planningClass")}
                   </button>
                   <button
                     type="button"
@@ -575,7 +621,7 @@ export default function CenterPlanningPage() {
                           ? `${t("centre", "planningLevelAbbr")} ${niveaux.find((n) => n.id === selectedNiveauId)?.annee ?? niveaux.find((n) => n.id === selectedNiveauId)?.mois ?? "—"}`
                           : t("centre", "planningLevel")}
                         <span className="text-neutral-300">·</span>
-                        {selectedGroupe?.nom || t("centre", "planningClass")}
+                        {selectedGroupe?.nom || (centerType === "universite" ? t("centre", "univPromotion") : t("centre", "planningClass"))}
                         {selectedTrainerId && (
                           <>
                             <span className="text-neutral-300">·</span>
@@ -635,7 +681,7 @@ export default function CenterPlanningPage() {
                         <>
                           {niveaux.length > 0 && <span className="w-px h-5 bg-neutral-200 shrink-0" />}
                           <div className="flex gap-1.5 flex-wrap items-center">
-                            <span className="text-xs text-neutral-500">{t("centre", "planningClass")}</span>
+                            <span className="text-xs text-neutral-500">{centerType === "universite" ? t("centre", "univPromotion") : t("centre", "planningClass")}</span>
                             {groupes.length === 0 ? (
                               <span className="text-[10px] text-neutral-400 italic">{t("centre", "planningNoClassForLevel")}</span>
                             ) : (
@@ -1059,6 +1105,7 @@ export default function CenterPlanningPage() {
           trainers={trainers}
           disciplines={disciplines}
           isTcfCenter={isTcfCenter}
+          isUniversite={centerType === "universite"}
           defaultNiveauId={selectedNiveauId}
           defaultGroupeId={selectedGroupeId}
           onClose={() => setSidePanel(null)}
@@ -1166,12 +1213,12 @@ function PrintPlanningModal({ weekStart, slotsByDay, filiereName, onClose }: {
 // ════════════════════════════════════════════════════════════════════════════
 function SlotPanel({
   type, centerId, userId, sessionToken, filiereId, filiereName, niveaux, groupes, trainers, disciplines,
-  isTcfCenter, defaultNiveauId, defaultGroupeId, onClose, onSaved,
+  isTcfCenter, isUniversite, defaultNiveauId, defaultGroupeId, onClose, onSaved,
 }: {
   type: NonNullable<SidePanel>;
   centerId: string; userId: string; sessionToken: string; filiereId: string; filiereName: string;
   niveaux: NiveauOption[]; groupes: GroupeOption[]; trainers: TrainerOption[];
-  disciplines: DisciplineOption[]; isTcfCenter?: boolean;
+  disciplines: DisciplineOption[]; isTcfCenter?: boolean; isUniversite?: boolean;
   defaultNiveauId?: string; defaultGroupeId?: string;
   onClose: () => void; onSaved: () => void;
 }) {
@@ -1193,6 +1240,7 @@ function SlotPanel({
   const [niveauId,       setNiveauId]       = useState(defaultNiveauId || "");
   const [groupeId,       setGroupeId]       = useState(defaultGroupeId || "");
   const [specificDate,   setSpecificDate]   = useState("");
+  const [isExam,         setIsExam]         = useState(false);
   const [selectedGroupeIds, setSelectedGroupeIds] = useState<string[]>(
     !isTcfCenter && defaultGroupeId ? [defaultGroupeId] : [],
   );
@@ -1397,6 +1445,7 @@ function SlotPanel({
           setNiveauId((!isTcfCenter && defaultNiveauId) ? defaultNiveauId : (data.niveau_id ?? defaultNiveauId ?? ""));
           setGroupeId((!isTcfCenter && defaultGroupeId) ? defaultGroupeId : (data.groupe_id ?? defaultGroupeId ?? ""));
           if (data.specific_date) setSpecificDate(data.specific_date);
+          setIsExam(Boolean((data as { is_exam?: boolean }).is_exam));
           const { data: grpLinks } = await supabase
             .from("schedule_slot_groupes")
             .select("groupe_id")
@@ -1567,6 +1616,7 @@ function SlotPanel({
             mode,
             online_link: null, // LiveKit NEXA — pas de lien externe
             is_tronc_commun: isTroncCommun,
+            is_exam: isUniversite ? isExam : false,
           }),
         });
         const json = await res.json().catch(() => ({}));
@@ -1724,7 +1774,11 @@ function SlotPanel({
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setError(json.error || t("centre", "planningDuplicateError")); setSaving(false); return; }
-      setDupMsg(t("centre", "planningDuplicateResult", { created: String(json.created ?? 0), skipped: String(json.skipped ?? 0) }));
+      const autoN = Number(json.auto_convocations_created || 0);
+      setDupMsg(
+        t("centre", "planningDuplicateResult", { created: String(json.created ?? 0), skipped: String(json.skipped ?? 0) })
+        + (autoN > 0 ? ` · ${autoN} convocation(s) auto` : ""),
+      );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("centre", "planningNetworkError"));
     } finally {
@@ -1882,7 +1936,7 @@ function SlotPanel({
               </div>
 
               {!isTcfCenter && (
-              <PanelField label={t("centre", "planningSubject")}>
+              <PanelField label={isUniversite ? t("centre", "univUe") : t("centre", "planningSubject")}>
                 <select value={disciplineId} onChange={(e) => setDisciplineId(e.target.value)} className={panelInputCls}>
                   <option value="">{t("centre", "planningNoSubjectFreeTitle")}</option>
                   {disciplines.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
@@ -1894,6 +1948,23 @@ function SlotPanel({
                 <PanelField label={isTcfCenter ? "Titre de la séance" : t("centre", "planningFreeTitle")}>
                   <input value={slotTitle} onChange={(e) => setSlotTitle(e.target.value)} placeholder={isTcfCenter ? "Ex : Expression orale — groupe A" : t("centre", "planningFreeTitlePlaceholder")} className={panelInputCls} />
                 </PanelField>
+              )}
+
+              {isUniversite && (
+                <label className="flex items-start gap-2.5 rounded-xl border border-orange-100 bg-orange-50/50 px-3 py-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isExam}
+                    onChange={(e) => setIsExam(e.target.checked)}
+                    className="mt-0.5"
+                  />
+                  <span>
+                    <span className="block text-[13px] font-bold" style={{ color: BLUE }}>Créneau d&apos;examen</span>
+                    <span className="block text-[11px] font-medium text-neutral-500 mt-0.5">
+                      Si le mode auto est activé (Convocations), une salle + date matérialisée crée la convocation.
+                    </span>
+                  </span>
+                </label>
               )}
 
               <PanelField label={t("centre", "planningTrainer")}>
@@ -1911,7 +1982,7 @@ function SlotPanel({
                       ? `${t("centre", "planningLevel")} ${lockedNiveau.annee ?? `${lockedNiveau.mois}m`}`
                       : `${t("centre", "planningLevel")} —`}
                     {" · "}
-                    {lockedGroupe?.nom || `${t("centre", "planningClass")} —`}
+                    {lockedGroupe?.nom || `${isUniversite ? t("centre", "univPromotion") : t("centre", "planningClass")} —`}
                   </p>
                   {filiereName && (
                     <p className="text-xs text-neutral-400 mt-0.5 truncate">{filiereName}</p>

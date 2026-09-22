@@ -83,6 +83,10 @@ type MatiereDraft = {
   max_score: number | string;
   /** Crédits ECTS — uniquement rempli pour les UE d'un centre universite (LMD). */
   credits?: number | string;
+  /** UE optionnelle (inscription pédagogique staff) — LMD uniquement. */
+  is_optional?: boolean;
+  /** CM / TD / TP — LMD uniquement. */
+  course_format?: "cm" | "td" | "tp" | "";
   /** Semestres concernés — clés `${niveauNumero}:${semestreOrdre}` (LMD uniquement, remplace niveauNumeros). */
   semestreKeys?: string[];
 };
@@ -155,6 +159,7 @@ function defaultMatiere(): MatiereDraft {
     existingByNiveau: {},
     coefficient: 1,
     max_score: 20,
+    course_format: "",
   };
 }
 function defaultFee(): FeeDraft {
@@ -638,12 +643,15 @@ function ClassroomsBlock({
   onRename,
   editLocked,
   niveauLabel,
+  asPromotion,
 }: {
   classes: ClasseDraft[];
   onSetCount: (n: number) => void;
   onRename: (idx: number, val: string) => void;
   editLocked?: boolean;
   niveauLabel?: string;
+  /** Univ LMD : cohortes étudiants (promotion), pas des salles physiques. */
+  asPromotion?: boolean;
 }) {
   const { locale } = useI18n();
   const en = locale === "en";
@@ -651,10 +659,15 @@ function ClassroomsBlock({
   return (
     <div>
       <p className="text-sm font-semibold text-neutral-600 tracking-normal mb-1">
-        {en ? "Classrooms" : "Salles de classe"}{niveauLabel ? `: ${niveauLabel}` : ""}
+        {asPromotion
+          ? (en ? "Cohorts" : "Promotions")
+          : (en ? "Classrooms" : "Salles de classe")}
+        {niveauLabel ? `: ${niveauLabel}` : ""}
       </p>
       <p className="text-sm text-neutral-400 mb-3 font-medium">
-        {en ? "Enter the number of classrooms, then name them (e.g. Day class, Evening class)." : "Indiquez le nombre de salles, puis nommez-les (ex. Cours du jour, Cours du soir)."}
+        {asPromotion
+          ? (en ? "Enter how many cohorts, then name them (e.g. Promo A, Evening)." : "Indiquez le nombre de promotions, puis nommez-les (ex. Promo A, Cours du soir).")
+          : (en ? "Enter the number of classrooms, then name them (e.g. Day class, Evening class)." : "Indiquez le nombre de salles, puis nommez-les (ex. Cours du jour, Cours du soir).")}
       </p>
       <div className="flex items-center gap-3 mb-3">
         <label className="text-sm font-semibold text-neutral-600">{en ? "Number" : "Nombre"}</label>
@@ -678,7 +691,11 @@ function ClassroomsBlock({
         )}
       </div>
       {classes.length === 0 ? (
-        <p className="text-sm font-medium text-neutral-400">{en ? "No classrooms. Enter a number above." : "Aucune salle. Saisissez un nombre ci-dessus."}</p>
+        <p className="text-sm font-medium text-neutral-400">
+          {asPromotion
+            ? (en ? "No cohorts. Enter a number above." : "Aucune promotion. Saisissez un nombre ci-dessus.")
+            : (en ? "No classrooms. Enter a number above." : "Aucune salle. Saisissez un nombre ci-dessus.")}
+        </p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {classes.map((c, idx) => (
@@ -910,10 +927,21 @@ function NouveauProgrammeForm() {
       .eq("filiere_id", filiereId);
     setEditLocked((enrollCount || 0) > 0);
 
-    const { data: matRows } = await supabase
+    const matSelectWithFormat =
+      "id, niveau_id, annee, discipline_id, coefficient, max_score, credits, semestre_id, is_optional, course_format, exam_disciplines(name)";
+    const matSelectLegacy =
+      "id, niveau_id, annee, discipline_id, coefficient, max_score, credits, semestre_id, is_optional, exam_disciplines(name)";
+    let { data: matRows, error: matErr } = await supabase
       .from("filiere_matieres")
-      .select("id, niveau_id, annee, discipline_id, coefficient, max_score, credits, semestre_id, exam_disciplines(name)")
+      .select(matSelectWithFormat)
       .eq("filiere_id", filiereId);
+    if (matErr) {
+      const fb = await supabase
+        .from("filiere_matieres")
+        .select(matSelectLegacy)
+        .eq("filiere_id", filiereId);
+      matRows = (fb.data || []).map((row) => ({ ...row, course_format: null })) as typeof matRows;
+    }
     const fmIds = (matRows || []).map((m: { id: string }) => m.id);
     setInitialMatiereIds(fmIds);
 
@@ -934,6 +962,8 @@ function NouveauProgrammeForm() {
       max_score?: number | null;
       credits?: number | null;
       semestre_id?: string | null;
+      is_optional?: boolean | null;
+      course_format?: string | null;
     }>;
 
     if (f.type === "cursus") {
@@ -1024,9 +1054,15 @@ function NouveauProgrammeForm() {
             coefficient: Number(m.coefficient) > 0 ? Number(m.coefficient) : 1,
             max_score: Number(m.max_score) > 0 ? Number(m.max_score) : 20,
             credits: m.credits != null ? m.credits : "",
+            is_optional: Boolean(m.is_optional),
+            course_format: (m.course_format === "cm" || m.course_format === "td" || m.course_format === "tp") ? m.course_format : "",
           };
         }
         const draft = byDisc[m.discipline_id];
+        if (m.is_optional) draft.is_optional = true;
+        if (!draft.course_format && (m.course_format === "cm" || m.course_format === "td" || m.course_format === "tp")) {
+          draft.course_format = m.course_format;
+        }
         if (annee != null && !draft.niveauNumeros!.includes(annee)) draft.niveauNumeros!.push(annee);
         if (m.semestre_id && semestreKeyById[m.semestre_id]) {
           const sKey = semestreKeyById[m.semestre_id];
@@ -1726,8 +1762,18 @@ function NouveauProgrammeForm() {
 
       if (fmId) {
         const patch: Record<string, unknown> = { coefficient: coeff, max_score: maxScore };
-        if (isUniversityLmd) { patch.credits = credits; patch.semestre_id = semestreId ?? null; }
-        const { error: metaErr } = await supabase.from("filiere_matieres").update(patch).eq("id", fmId);
+        if (isUniversityLmd) {
+          patch.credits = credits;
+          patch.semestre_id = semestreId ?? null;
+          patch.is_optional = Boolean(m.is_optional);
+          patch.course_format = m.course_format === "cm" || m.course_format === "td" || m.course_format === "tp" ? m.course_format : null;
+        }
+        let { error: metaErr } = await supabase.from("filiere_matieres").update(patch).eq("id", fmId);
+        if (metaErr && "course_format" in patch) {
+          const { course_format: _cf, ...withoutFormat } = patch;
+          const retry = await supabase.from("filiere_matieres").update(withoutFormat).eq("id", fmId);
+          metaErr = retry.error;
+        }
         if (metaErr) throw new Error(en ? `Maximum score / coefficient: ${metaErr.message}` : `Barème / coeff. : ${metaErr.message}`);
         const initial = initialFormateurIds || [];
         const toAdd = m.formateurIds.filter((f) => !initial.includes(f));
@@ -1744,19 +1790,33 @@ function NouveauProgrammeForm() {
       }
       const disciplineId = await resolveDisciplineId(m);
       if (!disciplineId) return null;
-      const { data: fm, error: fe } = await supabase
+      const insertPayload: Record<string, unknown> = {
+        filiere_id: filiereId,
+        discipline_id: disciplineId,
+        niveau_id: niveauId,
+        annee,
+        obligatoire: true,
+        coefficient: coeff,
+        max_score: maxScore,
+        ...(isUniversityLmd
+          ? {
+              credits,
+              semestre_id: semestreId ?? null,
+              is_optional: Boolean(m.is_optional),
+              course_format: m.course_format === "cm" || m.course_format === "td" || m.course_format === "tp" ? m.course_format : null,
+            }
+          : {}),
+      };
+      let { data: fm, error: fe } = await supabase
         .from("filiere_matieres")
-        .insert({
-          filiere_id: filiereId,
-          discipline_id: disciplineId,
-          niveau_id: niveauId,
-          annee,
-          obligatoire: true,
-          coefficient: coeff,
-          max_score: maxScore,
-          ...(isUniversityLmd ? { credits, semestre_id: semestreId ?? null } : {}),
-        })
+        .insert(insertPayload)
         .select("id").single();
+      if (fe && "course_format" in insertPayload) {
+        const { course_format: _cf, ...withoutFormat } = insertPayload;
+        const retry = await supabase.from("filiere_matieres").insert(withoutFormat).select("id").single();
+        fm = retry.data;
+        fe = retry.error;
+      }
       if (fe || !fm) throw new Error(en ? `Subject not saved: ${fe?.message || "rejected"}` : `Matière non enregistrée : ${fe?.message || "refus"}`);
       for (const f of m.formateurIds) {
         const { error } = await supabase.from("matiere_formateurs").insert({ filiere_matiere_id: fm.id, formateur_id: f });
@@ -2029,23 +2089,35 @@ function NouveauProgrammeForm() {
         rawMaxScore: number | string = 20,
         semestreId?: string | null,
         rawCredits?: number | string,
+        isOptional?: boolean,
+        courseFormat?: string,
       ) {
         const coeff = Number(rawCoeff) > 0 ? Number(rawCoeff) : 1;
         const maxScore = Number(rawMaxScore) > 0 ? Number(rawMaxScore) : 20;
         const credits = isUniversityLmd && rawCredits !== undefined && String(rawCredits).trim() ? Number(rawCredits) : null;
-        const { data: fm, error: fmErr } = await supabase
+        const format = courseFormat === "cm" || courseFormat === "td" || courseFormat === "tp" ? courseFormat : null;
+        const insertPayload: Record<string, unknown> = {
+          filiere_id: filiereId,
+          discipline_id: disciplineId,
+          niveau_id: niveauId,
+          annee,
+          obligatoire: true,
+          coefficient: coeff,
+          max_score: maxScore,
+          ...(isUniversityLmd
+            ? { credits, semestre_id: semestreId ?? null, is_optional: Boolean(isOptional), course_format: format }
+            : {}),
+        };
+        let { data: fm, error: fmErr } = await supabase
           .from("filiere_matieres")
-          .insert({
-            filiere_id: filiereId,
-            discipline_id: disciplineId,
-            niveau_id: niveauId,
-            annee,
-            obligatoire: true,
-            coefficient: coeff,
-            max_score: maxScore,
-            ...(isUniversityLmd ? { credits, semestre_id: semestreId ?? null } : {}),
-          })
+          .insert(insertPayload)
           .select("id").single();
+        if (fmErr && "course_format" in insertPayload) {
+          const { course_format: _cf, ...withoutFormat } = insertPayload;
+          const retry = await supabase.from("filiere_matieres").insert(withoutFormat).select("id").single();
+          fm = retry.data;
+          fmErr = retry.error;
+        }
         if (fmErr || !fm) throw new Error(en ? `Subject not saved: ${fmErr?.message || "insertion rejected"}` : `Matière non enregistrée : ${fmErr?.message || "insertion refusée"}`);
         for (const formateurId of formateurIds) {
           const { error: mfErr } = await supabase.from("matiere_formateurs").insert({ filiere_matiere_id: fm.id, formateur_id: formateurId });
@@ -2125,6 +2197,8 @@ function NouveauProgrammeForm() {
                 m.max_score,
                 semestreId,
                 m.credits,
+                m.is_optional,
+                m.course_format,
               );
             }
           }
@@ -3027,7 +3101,7 @@ function NouveauProgrammeForm() {
           )}
         </ProgramSection>
 
-        <ProgramSection icon={Layers} title={en ? "Classrooms" : "Salles de classe"} description={en ? "Enter the number of classrooms, then give each one a name." : "Indiquez le nombre de salles, puis donnez-leur un nom."}>
+        <ProgramSection icon={Layers} title={isUniversityLmd ? (en ? "Cohorts" : "Promotions") : (en ? "Classrooms" : "Salles de classe")} description={isUniversityLmd ? (en ? "Enter how many cohorts, then give each one a name." : "Indiquez le nombre de promotions, puis donnez-leur un nom.") : (en ? "Enter the number of classrooms, then give each one a name." : "Indiquez le nombre de salles, puis donnez-leur un nom.")}>
           {type === "cursus" ? (
             <>
               <div className="flex gap-1.5 flex-wrap mb-2">
@@ -3062,6 +3136,7 @@ function NouveauProgrammeForm() {
                         onSetCount={(n) => setClassesCountSemestre(niveauActuel.numero, semestreActuel.ordre, n)}
                         onRename={(idx, val) => renameClasseSemestre(niveauActuel.numero, semestreActuel.ordre, idx, val)}
                         editLocked={editLocked}
+                        asPromotion
                         niveauLabel={`${en ? "Level" : "Niveau"} ${niveauActuel.numero} · ${en ? "Semester" : "Semestre"} ${semestreActuel.ordre}`}
                       />
                     );
@@ -3088,7 +3163,7 @@ function NouveauProgrammeForm() {
           )}
         </ProgramSection>
 
-        <ProgramSection icon={BookOpen} title={en ? "Program subjects" : "Matières du programme"} description={en ? "Confirm one subject at a time to keep the screen simple. Trainers are optional and profiles can be completed under Staff." : "Validez une matière à la fois pour alléger l'écran. Formateurs optionnels, complétez dans Staff."}>
+        <ProgramSection icon={BookOpen} title={isUniversityLmd ? (en ? "Program course units (UE)" : "UE du programme") : (en ? "Program subjects" : "Matières du programme")} description={isUniversityLmd ? (en ? "Confirm one UE at a time. Trainers are optional and profiles can be completed under Staff." : "Validez une UE à la fois. Formateurs optionnels, complétez dans Staff.") : (en ? "Confirm one subject at a time to keep the screen simple. Trainers are optional and profiles can be completed under Staff." : "Validez une matière à la fois pour alléger l'écran. Formateurs optionnels, complétez dans Staff.")}>
           {type === "cursus" ? (
             <>
               {matieresProgram.length > 0 && (
@@ -3096,13 +3171,17 @@ function NouveauProgrammeForm() {
                   {matieresProgram.map((m) => (
                     <li key={m.key} className="flex items-start justify-between gap-3 rounded-xl border border-neutral-200 bg-neutral-50/80 px-3 py-2.5">
                       <div className="min-w-0">
-                        <p className="text-xs font-black truncate" style={{ color: BLUE }}>{matiereDisplayName(m)}</p>
+                        <p className="text-xs font-black truncate" style={{ color: BLUE }}>
+                          {matiereDisplayName(m)}
+                          {isUniversityLmd && m.course_format ? ` · ${String(m.course_format).toUpperCase()}` : ""}
+                        </p>
                         <p className="text-[10px] text-neutral-400 font-medium mt-0.5">
                           {isUniversityLmd
                             ? `${en ? "Semesters" : "Sem."} ${(m.semestreKeys || []).map((k) => k.split(":")[1]).join(", ") || "—"}`
                             : `${en ? "Levels" : "Niv."} ${(m.niveauNumeros || []).join(", ") || "—"}`}
                           {` · /${m.max_score || 20} · ×${m.coefficient || 1}`}
                           {isUniversityLmd && m.credits !== undefined && m.credits !== "" ? ` · ${m.credits} cr.` : ""}
+                          {isUniversityLmd && m.is_optional ? (en ? " · optional" : " · optionnelle") : ""}
                           {m.formateurIds.length > 0 ? ` · ${m.formateurIds.length} formateur${m.formateurIds.length > 1 ? "s" : ""}` : " · formateur optionnel"}
                         </p>
                       </div>
@@ -3116,7 +3195,7 @@ function NouveauProgrammeForm() {
               )}
               {draftMatiereProgram ? (
                 <div className="bg-white border-2 border-orange-200/80 rounded-xl p-4 space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: ORANGE }}>{en ? "New subject" : "Nouvelle matière"}</p>
+                  <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: ORANGE }}>{isUniversityLmd ? (en ? "New course unit" : "Nouvelle UE") : (en ? "New subject" : "Nouvelle matière")}</p>
                   <select
                     value={draftMatiereProgram.discipline_id}
                     onChange={(e) => {
@@ -3125,7 +3204,7 @@ function NouveauProgrammeForm() {
                     }}
                     className={FIELD_INPUT}
                   >
-                    <option value="" disabled>{en ? "Choose an existing subject…" : "Choisir une matière existante…"}</option>
+                    <option value="" disabled>{isUniversityLmd ? (en ? "Choose an existing UE…" : "Choisir une UE existante…") : (en ? "Choose an existing subject…" : "Choisir une matière existante…")}</option>
                     {disciplines.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   <button
@@ -3138,14 +3217,14 @@ function NouveauProgrammeForm() {
                     }`}
                     style={{ color: ORANGE }}
                   >
-                    <Plus size={14} /> {en ? "Create a new subject" : "Créer une nouvelle matière"}
+                    <Plus size={14} /> {isUniversityLmd ? (en ? "Create a new UE" : "Créer une nouvelle UE") : (en ? "Create a new subject" : "Créer une nouvelle matière")}
                   </button>
                   {!draftMatiereProgram.discipline_id && (
                     <div>
                       <input
                         value={draftMatiereProgram.newDisciplineName}
                         onChange={(e) => updateMatiereProgram(draftMatiereProgram.key!, { newDisciplineName: e.target.value })}
-                        placeholder={en ? "Subject name..." : "Intitulé de la matière..."}
+                        placeholder={isUniversityLmd ? (en ? "UE name..." : "Intitulé de l'UE...") : (en ? "Subject name..." : "Intitulé de la matière...")}
                         className={FIELD_INPUT}
                       />
                       {(() => {
@@ -3159,7 +3238,9 @@ function NouveauProgrammeForm() {
                               onClick={() => updateMatiereProgram(draftMatiereProgram.key!, { discipline_id: match.id, newDisciplineName: "" })}
                               className="mt-1.5 w-full text-left text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 p-2.5 rounded-lg border border-blue-200 flex items-center justify-between transition-colors"
                             >
-                              <span>💡 {en ? <>The subject “<b>{match.name}</b>” already exists.</> : <>La matière « <b>{match.name}</b> » existe déjà.</>}</span>
+                              <span>💡 {isUniversityLmd
+                                ? (en ? <>The UE “<b>{match.name}</b>” already exists.</> : <>L&apos;UE « <b>{match.name}</b> » existe déjà.</>)
+                                : (en ? <>The subject “<b>{match.name}</b>” already exists.</> : <>La matière « <b>{match.name}</b> » existe déjà.</>)}</span>
                               <span className="underline shrink-0">{en ? "Select" : "Sélectionner"}</span>
                             </button>
                           );
@@ -3253,6 +3334,46 @@ function NouveauProgrammeForm() {
                       </div>
                     )}
                   </div>
+                  {isUniversityLmd && (
+                    <>
+                      <div>
+                        <p className={FIELD_LABEL}>{en ? "Course type (CM / TD / TP)" : "Type de cours (CM / TD / TP)"}</p>
+                        <select
+                          value={draftMatiereProgram.course_format || ""}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            updateMatiereProgram(draftMatiereProgram.key!, {
+                              course_format: v === "cm" || v === "td" || v === "tp" ? v : "",
+                            });
+                          }}
+                          className={FIELD_INPUT}
+                        >
+                          <option value="">{en ? "Unspecified" : "Non précisé"}</option>
+                          <option value="cm">{en ? "Lecture (CM)" : "CM — Cours magistral"}</option>
+                          <option value="td">{en ? "Tutorial (TD)" : "TD — Travaux dirigés"}</option>
+                          <option value="tp">{en ? "Lab (TP)" : "TP — Travaux pratiques"}</option>
+                        </select>
+                      </div>
+                      <label className="flex items-start gap-2.5 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5"
+                          checked={Boolean(draftMatiereProgram.is_optional)}
+                          onChange={(e) => updateMatiereProgram(draftMatiereProgram.key!, { is_optional: e.target.checked })}
+                        />
+                        <span>
+                          <span className="block text-[13px] font-bold" style={{ color: BLUE }}>
+                            {en ? "Optional course unit" : "UE optionnelle"}
+                          </span>
+                          <span className="block text-[11px] font-medium text-neutral-500 mt-0.5">
+                            {en
+                              ? "Staff must enroll the student on this unit. Compulsory units are automatic."
+                              : "Le staff doit inscrire l'étudiant sur cette UE. Les UE obligatoires sont automatiques."}
+                          </span>
+                        </span>
+                      </label>
+                    </>
+                  )}
                   <FormateursBlock
                     trainers={trainers}
                     matiereData={draftMatiereProgram}
@@ -3263,13 +3384,13 @@ function NouveauProgrammeForm() {
                   <div className="flex gap-2">
                     <button type="button" onClick={cancelDraftMatiereProgram} className="flex-1 h-11 rounded-xl border border-neutral-200 text-[10px] font-black uppercase text-neutral-500">{en ? "Cancel" : "Annuler"}</button>
                     <button type="button" onClick={confirmDraftMatiereProgram} className="flex-1 h-11 rounded-xl text-[10px] font-black uppercase text-white" style={{ backgroundColor: BLUE }}>
-                      <CheckCircle2 size={14} className="inline mr-1" /> {en ? "Confirm subject" : "Valider la matière"}
+                      <CheckCircle2 size={14} className="inline mr-1" /> {isUniversityLmd ? (en ? "Confirm UE" : "Valider l'UE") : (en ? "Confirm subject" : "Valider la matière")}
                     </button>
                   </div>
                 </div>
               ) : (
                 <button type="button" onClick={() => { setDraftMatiereProgram(defaultMatiere()); setDraftProgramIsEdit(false); setMatiereDraftError(""); }} className="w-full h-11 rounded-xl border border-dashed border-orange-200 hover:bg-orange-50 flex items-center justify-center gap-1.5 text-[10px] font-black uppercase" style={{ color: ORANGE }}>
-                  <Plus size={14} /> {en ? "Add a subject" : "Ajouter une matière"}
+                  <Plus size={14} /> {isUniversityLmd ? (en ? "Add a course unit" : "Ajouter une UE") : (en ? "Add a subject" : "Ajouter une matière")}
                 </button>
               )}
             </>

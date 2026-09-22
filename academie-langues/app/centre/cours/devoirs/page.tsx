@@ -167,22 +167,39 @@ export default function TrainerDevoirsPage() {
           if (tcfSubjects.length > 0) setSelectedSubject(tcfSubjects[0]);
         }
       } else if (profile.role === "trainer") {
+        const { loadClientTrainerScope } = await import("@/app/utils/trainerAcademicScope.client");
+        const centerIdForScope = profile.center_id as string;
+        let allowedUe: Set<string> | null = null;
+        if (cType === "universite" && centerIdForScope) {
+          const scope = await loadClientTrainerScope(session.user.id, centerIdForScope);
+          allowedUe = scope.empty ? new Set() : scope.filiereMatiereIds;
+        }
         const { data: mfData } = await supabase
           .from("matiere_formateurs")
-          .select(`filiere_matiere_id, filiere_matieres(id, filiere_id, niveau_id, annee, exam_disciplines(name), filieres(name), niveaux(annee))`)
+          .select(`filiere_matiere_id, filiere_matieres(id, filiere_id, niveau_id, annee, exam_disciplines(name), filieres(name, center_id), niveaux(annee))`)
           .eq("formateur_id", session.user.id);
 
-        setSubjects((mfData || []).map((mf: any) => {
-          const fm = mf.filiere_matieres;
-          return {
-            filiere_matiere_id: mf.filiere_matiere_id,
-            discipline_name: fm?.exam_disciplines?.name || "—",
-            filiere_name: fm?.filieres?.name || "—",
-            niveau_annee: fm?.niveaux?.annee || fm?.annee || null,
-            filiere_id: fm?.filiere_id || "",
-            niveau_id: fm?.niveau_id || null,
-          };
-        }));
+        setSubjects(
+          (mfData || [])
+            .filter((mf: any) => {
+              const fm = mf.filiere_matieres;
+              if (!fm) return false;
+              if (allowedUe && !allowedUe.has(mf.filiere_matiere_id)) return false;
+              if (!fm.filieres?.center_id || fm.filieres.center_id !== centerIdForScope) return false;
+              return true;
+            })
+            .map((mf: any) => {
+              const fm = mf.filiere_matieres;
+              return {
+                filiere_matiere_id: mf.filiere_matiere_id,
+                discipline_name: fm?.exam_disciplines?.name || "—",
+                filiere_name: fm?.filieres?.name || "—",
+                niveau_annee: fm?.niveaux?.annee || fm?.annee || null,
+                filiere_id: fm?.filiere_id || "",
+                niveau_id: fm?.niveau_id || null,
+              };
+            }),
+        );
       } else {
         const { data: fmData } = await supabase
           .from("filiere_matieres")
@@ -328,13 +345,27 @@ export default function TrainerDevoirsPage() {
   useEffect(() => {
     if (!selectedSubject) return;
     (async () => {
-      // Groupes de la filière/niveau
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user?.id;
+      let allowedGroupes: Set<string> | null = null;
+      if (uid && centerType === "universite" && centerId) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+        if (profile?.role === "trainer") {
+          const { loadClientTrainerScope } = await import("@/app/utils/trainerAcademicScope.client");
+          const scope = await loadClientTrainerScope(uid, centerId);
+          allowedGroupes = scope.empty ? new Set() : scope.groupeIds;
+        }
+      }
+
       let grpQuery = supabase.from("groupes").select("id, nom").eq("filiere_id", selectedSubject.filiere_id);
       if (selectedSubject.niveau_id && !isTcfCanadaCenter(centerType)) {
         grpQuery = grpQuery.eq("niveau_id", selectedSubject.niveau_id);
       }
       const { data: grpData } = await grpQuery;
-      setGroupes(grpData || []);
+      const groupesList = allowedGroupes
+        ? (grpData || []).filter((g) => allowedGroupes!.has(g.id))
+        : (grpData || []);
+      setGroupes(groupesList);
 
       let enrollQuery = supabase
         .from("enrollments")
@@ -346,15 +377,17 @@ export default function TrainerDevoirsPage() {
       }
       const { data: enrollData } = await enrollQuery;
 
-      setStudents((enrollData || []).map((e: any) => ({
-        id: e.student_id,
-        prenom: e.profiles?.prenom || "",
-        nom: e.profiles?.nom || "",
-        enrollment_id: e.id,
-        groupe_id: e.groupe_id || null,
-      })).sort((a: StudentOption, b: StudentOption) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)));
+      setStudents((enrollData || [])
+        .filter((e: any) => !allowedGroupes || (e.groupe_id && allowedGroupes.has(e.groupe_id)))
+        .map((e: any) => ({
+          id: e.student_id,
+          prenom: e.profiles?.prenom || "",
+          nom: e.profiles?.nom || "",
+          enrollment_id: e.id,
+          groupe_id: e.groupe_id || null,
+        })).sort((a: StudentOption, b: StudentOption) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)));
     })();
-  }, [selectedSubject, centerType]);
+  }, [selectedSubject, centerType, centerId]);
 
   // ============================================================
   // CRÉER UN DEVOIR
@@ -387,6 +420,15 @@ export default function TrainerDevoirsPage() {
     }
     if (targetType === "students" && targetStudentIds.length === 0) {
       setError("Sélectionnez au moins un élève."); return;
+    }
+    // Formateur univ : « Tous » = toutes SES promotions (jamais toute la filière DB).
+    if (
+      targetType === "all"
+      && userRole === "trainer"
+      && centerType === "universite"
+      && groupes.length === 0
+    ) {
+      setError("Aucune promotion dans votre périmètre."); return;
     }
     if (!selectedSubject || !centerId || !userId) return;
     setSaving(true); setError("");
@@ -440,9 +482,30 @@ export default function TrainerDevoirsPage() {
     }
 
     if (targetType === "groupes" && targetGroupeIds.length > 0) {
-      await supabase.from("mission_groupes").insert(
+      const { error: mgErr } = await supabase.from("mission_groupes").insert(
         targetGroupeIds.map(gid => ({ mission_id: newMission.id, groupe_id: gid }))
       );
+      if (mgErr) {
+        await supabase.from("missions").delete().eq("id", newMission.id);
+        setError(mgErr.message || "Impossible d'attacher les promotions.");
+        setSaving(false);
+        return;
+      }
+    } else if (
+      targetType === "all"
+      && userRole === "trainer"
+      && centerType === "universite"
+      && groupes.length > 0
+    ) {
+      const { error: mgErr } = await supabase.from("mission_groupes").insert(
+        groupes.map((g) => ({ mission_id: newMission.id, groupe_id: g.id })),
+      );
+      if (mgErr) {
+        await supabase.from("missions").delete().eq("id", newMission.id);
+        setError(mgErr.message || "Impossible d'attacher les promotions.");
+        setSaving(false);
+        return;
+      }
     }
 
     if (targetType === "students" && targetStudentIds.length > 0) {
@@ -457,6 +520,7 @@ export default function TrainerDevoirsPage() {
     } else if (targetType === "groupes") {
       notifyStudents = students.filter(s => s.groupe_id && targetGroupeIds.includes(s.groupe_id));
     }
+    // « all » formateur univ : students déjà filtrés au chargement (périmètre)
 
     if (notifyStudents.length > 0) {
       const notifications = notifyStudents.map(s => ({

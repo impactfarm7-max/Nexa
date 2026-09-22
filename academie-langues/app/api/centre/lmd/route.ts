@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { campusAllowed, getCenterStaffContext, requireCenterPermission, supabaseAdmin as db } from "@/app/utils/center-auth-server";
-import { loadLmdProgress } from "@/app/utils/lmd-progress.server";
+import { loadLmdProgress, loadOptionalUeInscriptions } from "@/app/utils/lmd-progress.server";
 import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 import { diplomaBlockers, emptyAcademicCase, parseAcademicCase } from "@/app/utils/lmd-academic";
 
@@ -42,9 +42,22 @@ export async function GET(req: Request) {
     }
     const { data: groups, error: groupError } = await db.from("groupes").select("id, nom, semestre_id").eq("filiere_id", c.source!.filiere_id).eq("niveau_id", c.source!.niveau_id);
     if (groupError) throw groupError;
-    return NextResponse.json({ progress: c.progress, record, events, groups, migrationRequired,
+    const ueInscriptions = await loadOptionalUeInscriptions(
+      db,
+      c.source!.id,
+      c.source!.filiere_id,
+      c.source!.semestre_id,
+    );
+    return NextResponse.json({
+      progress: c.progress,
+      record,
+      events,
+      groups,
+      migrationRequired,
       canManage: ["center_manager", "manager", "campus_manager", "admin"].includes(c.ctx!.role),
-      blockers: diplomaBlockers(record?.dossier || emptyAcademicCase, c.progress, new Date().toISOString().slice(0, 10)) });
+      blockers: diplomaBlockers(record?.dossier || emptyAcademicCase, c.progress, new Date().toISOString().slice(0, 10)),
+      ...ueInscriptions,
+    });
   } catch (e) {
     console.error("[lmd] read", e);
     return fail("Impossible de charger le dossier LMD.", 500);
@@ -71,6 +84,52 @@ export async function POST(req: Request) {
       const { error } = await db.from("enrollments").update({ semestre_id: semester.id, groupe_id: body.groupe_id || null }).eq("id", source.id).eq("status", "active");
       if (error) throw error;
       return NextResponse.json({ success: true });
+    }
+    if (body.action === "ue_choices") {
+      if (source.status !== "active") return fail("Une inscription active est requise.");
+      if (!source.semestre_id) return fail("Attribuez d'abord un semestre.");
+      const requested: string[] = Array.isArray(body.ue_ids)
+        ? body.ue_ids.map((id: unknown) => String(id))
+        : [];
+      const { data: optionalRows, error: optErr } = await db
+        .from("filiere_matieres")
+        .select("id")
+        .eq("filiere_id", source.filiere_id)
+        .eq("semestre_id", source.semestre_id)
+        .eq("is_optional", true);
+      if (optErr) {
+        if (["42703", "PGRST204"].includes(optErr.code || "")) {
+          return fail("Colonne is_optional absente — exécutez supabase-inscription-pedagogique-ue-2026-09-22.sql.", 503);
+        }
+        throw optErr;
+      }
+      const allowed = new Set<string>((optionalRows || []).map((r) => String(r.id)));
+      const ueIds = requested.filter((id) => allowed.has(id));
+      const uniqueUeIds = [...new Set(ueIds)];
+
+      const { error: delErr } = await db
+        .from("enrollment_ue_inscriptions")
+        .delete()
+        .eq("enrollment_id", source.id)
+        .in("filiere_matiere_id", [...allowed]);
+      if (delErr) {
+        if (["42P01", "PGRST205"].includes(delErr.code || "")) {
+          return fail("Table inscriptions UE absente — exécutez supabase-inscription-pedagogique-ue-2026-09-22.sql.", 503);
+        }
+        throw delErr;
+      }
+
+      if (uniqueUeIds.length) {
+        const { error: insErr } = await db.from("enrollment_ue_inscriptions").insert(
+          uniqueUeIds.map((filiere_matiere_id) => ({
+            enrollment_id: source.id,
+            filiere_matiere_id,
+            created_by: c.ctx!.user.id,
+          })),
+        );
+        if (insErr) throw insErr;
+      }
+      return NextResponse.json({ success: true, selectedUeIds: uniqueUeIds });
     }
     if (body.action === "recover") {
       if (source.status !== "active") return fail("Une inscription active est requise.");

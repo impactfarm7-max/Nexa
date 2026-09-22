@@ -25,6 +25,7 @@ import { downloadClassGradeSheetPdf } from "@/app/utils/centerPdfExport";
 import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 import { evaluateLmdUe } from "@/app/utils/lmd-results";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
+import { formatUeDisplayName } from "@/app/utils/univAcademicVocab";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { ACTION_TONE } from "@/app/utils/action-tones";
 
@@ -59,6 +60,7 @@ type TeachingSubject = {
   /** UE d'une filière LMD (centre universite) uniquement. */
   semestre_id: string | null;
   credits: number | null;
+  course_format: "cm" | "td" | "tp" | null;
 };
 
 type PeriodOption = {
@@ -113,6 +115,7 @@ function mapSubject(fm: any, filiereMatiereId?: string): TeachingSubject {
     grade_weights: parseGradeWeights(fm?.grade_weights),
     semestre_id: fm?.semestre_id || null,
     credits: fm?.credits != null ? Number(fm.credits) : null,
+    course_format: fm?.course_format === "cm" || fm?.course_format === "td" || fm?.course_format === "tp" ? fm.course_format : null,
   };
 }
 
@@ -400,13 +403,19 @@ export default function GradeBookPage() {
       );
 
       const fmSelectBase = `
-        id, filiere_id, niveau_id, annee, discipline_id, coefficient, max_score, semestre_id, credits,
+        id, filiere_id, niveau_id, annee, discipline_id, coefficient, max_score, semestre_id, credits, course_format,
         exam_disciplines(id, name),
         filieres(name, center_id, type),
         niveaux(annee)
       `;
       const fmSelectWithWeights = `
-        id, filiere_id, niveau_id, annee, discipline_id, coefficient, max_score, grade_weights, semestre_id, credits,
+        id, filiere_id, niveau_id, annee, discipline_id, coefficient, max_score, grade_weights, semestre_id, credits, course_format,
+        exam_disciplines(id, name),
+        filieres(name, center_id, type),
+        niveaux(annee)
+      `;
+      const fmSelectLegacy = `
+        id, filiere_id, niveau_id, annee, discipline_id, coefficient, max_score, semestre_id, credits,
         exam_disciplines(id, name),
         filieres(name, center_id, type),
         niveaux(annee)
@@ -430,12 +439,43 @@ export default function GradeBookPage() {
             .from("matiere_formateurs")
             .select(`filiere_matiere_id, filiere_matieres(${fmSelectBase})`)
             .eq("formateur_id", session.user.id);
-          rows = fb.data as any[] | null;
+          if (fb.error) {
+            const fb2 = await supabase
+              .from("matiere_formateurs")
+              .select(`filiere_matiere_id, filiere_matieres(${fmSelectLegacy})`)
+              .eq("formateur_id", session.user.id);
+            rows = fb2.data as any[] | null;
+          } else {
+            rows = fb.data as any[] | null;
+          }
         }
         subjects = (rows || [])
-          .filter((mf: any) => mf.filiere_matieres)
+          .filter((mf: any) => {
+            const fm = mf.filiere_matieres;
+            if (!fm) return false;
+            const center = fm.filieres?.center_id;
+            return center === cId;
+          })
           .map((mf: any) => mapSubject(mf.filiere_matieres, mf.filiere_matiere_id));
-        const gids = (fgData || []).map((r: { groupe_id: string }) => r.groupe_id);
+        // Groupes : ne garder que ceux des filières du centre (via scope UE filtrées)
+        const centerFiliereIds = new Set(
+          subjects.map((s) => s.filiere_id).filter(Boolean),
+        );
+        let gids = (fgData || []).map((r: { groupe_id: string }) => r.groupe_id);
+        if (gids.length > 0 && centerFiliereIds.size > 0) {
+          const { data: gMeta } = await supabase
+            .from("groupes")
+            .select("id, filiere_id, niveaux(filiere_id)")
+            .in("id", gids);
+          gids = (gMeta || [])
+            .filter((g) => {
+              const niv = g.niveaux as { filiere_id?: string } | { filiere_id?: string }[] | null;
+              const nivFil = Array.isArray(niv) ? niv[0]?.filiere_id : niv?.filiere_id;
+              const fid = g.filiere_id || nivFil;
+              return !!fid && centerFiliereIds.has(fid);
+            })
+            .map((g) => g.id);
+        }
         setTrainerGroupeIds(gids.length > 0 ? gids : null);
       } else {
         const { data: fmData, error: fmErr } = await supabase
@@ -448,7 +488,15 @@ export default function GradeBookPage() {
             .from("filiere_matieres")
             .select(fmSelectBase)
             .eq("filieres.center_id", cId);
-          rows = fb.data as any[] | null;
+          if (fb.error) {
+            const fb2 = await supabase
+              .from("filiere_matieres")
+              .select(fmSelectLegacy)
+              .eq("filieres.center_id", cId);
+            rows = fb2.data as any[] | null;
+          } else {
+            rows = fb.data as any[] | null;
+          }
         }
         subjects = (rows || [])
           .filter((fm: any) => fm.filieres?.center_id === cId)
@@ -852,7 +900,7 @@ export default function GradeBookPage() {
   };
 
   const saveAll = async () => {
-    if (!userId || !selectedSubject || !selectedPeriodId) return;
+    if (!userId || !selectedSubject || !selectedPeriodId || !selectedGroupeId) return;
     const hasWork = studentRows.some((r) => r.dirty || r.extras.some((ex) => ex.dirty || ex.deleted));
     if (!hasWork) return;
 
@@ -862,11 +910,16 @@ export default function GradeBookPage() {
     const titleByCol = new Map(suplColumns.map((c) => [c.colKey, c.title.trim()]));
 
     try {
-      // Clone pour mise à jour locale après succès (sans reload)
       const nextRows: StudentGradeRow[] = studentRows.map((r) => ({
         ...r,
         extras: r.extras.map((ex) => ({ ...ex })),
       }));
+
+      type GradeOp =
+        | { op: "upsert"; enrollment_id: string; grade_id?: string | null; score: number; max_score: number; title: string | null; rowIndex: number; kind: "principal" | "extra"; colKey?: string }
+        | { op: "delete"; grade_id: string; rowIndex: number; colKey: string };
+
+      const ops: GradeOp[] = [];
 
       for (let i = 0; i < nextRows.length; i++) {
         const row = nextRows[i];
@@ -877,96 +930,108 @@ export default function GradeBookPage() {
           if (score > maxScore) {
             throw new Error(`${row.nom} ${row.prenom} : ${t("centre", "notesScoreAboveScale", { scale: String(maxScore) })}`);
           }
-          if (row.existing_grade_id) {
-            const { error: upErr } = await supabase
-              .from("grades")
-              .update({ score, max_score: maxScore, title: null })
-              .eq("id", row.existing_grade_id);
-            if (upErr) throw new Error(`${row.nom} ${row.prenom} : ${upErr.message}`);
-            row.existing_score = score;
-            row.dirty = false;
-          } else {
-            const { data: inserted, error: insErr } = await supabase
-              .from("grades")
-              .insert({
-                enrollment_id: row.enrollment_id,
-                filiere_matiere_id: selectedSubject.filiere_matiere_id,
-                period_id: selectedPeriodId,
-                formateur_id: userId,
-                score,
-                max_score: maxScore,
-                title: null,
-              })
-              .select("id")
-              .single();
-            if (insErr || !inserted) throw new Error(`${row.nom} ${row.prenom} : ${insErr?.message || "insert"}`);
-            row.existing_grade_id = inserted.id;
-            row.existing_score = score;
-            row.dirty = false;
-          }
+          ops.push({
+            op: "upsert",
+            enrollment_id: row.enrollment_id,
+            grade_id: row.existing_grade_id,
+            score,
+            max_score: maxScore,
+            title: null,
+            rowIndex: i,
+            kind: "principal",
+          });
         }
 
-        const keptExtras: ExtraCell[] = [];
         for (const ex of row.extras) {
           if (ex.deleted && ex.id) {
-            const { error: delErr } = await supabase.from("grades").delete().eq("id", ex.id);
-            if (delErr) throw new Error(`${row.nom} ${row.prenom} : ${delErr.message}`);
+            ops.push({ op: "delete", grade_id: ex.id, rowIndex: i, colKey: ex.colKey });
             continue;
           }
-          if (ex.deleted) continue;
-
-          if (!ex.dirty) {
-            keptExtras.push(ex);
-            continue;
-          }
+          if (ex.deleted || !ex.dirty) continue;
 
           const title = titleByCol.get(ex.colKey) || "";
           const score = parseFloat(ex.score);
           const hasScore = ex.score.trim() !== "" && !isNaN(score);
 
-          // Colonne vide partout → ignorer
-          if (!hasScore && !ex.id) {
-            keptExtras.push({ ...ex, dirty: false });
-            continue;
-          }
-
-          if (!title) {
-            throw new Error(t("centre", "notesExtraColumnTitleRequired"));
-          }
-          if (!hasScore) {
-            keptExtras.push({ ...ex, dirty: false });
-            continue;
-          }
+          if (!hasScore && !ex.id) continue;
+          if (!title) throw new Error(t("centre", "notesExtraColumnTitleRequired"));
+          if (!hasScore) continue;
           if (score < 0 || score > maxScore) {
             throw new Error(`${row.nom} ${row.prenom} (${title}) : ${t("centre", "gradesAboveScale", { scale: String(maxScore) })}`);
           }
 
-          if (ex.id) {
-            const { error: upErr } = await supabase
-              .from("grades")
-              .update({ title, score, max_score: maxScore })
-              .eq("id", ex.id);
-            if (upErr) throw new Error(`${row.nom} ${row.prenom} : ${upErr.message}`);
-            keptExtras.push({ ...ex, dirty: false });
-          } else {
-            const { data: inserted, error: insErr } = await supabase
-              .from("grades")
-              .insert({
-                enrollment_id: row.enrollment_id,
-                filiere_matiere_id: selectedSubject.filiere_matiere_id,
-                period_id: selectedPeriodId,
-                formateur_id: userId,
-                score,
-                max_score: maxScore,
-                title,
-              })
-              .select("id")
-              .single();
-            if (insErr || !inserted) throw new Error(`${row.nom} ${row.prenom} : ${insErr?.message || "insert"}`);
-            keptExtras.push({ ...ex, id: inserted.id, dirty: false });
+          ops.push({
+            op: "upsert",
+            enrollment_id: row.enrollment_id,
+            grade_id: ex.id,
+            score,
+            max_score: maxScore,
+            title,
+            rowIndex: i,
+            kind: "extra",
+            colKey: ex.colKey,
+          });
+        }
+      }
+
+      if (ops.length === 0) {
+        setSaving(false);
+        return;
+      }
+
+      const res = await fetch("/api/centre/grades", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          filiere_matiere_id: selectedSubject.filiere_matiere_id,
+          period_id: selectedPeriodId,
+          groupe_id: selectedGroupeId,
+          ops: ops.map((op) => {
+            if (op.op === "delete") return { op: "delete" as const, grade_id: op.grade_id };
+            return {
+              op: "upsert" as const,
+              enrollment_id: op.enrollment_id,
+              grade_id: op.grade_id,
+              score: op.score,
+              max_score: op.max_score,
+              title: op.title,
+            };
+          }),
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload?.error || t("centre", "notesSaveError"));
+      }
+
+      const results: { op: string; grade_id: string | null; enrollment_id?: string; title?: string | null }[] =
+        Array.isArray(payload?.results) ? payload.results : [];
+
+      let resultIdx = 0;
+      for (const localOp of ops) {
+        const remote = results[resultIdx++];
+        if (localOp.op === "delete") {
+          const row = nextRows[localOp.rowIndex];
+          row.extras = row.extras.filter((ex) => ex.colKey !== localOp.colKey);
+          continue;
+        }
+        const row = nextRows[localOp.rowIndex];
+        if (localOp.kind === "principal") {
+          row.existing_grade_id = remote?.grade_id || row.existing_grade_id;
+          row.existing_score = localOp.score;
+          row.dirty = false;
+        } else if (localOp.colKey) {
+          const ex = row.extras.find((e) => e.colKey === localOp.colKey);
+          if (ex) {
+            ex.id = remote?.grade_id || ex.id;
+            ex.dirty = false;
           }
         }
-        row.extras = keptExtras;
+      }
+
+      // Nettoyer extras marqués deleted sans id (déjà ignorés côté API)
+      for (const row of nextRows) {
+        row.extras = row.extras.filter((ex) => !ex.deleted);
       }
 
       setStudentRows(nextRows);
@@ -1135,7 +1200,7 @@ export default function GradeBookPage() {
           ? (selectedNiveau.nom?.trim() || (selectedNiveau.annee != null ? t("centre", "notesLevelNumber", { number: selectedNiveau.annee }) : null))
           : (selectedSubject.niveau_annee != null ? t("centre", "notesLevelNumber", { number: selectedSubject.niveau_annee }) : null),
         classeName: selectedGroupe.nom,
-        matiereName: selectedSubject.discipline_name,
+        matiereName: formatUeDisplayName(selectedSubject.discipline_name, selectedSubject.course_format),
         periodLabel: selectedPeriod
           ? (selectedPeriod.parent_name ? `${selectedPeriod.parent_name} → ${selectedPeriod.name}` : selectedPeriod.name)
           : t("centre", "reportsPeriod"),
@@ -1322,7 +1387,7 @@ export default function GradeBookPage() {
               <>
                 {niveaux.length > 0 && <span className="hidden sm:block w-px h-4 bg-black/[0.08] shrink-0" />}
                 <div className="flex gap-1 flex-wrap items-center">
-                  <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">{t("centre", "identityClass")}</span>
+                  <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">{isUniversityLmd ? t("centre", "univPromotion") : t("centre", "identityClass")}</span>
                   {groupes.length === 0 ? (
                     <span className="text-[10px] text-neutral-400 italic">{t("centre", "notesNoClass")}</span>
                   ) : (
@@ -1352,7 +1417,7 @@ export default function GradeBookPage() {
                 <span className="hidden sm:block w-px h-4 bg-black/[0.08] shrink-0" />
                 <div className="relative w-full sm:min-w-[220px] sm:max-w-xs sm:flex-1 flex items-center gap-1.5" ref={subjectPickerRef}>
                   <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider shrink-0">
-                    {t("centre", "planningSubject")}
+                    {isUniversityLmd ? t("centre", "univUe") : t("centre", "planningSubject")}
                   </span>
                   {subjectsForContext.length === 0 ? (
                     <span className="text-[10px] text-neutral-400 italic">{t("centre", "notesNoSubject")}</span>
@@ -1364,7 +1429,9 @@ export default function GradeBookPage() {
                         className="w-full h-8 px-2.5 rounded-lg border border-black/[0.08] bg-white text-left text-xs font-semibold text-[#11224E] flex items-center justify-between gap-2 hover:border-[#11224E]/30"
                       >
                         <span className="truncate">
-                          {selectedSubject?.discipline_name || t("centre", "notesSearchSubjectPlaceholder")}
+                          {selectedSubject
+                            ? formatUeDisplayName(selectedSubject.discipline_name, selectedSubject.course_format)
+                            : t("centre", "notesSearchSubjectPlaceholder")}
                         </span>
                         <span className="text-[10px] font-bold text-neutral-400 shrink-0 tabular-nums">
                           {subjectsForContext.length}
@@ -1407,7 +1474,7 @@ export default function GradeBookPage() {
                                           : "text-neutral-700 hover:bg-black/[0.03]"
                                       }`}
                                     >
-                                      {s.discipline_name}
+                                      {formatUeDisplayName(s.discipline_name, s.course_format)}
                                     </button>
                                   </li>
                                 );
@@ -1513,7 +1580,11 @@ export default function GradeBookPage() {
                       </div>
                       <p className="text-base font-extrabold tracking-tight mb-2" style={{ color: BLUE }}>{f.name}</p>
                       <p className="text-[11px] font-semibold text-neutral-500 tabular-nums">
-                        {t("centre", count === 1 ? "notesSubjectCountOne" : "notesSubjectCountMany", { count })}
+                        {isUniversityLmd
+                          ? (count === 1
+                            ? (locale === "en" ? `${count} course unit` : `${count} UE`)
+                            : (locale === "en" ? `${count} course units` : `${count} UE`))
+                          : t("centre", count === 1 ? "notesSubjectCountOne" : "notesSubjectCountMany", { count })}
                       </p>
                       <p className="text-[11px] font-semibold text-neutral-600 tabular-nums mt-0.5">
                         {t("centre", f.student_count === 1 ? "notesLearnerCountOne" : "notesLearnerCountMany", { count: f.student_count })}

@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, Calendar, FileText, ArrowRight, Video } from "lucide-react";
+import { BookOpen, Calendar, ClipboardCheck, FileText, ArrowRight, Video } from "lucide-react";
 import {
   BLUE,
   CenterPageLayout,
@@ -10,6 +10,7 @@ import {
   CenterPageBody,
 } from "../center-page-ui";
 import { useI18n } from "@/app/i18n/I18nProvider";
+import { supabase } from "@/app/utils/supabase";
 
 type ModuleCardProps = {
   title: string;
@@ -20,10 +21,39 @@ type ModuleCardProps = {
 
 export default function CentreHubDashboard() {
   const { t } = useI18n();
+  const [isUniversite, setIsUniversite] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("center_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (!profile?.center_id) return;
+      const { data: center } = await supabase
+        .from("centers")
+        .select("center_type")
+        .eq("id", profile.center_id)
+        .maybeSingle();
+      setIsUniversite(center?.center_type === "universite");
+    })();
+  }, []);
+
   const trainerModules: ModuleCardProps[] = [
     { title: t("centre", "hubCoursesQuiz"), description: t("centre", "hubCoursesQuizDescription"), href: "/centre/cours/gestion-cours", icon: <BookOpen /> },
     { title: t("centre", "hubAssignmentsMissions"), description: t("centre", "hubAssignmentsDescription"), href: "/centre/cours/devoirs", icon: <FileText /> },
     { title: t("centre", "hubLiveSessions"), description: t("centre", "hubLiveDescription"), href: "/centre/lives", icon: <Video /> },
+    ...(isUniversite
+      ? [{
+          title: "Assiduité",
+          description: "Présent / absent par séance datée (pas de suivi amphithéâtre).",
+          href: "/centre/cours/assiduite",
+          icon: <ClipboardCheck />,
+        }]
+      : []),
   ];
   const adminModules: ModuleCardProps[] = [
     { title: t("centre", "hubSchedule"), description: t("centre", "hubScheduleDescription"), href: "/centre/cours/planning", icon: <Calendar /> },

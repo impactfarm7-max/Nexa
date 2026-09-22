@@ -1,41 +1,39 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { getAuthUser } from "@/app/utils/auth-server";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-const STAFF_ROLES = ["center_manager", "campus_manager", "trainer", "staff"];
-
-async function getStaffProfile(userId: string) {
-  const { data: profile } = await supabaseAdmin
-    .from("profiles")
-    .select("id, role, center_id")
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (!profile?.center_id || !STAFF_ROLES.includes(profile.role)) return null;
-  return profile;
-}
+import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-server";
+import {
+  getTrainerAcademicScope,
+  isTrainerLeastPrivilege,
+} from "@/app/utils/trainerAcademicScope.server";
 
 /** Liste toutes les soumissions en attente de correction manuelle du centre. */
 export async function GET(req: Request) {
-  const user = await getAuthUser(req);
-  if (!user) return NextResponse.json({ error: "Non autorisé." }, { status: 401 });
+  const auth = await getCenterStaffContext(req);
+  if (auth.error) return auth.error;
 
-  const profile = await getStaffProfile(user.id);
-  if (!profile) return NextResponse.json({ error: "Accès refusé." }, { status: 403 });
+  const trainerScope = isTrainerLeastPrivilege(auth.ctx)
+    ? await getTrainerAcademicScope(supabaseAdmin, auth.ctx.user.id, auth.ctx.centerId)
+    : null;
+  if (trainerScope?.empty) {
+    return NextResponse.json({ items: [], count: 0, by_mission: {} });
+  }
 
   const { data: missions } = await supabaseAdmin
     .from("missions")
     .select("id, title, filiere_matiere_id, correction_mode, formateur_id")
-    .eq("center_id", profile.center_id);
+    .eq("center_id", auth.ctx.centerId);
 
-  const missionIds = (missions ?? []).map((m) => m.id);
+  let missionList = missions ?? [];
+  if (trainerScope) {
+    missionList = missionList.filter(
+      (m) =>
+        m.formateur_id === auth.ctx.user.id
+        || (m.filiere_matiere_id && trainerScope.filiereMatiereIds.has(m.filiere_matiere_id)),
+    );
+  }
+
+  const missionIds = missionList.map((m) => m.id);
   if (missionIds.length === 0) {
-    return NextResponse.json({ items: [], count: 0 });
+    return NextResponse.json({ items: [], count: 0, by_mission: {} });
   }
 
   const { data: subs, error } = await supabaseAdmin
@@ -50,7 +48,28 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const userIds = [...new Set((subs ?? []).map((s) => s.user_id).filter(Boolean))];
+  let filteredSubs = subs ?? [];
+  if (trainerScope && filteredSubs.length > 0) {
+    const studentIds = [...new Set(filteredSubs.map((s) => s.user_id).filter(Boolean))];
+    const { data: enrollments } = await supabaseAdmin
+      .from("enrollments")
+      .select("student_id, groupe_id, filieres(center_id)")
+      .in("student_id", studentIds)
+      .in("status", ["active", "completed"]);
+
+    const allowedStudents = new Set<string>();
+    for (const e of enrollments || []) {
+      const f = e.filieres as { center_id?: string } | { center_id?: string }[] | null;
+      const c = Array.isArray(f) ? f[0]?.center_id : f?.center_id;
+      if (!c || c !== auth.ctx.centerId) continue;
+      if (e.groupe_id && trainerScope.groupeIds.has(e.groupe_id)) {
+        allowedStudents.add(e.student_id);
+      }
+    }
+    filteredSubs = filteredSubs.filter((s) => allowedStudents.has(s.user_id));
+  }
+
+  const userIds = [...new Set(filteredSubs.map((s) => s.user_id).filter(Boolean))];
   const profileById = new Map<string, { prenom: string | null; nom: string | null }>();
   if (userIds.length > 0) {
     const { data: profiles } = await supabaseAdmin
@@ -62,9 +81,10 @@ export async function GET(req: Request) {
     }
   }
 
-  const missionById = new Map((missions ?? []).map((m) => [m.id, m]));
+  const missionById = new Map(missionList.map((m) => [m.id, m]));
+  const filteredMissionIds = new Set(filteredSubs.map((s) => s.mission_id));
 
-  const items = (subs ?? []).map((s: any) => {
+  const items = filteredSubs.map((s) => {
     const mission = missionById.get(s.mission_id);
     const student = profileById.get(s.user_id);
     return {
@@ -83,11 +103,34 @@ export async function GET(req: Request) {
 
   const { data: allSubs } = await supabaseAdmin
     .from("mission_submissions")
-    .select("mission_id, status")
+    .select("mission_id, status, user_id")
     .in("mission_id", missionIds);
 
+  let allForStats = allSubs ?? [];
+  if (trainerScope && allForStats.length > 0) {
+    const studentIds = [...new Set(allForStats.map((s) => s.user_id).filter(Boolean))];
+    const { data: enrollments } = await supabaseAdmin
+      .from("enrollments")
+      .select("student_id, groupe_id, filieres(center_id)")
+      .in("student_id", studentIds)
+      .in("status", ["active", "completed"]);
+    const allowedStudents = new Set<string>();
+    for (const e of enrollments || []) {
+      const f = e.filieres as { center_id?: string } | { center_id?: string }[] | null;
+      const c = Array.isArray(f) ? f[0]?.center_id : f?.center_id;
+      if (c && c !== auth.ctx.centerId) continue;
+      if (e.groupe_id && trainerScope.groupeIds.has(e.groupe_id)) {
+        allowedStudents.add(e.student_id);
+      }
+    }
+    allForStats = allForStats.filter((s) => allowedStudents.has(s.user_id));
+  }
+
   const by_mission: Record<string, { total: number; pending: number }> = {};
-  for (const s of allSubs ?? []) {
+  for (const s of allForStats) {
+    if (trainerScope && !filteredMissionIds.has(s.mission_id) && !missionIds.includes(s.mission_id)) {
+      continue;
+    }
     if (!by_mission[s.mission_id]) by_mission[s.mission_id] = { total: 0, pending: 0 };
     by_mission[s.mission_id].total++;
     if (s.status === "pending_review" || s.status === "correcting") {

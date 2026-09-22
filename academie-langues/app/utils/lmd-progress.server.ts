@@ -15,12 +15,60 @@ export async function loadLmdProgress(db: SupabaseClient, enrollmentId: string, 
   const { data: semesters, error: semesterError } = await db.from("semestres").select("id, niveau_id, ordre, nom").in("niveau_id", levels.map(l => l.id));
   if (semesterError) throw semesterError;
   if (!semesters?.length) return null;
-  const { data: rows, error: ueError } = await db.from("filiere_matieres")
-    .select("id, semestre_id, niveau_id, credits, max_score, grade_weights, exam_disciplines(name)")
+
+  type UeRow = {
+    id: string;
+    semestre_id: string;
+    niveau_id: string;
+    credits: number | null;
+    max_score: number;
+    grade_weights?: unknown;
+    is_optional?: boolean | null;
+    exam_disciplines: { name?: string } | { name?: string }[] | null;
+  };
+
+  let rows: UeRow[] = [];
+  const withOptional = await db.from("filiere_matieres")
+    .select("id, semestre_id, niveau_id, credits, max_score, grade_weights, is_optional, exam_disciplines(name)")
     .eq("filiere_id", source.filiere_id).in("semestre_id", semesters.map(s => s.id));
-  if (ueError) throw ueError;
-  const ues: LmdUe[] = (rows || []).map(row => ({ ...row, name: (row.exam_disciplines as unknown as { name?: string } | null)?.name || "UE", credits: Number(row.credits) || 0, creditsConfigured: row.credits != null && Number.isInteger(Number(row.credits)) && Number(row.credits) >= 0 }));
+  if (withOptional.error && ["42703", "PGRST204"].includes(withOptional.error.code || "")) {
+    const fallback = await db.from("filiere_matieres")
+      .select("id, semestre_id, niveau_id, credits, max_score, grade_weights, exam_disciplines(name)")
+      .eq("filiere_id", source.filiere_id).in("semestre_id", semesters.map(s => s.id));
+    if (fallback.error) throw fallback.error;
+    rows = (fallback.data || []).map((r) => ({ ...(r as UeRow), is_optional: false }));
+  } else if (withOptional.error) {
+    throw withOptional.error;
+  } else {
+    rows = (withOptional.data || []) as UeRow[];
+  }
+
   const ids = (enrollments || []).map(e => e.id);
+  const chosenOptionalIds = new Set<string>();
+  if (ids.length) {
+    const { data: choices, error: choiceErr } = await db
+      .from("enrollment_ue_inscriptions")
+      .select("filiere_matiere_id")
+      .in("enrollment_id", ids);
+    if (choiceErr && !["42P01", "PGRST205"].includes(choiceErr.code || "")) throw choiceErr;
+    for (const c of choices || []) {
+      if (c.filiere_matiere_id) chosenOptionalIds.add(c.filiere_matiere_id);
+    }
+  }
+
+  const ues: LmdUe[] = rows
+    .filter((row) => !row.is_optional || chosenOptionalIds.has(row.id))
+    .map((row) => {
+      const disc = row.exam_disciplines;
+      const name = Array.isArray(disc) ? disc[0]?.name : disc?.name;
+      return {
+        ...row,
+        name: name || "UE",
+        credits: Number(row.credits) || 0,
+        creditsConfigured: row.credits != null && Number.isInteger(Number(row.credits)) && Number(row.credits) >= 0,
+      };
+    });
+
   const grades: LmdGrade[] = [];
   if (ids.length && ues.length) {
     for (let offset = 0; ; offset += 500) {
@@ -39,4 +87,55 @@ export async function loadLmdProgress(db: SupabaseClient, enrollmentId: string, 
     return year != null && currentYear != null && (year < currentYear || (year === currentYear && currentSemester && s.ordre < currentSemester.ordre));
   }).map(s => s.id);
   return { ...computeLmdProgress(ues, grades || [], thresholdPct, source.niveau_id, past), source, semesters };
+}
+
+/** UE optionnelles du semestre courant + sélection pour une inscription. */
+export async function loadOptionalUeInscriptions(
+  db: SupabaseClient,
+  enrollmentId: string,
+  filiereId: string,
+  semestreId: string | null,
+) {
+  if (!semestreId) {
+    return { optionalUes: [] as { id: string; name: string; credits: number }[], selectedUeIds: [] as string[] };
+  }
+
+  const q = await db.from("filiere_matieres")
+    .select("id, credits, is_optional, exam_disciplines(name)")
+    .eq("filiere_id", filiereId)
+    .eq("semestre_id", semestreId)
+    .eq("is_optional", true);
+  if (q.error && ["42703", "PGRST204"].includes(q.error.code || "")) {
+    return { optionalUes: [], selectedUeIds: [] as string[] };
+  }
+  if (q.error) throw q.error;
+
+  const optionalRows = q.data || [];
+  const { data: selected, error: selErr } = await db
+    .from("enrollment_ue_inscriptions")
+    .select("filiere_matiere_id")
+    .eq("enrollment_id", enrollmentId);
+  if (selErr && ["42P01", "PGRST205"].includes(selErr.code || "")) {
+    return {
+      optionalUes: optionalRows.map((r) => {
+        const disc = r.exam_disciplines as { name?: string } | { name?: string }[] | null;
+        const name = Array.isArray(disc) ? disc[0]?.name : disc?.name;
+        return { id: r.id, name: name || "UE", credits: Number(r.credits) || 0 };
+      }),
+      selectedUeIds: [] as string[],
+    };
+  }
+  if (selErr) throw selErr;
+
+  const optionalIds = new Set(optionalRows.map((r) => r.id));
+  return {
+    optionalUes: optionalRows.map((r) => {
+      const disc = r.exam_disciplines as { name?: string } | { name?: string }[] | null;
+      const name = Array.isArray(disc) ? disc[0]?.name : disc?.name;
+      return { id: r.id, name: name || "UE", credits: Number(r.credits) || 0 };
+    }),
+    selectedUeIds: (selected || [])
+      .map((s) => s.filiere_matiere_id)
+      .filter((id): id is string => Boolean(id) && optionalIds.has(id)),
+  };
 }

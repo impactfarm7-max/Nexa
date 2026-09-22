@@ -35,6 +35,30 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
   const isStaff = !!profile && STAFF_ROLES.includes(profile.role || "");
 
+  let trainerRoomIds: Set<string> | null = null;
+  if (isStaff && profile!.role === "trainer" && profile!.center_id) {
+    const { data: center } = await supabaseAdmin
+      .from("centers")
+      .select("center_type")
+      .eq("id", profile!.center_id)
+      .maybeSingle();
+    if (center?.center_type === "universite") {
+      const { getTrainerAcademicScope, communityRoomInTrainerScope } = await import(
+        "@/app/utils/trainerAcademicScope.server"
+      );
+      const scope = await getTrainerAcademicScope(supabaseAdmin, user.id, profile!.center_id);
+      const { data: rooms } = await supabaseAdmin
+        .from("community_rooms")
+        .select("id, groupe_id, filiere_id, type")
+        .eq("center_id", profile!.center_id);
+      trainerRoomIds = new Set(
+        (rooms || [])
+          .filter((r) => communityRoomInTrainerScope(scope, r))
+          .map((r) => r.id),
+      );
+    }
+  }
+
   const { data: memberships } = await supabaseAdmin
     .from("community_room_members")
     .select("room_id")
@@ -47,8 +71,11 @@ export async function POST(req: NextRequest) {
     try {
       const path = resolveStoragePath("community-files", url);
       const [centerId, roomId] = path.split("/");
-      const authorized =
-        (isStaff && profile!.center_id === centerId) || memberRoomIds.has(roomId);
+      const staffOk =
+        isStaff
+        && profile!.center_id === centerId
+        && (trainerRoomIds == null || trainerRoomIds.has(roomId));
+      const authorized = staffOk || memberRoomIds.has(roomId);
       signed[url] = authorized ? await getSignedStorageUrl("community-files", url, 3600) : null;
     } catch {
       signed[url] = null;

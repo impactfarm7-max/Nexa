@@ -151,7 +151,7 @@ export default function ExamensHubPage() {
             <>
               <HubCard
                 title="Convocations d'examens"
-                description="Épreuve, date, salle — convoquez des classes ou des étudiants. PDF côté étudiant."
+                description="Épreuve, date, salle — convoquez des promotions ou des étudiants. PDF côté étudiant."
                 href="/centre/examens/convocations"
                 icon={<Calendar className="h-6 w-6" style={{ color: BLUE }} />}
               />

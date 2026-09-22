@@ -15,6 +15,8 @@ type Payload = {
   migrationRequired: boolean;
   canManage: boolean;
   blockers: string[];
+  optionalUes?: { id: string; name: string; credits: number }[];
+  selectedUeIds?: string[];
 };
 const input = "w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm disabled:opacity-60";
 const button = "rounded-lg bg-[#11224E] px-4 py-2 text-sm font-semibold text-white disabled:opacity-40";
@@ -33,6 +35,7 @@ export default function LmdAcademicPanel({ enrollmentId, onChanged }: { enrollme
   const [group, setGroup] = useState("");
   const [scores, setScores] = useState<Record<string, string>>({});
   const [confirmIssue, setConfirmIssue] = useState(false);
+  const [selectedOptionalIds, setSelectedOptionalIds] = useState<string[]>([]);
   const headers = async () => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error(en ? "Session expired." : "Session expirée.");
@@ -49,6 +52,7 @@ export default function LmdAcademicPanel({ enrollmentId, onChanged }: { enrollme
     setDossier(result.record?.dossier || emptyAcademicCase);
     setSemester(result.progress.source.semestre_id || "");
     setGroup(result.progress.source.groupe_id || "");
+    setSelectedOptionalIds(result.selectedUeIds || []);
     setConfirmIssue(false);
     // Session is resolved on every request; locale does not change the data scope.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,7 +67,7 @@ export default function LmdAcademicPanel({ enrollmentId, onChanged }: { enrollme
       if (!response.ok) throw new Error(result.error);
       await load();
       setMessage(en ? "Saved." : "Enregistré.");
-      if (action === "semester" || action === "recover") onChanged();
+      if (action === "semester" || action === "recover" || action === "ue_choices") onChanged();
     } catch (e) { setError(e instanceof Error ? e.message : "Erreur"); }
     finally { setBusy(false); }
   };
@@ -107,10 +111,51 @@ export default function LmdAcademicPanel({ enrollmentId, onChanged }: { enrollme
       <p className="text-xs text-neutral-500">{en ? "The annual enrollment and tuition stay the same. Outstanding UE remain visible." : "L'inscription annuelle et les frais sont conservés. Les UE en dette restent visibles."}</p>
       <div className="flex flex-wrap gap-2">
         <select aria-label={en ? "Semester" : "Semestre"} className={`${input} flex-1`} value={semester} disabled={busy} onChange={e => { setSemester(e.target.value); setGroup(""); }}><option value="">—</option>{data.progress.semesters.filter(s => s.niveau_id === data.progress.source.niveau_id).sort((a,b) => a.ordre-b.ordre).map(s => <option key={s.id} value={s.id}>{s.nom || `${en ? "Semester" : "Semestre"} ${s.ordre}`}</option>)}</select>
-        <select aria-label={en ? "Class" : "Classe"} className={`${input} flex-1`} disabled={busy} value={group} onChange={e => setGroup(e.target.value)}><option value="">{en ? "No class assigned" : "Sans classe attribuée"}</option>{data.groups.filter(g => g.semestre_id === semester).map(g => <option key={g.id} value={g.id}>{g.nom}</option>)}</select>
+        <select aria-label={en ? "Cohort" : "Promotion"} className={`${input} flex-1`} disabled={busy} value={group} onChange={e => setGroup(e.target.value)}><option value="">{en ? "No cohort assigned" : "Sans promotion attribuée"}</option>{data.groups.filter(g => g.semestre_id === semester).map(g => <option key={g.id} value={g.id}>{g.nom}</option>)}</select>
         <button type="button" className={button} disabled={busy || !semester} onClick={() => void act("semester", { semestre_id: semester, groupe_id: group })}>{en ? "Confirm semester" : "Confirmer le semestre"}</button>
       </div>
     </div>}
+    {data.canManage && (data.optionalUes?.length ?? 0) > 0 && (
+      <div className="space-y-2">
+        <h3 className="font-semibold">{en ? "Optional course units (this semester)" : "UE optionnelles (ce semestre)"}</h3>
+        <p className="text-xs text-neutral-500">
+          {en
+            ? "Compulsory units are automatic. Tick the optional units this student takes."
+            : "Les UE obligatoires sont automatiques. Cochez les UE optionnelles suivies par cet étudiant."}
+        </p>
+        <ul className="space-y-1.5 rounded-lg border bg-white p-3">
+          {(data.optionalUes || []).map((ue) => {
+            const checked = selectedOptionalIds.includes(ue.id);
+            return (
+              <li key={ue.id}>
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    disabled={busy}
+                    checked={checked}
+                    onChange={() => {
+                      setSelectedOptionalIds((prev) =>
+                        checked ? prev.filter((id) => id !== ue.id) : [...prev, ue.id],
+                      );
+                    }}
+                  />
+                  <span className="flex-1">{ue.name}</span>
+                  <span className="text-neutral-400">{ue.credits} cr.</span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+        <button
+          type="button"
+          className={button}
+          disabled={busy}
+          onClick={() => void act("ue_choices", { ue_ids: selectedOptionalIds })}
+        >
+          {en ? "Save optional units" : "Enregistrer les UE optionnelles"}
+        </button>
+      </div>
+    )}
     {data.progress.debts.length > 0 && <div className="space-y-2"><h3 className="font-semibold">{en ? "Outstanding UE" : "UE en dette"}</h3>
       {data.progress.debts.map(ue => <div key={ue.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 p-3"><span className="flex-1 text-sm">{ue.name} · {ue.credits} cr.</span>{data.canManage && <>
         <input aria-label={`${en ? "Recovery grade" : "Note de rattrapage"} ${ue.name}`} className={`${input} max-w-24`} type="number" min="0" max={ue.max_score} step="0.25" placeholder={`/${ue.max_score}`} disabled={busy} value={scores[ue.id] || ""} onChange={e => setScores({ ...scores, [ue.id]: e.target.value })}/>

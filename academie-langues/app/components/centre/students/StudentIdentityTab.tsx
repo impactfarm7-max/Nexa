@@ -167,6 +167,7 @@ export default function StudentIdentityTab({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showFiche, setShowFiche] = useState(false);
   const [attestationBusy, setAttestationBusy] = useState(false);
+  const [isUniversite, setIsUniversite] = useState(false);
 
   // Formulaire identité
   const [form, setForm] = useState<StudentDetails>(details);
@@ -317,12 +318,16 @@ export default function StudentIdentityTab({
   const loadPlacementOptions = useCallback(async (filiereId: string, niveauId: string | null) => {
     setPlaceLoadingOpts(true);
     try {
-      const { data: filRows } = await supabase
-        .from("filieres")
-        .select("id, name, type")
-        .eq("center_id", centerId)
-        .eq("status", "published")
-        .order("name");
+      const [{ data: filRows }, { data: centerRow }] = await Promise.all([
+        supabase
+          .from("filieres")
+          .select("id, name, type")
+          .eq("center_id", centerId)
+          .eq("status", "published")
+          .order("name"),
+        supabase.from("centers").select("center_type").eq("id", centerId).maybeSingle(),
+      ]);
+      setIsUniversite(centerRow?.center_type === "universite");
       setFilieres((filRows || []).map((f) => ({ id: f.id, name: f.name, type: f.type })));
 
       if (!filiereId) {
@@ -615,15 +620,15 @@ export default function StudentIdentityTab({
                   </div>
                 )}
                 <div>
-                  <label className={FIELD_LABEL}>{t("centre", "identityClass")}</label>
+                  <label className={FIELD_LABEL}>{isUniversite ? t("centre", "univPromotion") : t("centre", "identityClass")}</label>
                   <CenterSelect
                     size="lg"
                     value={placeGroupeId}
                     onChange={setPlaceGroupeId}
                     disabled={placeLoadingOpts}
-                    placeholder={t("centre", "identityNoneDefine")}
+                    placeholder={isUniversite ? t("centre", "univNoPromotion") : t("centre", "identityNoneDefine")}
                     options={[
-                      { value: "", label: t("centre", "identityNoneDefine") },
+                      { value: "", label: isUniversite ? t("centre", "univNoPromotion") : t("centre", "identityNoneDefine") },
                       ...groupes.map((g) => ({ value: g.id, label: g.nom })),
                     ]}
                   />
@@ -691,7 +696,7 @@ export default function StudentIdentityTab({
                   </div>
                 )}
                 <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
-                  <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityClassroom")}</p>
+                  <p className="text-xs font-semibold text-neutral-400">{isUniversite ? t("centre", "univPromotion") : t("centre", "identityClassroom")}</p>
                   <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.groupe_nom || "—"}</p>
                 </div>
                 <div className="bg-white rounded-lg p-3 border border-black/[0.06]">

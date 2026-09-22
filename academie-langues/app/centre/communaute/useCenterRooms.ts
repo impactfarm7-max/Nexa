@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/app/utils/supabase";
+import { loadClientTrainerScope } from "@/app/utils/trainerAcademicScope.client";
 
 export type CommunityRoom = {
   id: string;
@@ -29,30 +30,30 @@ export function useCenterRooms(userId: string | null, centerId: string | null) {
     if (!userId || !centerId) { setRooms([]); setLoading(false); return; }
     setLoading(true);
 
-    const { data: profile } = await supabase.from("profiles").select("role").eq("id", userId).single();
+    const [{ data: profile }, { data: center }] = await Promise.all([
+      supabase.from("profiles").select("role").eq("id", userId).single(),
+      supabase.from("centers").select("center_type").eq("id", centerId).maybeSingle(),
+    ]);
     const userRole = profile?.role || "";
+    const isUnivTrainer = userRole === "trainer" && center?.center_type === "universite";
 
-    let allRooms: any[] = [];
+    const { data } = await supabase
+      .from("community_rooms")
+      .select("*")
+      .eq("center_id", centerId)
+      .order("created_at", { ascending: true });
+    let allRooms: any[] = data || [];
 
-    if (["admin", "center_manager", "campus_manager", "staff"].includes(userRole)) {
-      // Administratifs : toutes les salles du centre (la policy RLS l'autorise)
-      const { data } = await supabase
-        .from("community_rooms")
-        .select("*")
-        .eq("center_id", centerId)
-        .order("created_at", { ascending: true });
-      allRooms = data || [];
-    } else {
-      // Formateurs : seules les salles autorisées par RLS (la policy filtre automatiquement)
-      const { data } = await supabase
-        .from("community_rooms")
-        .select("*")
-        .eq("center_id", centerId)
-        .order("created_at", { ascending: true });
-      allRooms = data || [];
+    if (isUnivTrainer) {
+      const scope = await loadClientTrainerScope(userId, centerId);
+      allRooms = allRooms.filter((r) => {
+        if (scope.empty) return false;
+        if (r.groupe_id) return scope.groupeIds.has(r.groupe_id);
+        if (r.type === "announcement") return true;
+        return false;
+      });
     }
 
-    // Récupérer le rôle de l'utilisateur dans chaque salle
     const { data: memberships } = await supabase
       .from("community_room_members")
       .select("room_id, role")

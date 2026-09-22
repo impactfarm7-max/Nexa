@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { CENTER_STAFF_ROLES } from "@/app/utils/student-routes";
 import { isCenterOperational } from "@/app/utils/center-trial";
+import { TRAINER_DEFAULT_PERMISSIONS } from "@/app/utils/trainer-defaults";
 
 const adminUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "https://placeholder.supabase.co";
 const adminKey =
@@ -43,9 +44,13 @@ export async function requireCenterPermission(
       .maybeSingle(),
   ]);
 
-  const permissions = Array.isArray(membership?.permissions)
+  let permissions = Array.isArray(membership?.permissions)
     ? membership.permissions.map(String)
     : [];
+  // Aligné sur /api/center/me + sidebar : formateur sans droits stockés → defaults.
+  if (ctx.role === "trainer" && permissions.length === 0) {
+    permissions = [...TRAINER_DEFAULT_PERMISSIONS];
+  }
   if (permissions.includes(permission) || legacyPermission) return null;
 
   return NextResponse.json(

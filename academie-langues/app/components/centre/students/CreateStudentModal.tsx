@@ -69,6 +69,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
   const [step, setStep] = useState(1);
   /** Centres libres (generic) uniquement — ne pas imposer aux TCF / courte */
   const [isLibreCenter, setIsLibreCenter] = useState(false);
+  const [isUniversite, setIsUniversite] = useState(false);
 
   // --- Étape 1 : Identité ---
   const [prenom, setPrenom] = useState("");
@@ -131,6 +132,7 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         supabase.from("centers").select("center_type").eq("id", centerId).maybeSingle(),
       ]);
       setIsLibreCenter(isPluriannualCenter(centerRow?.center_type));
+      setIsUniversite(centerRow?.center_type === "universite");
       setAvailableCoupons(await fetchUsableCoupons(supabase, centerId));
       setFilieres(
         (filiereRows || []).map((f: any) => ({
@@ -851,14 +853,14 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             {groupes.length > 1 && (
               <div>
-                <label className={FIELD_LABEL}>{t("centre", "createStudentClassroom")} *</label>
+                <label className={FIELD_LABEL}>{isUniversite ? t("centre", "univPromotion") : t("centre", "createStudentClassroom")} *</label>
                 <CenterSelect
                   size="lg"
                   value={groupeId}
                   onChange={setGroupeId}
-                  placeholder={t("centre", "createStudentChooseClassroom")}
+                  placeholder={isUniversite ? t("centre", "univChoosePromotion") : t("centre", "createStudentChooseClassroom")}
                   options={[
-                    { value: "", label: t("centre", "createStudentChooseClassroom") },
+                    { value: "", label: isUniversite ? t("centre", "univChoosePromotion") : t("centre", "createStudentChooseClassroom") },
                     ...groupes.map((g) => ({ value: g.id, label: g.nom })),
                   ]}
                 />
@@ -873,9 +875,13 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             {filiereId && groupes.length === 0 && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-medium text-amber-800">
-                {locale === "en"
-                  ? "No classroom on this program. Open the program and add at least one classroom, then try again."
-                  : "Aucune salle de classe sur ce programme. Ouvre le programme, ajoute au moins une salle, puis réessaie."}
+                {isUniversite
+                  ? (locale === "en"
+                    ? "No cohort on this program. Open the program, add at least one cohort, then try again."
+                    : "Aucune promotion sur ce programme. Ouvre le programme, ajoute au moins une promotion, puis réessaie.")
+                  : (locale === "en"
+                    ? "No classroom on this program. Open the program and add at least one classroom, then try again."
+                    : "Aucune salle de classe sur ce programme. Ouvre le programme, ajoute au moins une salle, puis réessaie.")}
               </div>
             )}
 

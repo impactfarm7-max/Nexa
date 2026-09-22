@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-server";
+import {
+  getTrainerAcademicScope,
+  isTrainerLeastPrivilege,
+} from "@/app/utils/trainerAcademicScope.server";
 import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 import { computeEnrollmentCreditsStatus } from "@/app/utils/lmd-credits.server";
 
@@ -50,6 +54,14 @@ function shortDurationLabel(e: EnrollRow): string {
 export async function GET(req: Request) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
+
+  let trainerScope: Awaited<ReturnType<typeof getTrainerAcademicScope>> | null = null;
+  if (isTrainerLeastPrivilege(ctx!)) {
+    trainerScope = await getTrainerAcademicScope(supabaseAdmin, ctx!.user.id, ctx!.centerId);
+    if (trainerScope.empty) {
+      return NextResponse.json({ students: [], campuses: [] });
+    }
+  }
 
   const requestedCampusId = new URL(req.url).searchParams.get("campusId");
   const { data: campusRows } = await supabaseAdmin
@@ -145,6 +157,12 @@ export async function GET(req: Request) {
     enrollRows = enrollRows.filter((e) => e.campus_id && allowedCampusIds.includes(e.campus_id));
   }
 
+  if (trainerScope) {
+    enrollRows = enrollRows.filter(
+      (e) => e.groupe_id && trainerScope!.groupeIds.has(e.groupe_id),
+    );
+  }
+
   const { data: centerRow } = await supabaseAdmin
     .from("centers")
     .select("lmd_validation_threshold_pct")
@@ -205,7 +223,12 @@ export async function GET(req: Request) {
       })),
     };
   }));
-  const filteredStudents = students.filter((s) => !allowedCampusIds?.length || s.enrollments.length > 0);
+  // Formateur univ : uniquement les étudiants de ses promotions (même sans autre inscription).
+  const filteredStudents = students.filter((s) => {
+    if (allowedCampusIds?.length && s.enrollments.length === 0) return false;
+    if (trainerScope && s.enrollments.length === 0) return false;
+    return true;
+  });
 
   return NextResponse.json({ students: filteredStudents, campuses: campusList });
 }

@@ -77,6 +77,7 @@ import {
   CalendarClock,
   BookOpen,
   MapPin,
+  UserCheck,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { isCenterStaff, CENTER_HOME } from "../utils/student-routes";
@@ -283,6 +284,11 @@ export default function Dashboard() {
     roomName: string;
   }[]>([]);
   const [showConvocationsWidget, setShowConvocationsWidget] = useState(false);
+  const [attendanceSummary, setAttendanceSummary] = useState<{
+    rate: number | null;
+    present: number;
+    absent: number;
+  } | null>(null);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [newTodo, setNewTodo] = useState("");
   const [discipline, setDiscipline] = useState<DisciplineStats>({
@@ -898,20 +904,44 @@ export default function Dashboard() {
                 .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
                 .slice(0, 5);
               setUpcomingConvocations(upcoming);
+
+              try {
+                const attRes = await fetch("/api/student/class-attendance", {
+                  headers: { Authorization: `Bearer ${accessToken}` },
+                });
+                if (attRes.ok) {
+                  const attJson = await attRes.json();
+                  if (attJson.enabled) {
+                    setAttendanceSummary({
+                      rate: attJson.rate ?? null,
+                      present: attJson.present || 0,
+                      absent: attJson.absent || 0,
+                    });
+                  } else {
+                    setAttendanceSummary(null);
+                  }
+                }
+              } catch {
+                setAttendanceSummary(null);
+              }
             } else {
               setUpcomingConvocations([]);
+              setAttendanceSummary(null);
             }
           } else {
             setShowConvocationsWidget(false);
             setUpcomingConvocations([]);
+            setAttendanceSummary(null);
           }
         } catch {
           setShowConvocationsWidget(false);
           setUpcomingConvocations([]);
+          setAttendanceSummary(null);
         }
       } else {
         setShowConvocationsWidget(false);
         setUpcomingConvocations([]);
+        setAttendanceSummary(null);
       }
 
       // 4. Discipline
@@ -1530,7 +1560,9 @@ export default function Dashboard() {
           {/* ============ CONVOCATIONS + SESSIONS LIVE + TODO LIST ============ */}
           <section
             className={`grid grid-cols-1 gap-5 xl:gap-7 2xl:gap-8 mb-10 ${
-              showConvocationsWidget ? "lg:grid-cols-2 xl:grid-cols-3" : "lg:grid-cols-2"
+              showConvocationsWidget || attendanceSummary
+                ? "lg:grid-cols-2 xl:grid-cols-3"
+                : "lg:grid-cols-2"
             }`}
           >
             {/* CONVOCATIONS D'EXAMEN (université) */}
@@ -1569,6 +1601,37 @@ export default function Dashboard() {
                       </li>
                     ))}
                   </ul>
+                )}
+              </div>
+            )}
+
+            {/* ASSIDUITÉ (université) */}
+            {attendanceSummary && (
+              <div className="bg-white rounded-[1.75rem] border border-neutral-200 shadow-sm p-5 md:p-6 xl:p-7 2xl:p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-display font-black text-sm md:text-base xl:text-lg 2xl:text-xl flex items-center gap-2" style={{ color: BRAND.blue }}>
+                    <UserCheck className="w-4 h-4" style={{ color: BRAND.orange }} /> {t("dashboard", "myAttendance")}
+                  </h3>
+                  <a href="/dashboard/assiduite" className="text-[11px] font-bold text-neutral-400 hover:text-orange-500 transition-colors">{t("dashboard", "seeAll")}</a>
+                </div>
+                {widgetsLoading ? (
+                  <div className="h-20 bg-neutral-100 rounded-xl animate-pulse" />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => router.push("/dashboard/assiduite")}
+                    className="w-full text-left rounded-2xl border border-blue-100 bg-blue-50/40 p-4 hover:border-orange-300 transition-colors"
+                  >
+                    <p className="text-3xl font-display font-black" style={{ color: BRAND.blue }}>
+                      {attendanceSummary.rate == null ? "—" : `${attendanceSummary.rate}%`}
+                    </p>
+                    <p className="text-[11px] font-bold text-neutral-500 mt-1">{t("dashboard", "attendanceRateLabel")}</p>
+                    <p className="text-[10px] font-semibold text-neutral-400 mt-2">
+                      {attendanceSummary.present + attendanceSummary.absent === 0
+                        ? t("dashboard", "noAttendanceYet")
+                        : `${attendanceSummary.present} présent · ${attendanceSummary.absent} absent`}
+                    </p>
+                  </button>
                 )}
               </div>
             )}

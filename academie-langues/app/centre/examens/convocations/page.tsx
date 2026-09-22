@@ -24,6 +24,7 @@ type PlanningSlot = {
   duration_minutes: number;
   groupe_id: string | null;
   scheduled_at: string;
+  has_convocation?: boolean;
 };
 
 type Meta = {
@@ -33,6 +34,7 @@ type Meta = {
   matieres: { id: string; filiere_id: string; label: string; credits: number | null }[];
   students: { id: string; name: string; groupe_id: string | null }[];
   planningSlots?: PlanningSlot[];
+  exam_convocation_from_planning?: "manual" | "auto";
 };
 
 type Convocation = {
@@ -75,6 +77,8 @@ export default function ExamConvocationsPage() {
   const [targetScope, setTargetScope] = useState<"all" | "groupes" | "students">("groupes");
   const [groupeIds, setGroupeIds] = useState<string[]>([]);
   const [studentIds, setStudentIds] = useState<string[]>([]);
+  const [scheduleSlotId, setScheduleSlotId] = useState<string | null>(null);
+  const [savingMode, setSavingMode] = useState(false);
 
   const authHeaders = useCallback(async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -126,6 +130,7 @@ export default function ExamConvocationsPage() {
     setTargetScope("groupes");
     setGroupeIds([]);
     setStudentIds([]);
+    setScheduleSlotId(null);
     setError("");
   };
 
@@ -136,6 +141,7 @@ export default function ExamConvocationsPage() {
 
   const openFromPlanning = (slot: PlanningSlot) => {
     resetForm();
+    setScheduleSlotId(slot.id);
     setEpreuveLabel(slot.title);
     setScheduledAt(toLocalInput(new Date(slot.scheduled_at).toISOString()));
     setDuration(String(slot.duration_minutes || 120));
@@ -207,6 +213,7 @@ export default function ExamConvocationsPage() {
       student_ids: studentIds,
       status: "published" as const,
       notify: true,
+      schedule_slot_id: scheduleSlotId,
     };
 
     const res = await fetch("/api/centre/exam-convocations", {
@@ -237,9 +244,29 @@ export default function ExamConvocationsPage() {
     await load();
   };
 
+  const setPlanningMode = async (mode: "manual" | "auto") => {
+    if (meta?.exam_convocation_from_planning === mode) return;
+    const headers = await authHeaders();
+    if (!headers) return;
+    setSavingMode(true);
+    const res = await fetch("/api/centre/exam-convocations", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ exam_convocation_from_planning: mode }),
+    });
+    const json = await res.json().catch(() => ({}));
+    setSavingMode(false);
+    if (!res.ok) {
+      setError(json.error || "Impossible de changer le mode.");
+      return;
+    }
+    setMeta((prev) => (prev ? { ...prev, exam_convocation_from_planning: mode } : prev));
+  };
+
   if (loading) return <CenterPageLoading className="bg-[#FFFBF7]" />;
 
   const planningSlots = meta?.planningSlots || [];
+  const planningMode = meta?.exam_convocation_from_planning || "manual";
 
   return (
     <CenterPageLayout
@@ -266,8 +293,47 @@ export default function ExamConvocationsPage() {
     >
       <CenterPageBody>
         <p className="text-sm text-neutral-500 font-medium -mt-1 mb-4">
-          Création manuelle ou depuis un créneau daté du planning. Distinct des sessions live / coaching.
+          Création manuelle ou depuis un créneau daté coché « Examen ». Distinct des sessions live / coaching.
         </p>
+
+        <section className="mb-5 rounded-xl border border-black/[0.08] bg-white px-4 py-3">
+          <p className="text-[11px] font-extrabold uppercase tracking-wide text-neutral-400 mb-2">
+            Depuis le planning
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={savingMode}
+              onClick={() => void setPlanningMode("manual")}
+              className={`h-8 px-3 rounded-lg text-[12px] font-bold border ${
+                planningMode === "manual"
+                  ? "text-white border-transparent"
+                  : "text-neutral-600 border-black/[0.1] bg-white"
+              }`}
+              style={planningMode === "manual" ? { backgroundColor: BLUE } : undefined}
+            >
+              Manuel
+            </button>
+            <button
+              type="button"
+              disabled={savingMode}
+              onClick={() => void setPlanningMode("auto")}
+              className={`h-8 px-3 rounded-lg text-[12px] font-bold border ${
+                planningMode === "auto"
+                  ? "text-white border-transparent"
+                  : "text-neutral-600 border-black/[0.1] bg-white"
+              }`}
+              style={planningMode === "auto" ? { backgroundColor: ORANGE } : undefined}
+            >
+              Automatique
+            </button>
+          </div>
+          <p className="mt-2 text-[12px] font-medium text-neutral-500">
+            {planningMode === "auto"
+              ? "Les créneaux datés cochés « Examen » (avec salle) créent la convocation à la publication / matérialisation."
+              : "Vous créez les convocations à la main, ou via « Créer une convocation » sur un créneau examen."}
+          </p>
+        </section>
 
         {error && !showForm && (
           <p className="mb-3 text-sm font-semibold text-red-600">{error}</p>
@@ -276,7 +342,7 @@ export default function ExamConvocationsPage() {
         {planningSlots.length > 0 && (
           <section className="mb-6">
             <h3 className="text-[12px] font-extrabold uppercase tracking-wide text-neutral-400 mb-2 flex items-center gap-1.5">
-              <CalendarPlus size={13} /> Depuis le planning (créneaux datés)
+              <CalendarPlus size={13} /> Créneaux examen (planning)
             </h3>
             <div className="space-y-2">
               {planningSlots.slice(0, 8).map((slot) => (
@@ -289,16 +355,19 @@ export default function ExamConvocationsPage() {
                     <p className="text-[11px] font-semibold text-neutral-500 mt-0.5">
                       {slot.specific_date} · {slot.start_time}–{slot.end_time}
                       {slot.room_name ? ` · ${slot.room_name}` : ""}
+                      {slot.has_convocation ? " · déjà convoqué" : ""}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => openFromPlanning(slot)}
-                    className="h-8 px-3 rounded-lg text-[11px] font-bold text-white"
-                    style={{ backgroundColor: BLUE }}
-                  >
-                    Créer une convocation
-                  </button>
+                  {!slot.has_convocation && (
+                    <button
+                      type="button"
+                      onClick={() => openFromPlanning(slot)}
+                      className="h-8 px-3 rounded-lg text-[11px] font-bold text-white"
+                      style={{ backgroundColor: BLUE }}
+                    >
+                      Créer une convocation
+                    </button>
+                  )}
                 </div>
               ))}
             </div>
@@ -454,7 +523,7 @@ export default function ExamConvocationsPage() {
                     onChange={(v) => setTargetScope(v as "all" | "groupes" | "students")}
                     options={[
                       { value: "all", label: "Tous les étudiants du programme" },
-                      { value: "groupes", label: "Classes / groupes" },
+                      { value: "groupes", label: "Promotions" },
                       { value: "students", label: "Étudiants précis" },
                     ]}
                     className="mt-1"
@@ -476,7 +545,7 @@ export default function ExamConvocationsPage() {
                       </label>
                     ))}
                     {groupesFiltered.length === 0 && (
-                      <p className="px-3 py-2 text-xs text-neutral-400">Aucune classe.</p>
+                      <p className="px-3 py-2 text-xs text-neutral-400">Aucune promotion.</p>
                     )}
                   </div>
                 )}
