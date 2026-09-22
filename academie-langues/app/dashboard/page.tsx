@@ -76,6 +76,7 @@ import {
   Lock,
   CalendarClock,
   BookOpen,
+  MapPin,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { isCenterStaff, CENTER_HOME } from "../utils/student-routes";
@@ -275,6 +276,13 @@ export default function Dashboard() {
   const [grades, setGrades] = useState<GradeEntry[]>([]);
   const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
   const [upcomingLives, setUpcomingLives] = useState<LiveSession[]>([]);
+  const [upcomingConvocations, setUpcomingConvocations] = useState<{
+    id: string;
+    epreuveLabel: string;
+    scheduledAt: string;
+    roomName: string;
+  }[]>([]);
+  const [showConvocationsWidget, setShowConvocationsWidget] = useState(false);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [newTodo, setNewTodo] = useState("");
   const [discipline, setDiscipline] = useState<DisciplineStats>({
@@ -867,6 +875,44 @@ export default function Dashboard() {
 
       liveItems.sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
       setUpcomingLives(liveItems.slice(0, 5));
+
+      // 3b. Convocations d'examen (université uniquement — distinct des lives)
+      if (centerId && accessToken) {
+        try {
+          const convRes = await fetch("/api/student/exam-convocations", {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (convRes.ok) {
+            const convJson = await convRes.json();
+            const isUniv = Boolean(convJson.centerName);
+            setShowConvocationsWidget(isUniv);
+            if (isUniv) {
+              const now = Date.now();
+              const upcoming = ((convJson.convocations || []) as {
+                id: string;
+                epreuveLabel: string;
+                scheduledAt: string;
+                roomName: string;
+              }[])
+                .filter((c) => new Date(c.scheduledAt).getTime() + 2 * 60 * 60 * 1000 > now)
+                .sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+                .slice(0, 5);
+              setUpcomingConvocations(upcoming);
+            } else {
+              setUpcomingConvocations([]);
+            }
+          } else {
+            setShowConvocationsWidget(false);
+            setUpcomingConvocations([]);
+          }
+        } catch {
+          setShowConvocationsWidget(false);
+          setUpcomingConvocations([]);
+        }
+      } else {
+        setShowConvocationsWidget(false);
+        setUpcomingConvocations([]);
+      }
 
       // 4. Discipline
       //    - homeworkSubmitted : réel (mission_submissions de la semaine)
@@ -1481,8 +1527,52 @@ export default function Dashboard() {
             </div>
           </section>
 
-          {/* ============ SESSIONS LIVE + TODO LIST ============ */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-5 xl:gap-7 2xl:gap-8 mb-10">
+          {/* ============ CONVOCATIONS + SESSIONS LIVE + TODO LIST ============ */}
+          <section
+            className={`grid grid-cols-1 gap-5 xl:gap-7 2xl:gap-8 mb-10 ${
+              showConvocationsWidget ? "lg:grid-cols-2 xl:grid-cols-3" : "lg:grid-cols-2"
+            }`}
+          >
+            {/* CONVOCATIONS D'EXAMEN (université) */}
+            {showConvocationsWidget && (
+              <div className="bg-white rounded-[1.75rem] border border-neutral-200 shadow-sm p-5 md:p-6 xl:p-7 2xl:p-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-display font-black text-sm md:text-base xl:text-lg 2xl:text-xl flex items-center gap-2" style={{ color: BRAND.blue }}>
+                    <ScrollText className="w-4 h-4" style={{ color: BRAND.orange }} /> {t("dashboard", "upcomingConvocations")}
+                  </h3>
+                  <a href="/dashboard/convocations" className="text-[11px] font-bold text-neutral-400 hover:text-orange-500 transition-colors">{t("dashboard", "seeAll")}</a>
+                </div>
+                {widgetsLoading ? (
+                  <div className="space-y-2">{[1, 2].map((i) => <div key={i} className="h-14 bg-neutral-100 rounded-xl animate-pulse" />)}</div>
+                ) : upcomingConvocations.length === 0 ? (
+                  <p className="text-sm text-neutral-400 font-medium py-6 text-center">{t("dashboard", "noConvocationsScheduled")}</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {upcomingConvocations.map((c) => (
+                      <li key={c.id}>
+                        <button
+                          type="button"
+                          onClick={() => router.push("/dashboard/convocations")}
+                          className="w-full flex items-center justify-between gap-2 p-3 rounded-2xl border border-orange-100 bg-orange-50/40 hover:border-orange-300 hover:bg-orange-50/70 transition-colors text-left"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-neutral-800 truncate">{c.epreuveLabel}</p>
+                            <p className="text-[10px] font-medium text-neutral-400">{formatLiveDate(c.scheduledAt)}</p>
+                            <p className="text-[10px] font-semibold text-neutral-500 inline-flex items-center gap-1 mt-0.5">
+                              <MapPin size={10} /> {c.roomName}
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-wide px-2 py-1 rounded-full shrink-0" style={{ color: BRAND.orange, backgroundColor: "#FFF1E6" }}>
+                            {t("dashboard", "examBadge")}
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
             {/* SESSIONS LIVE À VENIR */}
             <div className="bg-white rounded-[1.75rem] border border-neutral-200 shadow-sm p-5 md:p-6 xl:p-7 2xl:p-8">
               <div className="flex items-center justify-between mb-4">

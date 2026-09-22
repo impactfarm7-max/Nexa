@@ -1419,3 +1419,97 @@ export async function downloadReleveNotesLmdPdf(params: ReleveNotesLmdPdfParams)
   doc.save(`${isEn ? "official_transcript" : "releve_notes_officiel"}_${safe}.pdf`);
 }
 
+// ── Convocation d'examen (université) ───────────────────────────────────────
+
+export type ConvocationExamenPdfParams = {
+  locale?: "fr" | "en";
+  studentName: string;
+  studentMatricule?: string | null;
+  epreuveLabel: string;
+  scheduledAt: string;
+  durationMinutes?: number | null;
+  roomName: string;
+  instructions?: string | null;
+  centerName?: string | null;
+  config?: Partial<DocumentExportConfig>;
+  signatures?: { id: string; label: string; signatureUrl?: string | null }[];
+  stampUrl?: string | null;
+};
+
+export async function downloadConvocationExamenPdf(params: ConvocationExamenPdfParams) {
+  const isEn = params.locale === "en";
+  const title = params.config?.title?.trim() || (isEn ? "Examination summons" : "Convocation d'examen");
+  const { doc, startY, cfg } = await createDoc(title, { ...params.config, title });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  let y = startY + 8;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(40, 40, 40);
+  const intro = isEn
+    ? "You are hereby requested to attend the examination as follows:"
+    : "Vous êtes convoqué(e) à l'épreuve ci-dessous. Présentez-vous aux lieu, date et heure indiqués, muni(e) d'une pièce d'identité.";
+  const wrappedIntro = doc.splitTextToSize(intro, pageWidth - 40);
+  doc.text(wrappedIntro, pageWidth / 2, y, { align: "center" });
+  y += wrappedIntro.length * 6 + 10;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(...cfg.blueRgb);
+  doc.text(params.studentName.toUpperCase(), pageWidth / 2, y, { align: "center" });
+  y += 8;
+  if (params.studentMatricule) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.text(`${isEn ? "Student ID" : "Matricule"} : ${params.studentMatricule}`, pageWidth / 2, y, { align: "center" });
+    y += 10;
+  } else {
+    y += 4;
+  }
+
+  const when = new Date(params.scheduledAt).toLocaleString(isEn ? "en-GB" : "fr-FR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const details = [
+    [`${isEn ? "Examination" : "Épreuve"}`, params.epreuveLabel],
+    [`${isEn ? "Date & time" : "Date et heure"}`, when],
+    [`${isEn ? "Room" : "Salle"}`, params.roomName],
+  ];
+  if (params.durationMinutes) {
+    details.push([isEn ? "Duration" : "Durée", `${params.durationMinutes} min`]);
+  }
+
+  doc.setFontSize(11);
+  for (const [label, value] of details) {
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...cfg.blueRgb);
+    doc.text(`${label} :`, 24, y);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(40, 40, 40);
+    const lines = doc.splitTextToSize(String(value), pageWidth - 70);
+    doc.text(lines, 70, y);
+    y += Math.max(8, lines.length * 6);
+  }
+
+  if (params.instructions) {
+    y += 4;
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(90, 90, 90);
+    const notes = doc.splitTextToSize(params.instructions, pageWidth - 48);
+    doc.text(notes, 24, y);
+    y += notes.length * 5 + 4;
+  }
+
+  await addPdfSignatures(doc, cfg, params.signatures, params.stampUrl);
+  addPdfFooter(doc, cfg);
+  const safe = params.studentName.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") || (isEn ? "learner" : "apprenant");
+  doc.save(`${isEn ? "exam_summons" : "convocation_examen"}_${safe}.pdf`);
+}
+

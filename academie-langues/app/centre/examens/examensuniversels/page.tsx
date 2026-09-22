@@ -147,6 +147,21 @@ export default function ExamensHubPage() {
                 icon={<Trophy className="h-6 w-6" style={{ color: BLUE }} />}
               />
             </>
+          ) : centerType === "universite" ? (
+            <>
+              <HubCard
+                title="Convocations d'examens"
+                description="Épreuve, date, salle — convoquez des classes ou des étudiants. PDF côté étudiant."
+                href="/centre/examens/convocations"
+                icon={<Calendar className="h-6 w-6" style={{ color: BLUE }} />}
+              />
+              <HubCard
+                title={t("centre", "examensGradebook")}
+                description={t("centre", "examensGradebookDesc")}
+                href="/centre/examens/notes"
+                icon={<BookOpen className="h-6 w-6" style={{ color: BLUE }} />}
+              />
+            </>
           ) : (
             <HubCard
               title={t("centre", "examensGradebook")}

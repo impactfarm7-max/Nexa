@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/app/utils/supabase";
 import { logClientActivity } from "@/app/utils/client-activity";
@@ -510,6 +511,27 @@ export default function CoachingPage() {
       </header>
 
       <main className="nexa-student-shell flex-1 pt-6 md:pt-8 space-y-6 md:space-y-8 xl:space-y-10 pb-6">
+
+        {userProfile?.center_id ? (
+          <Link
+            href="/dashboard/convocations"
+            className="flex items-center justify-between gap-3 rounded-2xl border border-blue-100 bg-white px-4 py-3.5 shadow-sm hover:border-orange-200 transition-colors"
+          >
+            <div className="min-w-0">
+              <p className="text-[13px] font-extrabold" style={{ color: BRAND.blue }}>
+                {locale === "en" ? "My exam summons" : "Mes convocations d'examens"}
+              </p>
+              <p className="text-[11px] font-medium text-neutral-400 mt-0.5">
+                {locale === "en"
+                  ? "Room, date, exam — separate from live sessions below"
+                  : "Salle, date, épreuve — séparées des sessions live ci-dessous"}
+              </p>
+            </div>
+            <span className="text-[11px] font-bold shrink-0" style={{ color: BRAND.orange }}>
+              {locale === "en" ? "Open" : "Ouvrir"} →
+            </span>
+          </Link>
+        ) : null}
         
         {/* SÉANCE 1-ON-1 À VENIR (HERO) */}
         {upcomingAppointment && (

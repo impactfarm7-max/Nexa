@@ -1104,6 +1104,13 @@ export default function CenterStudentProfil() {
                       </span>
                     </button>
                   )}
+                  <a
+                    href="/dashboard/convocations"
+                    className="w-full min-w-0 flex items-center justify-center gap-2 min-h-10 h-auto py-2.5 px-3 rounded-lg text-[12.5px] sm:text-[13px] font-bold border box-border"
+                    style={{ backgroundColor: "#fff", borderColor: "rgba(17,34,78,0.2)", color: BRAND.blue }}
+                  >
+                    {locale === "en" ? "My exam summons" : "Mes convocations d'examens"}
+                  </a>
                 </>
               )}
             </div>
