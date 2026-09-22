@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Tag, Users, MapPin, Plus, X, Trash2, Loader2, CheckCircle2,
   Lock, Pencil, ArrowRight, Sparkles, Copy, Check, Link2,
@@ -11,6 +12,7 @@ import { supabase } from "@/app/utils/supabase";
 import SetupBanner from "@/app/components/SetupBanner";
 import SetupFooter from "@/app/components/SetupFooter";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
+import { useI18n } from "@/app/i18n/I18nProvider";
 import {
   buildCenterSignupUrl,
   type CenterSignupRef,
@@ -35,8 +37,10 @@ function serializeExtraFees(fees: ExtraFee[]) {
 
 export default function TCFProgrammePage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [centerId, setCenterId] = useState<string | null>(null);
+  const [centerType, setCenterType] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [centerSignup, setCenterSignup] = useState<CenterSignupRef | null>(null);
   const [centerName, setCenterName] = useState("");
@@ -83,11 +87,17 @@ export default function TCFProgrammePage() {
 
     const { data: center } = await supabase
       .from("centers")
-      .select("signup_slug, code, name")
+      .select("signup_slug, code, name, center_type")
       .eq("id", profile.center_id)
       .single();
     setCenterSignup(center ? { signup_slug: center.signup_slug, code: center.code } : null);
     setCenterName(center?.name || "");
+    setCenterType(center?.center_type ?? null);
+
+    if (center?.center_type !== "tcf_canada") {
+      setLoading(false);
+      return;
+    }
 
     let { data: filiere } = await supabase
       .from("filieres")
@@ -318,6 +328,17 @@ export default function TCFProgrammePage() {
   };
 
   if (loading) return <CenterPageLoading />;
+
+  if (centerType !== "tcf_canada") {
+    return (
+      <div className="min-h-[100dvh] p-12 text-center">
+        <p className="text-sm font-semibold text-neutral-500">{t("centre", "examensTcfOnly")}</p>
+        <Link href="/centre/dashboard" className="mt-4 inline-block text-xs font-bold uppercase tracking-wider hover:underline" style={{ color: BLUE }}>
+          {t("centre", "notesBackToPrograms")}
+        </Link>
+      </div>
+    );
+  }
 
   if (!filiereId) return (
     <div className="min-h-[100dvh] bg-white flex items-center justify-center p-8">

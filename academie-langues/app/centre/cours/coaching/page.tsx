@@ -593,7 +593,7 @@ export default function CenterCoachingPage() {
                     onChange={(e) => setForm({ ...form, title: e.target.value })}
                     maxLength={120}
                     className="w-full border border-neutral-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#eb670e]"
-                    placeholder="Ex: Préparation intensive TCF"
+                    placeholder="Ex: Méthodologie de rédaction académique"
                   />
                 </div>
                 <div>

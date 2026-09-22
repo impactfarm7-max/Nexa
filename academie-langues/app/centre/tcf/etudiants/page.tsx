@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Users, Plus, Search, Loader2, X, CheckCircle2, Ban,
   Clock, Tag, Copy, Check, Link2, Bell, User, Mail,
@@ -29,6 +30,7 @@ import { fetchDocumentExportConfig, type DocumentExportConfig } from "@/app/util
 import { sumNamedExtraFees } from "@/app/utils/short-pricing";
 import { fetchUsableCoupons, type CouponListItem } from "@/app/utils/coupon.client";
 import { ACTION_TONE } from "@/app/utils/action-tones";
+import { isTcfCanadaCenter } from "@/app/data/tcf-teaching-subjects";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -266,8 +268,10 @@ async function loadTcfPricingDetails(centerId: string): Promise<{ monthlyPrice: 
 
 export default function CenterTCFStudentsPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [centerId, setCenterId] = useState<string | null>(null);
+  const [centerType, setCenterType] = useState<string | null>(null);
   const [centerSignup, setCenterSignup] = useState<CenterSignupRef | null>(null);
   const [students, setStudents] = useState<TCFStudent[]>([]);
   const [search, setSearch] = useState("");
@@ -405,13 +409,16 @@ export default function CenterTCFStudentsPage() {
       if (!profile?.center_id) { setLoading(false); return; }
       setCenterId(profile.center_id);
       const [{ data: center }, exportConfig] = await Promise.all([
-        supabase.from("centers").select("signup_slug, code, name").eq("id", profile.center_id).single(),
+        supabase.from("centers").select("signup_slug, code, name, center_type").eq("id", profile.center_id).single(),
         fetchDocumentExportConfig(supabase, profile.center_id),
       ]);
       setCenterSignup(center ? { signup_slug: center.signup_slug, code: center.code } : null);
       setCenterName(exportConfig.legalName || center?.name || "");
+      setCenterType(center?.center_type ?? null);
       setDocConfig(exportConfig);
-      await loadStudents(profile.center_id);
+      if (isTcfCanadaCenter(center?.center_type)) {
+        await loadStudents(profile.center_id);
+      }
       setLoading(false);
     })();
   }, [loadStudents]);
@@ -555,6 +562,17 @@ export default function CenterTCFStudentsPage() {
   };
 
   if (loading) return <CenterPageLoading />;
+
+  if (!isTcfCanadaCenter(centerType)) {
+    return (
+      <div className="min-h-[100dvh] p-12 text-center">
+        <p className="text-sm font-semibold text-neutral-500">{t("centre", "examensTcfOnly")}</p>
+        <Link href="/centre/dashboard" className="mt-4 inline-block text-xs font-bold uppercase tracking-wider hover:underline" style={{ color: BLUE }}>
+          {t("centre", "notesBackToPrograms")}
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] bg-white text-[#11224E] pb-24 overflow-x-hidden">
