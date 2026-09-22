@@ -43,7 +43,7 @@ import StudentRouteSkeleton from "@/app/components/StudentRouteSkeleton";
 import DownloadAppButton from "@/app/components/DownloadAppButton";
 import { LogoutConfirmDialog } from "@/app/components/LogoutConfirmDialog";
 import { BRAND } from "@/app/utils/brand";
-import { centerNotoSans } from "@/app/centre/center-page-ui";
+import { CenterSelect, centerNotoSans } from "@/app/centre/center-page-ui";
 import { AFRICA_54, findAfricaCountry, resolveAfricaCountry } from "@/app/data/africa-54";
 import { checkPasswordStrength, PASSWORD_POLICY_HINT } from "@/app/utils/password-policy";
 import { initPwaInstallCapture, isIosDevice, isPwaInstalled, promptPwaInstall } from "@/app/utils/pwa-install";
@@ -185,6 +185,8 @@ type LmdProgressData = {
     semesters: { id: string; niveau_id: string; ordre: number; nom?: string | null }[];
   } | null;
   niveaux: { id: string; annee: number | null }[];
+  currentNiveauId?: string | null;
+  currentSemestreId?: string | null;
   diploma: { number: string; issuedAt: string; acquiredCredits: number; totalCredits: number } | null;
   studentName: string;
   matricule: string | null;
@@ -378,14 +380,19 @@ export default function CenterStudentProfil() {
     if (!lmdDocs || downloadingDoc) return;
     setDownloadingDoc("scolarite");
     try {
-      const niveauId = lmdDocs.progress?.results[0]?.niveau_id;
+      const niveauId = lmdDocs.currentNiveauId
+        || lmdDocs.progress?.semesters.slice(-1)[0]?.niveau_id
+        || null;
       const annee = lmdDocs.niveaux.find((n) => n.id === niveauId)?.annee;
+      const sem = lmdDocs.progress?.semesters.find((s) => s.id === lmdDocs.currentSemestreId)
+        || lmdDocs.progress?.semesters.slice(-1)[0];
       await downloadAttestationScolaritePdf({
         locale: locale === "en" ? "en" : "fr",
         studentName: lmdDocs.studentName,
         studentMatricule: lmdDocs.matricule,
         programName: lmdDocs.programName,
         niveauLabel: annee != null ? `${locale === "en" ? "Level" : "Niveau"} ${annee}` : null,
+        semestreLabel: sem?.ordre != null ? `${locale === "en" ? "Semester" : "Semestre"} ${sem.ordre}` : null,
         config: lmdDocs.attestationConfig,
         signatures: lmdDocs.attestationSignatures,
         stampUrl: lmdDocs.stampUrl,
@@ -660,7 +667,7 @@ export default function CenterStudentProfil() {
   const emptyValue = "—";
 
   return (
-    <div className={`platform-profile-page ${centerNotoSans.className} min-h-[100dvh] bg-[#FFFBF7] text-[#11224E] pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] md:pb-10 overflow-x-hidden`}>
+    <div className={`platform-profile-page ${centerNotoSans.className} min-h-[100dvh] bg-[#FFFBF7] text-[#11224E] pb-[calc(12rem+env(safe-area-inset-bottom,0px))] md:pb-10 overflow-x-hidden`}>
       <header className="sticky top-0 z-30 border-b border-black/[0.06] bg-[#FFFBF7] pt-[env(safe-area-inset-top,0px)]">
         <div className="nexa-student-shell flex items-center gap-2 sm:gap-3 h-[68px]">
           <Link
@@ -816,109 +823,6 @@ export default function CenterStudentProfil() {
           {account.profile.genre ? <Row icon={User} label={td("profilGender")} value={account.profile.genre} /> : null}
           <Row icon={Calendar} label={td("profilMemberSince")} value={formatDateFr(account.profile.created_at || account.user.created_at, locale)} />
         </Group>
-
-        {account.center.center_type === "universite" && (
-          <Group title={locale === "en" ? "Documents" : "Documents"}>
-            <div className="px-4 sm:px-5 py-3.5 space-y-3">
-              {lmdDocsLoading ? (
-                <p className="text-[13px] font-medium" style={{ color: "rgba(17,34,78,0.5)" }}>
-                  {locale === "en" ? "Loading…" : "Chargement…"}
-                </p>
-              ) : !lmdDocs?.progress ? (
-                <p className="text-[13px] font-medium" style={{ color: "rgba(17,34,78,0.5)" }}>
-                  {locale === "en" ? "No academic record yet." : "Aucun parcours disponible pour l'instant."}
-                </p>
-              ) : (
-                <>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(["semestre", "niveau", "parcours"] as const).map((scope) => (
-                      <button
-                        key={scope}
-                        type="button"
-                        onClick={() => {
-                          setDocScope(scope);
-                          if (scope === "niveau") setDocScopeId(lmdDocs.niveaux.slice(-1)[0]?.id || "");
-                          else if (scope === "semestre") setDocScopeId(lmdDocs.progress!.semesters.slice(-1)[0]?.id || "");
-                          else setDocScopeId("");
-                        }}
-                        className="h-7 px-2.5 rounded-lg text-xs font-semibold border transition-colors"
-                        style={
-                          docScope === scope
-                            ? { backgroundColor: BRAND.blue, borderColor: BRAND.blue, color: "#fff" }
-                            : { backgroundColor: "#fff", borderColor: "rgba(17,34,78,0.12)", color: BRAND.blue }
-                        }
-                      >
-                        {scope === "semestre"
-                          ? (locale === "en" ? "Semester" : "Semestre")
-                          : scope === "niveau"
-                            ? (locale === "en" ? "Year" : "Année")
-                            : (locale === "en" ? "Full program" : "Parcours complet")}
-                      </button>
-                    ))}
-                  </div>
-                  {docScope !== "parcours" && (
-                    <select
-                      value={docScopeId}
-                      onChange={(e) => setDocScopeId(e.target.value)}
-                      className="w-full h-9 px-2.5 rounded-lg border text-[13px] font-semibold outline-none"
-                      style={{ borderColor: "rgba(17,34,78,0.12)", color: BRAND.blue }}
-                    >
-                      {docScope === "niveau"
-                        ? lmdDocs.niveaux.map((n) => (
-                            <option key={n.id} value={n.id}>
-                              {locale === "en" ? "Level" : "Niveau"} {n.annee}
-                            </option>
-                          ))
-                        : lmdDocs.progress.semesters.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {locale === "en" ? "Semester" : "Semestre"} {s.ordre}
-                            </option>
-                          ))}
-                    </select>
-                  )}
-                  <button
-                    type="button"
-                    onClick={downloadReleve}
-                    disabled={downloadingDoc !== null || (docScope !== "parcours" && !docScopeId)}
-                    className="w-full flex items-center justify-center gap-2 h-10 rounded-lg text-[13px] font-bold disabled:opacity-50"
-                    style={{ backgroundColor: BRAND.orange, color: "#fff" }}
-                  >
-                    <FileText size={15} />
-                    {downloadingDoc === "releve"
-                      ? (locale === "en" ? "Generating…" : "Génération…")
-                      : (locale === "en" ? "Download transcript" : "Télécharger le relevé de notes")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={downloadScolarite}
-                    disabled={downloadingDoc !== null}
-                    className="w-full flex items-center justify-center gap-2 h-10 rounded-lg text-[13px] font-bold border disabled:opacity-50"
-                    style={{ borderColor: BRAND.blue, color: BRAND.blue }}
-                  >
-                    <Download size={15} />
-                    {downloadingDoc === "scolarite"
-                      ? (locale === "en" ? "Generating…" : "Génération…")
-                      : (locale === "en" ? "Download enrollment certificate" : "Télécharger l'attestation de scolarité")}
-                  </button>
-                  {lmdDocs.diploma && (
-                    <button
-                      type="button"
-                      onClick={downloadDiplome}
-                      disabled={downloadingDoc !== null}
-                      className="w-full flex items-center justify-center gap-2 h-10 rounded-lg text-[13px] font-bold border disabled:opacity-50"
-                      style={{ borderColor: "#047857", color: "#047857" }}
-                    >
-                      <GraduationCap size={15} />
-                      {downloadingDoc === "diplome"
-                        ? (locale === "en" ? "Generating…" : "Génération…")
-                        : (locale === "en" ? "Download diploma" : "Télécharger le diplôme")}
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          </Group>
-        )}
         </div>
 
         <div className="space-y-4 min-w-0 lg:col-start-2">
@@ -1089,9 +993,125 @@ export default function CenterStudentProfil() {
             <Row icon={Wallet} label={td("profilFinance")} value={td("profilFinanceUnavailable")} />
           )}
         </Group>
+
+        {account.center.center_type === "universite" && (
+          <Group title={locale === "en" ? "Documents" : "Documents"}>
+            <div className="px-4 sm:px-5 py-3.5 flex flex-col gap-2.5">
+              {lmdDocsLoading ? (
+                <p className="text-[13px] font-medium" style={{ color: "rgba(17,34,78,0.5)" }}>
+                  {locale === "en" ? "Loading…" : "Chargement…"}
+                </p>
+              ) : !lmdDocs?.progress ? (
+                <p className="text-[13px] font-medium" style={{ color: "rgba(17,34,78,0.5)" }}>
+                  {locale === "en" ? "No academic record yet." : "Aucun parcours disponible pour l'instant."}
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-1.5 w-full min-w-0">
+                    {(["semestre", "niveau", "parcours"] as const).map((scope) => (
+                      <button
+                        key={scope}
+                        type="button"
+                        onClick={() => {
+                          setDocScope(scope);
+                          if (scope === "niveau") setDocScopeId(lmdDocs.niveaux.slice(-1)[0]?.id || "");
+                          else if (scope === "semestre") setDocScopeId(lmdDocs.progress!.semesters.slice(-1)[0]?.id || "");
+                          else setDocScopeId("");
+                        }}
+                        className="w-full min-w-0 min-h-9 h-9 sm:h-8 px-1 sm:px-1.5 rounded-lg text-[10px] sm:text-xs font-semibold border transition-colors leading-tight"
+                        style={
+                          docScope === scope
+                            ? { backgroundColor: BRAND.blue, borderColor: BRAND.blue, color: "#fff" }
+                            : { backgroundColor: "#fff", borderColor: "rgba(17,34,78,0.12)", color: BRAND.blue }
+                        }
+                      >
+                        {scope === "semestre"
+                          ? (locale === "en" ? "Semester" : "Semestre")
+                          : scope === "niveau"
+                            ? (locale === "en" ? "Year" : "Année")
+                            : (
+                              <>
+                                <span className="sm:hidden">{locale === "en" ? "Full" : "Complet"}</span>
+                                <span className="hidden sm:inline">{locale === "en" ? "Full program" : "Parcours complet"}</span>
+                              </>
+                            )}
+                      </button>
+                    ))}
+                  </div>
+                  {docScope !== "parcours" && (
+                    <CenterSelect
+                      value={docScopeId}
+                      onChange={setDocScopeId}
+                      size="md"
+                      className="w-full min-w-0"
+                      label={docScope === "niveau"
+                        ? (locale === "en" ? "Select year" : "Choisir l'année")
+                        : (locale === "en" ? "Select semester" : "Choisir le semestre")}
+                      options={
+                        docScope === "niveau"
+                          ? lmdDocs.niveaux.map((n) => ({
+                              value: n.id,
+                              label: `${locale === "en" ? "Level" : "Niveau"} ${n.annee}`,
+                            }))
+                          : lmdDocs.progress.semesters.map((s) => ({
+                              value: s.id,
+                              label: `${locale === "en" ? "Semester" : "Semestre"} ${s.ordre}`,
+                            }))
+                      }
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={downloadReleve}
+                    disabled={downloadingDoc !== null || (docScope !== "parcours" && !docScopeId)}
+                    className="w-full min-w-0 flex items-center justify-center gap-2 min-h-10 h-auto py-2.5 px-3 rounded-lg text-[12.5px] sm:text-[13px] font-bold border disabled:opacity-50 box-border"
+                    style={{ backgroundColor: BRAND.orange, borderColor: BRAND.orange, color: "#fff" }}
+                  >
+                    <FileText size={15} className="shrink-0" />
+                    <span className="text-center leading-snug">
+                      {downloadingDoc === "releve"
+                        ? (locale === "en" ? "Generating…" : "Génération…")
+                        : (locale === "en" ? "Download transcript" : "Télécharger le relevé de notes")}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={downloadScolarite}
+                    disabled={downloadingDoc !== null}
+                    className="w-full min-w-0 flex items-center justify-center gap-2 min-h-10 h-auto py-2.5 px-3 rounded-lg text-[12.5px] sm:text-[13px] font-bold border disabled:opacity-50 box-border"
+                    style={{ backgroundColor: "#fff", borderColor: BRAND.blue, color: BRAND.blue }}
+                  >
+                    <Download size={15} className="shrink-0" />
+                    <span className="text-center leading-snug">
+                      {downloadingDoc === "scolarite"
+                        ? (locale === "en" ? "Generating…" : "Génération…")
+                        : (locale === "en" ? "Download enrollment certificate" : "Télécharger l'attestation de scolarité")}
+                    </span>
+                  </button>
+                  {lmdDocs.diploma && (
+                    <button
+                      type="button"
+                      onClick={downloadDiplome}
+                      disabled={downloadingDoc !== null}
+                      className="w-full min-w-0 flex items-center justify-center gap-2 min-h-10 h-auto py-2.5 px-3 rounded-lg text-[12.5px] sm:text-[13px] font-bold border disabled:opacity-50 box-border"
+                      style={{ backgroundColor: "#fff", borderColor: "#047857", color: "#047857" }}
+                    >
+                      <GraduationCap size={15} className="shrink-0" />
+                      <span className="text-center leading-snug">
+                        {downloadingDoc === "diplome"
+                          ? (locale === "en" ? "Generating…" : "Génération…")
+                          : (locale === "en" ? "Download diploma" : "Télécharger le diplôme")}
+                      </span>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </Group>
+        )}
         </div>
 
-        <div className="space-y-4 min-w-0 lg:col-start-1">
+        <div className="space-y-4 min-w-0 lg:col-span-2 pb-4">
         <Group title={td("profilSecurityTitle")}>
           <AccordionRow
             icon={Lock}
@@ -1107,11 +1127,11 @@ export default function CenterStudentProfil() {
             {passwordError && (
               <p className="mb-3 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{passwordError}</p>
             )}
-            <div className="grid gap-3 sm:grid-cols-2 mb-4">
+            <div className="flex flex-col gap-3 mb-4 sm:max-w-md">
               <PField label={td("profilNewPassword")} value={passwordForm.password} onChange={(v) => setPasswordForm((c) => ({ ...c, password: v }))} type="password" />
               <PField label={td("profilConfirmPassword")} value={passwordForm.confirm} onChange={(v) => setPasswordForm((c) => ({ ...c, confirm: v }))} type="password" />
             </div>
-            <div className="flex gap-2 justify-end">
+            <div className="flex gap-2 justify-end w-full sm:max-w-md">
               <PButton variant="ghost" onClick={() => { acc.close(); setPasswordForm({ password: "", confirm: "" }); setPasswordError(null); }} disabled={passwordSaving}>
                 {td("profilCancel")}
               </PButton>

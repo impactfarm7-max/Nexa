@@ -78,6 +78,8 @@ export async function GET(req: Request) {
     return NextResponse.json({
       progress,
       niveaux: niveaux || [],
+      currentNiveauId: cursus.niveau_id || null,
+      currentSemestreId: cursus.semestre_id || null,
       diploma: record?.diploma || null,
       studentName: `${profile.prenom || ""} ${profile.nom || ""}`.trim(),
       matricule: profile.matricule,
