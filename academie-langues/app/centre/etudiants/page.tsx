@@ -22,6 +22,10 @@ import BulletinDynamique from "@/app/components/BulletinDynamique";
 import {
   passageDecisionLabel,
 } from "@/app/utils/cursus-passage";
+import {
+  academicStatusLabel,
+  isAcademicStatusReadonly,
+} from "@/app/utils/academic-status";
 import { ACTION_TONE } from "@/app/utils/action-tones";
 import { ActionConfirmModal } from "@/app/components/centre/ActionConfirmModal";
 import { useActionFeedback } from "@/app/components/ActionFeedback";
@@ -59,6 +63,7 @@ type Enrollment = {
   niveau_annee: number | null;
   duration_label?: string | null;
   academic_year?: string | null;
+  academic_status?: string | null;
   passage_decision?: string | null;
   passage_reason?: string | null;
   semestre_id?: string | null;
@@ -811,9 +816,27 @@ export default function CenterStudentsPage() {
                           {primaryEnr?.filiere_name_raw ? primaryEnr.filiere_name_raw.toUpperCase() : "—"}
                         </td>
                         <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span className={statusTone}>
-                            {hasDraft ? t("centre", "enrollmentDraft") : statusLabel}
-                          </span>
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={statusTone}>
+                              {hasDraft ? t("centre", "enrollmentDraft") : statusLabel}
+                            </span>
+                            {primaryEnr?.academic_status && (
+                              <span
+                                className={
+                                  isAcademicStatusReadonly(primaryEnr.academic_status)
+                                    ? ACTION_TONE.negativePill
+                                    : primaryEnr.academic_status === "redoublant"
+                                      ? ACTION_TONE.warningPill
+                                      : "inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-neutral-100 text-neutral-600"
+                                }
+                              >
+                                {academicStatusLabel(
+                                  primaryEnr.academic_status,
+                                  locale === "en" ? "en" : "fr",
+                                )}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3.5 text-[12px] font-medium text-neutral-700">
                           {enrStatus}
@@ -926,6 +949,7 @@ export default function CenterStudentsPage() {
                       niveau_annee: selectedEnrollment.niveau_annee,
                       duration_label: selectedEnrollment.duration_label ?? null,
                       academic_year: selectedEnrollment.academic_year ?? null,
+                      academic_status: selectedEnrollment.academic_status ?? null,
                       passage_decision: selectedEnrollment.passage_decision ?? null,
                       passage_reason: selectedEnrollment.passage_reason ?? null,
                       semestre_id: selectedEnrollment.semestre_id ?? null,
@@ -1148,6 +1172,11 @@ function StudentViewModal({
                   {primary.niveau_annee != null && <span>{t("centre", "enrollmentLevel")} {primary.niveau_annee}</span>}
                   {primary.duration_label && <span>{primary.duration_label}</span>}
                   {primary.academic_year && <span>{primary.academic_year}</span>}
+                  {primary.academic_status && (
+                    <span>
+                      {academicStatusLabel(primary.academic_status, locale === "en" ? "en" : "fr")}
+                    </span>
+                  )}
                   {primary.passage_decision && (
                     <span>{t("centre", "studentsProgression")} : {passageLabel(primary.passage_decision)}</span>
                   )}
@@ -1338,6 +1367,8 @@ function GradesTab({
   const [error,          setError]          = useState("");
   const [showBulletin,   setShowBulletin]   = useState(false);
   const [sessionLocked,  setSessionLocked]  = useState(false);
+  const academicReadonly = isAcademicStatusReadonly(enrollment.academic_status);
+  const gradesLocked = sessionLocked || academicReadonly;
 
   const FIELD_LABEL = "text-sm font-semibold text-neutral-600 block mb-1.5";
   const FIELD_INPUT =
@@ -1408,6 +1439,9 @@ function GradesTab({
         ? "Session validated — reopen from Grades to edit."
         : "Session validée — rouvrez depuis Notes pour modifier.");
     }
+    if (academicReadonly) {
+      return setError(t("centre", "academicStatusReadonlyHint"));
+    }
     const titleTrim = title.trim();
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -1452,11 +1486,19 @@ function GradesTab({
 
   return (
     <div className="w-full">
-      {enrollment.niveau_annee != null && (
+      {enrollment.niveau_annee != null && !academicReadonly && (
         <PassageNiveauPanel
           enrollmentId={enrollment.id}
           onDone={() => { onPassageDone?.(); }}
         />
+      )}
+
+      {academicReadonly && (
+        <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+          {academicStatusLabel(enrollment.academic_status, locale === "en" ? "en" : "fr")}
+          {" — "}
+          {t("centre", "academicStatusReadonlyHint")}
+        </div>
       )}
 
       <LmdAcademicPanel enrollmentId={enrollment.id} onChanged={() => { void load(); onPassageDone?.(); }} />
@@ -1515,11 +1557,17 @@ function GradesTab({
                 <button
                   type="button"
                   onClick={() => setAddingFor(addingFor === m.id ? null : m.id)}
-                  disabled={sessionLocked}
+                  disabled={gradesLocked}
                   className="h-9 w-9 rounded-lg border border-black/[0.08] inline-flex items-center justify-center hover:bg-black/[0.03] shrink-0 disabled:opacity-40"
                   style={{ color: ORANGE }}
                   aria-label={t("centre", "gradesAdd")}
-                  title={sessionLocked ? (locale === "en" ? "Session validated" : "Session validée") : undefined}
+                  title={
+                    academicReadonly
+                      ? t("centre", "academicStatusReadonlyHint")
+                      : sessionLocked
+                        ? (locale === "en" ? "Session validated" : "Session validée")
+                        : undefined
+                  }
                 >
                   <Plus size={16} />
                 </button>

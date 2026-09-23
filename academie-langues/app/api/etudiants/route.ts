@@ -713,6 +713,9 @@ export async function POST(req: NextRequest) {
     if (isCursusFiliere) {
       enrollmentPatch.tuition_fee = resolvedTuition;
       if (academicYear) enrollmentPatch.academic_year = academicYear;
+      if (isUniversityCenter(centerTypeRaw)) {
+        enrollmentPatch.academic_status = "inscrit";
+      }
     }
 
     await supabaseAdmin

@@ -161,6 +161,12 @@ export async function POST(req: Request) {
       if (/REVISION_CONFLICT|DIPLOMA_ALREADY_ISSUED/.test(error.message)) return fail("Le dossier a changé ou le diplôme est déjà émis. Rechargez le dossier.", 409);
       throw error;
     }
+    if (diploma) {
+      await db
+        .from("enrollments")
+        .update({ academic_status: "diplome" })
+        .eq("id", source.id);
+    }
     return NextResponse.json({ success: true, record });
   } catch (e) {
     console.error("[lmd] write", e);

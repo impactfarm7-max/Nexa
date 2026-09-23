@@ -21,6 +21,7 @@ type EnrollRow = {
   duration_unit: string | null;
   duration_months: number | null;
   academic_year: string | null;
+  academic_status: string | null;
   passage_decision: string | null;
   passage_reason: string | null;
   semestre_id: string | null;
@@ -124,13 +125,54 @@ export async function GET(req: Request) {
       .select(`
         id, student_id, status, filiere_id, niveau_id, groupe_id, campus_id,
         tuition_fee, enrolled_at, duration_value, duration_unit, duration_months,
-        academic_year, passage_decision, passage_reason, semestre_id,
+        academic_year, academic_status, passage_decision, passage_reason, semestre_id,
         filieres(name, type, duree_valeur, duree_unite),
         niveaux(annee, mois, semaines, jours),
         groupes(nom)
       `)
       .in("student_id", studentIds);
-    if (res.error && /passage_reason|semestre_id/i.test(res.error.message)) {
+    if (res.error && /academic_status/i.test(res.error.message)) {
+      const fallbackStatus = await supabaseAdmin
+        .from("enrollments")
+        .select(`
+          id, student_id, status, filiere_id, niveau_id, groupe_id, campus_id,
+          tuition_fee, enrolled_at, duration_value, duration_unit, duration_months,
+          academic_year, passage_decision, passage_reason, semestre_id,
+          filieres(name, type, duree_valeur, duree_unite),
+          niveaux(annee, mois, semaines, jours),
+          groupes(nom)
+        `)
+        .in("student_id", studentIds);
+      if (fallbackStatus.error && /passage_reason|semestre_id/i.test(fallbackStatus.error.message)) {
+        const fallback = await supabaseAdmin
+          .from("enrollments")
+          .select(`
+            id, student_id, status, filiere_id, niveau_id, groupe_id, campus_id,
+            tuition_fee, enrolled_at, duration_value, duration_unit, duration_months,
+            academic_year, passage_decision,
+            filieres(name, type, duree_valeur, duree_unite),
+            niveaux(annee, mois, semaines, jours),
+            groupes(nom)
+          `)
+          .in("student_id", studentIds);
+        if (fallback.error) {
+          return NextResponse.json({ error: fallback.error.message }, { status: 500 });
+        }
+        enrollRows = (fallback.data || []).map((e) => ({
+          ...e,
+          passage_reason: null,
+          semestre_id: null,
+          academic_status: null,
+        })) as EnrollRow[];
+      } else if (fallbackStatus.error) {
+        return NextResponse.json({ error: fallbackStatus.error.message }, { status: 500 });
+      } else {
+        enrollRows = (fallbackStatus.data || []).map((e) => ({
+          ...e,
+          academic_status: null,
+        })) as EnrollRow[];
+      }
+    } else if (res.error && /passage_reason|semestre_id/i.test(res.error.message)) {
       const fallback = await supabaseAdmin
         .from("enrollments")
         .select(`
@@ -145,7 +187,12 @@ export async function GET(req: Request) {
       if (fallback.error) {
         return NextResponse.json({ error: fallback.error.message }, { status: 500 });
       }
-      enrollRows = (fallback.data || []).map((e) => ({ ...e, passage_reason: null, semestre_id: null })) as EnrollRow[];
+      enrollRows = (fallback.data || []).map((e) => ({
+        ...e,
+        passage_reason: null,
+        semestre_id: null,
+        academic_status: null,
+      })) as EnrollRow[];
     } else if (res.error) {
       return NextResponse.json({ error: res.error.message }, { status: 500 });
     } else {
@@ -222,6 +269,7 @@ export async function GET(req: Request) {
           niveau_annee: isShort ? null : (niv?.annee ?? null),
           duration_label: isShort ? (dur || null) : null,
           academic_year: isShort ? null : (e.academic_year ?? null),
+          academic_status: isShort ? null : (e.academic_status ?? null),
           passage_decision: isShort ? null : (e.passage_decision ?? null),
           passage_reason: isShort ? null : (e.passage_reason ?? null),
           semestre_id: isShort ? null : (e.semestre_id ?? null),

@@ -13,6 +13,7 @@ import {
   snapshotFromGrade,
   type GradeAuditEventInput,
 } from "@/app/utils/gradeAudit.server";
+import { isAcademicStatusReadonly } from "@/app/utils/academic-status";
 
 const fail = (error: string, status = 400) => NextResponse.json({ error }, { status });
 
@@ -147,13 +148,29 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, updated: 0, status: action === "validate_session" ? "validated" : "provisional" });
       }
 
+      const { data: enrStatusRows } = await supabaseAdmin
+        .from("enrollments")
+        .select("id, academic_status")
+        .in("id", enrollmentIds);
+      const writableIds = (enrStatusRows || [])
+        .filter((e) => !isAcademicStatusReadonly(e.academic_status))
+        .map((e) => e.id);
+      // Fallback if column missing: treat all as writable
+      const sessionEnrollmentIds =
+        enrStatusRows && enrStatusRows.length
+          ? writableIds
+          : enrollmentIds;
+      if (!sessionEnrollmentIds.length) {
+        return NextResponse.json({ ok: true, updated: 0, status: action === "validate_session" ? "validated" : "provisional" });
+      }
+
       const nextStatus = action === "validate_session" ? "validated" : "provisional";
       const { data: beforeRows, error: beforeErr } = await supabaseAdmin
         .from("grades")
         .select("id, enrollment_id, score, max_score, title, status")
         .eq("filiere_matiere_id", filiereMatiereId)
         .eq("period_id", periodId)
-        .in("enrollment_id", enrollmentIds);
+        .in("enrollment_id", sessionEnrollmentIds);
       if (beforeErr) {
         if (["42703", "PGRST204"].includes(beforeErr.code || "") || /status/i.test(beforeErr.message || "")) {
           return fail("Colonne grades.status absente — exécutez supabase-grades-deliberation-status-2026-09-23.sql.", 503);
@@ -166,7 +183,7 @@ export async function POST(req: Request) {
         .update({ status: nextStatus })
         .eq("filiere_matiere_id", filiereMatiereId)
         .eq("period_id", periodId)
-        .in("enrollment_id", enrollmentIds)
+        .in("enrollment_id", sessionEnrollmentIds)
         .select("id, enrollment_id, score, max_score, title, status");
       if (error) {
         if (["42703", "PGRST204"].includes(error.code || "") || /status/i.test(error.message || "")) {
@@ -238,24 +255,50 @@ export async function POST(req: Request) {
     ];
 
     if (enrollmentIds.length) {
-      const { data: enrollments } = await supabaseAdmin
+      const { data: enrollments, error: enrErr } = await supabaseAdmin
         .from("enrollments")
-        .select("id, groupe_id, filiere_id, filieres(center_id)")
+        .select("id, groupe_id, filiere_id, academic_status, filieres(center_id)")
         .in("id", enrollmentIds);
 
-      const byId = new Map((enrollments || []).map((e) => [e.id, e]));
-      for (const eid of enrollmentIds) {
-        const e = byId.get(eid);
-        if (!e) return fail("Inscription introuvable.", 404);
-        const fil = e.filieres as { center_id?: string } | { center_id?: string }[] | null;
-        const center = Array.isArray(fil) ? fil[0]?.center_id : fil?.center_id;
-        if (!center || center !== centerId) return fail("Hors centre.", 403);
-        if (scope) {
-          if (!e.groupe_id || !scope.groupeIds.has(e.groupe_id)) {
-            return fail("Hors de votre périmètre (promotion).", 403);
+      if (enrErr && /academic_status/i.test(enrErr.message || "")) {
+        const fb = await supabaseAdmin
+          .from("enrollments")
+          .select("id, groupe_id, filiere_id, filieres(center_id)")
+          .in("id", enrollmentIds);
+        const byId = new Map((fb.data || []).map((e) => [e.id, { ...e, academic_status: null as string | null }]));
+        for (const eid of enrollmentIds) {
+          const e = byId.get(eid);
+          if (!e) return fail("Inscription introuvable.", 404);
+          const fil = e.filieres as { center_id?: string } | { center_id?: string }[] | null;
+          const center = Array.isArray(fil) ? fil[0]?.center_id : fil?.center_id;
+          if (!center || center !== centerId) return fail("Hors centre.", 403);
+          if (scope) {
+            if (!e.groupe_id || !scope.groupeIds.has(e.groupe_id)) {
+              return fail("Hors de votre périmètre (promotion).", 403);
+            }
+            if (groupeId && e.groupe_id !== groupeId) {
+              return fail("Inscription hors promotion sélectionnée.", 403);
+            }
           }
-          if (groupeId && e.groupe_id !== groupeId) {
-            return fail("Inscription hors promotion sélectionnée.", 403);
+        }
+      } else {
+        const byId = new Map((enrollments || []).map((e) => [e.id, e]));
+        for (const eid of enrollmentIds) {
+          const e = byId.get(eid);
+          if (!e) return fail("Inscription introuvable.", 404);
+          if (isAcademicStatusReadonly(e.academic_status)) {
+            return fail("Inscription en lecture seule (suspendu / diplômé / transféré).", 403);
+          }
+          const fil = e.filieres as { center_id?: string } | { center_id?: string }[] | null;
+          const center = Array.isArray(fil) ? fil[0]?.center_id : fil?.center_id;
+          if (!center || center !== centerId) return fail("Hors centre.", 403);
+          if (scope) {
+            if (!e.groupe_id || !scope.groupeIds.has(e.groupe_id)) {
+              return fail("Hors de votre périmètre (promotion).", 403);
+            }
+            if (groupeId && e.groupe_id !== groupeId) {
+              return fail("Inscription hors promotion sélectionnée.", 403);
+            }
           }
         }
       }
@@ -338,16 +381,21 @@ export async function POST(req: Request) {
         if (normalizeGradeStatus(existing.status) === "validated") {
           return fail("Note validée — rouvrez la session pour modifier.", 403);
         }
-        if (scope) {
-          const ueErr = assertTrainerUe(scope, existing.filiere_matiere_id);
-          if (ueErr) return fail(ueErr, 403);
+        {
           const { data: enr } = await supabaseAdmin
             .from("enrollments")
-            .select("groupe_id")
+            .select("groupe_id, academic_status")
             .eq("id", existing.enrollment_id)
             .maybeSingle();
-          if (!enr?.groupe_id || !scope.groupeIds.has(enr.groupe_id)) {
-            return fail("Hors de votre périmètre (promotion).", 403);
+          if (isAcademicStatusReadonly(enr?.academic_status)) {
+            return fail("Inscription en lecture seule (suspendu / diplômé / transféré).", 403);
+          }
+          if (scope) {
+            const ueErr = assertTrainerUe(scope, existing.filiere_matiere_id);
+            if (ueErr) return fail(ueErr, 403);
+            if (!enr?.groupe_id || !scope.groupeIds.has(enr.groupe_id)) {
+              return fail("Hors de votre périmètre (promotion).", 403);
+            }
           }
         }
         prepared.push({ kind: "delete", existing });

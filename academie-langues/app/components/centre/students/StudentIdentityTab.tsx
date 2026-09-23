@@ -15,6 +15,12 @@ import {
   type StudentCountryRef,
 } from "@/app/data/studentLocalisation";
 import { passageDecisionLabel, defaultAcademicYear, normalizeAcademicYear } from "@/app/utils/cursus-passage";
+import {
+  ACADEMIC_STATUSES,
+  academicStatusLabel,
+  isAcademicStatusReadonly,
+  type AcademicStatus,
+} from "@/app/utils/academic-status";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 import { downloadAttestationReussitePdf } from "@/app/utils/centerPdfExport";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -82,6 +88,7 @@ type Props = {
     niveau_annee: number | null;
     duration_label?: string | null;
     academic_year?: string | null;
+    academic_status?: string | null;
     passage_decision?: string | null;
     passage_reason?: string | null;
     semestre_id?: string | null;
@@ -192,8 +199,19 @@ export default function StudentIdentityTab({
   const [placeNiveauId, setPlaceNiveauId] = useState("");
   const [placeSemestreId, setPlaceSemestreId] = useState("");
   const [placeAcademicYear, setPlaceAcademicYear] = useState(defaultAcademicYear());
+  const [placeAcademicStatus, setPlaceAcademicStatus] = useState<AcademicStatus>("inscrit");
   const [placeGroupeId, setPlaceGroupeId] = useState("");
   const [placeLoadingOpts, setPlaceLoadingOpts] = useState(false);
+
+  useEffect(() => {
+    if (!centerId) return;
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase.from("centers").select("center_type").eq("id", centerId).maybeSingle();
+      if (!cancelled) setIsUniversite(data?.center_type === "universite");
+    })();
+    return () => { cancelled = true; };
+  }, [centerId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -388,6 +406,11 @@ export default function StudentIdentityTab({
     setPlaceNiveauId(nId);
     setPlaceSemestreId(enrollmentInfo.semestre_id || "");
     setPlaceAcademicYear(enrollmentInfo.academic_year || defaultAcademicYear());
+    setPlaceAcademicStatus(
+      (ACADEMIC_STATUSES.includes(enrollmentInfo.academic_status as AcademicStatus)
+        ? enrollmentInfo.academic_status
+        : "inscrit") as AcademicStatus,
+    );
     setPlaceGroupeId(gId);
     setEditingPlacement(true);
     await loadPlacementOptions(fId, nId || null);
@@ -490,6 +513,7 @@ export default function StudentIdentityTab({
           niveau_id: placeNiveauId || null,
           semestre_id: placeSemestreId || null,
           academic_year: placeAcademicYearNorm || placeAcademicYear.trim() || null,
+          academic_status: univCursus ? placeAcademicStatus : undefined,
           groupe_id: placeGroupeId || null,
         }),
       });
@@ -719,6 +743,25 @@ export default function StudentIdentityTab({
                     />
                   </div>
                 )}
+                {univCursus && (
+                  <div>
+                    <label className={FIELD_LABEL}>{t("centre", "academicStatusLabel")}</label>
+                    <CenterSelect
+                      size="lg"
+                      value={placeAcademicStatus}
+                      onChange={(v) => setPlaceAcademicStatus(v as AcademicStatus)}
+                      options={ACADEMIC_STATUSES.map((s) => ({
+                        value: s,
+                        label: academicStatusLabel(s, locale === "en" ? "en" : "fr"),
+                      }))}
+                    />
+                    {isAcademicStatusReadonly(placeAcademicStatus) && (
+                      <p className="text-xs font-medium text-amber-700 mt-1.5">
+                        {t("centre", "academicStatusReadonlyHint")}
+                      </p>
+                    )}
+                  </div>
+                )}
                 <div>
                   <label className={FIELD_LABEL}>{isUniversite ? t("centre", "univPromotion") : t("centre", "identityClass")}</label>
                   <CenterSelect
@@ -790,6 +833,22 @@ export default function StudentIdentityTab({
                   <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
                     <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityAcademicYear")}</p>
                     <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.academic_year || "—"}</p>
+                  </div>
+                )}
+                {(enrollmentInfo.academic_status || (isUniversite && enrollmentInfo.niveau_annee != null)) && (
+                  <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
+                    <p className="text-xs font-semibold text-neutral-400">{t("centre", "academicStatusLabel")}</p>
+                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>
+                      {academicStatusLabel(
+                        enrollmentInfo.academic_status || "inscrit",
+                        locale === "en" ? "en" : "fr",
+                      )}
+                    </p>
+                    {isAcademicStatusReadonly(enrollmentInfo.academic_status) && (
+                      <p className="text-xs font-medium text-amber-700 mt-1">
+                        {t("centre", "academicStatusReadonlyHint")}
+                      </p>
+                    )}
                   </div>
                 )}
                 {enrollmentInfo.passage_decision && (

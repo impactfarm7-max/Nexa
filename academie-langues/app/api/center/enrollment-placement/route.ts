@@ -3,10 +3,16 @@ import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-se
 import { finalizeStudentClassroom } from "@/app/utils/studentClassroom.server";
 import { normalizeAcademicYear } from "@/app/utils/cursus-passage";
 import { isUniversityCenter } from "@/app/utils/student-matricule";
+import {
+  isAcademicStatus,
+  isAcademicStatusReadonly,
+  normalizeAcademicStatus,
+  type AcademicStatus,
+} from "@/app/utils/academic-status";
 
 /**
  * POST /api/center/enrollment-placement
- * Change filière / niveau / semestre / année / classe d'une inscription existante.
+ * Change filière / niveau / semestre / année / classe / statut académique.
  * Option A (univ) : parcours complet obligatoire, même fiche mise à jour.
  */
 export async function POST(req: Request) {
@@ -19,6 +25,7 @@ export async function POST(req: Request) {
     niveau_id?: string | null;
     semestre_id?: string | null;
     academic_year?: string | null;
+    academic_status?: string | null;
     groupe_id?: string | null;
   };
   try {
@@ -50,7 +57,7 @@ export async function POST(req: Request) {
 
   const { data: enrollment, error: enrErr } = await supabaseAdmin
     .from("enrollments")
-    .select("id, student_id, filiere_id, niveau_id, groupe_id, semestre_id, academic_year, status, filieres(center_id, type)")
+    .select("id, student_id, filiere_id, niveau_id, groupe_id, semestre_id, academic_year, academic_status, status, filieres(center_id, type)")
     .eq("id", enrollmentId)
     .maybeSingle();
 
@@ -192,6 +199,23 @@ export async function POST(req: Request) {
     );
   }
 
+  let resolvedAcademicStatus: AcademicStatus | null = normalizeAcademicStatus(enrollment.academic_status);
+  if (body.academic_status !== undefined) {
+    if (body.academic_status === null || body.academic_status === "") {
+      resolvedAcademicStatus = isUnivCursus ? "inscrit" : null;
+    } else if (!isAcademicStatus(body.academic_status)) {
+      return NextResponse.json(
+        { error: "Statut académique invalide.", code: "ACADEMIC_STATUS_INVALID" },
+        { status: 400 },
+      );
+    } else {
+      resolvedAcademicStatus = body.academic_status;
+    }
+  }
+  if (isUnivCursus && !resolvedAcademicStatus) {
+    resolvedAcademicStatus = "inscrit";
+  }
+
   const oldGroupeId = enrollment.groupe_id as string | null;
 
   const updatePayload: Record<string, unknown> = {
@@ -204,6 +228,9 @@ export async function POST(req: Request) {
   }
   if (isUnivCursus || academicYear) {
     updatePayload.academic_year = finalAcademicYear ?? null;
+  }
+  if (isUnivCursus || body.academic_status !== undefined) {
+    updatePayload.academic_status = resolvedAcademicStatus;
   }
 
   const { error: updErr } = await supabaseAdmin
@@ -264,8 +291,15 @@ export async function POST(req: Request) {
       academic_year: (updatePayload.academic_year as string | null | undefined)
         ?? (enrollment.academic_year as string | null)
         ?? null,
+      academic_status: (updatePayload.academic_status as string | null | undefined)
+        ?? (enrollment.academic_status as string | null)
+        ?? null,
       groupe_id: groupeId,
       groupe_nom: groupeRow?.nom ?? null,
+      academic_readonly: isAcademicStatusReadonly(
+        (updatePayload.academic_status as string | null | undefined)
+          ?? (enrollment.academic_status as string | null),
+      ),
     },
   });
 }

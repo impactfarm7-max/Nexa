@@ -21,6 +21,7 @@ import {
 import { parseGradeWeights } from "@/app/utils/gradesCalc";
 import { loadLmdProgress } from "@/app/utils/lmd-progress.server";
 import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
+import { academicStatusAfterPassage, isAcademicStatusReadonly } from "@/app/utils/academic-status";
 
 type PassageLocale = "fr" | "en";
 
@@ -171,7 +172,7 @@ export async function POST(req: NextRequest) {
       .from("enrollments")
       .select(`
         id, student_id, filiere_id, niveau_id, groupe_id, campus_id, status,
-        tuition_fee, academic_year, passage_decision,
+        tuition_fee, academic_year, academic_status, passage_decision,
         filieres!inner(id, center_id, type, default_tuition_fee, cursus_fee_mode, payment_plan),
         niveaux(id, annee, tuition_fee, seuil_passage)
       `)
@@ -180,6 +181,16 @@ export async function POST(req: NextRequest) {
 
     if (srcErr || !source) {
       return jsonErr(locale, 404, "Inscription introuvable.", "Enrollment not found.", "NOT_FOUND");
+    }
+
+    if (isAcademicStatusReadonly((source as { academic_status?: string | null }).academic_status)) {
+      return jsonErr(
+        locale,
+        403,
+        "Inscription en lecture seule (suspendu / diplômé / transféré).",
+        "Enrollment is read-only (suspended / graduated / transferred).",
+        "ACADEMIC_READONLY",
+      );
     }
 
     const filiere = source.filieres as unknown as {
@@ -438,6 +449,7 @@ export async function POST(req: NextRequest) {
         ...(targetSemestreId ? { semestre_id: targetSemestreId } : {}),
         academic_year: academicYear || null,
         tuition_fee: tuition,
+        academic_status: academicStatusAfterPassage(decision) || "inscrit",
       })
       .eq("id", newEnrollmentId);
 
@@ -498,6 +510,7 @@ export async function GET(req: NextRequest) {
     niveau_id: string | null;
     status: string | null;
     academic_year: string | null;
+    academic_status?: string | null;
     passage_decision: string | null;
     passage_reason?: string | null;
     filieres: unknown;
@@ -510,18 +523,42 @@ export async function GET(req: NextRequest) {
     const withReason = await supabaseAdmin
       .from("enrollments")
       .select(`
-        id, filiere_id, niveau_id, status, academic_year, passage_decision, passage_reason,
+        id, filiere_id, niveau_id, status, academic_year, academic_status, passage_decision, passage_reason,
         filieres!inner(center_id, type),
         niveaux(id, annee, seuil_passage, nom)
       `)
       .eq("id", enrollmentId)
       .maybeSingle();
 
-    if (withReason.error && /passage_reason/i.test(withReason.error.message)) {
+    if (withReason.error && /academic_status/i.test(withReason.error.message || "")) {
+      const noStatus = await supabaseAdmin
+        .from("enrollments")
+        .select(`
+          id, filiere_id, niveau_id, status, academic_year, passage_decision, passage_reason,
+          filieres!inner(center_id, type),
+          niveaux(id, annee, seuil_passage, nom)
+        `)
+        .eq("id", enrollmentId)
+        .maybeSingle();
+      if (noStatus.error && /passage_reason/i.test(noStatus.error.message || "")) {
+        const fallback = await supabaseAdmin
+          .from("enrollments")
+          .select(`
+            id, filiere_id, niveau_id, status, academic_year, passage_decision,
+            filieres!inner(center_id, type),
+            niveaux(id, annee, seuil_passage, nom)
+          `)
+          .eq("id", enrollmentId)
+          .maybeSingle();
+        source = fallback.data as PassageSource | null;
+      } else {
+        source = noStatus.data as PassageSource | null;
+      }
+    } else if (withReason.error && /passage_reason/i.test(withReason.error.message || "")) {
       const fallback = await supabaseAdmin
         .from("enrollments")
         .select(`
-          id, filiere_id, niveau_id, status, academic_year, passage_decision,
+          id, filiere_id, niveau_id, status, academic_year, academic_status, passage_decision,
           filieres!inner(center_id, type),
           niveaux(id, annee, seuil_passage, nom)
         `)
@@ -634,7 +671,9 @@ export async function GET(req: NextRequest) {
       redouble: lmdProgress.semesters.filter(s => s.niveau_id === source.niveau_id),
     } : null,
     has_next_niveau: hasNextNiveau,
-    can_decide: !source.passage_decision && source.status !== "cancelled",
-    can_reopen_ajourne: source.passage_decision === "ajourne",
+    academic_status: source.academic_status ?? null,
+    academic_readonly: isAcademicStatusReadonly(source.academic_status),
+    can_decide: !source.passage_decision && source.status !== "cancelled" && !isAcademicStatusReadonly(source.academic_status),
+    can_reopen_ajourne: source.passage_decision === "ajourne" && !isAcademicStatusReadonly(source.academic_status),
   });
 }

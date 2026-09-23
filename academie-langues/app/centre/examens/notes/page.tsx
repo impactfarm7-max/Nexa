@@ -31,6 +31,7 @@ import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 import { evaluateLmdUe } from "@/app/utils/lmd-results";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 import { formatUeDisplayName } from "@/app/utils/univAcademicVocab";
+import { isAcademicStatusReadonly } from "@/app/utils/academic-status";
 import { normalizeGradeStatus, type GradeDeliberationStatus } from "@/app/utils/gradeStatus";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { ACTION_TONE } from "@/app/utils/action-tones";
@@ -96,6 +97,7 @@ type StudentGradeRow = {
   prenom: string;
   nom: string;
   matricule: string | null;
+  academic_readonly: boolean;
   existing_grade_id: string | null;
   existing_score: number | null;
   new_score: string;
@@ -728,7 +730,7 @@ export default function GradeBookPage() {
 
     let enrollQuery = supabase
       .from("enrollments")
-      .select("id, student_id, profiles:student_id(prenom, nom, matricule)")
+      .select("id, student_id, academic_status, profiles:student_id(prenom, nom, matricule)")
       .eq("filiere_id", selectedSubject.filiere_id)
       .eq("groupe_id", selectedGroupeId)
       .eq("status", "active");
@@ -739,7 +741,19 @@ export default function GradeBookPage() {
       enrollQuery = enrollQuery.eq("niveau_id", selectedNiveauId);
     }
 
-    const { data: enrollments } = await enrollQuery;
+    let { data: enrollments, error: enrollErr } = await enrollQuery;
+    if (enrollErr && /academic_status/i.test(enrollErr.message || "")) {
+      let fbQuery = supabase
+        .from("enrollments")
+        .select("id, student_id, profiles:student_id(prenom, nom, matricule)")
+        .eq("filiere_id", selectedSubject.filiere_id)
+        .eq("groupe_id", selectedGroupeId)
+        .eq("status", "active");
+      if (selectedSubject.niveau_id) fbQuery = fbQuery.eq("niveau_id", selectedSubject.niveau_id);
+      else if (selectedNiveauId) fbQuery = fbQuery.eq("niveau_id", selectedNiveauId);
+      const fbRes = await fbQuery;
+      enrollments = (fbRes.data || []).map((e) => ({ ...e, academic_status: null }));
+    }
 
     if (!enrollments || enrollments.length === 0) {
       setStudentRows([]);
@@ -841,6 +855,7 @@ export default function GradeBookPage() {
         prenom: e.profiles?.prenom || "",
         nom: e.profiles?.nom || "",
         matricule: e.profiles?.matricule || null,
+        academic_readonly: isAcademicStatusReadonly(e.academic_status),
         existing_grade_id: grade?.id || null,
         existing_score: grade?.score ?? null,
         new_score: grade?.score?.toString() || "",
@@ -879,7 +894,7 @@ export default function GradeBookPage() {
     if (!gridEditable) return;
     setPendingImportBatch(false);
     setStudentRows((prev) => prev.map((r) => {
-      if (r.enrollment_id !== enrollmentId) return r;
+      if (r.enrollment_id !== enrollmentId || r.academic_readonly) return r;
       return {
         ...r,
         new_score: value,
@@ -893,7 +908,7 @@ export default function GradeBookPage() {
     if (!gridEditable) return;
     setPendingImportBatch(false);
     setStudentRows((prev) => prev.map((r) => {
-      if (r.enrollment_id !== enrollmentId) return r;
+      if (r.enrollment_id !== enrollmentId || r.academic_readonly) return r;
       return {
         ...r,
         extras: r.extras.map((ex) =>
@@ -995,6 +1010,7 @@ export default function GradeBookPage() {
 
       for (let i = 0; i < nextRows.length; i++) {
         const row = nextRows[i];
+        if (row.academic_readonly) continue;
 
         if (row.dirty && row.new_score.trim() !== "") {
           const score = parseFloat(row.new_score);
@@ -1201,7 +1217,7 @@ export default function GradeBookPage() {
       setStudentRows((prev) =>
         prev.map((r) => {
           const hit = matched.find((m) => m.enrollment_id === r.enrollment_id);
-          if (!hit) return r;
+          if (!hit || r.academic_readonly) return r;
           let extras = r.extras.map((ex) => ({ ...ex }));
           for (const [title, score] of Object.entries(hit.extras)) {
             if (score == null) continue;
@@ -2287,11 +2303,16 @@ export default function GradeBookPage() {
                       const moy = rowAverage(row, suplColumns, subjectWeights);
                       const moyTone = moy !== null ? scoreTone(moy, bareme) : "empty";
                       const isDirty = row.dirty || row.extras.some((e) => e.dirty || e.deleted);
+                      const rowEditable = gridEditable && !row.academic_readonly;
                       return (
                         <div
                           key={row.enrollment_id}
                           className={`grid gap-2 px-4 py-2.5 items-center transition-colors ${
-                            isDirty ? "bg-amber-50/50" : "hover:bg-black/[0.015]"
+                            row.academic_readonly
+                              ? "bg-neutral-50/80 opacity-80"
+                              : isDirty
+                                ? "bg-amber-50/50"
+                                : "hover:bg-black/[0.015]"
                           }`}
                           style={{ gridTemplateColumns: gridTemplate }}
                         >
@@ -2309,6 +2330,11 @@ export default function GradeBookPage() {
                               {row.matricule && (
                                 <p className="text-[10px] text-neutral-400 font-semibold truncate">{row.matricule}</p>
                               )}
+                              {row.academic_readonly && (
+                                <p className="text-[10px] font-semibold text-amber-700 truncate">
+                                  {t("centre", "academicStatusReadonlyHint")}
+                                </p>
+                              )}
                             </div>
                           </div>
 
@@ -2321,8 +2347,8 @@ export default function GradeBookPage() {
                               value={row.new_score}
                               onChange={(e) => updatePrincipal(row.enrollment_id, e.target.value)}
                               placeholder="—"
-                              readOnly={!gridEditable}
-                              className={scoreFieldClass(row.new_score, bareme, row.dirty, !gridEditable)}
+                              readOnly={!rowEditable}
+                              className={scoreFieldClass(row.new_score, bareme, row.dirty, !rowEditable)}
                             />
                             {isUniversityLmd && selectedSubject?.credits != null && (() => {
                               const grades = row.new_score.trim() ? [{ score: Number(row.new_score), max_score: bareme, title: null as string | null }] : [];
@@ -2355,8 +2381,8 @@ export default function GradeBookPage() {
                                   value={cell?.score || ""}
                                   onChange={(e) => updateExtraScore(row.enrollment_id, col.colKey, e.target.value)}
                                   placeholder="—"
-                                  readOnly={!gridEditable}
-                                  className={scoreFieldClass(cell?.score || "", bareme, !!cell?.dirty, !gridEditable)}
+                                  readOnly={!rowEditable}
+                                  className={scoreFieldClass(cell?.score || "", bareme, !!cell?.dirty, !rowEditable)}
                                 />
                               </div>
                             );
