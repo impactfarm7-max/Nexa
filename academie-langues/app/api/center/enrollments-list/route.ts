@@ -177,6 +177,18 @@ export async function GET(req: Request) {
     return creditSummaries.get(key)!;
   };
 
+  const semestreIds = [...new Set(enrollRows.map((e) => e.semestre_id).filter(Boolean))] as string[];
+  const semestreOrdreById = new Map<string, number>();
+  if (semestreIds.length > 0) {
+    const { data: semRows } = await supabaseAdmin
+      .from("semestres")
+      .select("id, ordre")
+      .in("id", semestreIds);
+    for (const s of semRows || []) {
+      semestreOrdreById.set(s.id, s.ordre);
+    }
+  }
+
   const students = await Promise.all(profileRows.map(async (p) => {
     const ses = enrollRows.filter((e) => e.student_id === p.id);
     return {
@@ -212,6 +224,8 @@ export async function GET(req: Request) {
           academic_year: isShort ? null : (e.academic_year ?? null),
           passage_decision: isShort ? null : (e.passage_decision ?? null),
           passage_reason: isShort ? null : (e.passage_reason ?? null),
+          semestre_id: isShort ? null : (e.semestre_id ?? null),
+          semestre_ordre: isShort ? null : (e.semestre_id ? (semestreOrdreById.get(e.semestre_id) ?? null) : null),
           groupe_id: e.groupe_id,
           groupe_nom: e.groupes?.nom ?? null,
           campus_id: e.campus_id ?? null,

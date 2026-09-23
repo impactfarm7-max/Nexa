@@ -179,10 +179,12 @@ export const REPORT_HUB_CARDS: HubCard[] = [
   },
   {
     id: 19,
-    label: "Teaching activity",
-    description: "Classes delivered and workload",
+    label: "Teaching load",
+    description: "CM/TD/TP hours vs annual service (not the timetable)",
+    href: "/centre/cours/charge",
     section: "activite",
-    status: "soon",
+    status: "live",
+    priority: "P1",
   },
   {
     id: 20,

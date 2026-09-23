@@ -3,6 +3,7 @@ import { hexToRgb } from "@/app/utils/documentConfig";
 import { amountInWordsFr } from "@/app/utils/amountInWordsFr";
 import { amountInWordsEn } from "@/app/utils/amountInWordsEn";
 import { localizeInstallmentLabel, localizePaymentMethod } from "@/app/utils/financeI18n";
+import { assertMatriculeForOfficialDocument } from "@/app/utils/student-matricule";
 
 const BLUE_RGB: [number, number, number] = [17, 34, 78];
 const ORANGE_RGB: [number, number, number] = [235, 103, 14];
@@ -969,6 +970,9 @@ export async function downloadPayslipPdf(params: PayslipPdfParams) {
 export type BulletinNotesPdfParams = {
   locale?: "fr" | "en";
   studentName: string;
+  studentMatricule?: string | null;
+  /** Université : refuse l'impression sans matricule. */
+  requireMatricule?: boolean;
   enrollmentLabel: string;
   niveauLabel?: string | null;
   classeLabel?: string | null;
@@ -988,6 +992,9 @@ export type BulletinNotesPdfParams = {
 
 export async function downloadBulletinNotesPdf(params: BulletinNotesPdfParams) {
   const isEn = params.locale === "en";
+  const matricule = params.requireMatricule
+    ? assertMatriculeForOfficialDocument(params.studentMatricule, isEn ? "en" : "fr")
+    : (params.studentMatricule || "").trim() || null;
   const { doc, autoTable, startY, cfg } = await createDoc(
     params.config?.title || (isEn ? "Report card" : "Bulletin de notes"),
     params.config,
@@ -1003,6 +1010,7 @@ export async function downloadBulletinNotesPdf(params: BulletinNotesPdfParams) {
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
   const meta = [
+    matricule ? `${isEn ? "Student ID" : "Matricule"} : ${matricule}` : null,
     params.enrollmentLabel,
     params.niveauLabel,
     params.classeLabel,
@@ -1239,6 +1247,8 @@ export type AttestationScolaritePdfParams = {
   locale?: "fr" | "en";
   studentName: string;
   studentMatricule?: string | null;
+  /** Université : refuse sans matricule. Sinon affiche « — ». */
+  requireMatricule?: boolean;
   programName?: string | null;
   niveauLabel?: string | null;
   semestreLabel?: string | null;
@@ -1251,6 +1261,9 @@ export type AttestationScolaritePdfParams = {
 
 export async function downloadAttestationScolaritePdf(params: AttestationScolaritePdfParams) {
   const isEn = params.locale === "en";
+  const matricule = params.requireMatricule
+    ? assertMatriculeForOfficialDocument(params.studentMatricule, isEn ? "en" : "fr")
+    : (params.studentMatricule?.trim() || "—");
   const title = params.config?.title?.trim() || (isEn ? "Certificate of enrollment" : "Attestation de scolarité");
   const { doc, startY, cfg } = await createDoc(title, { ...params.config, title });
 
@@ -1293,7 +1306,7 @@ export async function downloadAttestationScolaritePdf(params: AttestationScolari
 
   y += 6;
   const details: string[] = [];
-  if (params.studentMatricule) details.push(`${isEn ? "Student ID" : "Matricule"} : ${params.studentMatricule}`);
+  details.push(`${isEn ? "Student ID" : "Matricule"} : ${matricule}`);
   if (params.programName) details.push(`${isEn ? "Program" : "Programme"} : ${params.programName}`);
   if (params.niveauLabel) details.push(`${isEn ? "Level" : "Niveau"} : ${params.niveauLabel}`);
   if (params.semestreLabel) details.push(`${isEn ? "Semester" : "Semestre"} : ${params.semestreLabel}`);
@@ -1339,6 +1352,7 @@ export type ReleveNotesLmdPdfParams = {
   locale?: "fr" | "en";
   studentName: string;
   studentMatricule?: string | null;
+  requireMatricule?: boolean;
   programName?: string | null;
   scopeLabel: string;
   academicYear?: string | null;
@@ -1352,6 +1366,9 @@ export type ReleveNotesLmdPdfParams = {
 
 export async function downloadReleveNotesLmdPdf(params: ReleveNotesLmdPdfParams) {
   const isEn = params.locale === "en";
+  const matricule = params.requireMatricule
+    ? assertMatriculeForOfficialDocument(params.studentMatricule, isEn ? "en" : "fr")
+    : (params.studentMatricule?.trim() || "—");
   const title = params.config?.title?.trim() || (isEn ? "Official transcript" : "Relevé de notes officiel");
   const { doc, autoTable, startY, cfg } = await createDoc(title, { ...params.config, title });
 
@@ -1365,7 +1382,7 @@ export async function downloadReleveNotesLmdPdf(params: ReleveNotesLmdPdfParams)
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
   const meta = [
-    params.studentMatricule ? `${isEn ? "Student ID" : "Matricule"} : ${params.studentMatricule}` : null,
+    `${isEn ? "Student ID" : "Matricule"} : ${matricule}`,
     params.programName,
     params.scopeLabel,
     params.academicYear,
@@ -1425,6 +1442,7 @@ export type ConvocationExamenPdfParams = {
   locale?: "fr" | "en";
   studentName: string;
   studentMatricule?: string | null;
+  requireMatricule?: boolean;
   epreuveLabel: string;
   scheduledAt: string;
   durationMinutes?: number | null;
@@ -1438,6 +1456,9 @@ export type ConvocationExamenPdfParams = {
 
 export async function downloadConvocationExamenPdf(params: ConvocationExamenPdfParams) {
   const isEn = params.locale === "en";
+  const matricule = params.requireMatricule
+    ? assertMatriculeForOfficialDocument(params.studentMatricule, isEn ? "en" : "fr")
+    : (params.studentMatricule?.trim() || "—");
   const title = params.config?.title?.trim() || (isEn ? "Examination summons" : "Convocation d'examen");
   const { doc, startY, cfg } = await createDoc(title, { ...params.config, title });
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -1458,15 +1479,11 @@ export async function downloadConvocationExamenPdf(params: ConvocationExamenPdfP
   doc.setTextColor(...cfg.blueRgb);
   doc.text(params.studentName.toUpperCase(), pageWidth / 2, y, { align: "center" });
   y += 8;
-  if (params.studentMatricule) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(80, 80, 80);
-    doc.text(`${isEn ? "Student ID" : "Matricule"} : ${params.studentMatricule}`, pageWidth / 2, y, { align: "center" });
-    y += 10;
-  } else {
-    y += 4;
-  }
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(80, 80, 80);
+  doc.text(`${isEn ? "Student ID" : "Matricule"} : ${matricule}`, pageWidth / 2, y, { align: "center" });
+  y += 10;
 
   const when = new Date(params.scheduledAt).toLocaleString(isEn ? "en-GB" : "fr-FR", {
     weekday: "long",

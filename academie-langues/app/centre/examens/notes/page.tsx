@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   ArrowLeft, Save, Loader2, CheckCircle2,
-  Users, Calendar, AlertTriangle, Plus, Trash2, Search, GitBranch, Pencil, Lock, Download,
+  Users, Calendar, AlertTriangle, Plus, Trash2, Search, GitBranch, Pencil, Lock, Download, Upload, History, X,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
@@ -21,11 +21,17 @@ import {
   scoreToneClasses,
   scoreToneTextClass,
 } from "@/app/utils/gradesCalc";
+import {
+  downloadGradesImportTemplate,
+  matchStudentToImportRow,
+  parseGradesImportFile,
+} from "@/app/utils/gradesExcelImport";
 import { downloadClassGradeSheetPdf } from "@/app/utils/centerPdfExport";
 import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 import { evaluateLmdUe } from "@/app/utils/lmd-results";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 import { formatUeDisplayName } from "@/app/utils/univAcademicVocab";
+import { normalizeGradeStatus, type GradeDeliberationStatus } from "@/app/utils/gradeStatus";
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { ACTION_TONE } from "@/app/utils/action-tones";
 
@@ -251,11 +257,32 @@ export default function GradeBookPage() {
   const [savingMeta, setSavingMeta] = useState(false);
   const [metaLocked, setMetaLocked] = useState(true);
   const [notesLocked, setNotesLocked] = useState(true);
+  /** Session délibérée (UE + période + promo) — lecture seule jusqu'à Rouvrir. */
+  const [sessionStatus, setSessionStatus] = useState<GradeDeliberationStatus | "empty">("empty");
+  const [sessionGradeCount, setSessionGradeCount] = useState(0);
+  const [deliberating, setDeliberating] = useState(false);
   const [formulaOpen, setFormulaOpen] = useState(false);
   const [formulaMode, setFormulaMode] = useState<"simple" | "weighted">("simple");
   const [formulaDraft, setFormulaDraft] = useState<Record<string, string>>({});
   const [savingFormula, setSavingFormula] = useState(false);
   const [exportingClass, setExportingClass] = useState(false);
+  const [importingExcel, setImportingExcel] = useState(false);
+  /** Set after Excel import so the next save is audited as a batch import. */
+  const [pendingImportBatch, setPendingImportBatch] = useState(false);
+  const [auditDrawer, setAuditDrawer] = useState<{
+    enrollment_id: string;
+    grade_id: string | null;
+    label: string;
+  } | null>(null);
+  const [auditEvents, setAuditEvents] = useState<{
+    id: string;
+    action: string;
+    actor_name: string;
+    created_at: string;
+    before: { score?: number | null; title?: string | null; status?: string | null } | null;
+    after: { score?: number | null; title?: string | null; status?: string | null } | null;
+  }[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [bulletinEnrollment, setBulletinEnrollment] = useState<{
     id: string;
     label: string;
@@ -265,7 +292,10 @@ export default function GradeBookPage() {
   const [subjectQuery, setSubjectQuery] = useState("");
   const [subjectMenuOpen, setSubjectMenuOpen] = useState(false);
   const subjectPickerRef = useRef<HTMLDivElement>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
+  const sessionValidated = sessionStatus === "validated";
+  const gridEditable = !notesLocked && !sessionValidated;
   const canEditMeta = userRole !== "trainer";
   const selectedFiliere = filieres.find((f) => f.id === selectedFiliereId) || null;
   const selectedSubject = allSubjects.find((s) => s.filiere_matiere_id === selectedSubjectId) || null;
@@ -715,24 +745,60 @@ export default function GradeBookPage() {
       setStudentRows([]);
       setSuplColumns([]);
       setNotesLocked(false);
+      setSessionStatus("empty");
+      setSessionGradeCount(0);
       setGridLoading(false);
       return;
     }
 
     const enrollmentIds = enrollments.map((e: { id: string }) => e.id);
-    const { data: existingGrades } = await supabase
-      .from("grades")
-      .select("id, enrollment_id, score, title, max_score")
-      .eq("filiere_matiere_id", selectedSubject.filiere_matiere_id)
-      .eq("period_id", selectedPeriodId)
-      .in("enrollment_id", enrollmentIds);
+    let existingGrades: {
+      id: string;
+      enrollment_id: string;
+      score: number;
+      title: string | null;
+      max_score: number | null;
+      status?: string | null;
+    }[] | null = null;
+    {
+      const withStatus = await supabase
+        .from("grades")
+        .select("id, enrollment_id, score, title, max_score, status")
+        .eq("filiere_matiere_id", selectedSubject.filiere_matiere_id)
+        .eq("period_id", selectedPeriodId)
+        .in("enrollment_id", enrollmentIds);
+      if (withStatus.error && (["42703", "PGRST204"].includes(withStatus.error.code || "") || /status/i.test(withStatus.error.message || ""))) {
+        const fb = await supabase
+          .from("grades")
+          .select("id, enrollment_id, score, title, max_score")
+          .eq("filiere_matiere_id", selectedSubject.filiere_matiere_id)
+          .eq("period_id", selectedPeriodId)
+          .in("enrollment_id", enrollmentIds);
+        existingGrades = (fb.data || []).map((g) => ({ ...g, status: "validated" }));
+      } else {
+        existingGrades = withStatus.data;
+      }
+    }
+
+    const gradeList = existingGrades || [];
+    const statuses = gradeList.map((g) => normalizeGradeStatus(g.status));
+    if (gradeList.length === 0) {
+      setSessionStatus("empty");
+      setSessionGradeCount(0);
+    } else if (statuses.every((s) => s === "validated")) {
+      setSessionStatus("validated");
+      setSessionGradeCount(gradeList.length);
+    } else {
+      setSessionStatus("provisional");
+      setSessionGradeCount(gradeList.length);
+    }
 
     const principalByEnroll = new Map<string, { id: string; score: number }>();
     const titleOrder: string[] = [];
     const titleToCol = new Map<string, string>();
     const suplByEnroll = new Map<string, Map<string, { id: string; score: number }>>();
 
-    for (const g of existingGrades || []) {
+    for (const g of gradeList) {
       if (isPrincipalGrade(g.title)) {
         if (!principalByEnroll.has(g.enrollment_id)) {
           principalByEnroll.set(g.enrollment_id, { id: g.id, score: g.score });
@@ -794,12 +860,12 @@ export default function GradeBookPage() {
 
     rows.sort((a, b) => `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`));
     setStudentRows(rows);
-    const hasSaved =
-      (existingGrades || []).length > 0 ||
-      rows.some((r) => r.existing_grade_id || r.extras.some((ex) => ex.id));
+    const hasSaved = gradeList.length > 0;
+    const validated = gradeList.length > 0 && statuses.every((s) => s === "validated");
     setNotesLocked(hasSaved);
+    if (validated) setNotesLocked(true);
     setGridLoading(false);
-  }, [selectedSubject, selectedPeriodId, selectedGroupeId, selectedNiveauId]);
+  }, [selectedSubject, selectedPeriodId, selectedGroupeId, selectedNiveauId, t]);
 
   useEffect(() => {
     if (contextReady) loadGrid();
@@ -810,7 +876,8 @@ export default function GradeBookPage() {
   }, [contextReady, loadGrid]);
 
   const updatePrincipal = (enrollmentId: string, value: string) => {
-    if (notesLocked) return;
+    if (!gridEditable) return;
+    setPendingImportBatch(false);
     setStudentRows((prev) => prev.map((r) => {
       if (r.enrollment_id !== enrollmentId) return r;
       return {
@@ -823,7 +890,8 @@ export default function GradeBookPage() {
   };
 
   const updateExtraScore = (enrollmentId: string, colKey: string, score: string) => {
-    if (notesLocked) return;
+    if (!gridEditable) return;
+    setPendingImportBatch(false);
     setStudentRows((prev) => prev.map((r) => {
       if (r.enrollment_id !== enrollmentId) return r;
       return {
@@ -837,7 +905,7 @@ export default function GradeBookPage() {
   };
 
   const updateColumnTitle = (colKey: string, title: string) => {
-    if (notesLocked) return;
+    if (!gridEditable) return;
     setSuplColumns((prev) => prev.map((c) => (c.colKey === colKey ? { ...c, title } : c)));
     setStudentRows((prev) => prev.map((r) => ({
       ...r,
@@ -849,7 +917,7 @@ export default function GradeBookPage() {
   };
 
   const addSuplColumn = () => {
-    if (notesLocked) return;
+    if (!gridEditable) return;
     const colKey = newLocalKey();
     setSuplColumns((prev) => [...prev, { colKey, title: "" }]);
     setStudentRows((prev) => prev.map((r) => ({
@@ -860,7 +928,7 @@ export default function GradeBookPage() {
   };
 
   const removeSuplColumn = (colKey: string) => {
-    if (notesLocked) return;
+    if (!gridEditable) return;
     setSuplColumns((prev) => prev.filter((c) => c.colKey !== colKey));
     setStudentRows((prev) => prev.map((r) => ({
       ...r,
@@ -901,6 +969,10 @@ export default function GradeBookPage() {
 
   const saveAll = async () => {
     if (!userId || !selectedSubject || !selectedPeriodId || !selectedGroupeId) return;
+    if (sessionValidated) {
+      setError(t("centre", "notesSessionValidatedLock"));
+      return;
+    }
     const hasWork = studentRows.some((r) => r.dirty || r.extras.some((ex) => ex.dirty || ex.deleted));
     if (!hasWork) return;
 
@@ -986,6 +1058,7 @@ export default function GradeBookPage() {
           filiere_matiere_id: selectedSubject.filiere_matiere_id,
           period_id: selectedPeriodId,
           groupe_id: selectedGroupeId,
+          ...(pendingImportBatch ? { source: "import" } : {}),
           ops: ops.map((op) => {
             if (op.op === "delete") return { op: "delete" as const, grade_id: op.grade_id };
             return {
@@ -1003,6 +1076,7 @@ export default function GradeBookPage() {
       if (!res.ok) {
         throw new Error(payload?.error || t("centre", "notesSaveError"));
       }
+      setPendingImportBatch(false);
 
       const results: { op: string; grade_id: string | null; enrollment_id?: string; title?: string | null }[] =
         Array.isArray(payload?.results) ? payload.results : [];
@@ -1037,10 +1111,166 @@ export default function GradeBookPage() {
       setStudentRows(nextRows);
       setSaveSuccess(true);
       setNotesLocked(true);
+      setSessionStatus("provisional");
+      setSessionGradeCount((prev) => Math.max(prev, nextRows.filter((r) => r.existing_grade_id || r.extras.some((ex) => ex.id)).length));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : t("centre", "notesSaveError"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const downloadImportTemplate = () => {
+    if (!selectedSubject || studentRows.length === 0) return;
+    const safeName = (selectedSubject.discipline_name || "notes")
+      .replace(/[^\w\-]+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 40);
+    downloadGradesImportTemplate({
+      students: studentRows.map((r) => ({
+        matricule: r.matricule,
+        nom: r.nom,
+        prenom: r.prenom,
+        existing_score:
+          r.existing_score != null
+            ? r.existing_score
+            : r.new_score.trim() !== "" && !isNaN(parseFloat(r.new_score))
+              ? parseFloat(r.new_score)
+              : null,
+      })),
+      bareme,
+      suplTitles: suplColumns.map((c) => c.title.trim()).filter(Boolean),
+      fileName: `modele-notes-${safeName || "ue"}.xlsx`,
+    });
+  };
+
+  const handleImportExcel = async (file: File) => {
+    if (!selectedSubject || !gridEditable) {
+      setError(sessionValidated ? t("centre", "notesSessionValidatedLock") : t("centre", "notesImportNeedEdit"));
+      return;
+    }
+    setImportingExcel(true);
+    setError("");
+    try {
+      const suplTitles = suplColumns.map((c) => c.title.trim()).filter(Boolean);
+      const parsed = await parseGradesImportFile(file, { bareme, suplTitles });
+      if (parsed.error) {
+        setError(parsed.error);
+        return;
+      }
+      const matched: { enrollment_id: string; note: number; extras: Record<string, number | null> }[] = [];
+      const problems: string[] = [];
+      for (const row of parsed.rows) {
+        if (row.error) {
+          problems.push(`L${row.rowIndex}: ${row.error}`);
+          continue;
+        }
+        if (row.note == null) {
+          problems.push(`L${row.rowIndex}: ${t("centre", "notesImportMissingScore")}`);
+          continue;
+        }
+        const eid = matchStudentToImportRow(row, studentRows);
+        if (!eid) {
+          problems.push(
+            `L${row.rowIndex}: ${t("centre", "notesImportNoStudent", {
+              who: row.matricule || `${row.nom} ${row.prenom}`.trim() || "?",
+            })}`,
+          );
+          continue;
+        }
+        matched.push({ enrollment_id: eid, note: row.note, extras: row.extras });
+      }
+      if (matched.length === 0) {
+        setError(
+          problems.slice(0, 5).join(" · ") || t("centre", "notesImportEmpty"),
+        );
+        return;
+      }
+      const confirmMsg = t("centre", "notesImportConfirm", {
+        ok: String(matched.length),
+        errors: String(problems.length),
+      });
+      if (!window.confirm(confirmMsg)) return;
+
+      const titleToCol = new Map(
+        suplColumns
+          .filter((c) => c.title.trim())
+          .map((c) => [c.title.trim(), c.colKey] as const),
+      );
+      setStudentRows((prev) =>
+        prev.map((r) => {
+          const hit = matched.find((m) => m.enrollment_id === r.enrollment_id);
+          if (!hit) return r;
+          let extras = r.extras.map((ex) => ({ ...ex }));
+          for (const [title, score] of Object.entries(hit.extras)) {
+            if (score == null) continue;
+            const colKey = titleToCol.get(title);
+            if (!colKey) continue;
+            extras = extras.map((ex) =>
+              ex.colKey === colKey
+                ? { ...ex, score: String(score), dirty: true, deleted: false }
+                : ex,
+            );
+          }
+          const noteStr = String(hit.note);
+          return {
+            ...r,
+            new_score: noteStr,
+            dirty: noteStr !== (r.existing_score?.toString() || ""),
+            extras,
+          };
+        }),
+      );
+      setNotesLocked(false);
+      setSaveSuccess(false);
+      setPendingImportBatch(true);
+      if (problems.length > 0) {
+        setError(t("centre", "notesImportPartial", { errors: String(problems.length) }));
+      }
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("centre", "notesImportEmpty"));
+    } finally {
+      setImportingExcel(false);
+      if (importFileRef.current) importFileRef.current.value = "";
+    }
+  };
+
+  const runSessionAction = async (action: "validate_session" | "reopen_session") => {
+    if (!selectedSubject || !selectedPeriodId || !selectedGroupeId) return;
+    if (action === "validate_session") {
+      const ok = window.confirm(
+        t("centre", "notesValidateSessionConfirm", { count: String(sessionGradeCount || studentRows.filter((r) => r.existing_grade_id || r.extras.some((e) => e.id)).length) }),
+      );
+      if (!ok) return;
+    } else {
+      const ok = window.confirm(t("centre", "notesReopenSessionConfirm"));
+      if (!ok) return;
+    }
+    setDeliberating(true);
+    setError("");
+    try {
+      const res = await fetch("/api/centre/grades", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          filiere_matiere_id: selectedSubject.filiere_matiere_id,
+          period_id: selectedPeriodId,
+          groupe_id: selectedGroupeId,
+        }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || t("centre", "notesSaveError"));
+      setSessionStatus(action === "validate_session" ? "validated" : "provisional");
+      if (typeof payload.updated === "number") setSessionGradeCount(payload.updated);
+      setNotesLocked(true);
+      setSaveSuccess(false);
+      await loadGrid();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : t("centre", "notesSaveError"));
+    } finally {
+      setDeliberating(false);
     }
   };
 
@@ -1234,8 +1464,37 @@ export default function GradeBookPage() {
 
   const gridTemplate = useMemo(() => {
     const supl = suplColumns.map(() => "6.5rem").join(" ");
-    return `minmax(0,1.6fr) 7rem ${supl ? `${supl} ` : ""}5.5rem 2.5rem`;
+    return `minmax(0,1.6fr) 7rem ${supl ? `${supl} ` : ""}5.5rem 4.5rem`;
   }, [suplColumns]);
+
+  const openGradeAudit = async (row: StudentGradeRow) => {
+    setAuditDrawer({
+      enrollment_id: row.enrollment_id,
+      grade_id: row.existing_grade_id,
+      label: `${row.nom} ${row.prenom}`,
+    });
+    setAuditLoading(true);
+    setAuditEvents([]);
+    try {
+      const params = new URLSearchParams({
+        enrollment_id: row.enrollment_id,
+        filiere_matiere_id: selectedSubject?.filiere_matiere_id || "",
+        period_id: selectedPeriodId || "",
+        limit: "40",
+      });
+      const res = await fetch(`/api/centre/grades/audit?${params}`);
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(payload?.error || t("centre", "notesAuditLoadError"));
+        return;
+      }
+      setAuditEvents(Array.isArray(payload.events) ? payload.events : []);
+    } catch {
+      setError(t("centre", "notesAuditLoadError"));
+    } finally {
+      setAuditLoading(false);
+    }
+  };
 
   const resetToFilieres = () => {
     setSelectedFiliereId("");
@@ -1305,9 +1564,37 @@ export default function GradeBookPage() {
                   <CheckCircle2 size={12} /> {t("centre", "notesSavedLocked")}
                 </span>
               )}
-              {dirtyCount > 0 && !notesLocked && (
+              {dirtyCount > 0 && gridEditable && (
                 <span className="text-[10px] font-semibold text-neutral-500">{t("centre", "notesModifiedCount", { count: String(dirtyCount) })}</span>
               )}
+              <button
+                type="button"
+                onClick={downloadImportTemplate}
+                disabled={studentRows.length === 0}
+                className="h-8 px-3 rounded-lg text-xs font-semibold border border-black/[0.08] bg-white text-neutral-700 flex items-center gap-1.5 disabled:opacity-40 hover:bg-black/[0.03]"
+              >
+                <Download size={13} />
+                {t("centre", "notesDownloadTemplate")}
+              </button>
+              <button
+                type="button"
+                onClick={() => importFileRef.current?.click()}
+                disabled={importingExcel || studentRows.length === 0 || !gridEditable}
+                className="h-8 px-3 rounded-lg text-xs font-semibold border border-black/[0.08] bg-white text-neutral-700 flex items-center gap-1.5 disabled:opacity-40 hover:bg-black/[0.03]"
+              >
+                {importingExcel ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />}
+                {t("centre", "notesImportExcel")}
+              </button>
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void handleImportExcel(f);
+                }}
+              />
               <button
                 type="button"
                 onClick={exportClassPdf}
@@ -1317,9 +1604,32 @@ export default function GradeBookPage() {
                 {exportingClass ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
                 {t("centre", "notesExport")}
               </button>
+              {sessionStatus === "provisional" && sessionGradeCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => runSessionAction("validate_session")}
+                  disabled={deliberating || dirtyCount > 0}
+                  className="h-8 px-3.5 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 disabled:opacity-40 hover:opacity-90"
+                  style={{ backgroundColor: BLUE }}
+                >
+                  {deliberating ? <Loader2 size={13} className="animate-spin" /> : <CheckCircle2 size={13} />}
+                  {t("centre", "notesValidateSession")}
+                </button>
+              )}
+              {sessionValidated && (
+                <button
+                  type="button"
+                  onClick={() => runSessionAction("reopen_session")}
+                  disabled={deliberating}
+                  className="h-8 px-3.5 rounded-lg text-xs font-semibold border border-amber-300 bg-amber-50 text-amber-900 flex items-center gap-1.5 disabled:opacity-40"
+                >
+                  {deliberating ? <Loader2 size={13} className="animate-spin" /> : <Lock size={13} />}
+                  {t("centre", "notesReopenSession")}
+                </button>
+              )}
               <button
                 onClick={saveAll}
-                disabled={saving || dirtyCount === 0 || notesLocked}
+                disabled={saving || dirtyCount === 0 || !gridEditable}
                 className="h-8 px-3.5 rounded-lg text-xs font-semibold text-white flex items-center gap-1.5 disabled:opacity-40 hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: ORANGE }}
               >
@@ -1621,6 +1931,38 @@ export default function GradeBookPage() {
 
         {contextReady && (
           <div className="nexa-center-shell py-4 sm:py-5 max-w-6xl w-full">
+            {selectedSubject && (
+              <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3.5 py-2.5 rounded-xl border border-[#11224E]/12 bg-[#11224E]/[0.04]">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#11224E]/70">
+                  {t("centre", "notesUeScaleBanner")}
+                </span>
+                <span className="text-sm font-extrabold tabular-nums" style={{ color: BLUE }}>
+                  /{bareme}
+                </span>
+                <span className="text-neutral-300">·</span>
+                <span className="text-sm font-extrabold tabular-nums text-neutral-700">
+                  ×{selectedSubject.coefficient}
+                </span>
+                {isUniversityLmd && (
+                  <>
+                    <span className="text-neutral-300">·</span>
+                    <span className="text-xs font-semibold text-neutral-600">
+                      {t("centre", "notesUeThresholdBanner", {
+                        pct: String(resolveLmdValidationThreshold(lmdThresholdPct)),
+                      })}
+                    </span>
+                  </>
+                )}
+                {selectedSubject.credits != null && selectedSubject.credits > 0 && (
+                  <>
+                    <span className="text-neutral-300">·</span>
+                    <span className="text-xs font-semibold text-neutral-600">
+                      {selectedSubject.credits} ECTS
+                    </span>
+                  </>
+                )}
+              </div>
+            )}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div className="flex items-center gap-2 h-9 bg-white rounded-lg border border-black/[0.08] px-3 focus-within:border-[#11224E]/40 focus-within:ring-2 focus-within:ring-[#11224E]/10 transition-colors min-w-[200px] flex-1 max-w-sm">
                 <Search size={14} className="text-neutral-400 shrink-0" />
@@ -1639,7 +1981,11 @@ export default function GradeBookPage() {
                   <span className="text-neutral-300">·</span>
                   <span style={{ color: BLUE }}>{completionPct}%</span>
                 </div>
-                {notesLocked ? (
+                {sessionValidated ? (
+                  <span className="h-8 px-3 rounded-lg border border-emerald-200 bg-emerald-50 text-[10px] font-bold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                    <CheckCircle2 size={11} /> {t("centre", "notesSessionValidated")}
+                  </span>
+                ) : notesLocked ? (
                   <button
                     type="button"
                     onClick={() => { setNotesLocked(false); setSaveSuccess(false); }}
@@ -1650,6 +1996,11 @@ export default function GradeBookPage() {
                 ) : (
                   <span className="h-8 px-3 rounded-lg border border-black/[0.08] bg-white text-[10px] font-bold uppercase tracking-wider text-neutral-600 flex items-center gap-1.5">
                     <Pencil size={11} /> {t("centre", "notesEditing")}
+                  </span>
+                )}
+                {sessionStatus === "provisional" && (
+                  <span className="h-8 px-3 rounded-lg border border-amber-200 bg-amber-50 text-[10px] font-bold uppercase tracking-wider text-amber-800 flex items-center gap-1.5">
+                    {t("centre", "notesProvisionalBadge")}
                   </span>
                 )}
                 {canEditMeta && (
@@ -1847,7 +2198,21 @@ export default function GradeBookPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {notesLocked && (
+                {sessionValidated ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5">
+                    <p className="text-xs font-medium text-emerald-900 inline-flex items-center gap-1.5">
+                      <CheckCircle2 size={13} />
+                      {t("centre", "notesSessionValidatedHint")}
+                    </p>
+                  </div>
+                ) : sessionStatus === "provisional" ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5">
+                    <p className="text-xs font-medium text-amber-900">
+                      {t("centre", "notesSessionReopenedHint")}
+                    </p>
+                  </div>
+                ) : null}
+                {notesLocked && !sessionValidated && (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-black/[0.06] bg-white px-4 py-2.5">
                     <p className="text-xs font-medium text-neutral-500 inline-flex items-center gap-1.5">
                       <Lock size={13} className="text-neutral-400" />
@@ -1866,7 +2231,7 @@ export default function GradeBookPage() {
                   <button
                     type="button"
                     onClick={addSuplColumn}
-                    disabled={notesLocked}
+                    disabled={!gridEditable}
                     className="h-8 px-3 rounded-lg border border-dashed border-black/[0.12] text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 hover:bg-black/[0.02] bg-white disabled:opacity-40 disabled:pointer-events-none text-neutral-600"
                   >
                     <Plus size={13} /> {t("centre", "notesAddExtraGrade")}
@@ -1888,16 +2253,16 @@ export default function GradeBookPage() {
                           value={col.title}
                           onChange={(e) => updateColumnTitle(col.colKey, e.target.value)}
                           placeholder={t("centre", "gradesLabel")}
-                          readOnly={notesLocked}
+                          readOnly={!gridEditable}
                           className={`w-full h-8 px-1.5 rounded-lg border text-[10px] font-bold uppercase tracking-wide text-center outline-none focus:border-orange-400 ${
-                            notesLocked
+                            !gridEditable
                               ? "border-black/[0.06] bg-neutral-100 text-neutral-500 cursor-not-allowed"
                               : col.title.trim()
                                 ? "border-black/[0.08] bg-white text-neutral-700"
                                 : "border-black/[0.08] bg-white"
                           }`}
                         />
-                        {!notesLocked && (
+                        {gridEditable && (
                           <button
                             type="button"
                             onClick={() => removeSuplColumn(col.colKey)}
@@ -1912,8 +2277,8 @@ export default function GradeBookPage() {
                     <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 text-center pb-1.5">
                       {t("centre", "notesAverage")}
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 text-center pb-1.5" title={t("centre", "notesPdfTranscript")}>
-                      {t("centre", "notesPdfColumn")}
+                    <span className="text-[10px] font-bold uppercase tracking-[0.08em] text-neutral-400 text-center pb-1.5">
+                      {t("centre", "notesActionsColumn")}
                     </span>
                   </div>
 
@@ -1956,8 +2321,8 @@ export default function GradeBookPage() {
                               value={row.new_score}
                               onChange={(e) => updatePrincipal(row.enrollment_id, e.target.value)}
                               placeholder="—"
-                              readOnly={notesLocked}
-                              className={scoreFieldClass(row.new_score, bareme, row.dirty, notesLocked)}
+                              readOnly={!gridEditable}
+                              className={scoreFieldClass(row.new_score, bareme, row.dirty, !gridEditable)}
                             />
                             {isUniversityLmd && selectedSubject?.credits != null && (() => {
                               const grades = row.new_score.trim() ? [{ score: Number(row.new_score), max_score: bareme, title: null as string | null }] : [];
@@ -1990,8 +2355,8 @@ export default function GradeBookPage() {
                                   value={cell?.score || ""}
                                   onChange={(e) => updateExtraScore(row.enrollment_id, col.colKey, e.target.value)}
                                   placeholder="—"
-                                  readOnly={notesLocked}
-                                  className={scoreFieldClass(cell?.score || "", bareme, !!cell?.dirty, notesLocked)}
+                                  readOnly={!gridEditable}
+                                  className={scoreFieldClass(cell?.score || "", bareme, !!cell?.dirty, !gridEditable)}
                                 />
                               </div>
                             );
@@ -2004,7 +2369,15 @@ export default function GradeBookPage() {
                             <span className="block text-[9px] text-neutral-400 font-bold">/{bareme}</span>
                           </div>
 
-                          <div className="flex justify-center">
+                          <div className="flex justify-center gap-1">
+                            <button
+                              type="button"
+                              title={t("centre", "notesAuditHistory")}
+                              onClick={() => void openGradeAudit(row)}
+                              className="w-9 h-9 flex items-center justify-center rounded-xl border border-neutral-200 text-neutral-500 hover:border-[#11224E]/30 hover:text-[#11224E] hover:bg-[#11224E]/[0.04] transition-colors"
+                            >
+                              <History size={14} />
+                            </button>
                             <button
                               type="button"
                               title={t("centre", "notesDownloadTranscript")}
@@ -2036,7 +2409,7 @@ export default function GradeBookPage() {
                 </p>
                 <button
                   onClick={saveAll}
-                  disabled={saving || dirtyCount === 0 || notesLocked}
+                  disabled={saving || dirtyCount === 0 || !gridEditable}
                   className="h-9 px-4 rounded-full text-[10px] font-black uppercase tracking-wider text-white flex items-center gap-1.5 disabled:opacity-40"
                   style={{ backgroundColor: BLUE }}
                 >
@@ -2056,6 +2429,94 @@ export default function GradeBookPage() {
           niveauAnnee={bulletinEnrollment.niveauAnnee}
           onClose={() => setBulletinEnrollment(null)}
         />
+      )}
+
+      {auditDrawer && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/30"
+            aria-label={t("centre", "bulletinClose")}
+            onClick={() => setAuditDrawer(null)}
+          />
+          <aside className="relative w-full max-w-md h-full bg-white shadow-xl border-l border-black/[0.06] flex flex-col">
+            <div className="h-14 px-4 flex items-center justify-between border-b border-black/[0.06] shrink-0">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                  {t("centre", "notesAuditHistory")}
+                </p>
+                <p className="text-sm font-extrabold truncate" style={{ color: BLUE }}>
+                  {auditDrawer.label}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAuditDrawer(null)}
+                className="h-8 w-8 rounded-lg border border-black/[0.08] flex items-center justify-center text-neutral-500 hover:bg-black/[0.03]"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {auditLoading ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="animate-spin text-neutral-400" size={20} />
+                </div>
+              ) : auditEvents.length === 0 ? (
+                <p className="text-sm text-neutral-400 text-center py-10">
+                  {t("centre", "notesAuditEmpty")}
+                </p>
+              ) : (
+                auditEvents.map((ev) => {
+                  const beforeScore = ev.before?.score;
+                  const afterScore = ev.after?.score;
+                  const scoreLine =
+                    beforeScore != null || afterScore != null
+                      ? `${beforeScore ?? "—"} → ${afterScore ?? "—"}`
+                      : null;
+                  return (
+                    <div
+                      key={ev.id}
+                      className="rounded-xl border border-black/[0.06] bg-[#FFFBF7] px-3 py-2.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#11224E]/70">
+                          {t("centre", `notesAuditAction_${ev.action}` as "notesAuditAction_create")}
+                        </span>
+                        <span className="text-[10px] text-neutral-400 tabular-nums">
+                          {new Date(ev.created_at).toLocaleString(locale === "en" ? "en-GB" : "fr-FR")}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-neutral-700 mt-1">{ev.actor_name}</p>
+                      {scoreLine && (
+                        <p className="text-sm font-extrabold mt-1 tabular-nums" style={{ color: BLUE }}>
+                          {scoreLine}
+                          {ev.after?.title || ev.before?.title
+                            ? ` · ${ev.after?.title || ev.before?.title}`
+                            : ""}
+                        </p>
+                      )}
+                      {(ev.before?.status || ev.after?.status) && (
+                        <p className="text-[10px] text-neutral-500 mt-0.5">
+                          {ev.before?.status || "—"} → {ev.after?.status || "—"}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <div className="p-3 border-t border-black/[0.06] shrink-0">
+              <a
+                href="/centre/examens/journal"
+                className="text-xs font-semibold hover:underline"
+                style={{ color: BLUE }}
+              >
+                {t("centre", "notesAuditOpenJournal")}
+              </a>
+            </div>
+          </aside>
+        </div>
       )}
     </div>
   );

@@ -1,7 +1,14 @@
 import { averageGradesOnScale, parseGradeWeights } from "./gradesCalc";
 import { computeUeFinalStatus } from "./lmd-credits";
 
-export type LmdGrade = { enrollment_id: string; filiere_matiere_id: string; score: number; max_score?: number | null; title?: string | null };
+export type LmdGrade = {
+  enrollment_id: string;
+  filiere_matiere_id: string;
+  score: number;
+  max_score?: number | null;
+  title?: string | null;
+  status?: string | null;
+};
 export type LmdUe = { id: string; semestre_id: string; niveau_id: string; credits: number; creditsConfigured?: boolean; max_score: number; grade_weights?: unknown; name?: string };
 
 export function evaluateLmdUe(grades: Omit<LmdGrade, "enrollment_id" | "filiere_matiere_id">[], maxScore: number, weights: unknown, thresholdPct: number) {

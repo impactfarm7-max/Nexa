@@ -84,6 +84,21 @@ export function defaultAcademicYear(): string {
   return `${y}-${y + 1}`;
 }
 
+/**
+ * Normalise "2025-2026" / "2025/2026".
+ * Retourne null si format invalide.
+ */
+export function normalizeAcademicYear(raw: unknown): string | null {
+  const s = typeof raw === "string" ? raw.trim() : "";
+  if (!s) return null;
+  const m = s.match(/^(\d{4})\s*[-/]\s*(\d{4})$/);
+  if (!m) return null;
+  const a = parseInt(m[1], 10);
+  const b = parseInt(m[2], 10);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || b !== a + 1) return null;
+  return `${a}-${b}`;
+}
+
 type GradeInput = {
   filiere_matiere_id: string;
   score: number;

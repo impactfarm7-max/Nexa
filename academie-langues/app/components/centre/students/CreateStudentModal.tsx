@@ -17,6 +17,7 @@ import {
 import {
   defaultAcademicYear,
   isCursusFeeMode,
+  normalizeAcademicYear,
   resolveCursusTuition,
   type CursusFeeMode,
 } from "@/app/utils/cursus-passage";
@@ -386,11 +387,14 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
       && /^\d{4}-\d{2}-\d{2}$/.test(birthDate.trim())
     )),
   );
+  const academicYearNormalized = normalizeAcademicYear(academicYear);
+  const univCursus = isUniversite && selectedFiliere?.type === "cursus";
   const canSubmit = canGoStep2 && filiereId
     && (selectedFiliere?.type !== "cursus" || niveauId)
     && (semestresForNiveau.length === 0 || Boolean(semestreId))
     && (campuses.length <= 1 || campusId)
-    && (groupes.length <= 1 || Boolean(groupeId))
+    && (univCursus ? Boolean(groupeId) : (groupes.length <= 1 || Boolean(groupeId)))
+    && (!univCursus || Boolean(academicYearNormalized))
     && (!isShort || shortMode !== "mensuel" || durationMonths >= 1);
 
   // ============================================================
@@ -441,8 +445,12 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
         }
       }
 
-      if (selectedFiliere?.type === "cursus" && academicYear.trim()) {
-        body.academic_year = academicYear.trim();
+      if (selectedFiliere?.type === "cursus") {
+        const year = normalizeAcademicYear(academicYear) || academicYear.trim();
+        if (univCursus && !normalizeAcademicYear(academicYear)) {
+          throw new Error(t("centre", "academicYearInvalid"));
+        }
+        if (year) body.academic_year = year;
       }
 
       if (couponCode.trim()) {
@@ -780,13 +788,19 @@ export default function CreateStudentModal({ centerId, onClose, onCreated }: Pro
 
             {selectedFiliere?.type === "cursus" && (
               <div>
-                <label className={FIELD_LABEL}>{t("centre", "identityAcademicYear")}</label>
+                <label className={FIELD_LABEL}>
+                  {t("centre", "identityAcademicYear")}
+                  {univCursus ? " *" : ""}
+                </label>
                 <input
                   value={academicYear}
                   onChange={(e) => setAcademicYear(e.target.value)}
                   placeholder="2025-2026"
                   className={FIELD_INPUT}
                 />
+                {univCursus && academicYear.trim() && !academicYearNormalized && (
+                  <p className="text-xs font-semibold text-red-600 mt-1.5">{t("centre", "academicYearInvalid")}</p>
+                )}
               </div>
             )}
 

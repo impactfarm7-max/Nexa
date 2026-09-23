@@ -23,6 +23,7 @@ import {
   isCursusFeeMode,
   type CursusFeeMode,
 } from "@/app/utils/cursus-passage";
+import { formatUeHoursShort, ueHoursFromDraft } from "@/app/utils/teachingLoad";
 import {
   BLUE,
   ORANGE,
@@ -87,6 +88,10 @@ type MatiereDraft = {
   is_optional?: boolean;
   /** CM / TD / TP — LMD uniquement. */
   course_format?: "cm" | "td" | "tp" | "";
+  /** Volumes horaires charge enseignement (≠ planning EDT) — LMD. */
+  heures_cm?: number | string;
+  heures_td?: number | string;
+  heures_tp?: number | string;
   /** Semestres concernés — clés `${niveauNumero}:${semestreOrdre}` (LMD uniquement, remplace niveauNumeros). */
   semestreKeys?: string[];
 };
@@ -149,7 +154,7 @@ function defaultSemestre(ordre: number): SemestreDraft {
 function semestreKey(niveauNumero: number, ordre: number) {
   return `${niveauNumero}:${ordre}`;
 }
-function defaultMatiere(): MatiereDraft {
+function defaultMatiere(opts?: { requireBareme?: boolean }): MatiereDraft {
   return {
     key: generateId(),
     discipline_id: "",
@@ -157,9 +162,12 @@ function defaultMatiere(): MatiereDraft {
     formateurIds: [],
     niveauNumeros: [],
     existingByNiveau: {},
-    coefficient: 1,
-    max_score: 20,
+    coefficient: opts?.requireBareme ? "" : 1,
+    max_score: opts?.requireBareme ? "" : 20,
     course_format: "",
+    heures_cm: "",
+    heures_td: "",
+    heures_tp: "",
   };
 }
 function defaultFee(): FeeDraft {
@@ -928,7 +936,7 @@ function NouveauProgrammeForm() {
     setEditLocked((enrollCount || 0) > 0);
 
     const matSelectWithFormat =
-      "id, niveau_id, annee, discipline_id, coefficient, max_score, credits, semestre_id, is_optional, course_format, exam_disciplines(name)";
+      "id, niveau_id, annee, discipline_id, coefficient, max_score, credits, semestre_id, is_optional, course_format, heures_cm, heures_td, heures_tp, exam_disciplines(name)";
     const matSelectLegacy =
       "id, niveau_id, annee, discipline_id, coefficient, max_score, credits, semestre_id, is_optional, exam_disciplines(name)";
     let { data: matRows, error: matErr } = await supabase
@@ -940,7 +948,13 @@ function NouveauProgrammeForm() {
         .from("filiere_matieres")
         .select(matSelectLegacy)
         .eq("filiere_id", filiereId);
-      matRows = (fb.data || []).map((row) => ({ ...row, course_format: null })) as typeof matRows;
+      matRows = (fb.data || []).map((row) => ({
+        ...row,
+        course_format: null,
+        heures_cm: null,
+        heures_td: null,
+        heures_tp: null,
+      })) as typeof matRows;
     }
     const fmIds = (matRows || []).map((m: { id: string }) => m.id);
     setInitialMatiereIds(fmIds);
@@ -964,6 +978,9 @@ function NouveauProgrammeForm() {
       semestre_id?: string | null;
       is_optional?: boolean | null;
       course_format?: string | null;
+      heures_cm?: number | null;
+      heures_td?: number | null;
+      heures_tp?: number | null;
     }>;
 
     if (f.type === "cursus") {
@@ -1056,6 +1073,9 @@ function NouveauProgrammeForm() {
             credits: m.credits != null ? m.credits : "",
             is_optional: Boolean(m.is_optional),
             course_format: (m.course_format === "cm" || m.course_format === "td" || m.course_format === "tp") ? m.course_format : "",
+            heures_cm: m.heures_cm != null ? Number(m.heures_cm) : "",
+            heures_td: m.heures_td != null ? Number(m.heures_td) : "",
+            heures_tp: m.heures_tp != null ? Number(m.heures_tp) : "",
           };
         }
         const draft = byDisc[m.discipline_id];
@@ -1063,6 +1083,9 @@ function NouveauProgrammeForm() {
         if (!draft.course_format && (m.course_format === "cm" || m.course_format === "td" || m.course_format === "tp")) {
           draft.course_format = m.course_format;
         }
+        if (draft.heures_cm === "" && m.heures_cm != null) draft.heures_cm = Number(m.heures_cm);
+        if (draft.heures_td === "" && m.heures_td != null) draft.heures_td = Number(m.heures_td);
+        if (draft.heures_tp === "" && m.heures_tp != null) draft.heures_tp = Number(m.heures_tp);
         if (annee != null && !draft.niveauNumeros!.includes(annee)) draft.niveauNumeros!.push(annee);
         if (m.semestre_id && semestreKeyById[m.semestre_id]) {
           const sKey = semestreKeyById[m.semestre_id];
@@ -1408,6 +1431,10 @@ function NouveauProgrammeForm() {
 
     if (forCursus && isUniversityLmd && !(m.semestreKeys || []).length) return en ? "Select at least one semester." : "Sélectionnez au moins un semestre.";
     if (forCursus && !isUniversityLmd && !(m.niveauNumeros || []).length) return en ? "Select at least one level." : "Sélectionnez au moins un niveau.";
+    if (isUniversityLmd) {
+      if (!(Number(m.max_score) > 0)) return en ? "Maximum score is required (e.g. 20)." : "Le barème est obligatoire (ex. 20).";
+      if (!(Number(m.coefficient) > 0)) return en ? "Coefficient is required." : "Le coefficient est obligatoire.";
+    }
     return null;
   };
 
@@ -1756,22 +1783,29 @@ function NouveauProgrammeForm() {
       initialFormateurIds?: string[],
       semestreId?: string | null,
     ) {
-      const coeff = Number(m.coefficient) > 0 ? Number(m.coefficient) : 1;
-      const maxScore = Number(m.max_score) > 0 ? Number(m.max_score) : 20;
+      const coeff = Number(m.coefficient);
+      const maxScore = Number(m.max_score);
+      if (isUniversityLmd) {
+        if (!(maxScore > 0)) throw new Error(en ? `UE “${matiereDisplayName(m)}”: maximum score is required.` : `UE « ${matiereDisplayName(m)} » : barème obligatoire.`);
+        if (!(coeff > 0)) throw new Error(en ? `UE “${matiereDisplayName(m)}”: coefficient is required.` : `UE « ${matiereDisplayName(m)} » : coefficient obligatoire.`);
+      }
+      const resolvedCoeff = coeff > 0 ? coeff : 1;
+      const resolvedMax = maxScore > 0 ? maxScore : 20;
       const credits = isUniversityLmd && m.credits !== undefined && String(m.credits).trim() ? Number(m.credits) : null;
 
       if (fmId) {
-        const patch: Record<string, unknown> = { coefficient: coeff, max_score: maxScore };
+        const patch: Record<string, unknown> = { coefficient: resolvedCoeff, max_score: resolvedMax };
         if (isUniversityLmd) {
           patch.credits = credits;
           patch.semestre_id = semestreId ?? null;
           patch.is_optional = Boolean(m.is_optional);
           patch.course_format = m.course_format === "cm" || m.course_format === "td" || m.course_format === "tp" ? m.course_format : null;
+          Object.assign(patch, ueHoursFromDraft(m));
         }
         let { error: metaErr } = await supabase.from("filiere_matieres").update(patch).eq("id", fmId);
-        if (metaErr && "course_format" in patch) {
-          const { course_format: _cf, ...withoutFormat } = patch;
-          const retry = await supabase.from("filiere_matieres").update(withoutFormat).eq("id", fmId);
+        if (metaErr && ("course_format" in patch || "heures_cm" in patch)) {
+          const { course_format: _cf, heures_cm: _hc, heures_td: _htd, heures_tp: _htp, ...withoutHours } = patch;
+          const retry = await supabase.from("filiere_matieres").update(withoutHours).eq("id", fmId);
           metaErr = retry.error;
         }
         if (metaErr) throw new Error(en ? `Maximum score / coefficient: ${metaErr.message}` : `Barème / coeff. : ${metaErr.message}`);
@@ -1796,14 +1830,15 @@ function NouveauProgrammeForm() {
         niveau_id: niveauId,
         annee,
         obligatoire: true,
-        coefficient: coeff,
-        max_score: maxScore,
+        coefficient: resolvedCoeff,
+        max_score: resolvedMax,
         ...(isUniversityLmd
           ? {
               credits,
               semestre_id: semestreId ?? null,
               is_optional: Boolean(m.is_optional),
               course_format: m.course_format === "cm" || m.course_format === "td" || m.course_format === "tp" ? m.course_format : null,
+              ...ueHoursFromDraft(m),
             }
           : {}),
       };
@@ -1811,9 +1846,9 @@ function NouveauProgrammeForm() {
         .from("filiere_matieres")
         .insert(insertPayload)
         .select("id").single();
-      if (fe && "course_format" in insertPayload) {
-        const { course_format: _cf, ...withoutFormat } = insertPayload;
-        const retry = await supabase.from("filiere_matieres").insert(withoutFormat).select("id").single();
+      if (fe && ("course_format" in insertPayload || "heures_cm" in insertPayload)) {
+        const { course_format: _cf, heures_cm: _hc, heures_td: _htd, heures_tp: _htp, ...withoutHours } = insertPayload;
+        const retry = await supabase.from("filiere_matieres").insert(withoutHours).select("id").single();
         fm = retry.data;
         fe = retry.error;
       }
@@ -2091,30 +2126,38 @@ function NouveauProgrammeForm() {
         rawCredits?: number | string,
         isOptional?: boolean,
         courseFormat?: string,
+        hours?: { heures_cm?: number | string; heures_td?: number | string; heures_tp?: number | string },
       ) {
-        const coeff = Number(rawCoeff) > 0 ? Number(rawCoeff) : 1;
-        const maxScore = Number(rawMaxScore) > 0 ? Number(rawMaxScore) : 20;
+        const coeff = Number(rawCoeff);
+        const maxScore = Number(rawMaxScore);
+        if (isUniversityLmd) {
+          if (!(maxScore > 0)) throw new Error(en ? "Maximum score is required for each course unit." : "Le barème est obligatoire pour chaque UE.");
+          if (!(coeff > 0)) throw new Error(en ? "Coefficient is required for each course unit." : "Le coefficient est obligatoire pour chaque UE.");
+        }
+        const resolvedCoeff = coeff > 0 ? coeff : 1;
+        const resolvedMax = maxScore > 0 ? maxScore : 20;
         const credits = isUniversityLmd && rawCredits !== undefined && String(rawCredits).trim() ? Number(rawCredits) : null;
         const format = courseFormat === "cm" || courseFormat === "td" || courseFormat === "tp" ? courseFormat : null;
+        const hoursPayload = hours ? ueHoursFromDraft(hours) : { heures_cm: null, heures_td: null, heures_tp: null };
         const insertPayload: Record<string, unknown> = {
           filiere_id: filiereId,
           discipline_id: disciplineId,
           niveau_id: niveauId,
           annee,
           obligatoire: true,
-          coefficient: coeff,
-          max_score: maxScore,
+          coefficient: resolvedCoeff,
+          max_score: resolvedMax,
           ...(isUniversityLmd
-            ? { credits, semestre_id: semestreId ?? null, is_optional: Boolean(isOptional), course_format: format }
+            ? { credits, semestre_id: semestreId ?? null, is_optional: Boolean(isOptional), course_format: format, ...hoursPayload }
             : {}),
         };
         let { data: fm, error: fmErr } = await supabase
           .from("filiere_matieres")
           .insert(insertPayload)
           .select("id").single();
-        if (fmErr && "course_format" in insertPayload) {
-          const { course_format: _cf, ...withoutFormat } = insertPayload;
-          const retry = await supabase.from("filiere_matieres").insert(withoutFormat).select("id").single();
+        if (fmErr && ("course_format" in insertPayload || "heures_cm" in insertPayload)) {
+          const { course_format: _cf, heures_cm: _hc, heures_td: _htd, heures_tp: _htp, ...withoutHours } = insertPayload;
+          const retry = await supabase.from("filiere_matieres").insert(withoutHours).select("id").single();
           fm = retry.data;
           fmErr = retry.error;
         }
@@ -2199,6 +2242,7 @@ function NouveauProgrammeForm() {
                 m.credits,
                 m.is_optional,
                 m.course_format,
+                m,
               );
             }
           }
@@ -2764,8 +2808,10 @@ function NouveauProgrammeForm() {
         {type === "cursus" && (
           <ProgramSection
             icon={Gauge}
-            title={en ? "Pass threshold" : "Seuil de passage"}
-            description={en ? "Minimum average out of 20 required to advance to the next level. Configurable for each level." : "Moyenne minimale (/20) pour passer au niveau suivant. Configurable par niveau."}
+            title={en ? "Year advancement threshold" : "Seuil de passage d'année"}
+            description={en
+              ? "Minimum average out of 20 to advance to the next level (year). Distinct from the UE validation threshold (credits) in Settings."
+              : "Moyenne minimale (/20) pour passer au niveau suivant (année). Distinct du seuil de validation d'une UE (crédits) dans Paramètres."}
           >
             <div className="flex gap-1.5 flex-wrap mb-4">
               {niveaux.map((n) => (
@@ -2785,7 +2831,7 @@ function NouveauProgrammeForm() {
             {niveauActuel && (
               <div>
                 <label className={FIELD_LABEL}>
-                  {en ? "Advancement threshold for level" : "Seuil de passage niveau"} {niveauActuel.numero} (/20)
+                  {en ? "Year advancement threshold for level" : "Seuil de passage d'année — niveau"} {niveauActuel.numero} (/20)
                 </label>
                 <input
                   type="text"
@@ -3179,6 +3225,13 @@ function NouveauProgrammeForm() {
                           {isUniversityLmd
                             ? `${en ? "Semesters" : "Sem."} ${(m.semestreKeys || []).map((k) => k.split(":")[1]).join(", ") || "—"}`
                             : `${en ? "Levels" : "Niv."} ${(m.niveauNumeros || []).join(", ") || "—"}`}
+                          {isUniversityLmd
+                            ? ` · ${formatUeHoursShort({
+                                heures_cm: Number(m.heures_cm) || null,
+                                heures_td: Number(m.heures_td) || null,
+                                heures_tp: Number(m.heures_tp) || null,
+                              }, en ? "en" : "fr")}`
+                            : ""}
                           {` · /${m.max_score || 20} · ×${m.coefficient || 1}`}
                           {isUniversityLmd && m.credits !== undefined && m.credits !== "" ? ` · ${m.credits} cr.` : ""}
                           {isUniversityLmd && m.is_optional ? (en ? " · optional" : " · optionnelle") : ""}
@@ -3290,31 +3343,39 @@ function NouveauProgrammeForm() {
                   </div>
                   <div className={isUniversityLmd ? "grid grid-cols-3 gap-3" : "grid grid-cols-2 gap-3"}>
                     <div>
-                      <p className={FIELD_LABEL}>{en ? "Maximum score" : "Barème (sur)"}</p>
+                      <p className={FIELD_LABEL}>
+                        {en ? "Maximum score" : "Barème (sur)"}
+                        {isUniversityLmd ? <span className="text-orange-600"> *</span> : null}
+                      </p>
                       <input
                         type="text"
                         inputMode="numeric"
-                        value={draftMatiereProgram.max_score === 0 ? "" : (draftMatiereProgram.max_score ?? "")}
+                        value={draftMatiereProgram.max_score === 0 || draftMatiereProgram.max_score === "" ? "" : (draftMatiereProgram.max_score ?? "")}
                         onChange={(e) => {
                           const raw = e.target.value.replace(/[^0-9]/g, "");
                           updateMatiereProgram(draftMatiereProgram.key!, { max_score: raw === "" ? "" : Number(raw) });
                         }}
-                        placeholder="20"
+                        placeholder={isUniversityLmd ? (en ? "Required, e.g. 20" : "Obligatoire, ex. 20") : "20"}
                         className={FIELD_INPUT}
+                        required={isUniversityLmd}
                       />
                     </div>
                     <div>
-                      <p className={FIELD_LABEL}>{en ? "Weight" : "Coefficient"}</p>
+                      <p className={FIELD_LABEL}>
+                        {en ? "Weight" : "Coefficient"}
+                        {isUniversityLmd ? <span className="text-orange-600"> *</span> : null}
+                      </p>
                       <input
                         type="text"
                         inputMode="decimal"
-                        value={draftMatiereProgram.coefficient === 0 ? "" : (draftMatiereProgram.coefficient ?? "")}
+                        value={draftMatiereProgram.coefficient === 0 || draftMatiereProgram.coefficient === "" ? "" : (draftMatiereProgram.coefficient ?? "")}
                         onChange={(e) => {
                           const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
                           updateMatiereProgram(draftMatiereProgram.key!, { coefficient: raw === "" ? "" : (parseFloat(raw) || (raw as any)) });
                         }}
-                        placeholder="1"
+                        placeholder={isUniversityLmd ? (en ? "Required, e.g. 1" : "Obligatoire, ex. 1") : "1"}
                         className={FIELD_INPUT}
+                        required={isUniversityLmd}
                       />
                     </div>
                     {isUniversityLmd && (
@@ -3354,6 +3415,35 @@ function NouveauProgrammeForm() {
                           <option value="tp">{en ? "Lab (TP)" : "TP — Travaux pratiques"}</option>
                         </select>
                       </div>
+                      <div>
+                        <p className={FIELD_LABEL}>
+                          {en ? "Teaching hours (not timetable)" : "Volumes horaires (charge ≠ planning)"}
+                        </p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {([
+                            ["heures_cm", "CM"],
+                            ["heures_td", "TD"],
+                            ["heures_tp", "TP"],
+                          ] as const).map(([key, label]) => (
+                            <div key={key}>
+                              <p className="text-[10px] font-bold text-neutral-400 mb-1">{label}</p>
+                              <input
+                                type="text"
+                                inputMode="decimal"
+                                value={draftMatiereProgram[key] === 0 || draftMatiereProgram[key] === "" ? "" : (draftMatiereProgram[key] ?? "")}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/[^0-9.,]/g, "").replace(",", ".");
+                                  updateMatiereProgram(draftMatiereProgram.key!, {
+                                    [key]: raw === "" ? "" : Number(raw),
+                                  });
+                                }}
+                                placeholder="0"
+                                className={FIELD_INPUT}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                       <label className="flex items-start gap-2.5 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2.5 cursor-pointer">
                         <input
                           type="checkbox"
@@ -3389,7 +3479,7 @@ function NouveauProgrammeForm() {
                   </div>
                 </div>
               ) : (
-                <button type="button" onClick={() => { setDraftMatiereProgram(defaultMatiere()); setDraftProgramIsEdit(false); setMatiereDraftError(""); }} className="w-full h-11 rounded-xl border border-dashed border-orange-200 hover:bg-orange-50 flex items-center justify-center gap-1.5 text-[10px] font-black uppercase" style={{ color: ORANGE }}>
+                <button type="button" onClick={() => { setDraftMatiereProgram(defaultMatiere({ requireBareme: isUniversityLmd })); setDraftProgramIsEdit(false); setMatiereDraftError(""); }} className="w-full h-11 rounded-xl border border-dashed border-orange-200 hover:bg-orange-50 flex items-center justify-center gap-1.5 text-[10px] font-black uppercase" style={{ color: ORANGE }}>
                   <Plus size={14} /> {isUniversityLmd ? (en ? "Add a course unit" : "Ajouter une UE") : (en ? "Add a subject" : "Ajouter une matière")}
                 </button>
               )}

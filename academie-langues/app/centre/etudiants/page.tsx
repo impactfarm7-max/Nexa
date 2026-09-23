@@ -61,6 +61,8 @@ type Enrollment = {
   academic_year?: string | null;
   passage_decision?: string | null;
   passage_reason?: string | null;
+  semestre_id?: string | null;
+  semestre_ordre?: number | null;
   groupe_id: string | null;
   groupe_nom: string | null;
   campus_id?: string | null;
@@ -86,7 +88,7 @@ type StudentRow = {
 };
 
 type FiliereMatiereRow = { id: string; matiere_name: string; formateurs: string[]; max_score: number; coefficient: number };
-type GradeRow = { id: string; score: number; max_score: number; period_name: string | null; title: string | null; comment: string | null; created_at: string };
+type GradeRow = { id: string; score: number; max_score: number; period_name: string | null; title: string | null; comment: string | null; created_at: string; status?: string | null };
 type Period    = { id: string; name: string };
 
 type ExportStudentRow = {
@@ -926,6 +928,8 @@ export default function CenterStudentsPage() {
                       academic_year: selectedEnrollment.academic_year ?? null,
                       passage_decision: selectedEnrollment.passage_decision ?? null,
                       passage_reason: selectedEnrollment.passage_reason ?? null,
+                      semestre_id: selectedEnrollment.semestre_id ?? null,
+                      semestre_ordre: selectedEnrollment.semestre_ordre ?? null,
                       groupe_id: selectedEnrollment.groupe_id,
                       groupe_nom:   selectedEnrollment.groupe_nom,
                       enrolled_at:  selectedEnrollment.enrolled_at,
@@ -1333,6 +1337,7 @@ function GradesTab({
   const [comment,        setComment]        = useState("");
   const [error,          setError]          = useState("");
   const [showBulletin,   setShowBulletin]   = useState(false);
+  const [sessionLocked,  setSessionLocked]  = useState(false);
 
   const FIELD_LABEL = "text-sm font-semibold text-neutral-600 block mb-1.5";
   const FIELD_INPUT =
@@ -1358,12 +1363,15 @@ function GradesTab({
     if (list.length > 0) {
       const { data: gradeRows } = await supabase
         .from("grades")
-        .select("id, filiere_matiere_id, score, max_score, title, comment, created_at, grade_periods(name)")
+        .select("id, filiere_matiere_id, score, max_score, title, comment, created_at, status, grade_periods(name)")
         .eq("enrollment_id", enrollment.id);
       const grouped: Record<string, GradeRow[]> = {};
+      let anyValidated = false;
       for (const g of gradeRows ?? []) {
         const key = (g as any).filiere_matiere_id;
         if (!grouped[key]) grouped[key] = [];
+        const status = (g as { status?: string | null }).status ?? null;
+        if (status === "validated") anyValidated = true;
         grouped[key].push({
           id: g.id,
           score: g.score,
@@ -1372,9 +1380,13 @@ function GradesTab({
           period_name: (g as any).grade_periods?.name ?? null,
           comment: g.comment,
           created_at: g.created_at,
+          status,
         });
       }
       setGradesByMatiere(grouped);
+      setSessionLocked(anyValidated);
+    } else {
+      setSessionLocked(false);
     }
     const { data: periodRows } = await supabase.from("grade_periods").select("id, name").order("starts_at", { ascending: false });
     setPeriods(periodRows ?? []);
@@ -1390,22 +1402,50 @@ function GradesTab({
     const num = parseFloat(score);
     if (isNaN(num) || num < 0) return setError(t("centre", "gradesInvalid"));
     if (num > bareme) return setError(t("centre", "gradesAboveScale", { scale: bareme }));
+    if (!periodId) return setError(locale === "en" ? "Choose a period." : "Choisissez une période.");
+    if (sessionLocked) {
+      return setError(locale === "en"
+        ? "Session validated — reopen from Grades to edit."
+        : "Session validée — rouvrez depuis Notes pour modifier.");
+    }
     const titleTrim = title.trim();
-    const { error: insErr } = await supabase.from("grades").insert({
-      enrollment_id: enrollment.id,
-      filiere_matiere_id: filiereMatiereId,
-      period_id: periodId || null,
-      formateur_id: userId,
-      score: num,
-      max_score: bareme,
-      title: titleTrim || null,
-      comment: comment.trim() || null,
-    });
-    if (insErr) return setError(insErr.message.includes("policy")
-      ? t("centre", "gradesUnauthorized")
-      : locale === "en" ? t("centre", "passageError") : insErr.message);
-    setAddingFor(null); setScore(""); setComment(""); setPeriodId(""); setTitle("");
-    await load();
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return setError(t("centre", "passageSessionExpired"));
+      const res = await fetch("/api/centre/grades", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          filiere_matiere_id: filiereMatiereId,
+          period_id: periodId,
+          groupe_id: enrollment.groupe_id || "",
+          source: "manual",
+          ops: [{
+            op: "upsert",
+            enrollment_id: enrollment.id,
+            score: num,
+            max_score: bareme,
+            title: titleTrim || null,
+            comment: comment.trim() || null,
+          }],
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return setError(
+          locale === "en"
+            ? t("centre", "passageError")
+            : (json.error || t("centre", "passageError")),
+        );
+      }
+      setAddingFor(null); setScore(""); setComment(""); setPeriodId(""); setTitle("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("centre", "passageError"));
+    }
   };
 
   if (loading) return <p className="text-sm text-neutral-400 p-8">{t("centre", "gradesLoading")}</p>;
@@ -1475,9 +1515,11 @@ function GradesTab({
                 <button
                   type="button"
                   onClick={() => setAddingFor(addingFor === m.id ? null : m.id)}
-                  className="h-9 w-9 rounded-lg border border-black/[0.08] inline-flex items-center justify-center hover:bg-black/[0.03] shrink-0"
+                  disabled={sessionLocked}
+                  className="h-9 w-9 rounded-lg border border-black/[0.08] inline-flex items-center justify-center hover:bg-black/[0.03] shrink-0 disabled:opacity-40"
                   style={{ color: ORANGE }}
                   aria-label={t("centre", "gradesAdd")}
+                  title={sessionLocked ? (locale === "en" ? "Session validated" : "Session validée") : undefined}
                 >
                   <Plus size={16} />
                 </button>
@@ -1490,6 +1532,16 @@ function GradesTab({
                       {g.period_name || t("centre", "gradesNoPeriod")}
                       {g.title ? ` · ${g.title}` : ` · ${t("centre", "gradesMainGrade")}`}
                       {g.comment ? ` · ${g.comment}` : ""}
+                      {g.status === "provisional" && (
+                        <span className="ml-1.5 inline-flex text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                          {t("centre", "notesProvisionalBadge")}
+                        </span>
+                      )}
+                      {g.status === "validated" && (
+                        <span className="ml-1.5 inline-flex text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800">
+                          {locale === "en" ? "Validated" : "Validée"}
+                        </span>
+                      )}
                     </span>
                     <span className={`font-extrabold ${ACTION_TONE.positiveText} shrink-0`}>
                       {g.score}/{g.max_score}

@@ -6,7 +6,7 @@ const {
   resolveStudentIdPrefix,
   formatMatricule,
   parseMatriculeForPrefix,
-} = await import("./student-matricule.server.ts");
+} = await import("./student-matricule.ts");
 
 test("DEFAULT_STUDENT_ID_PREFIX vaut ETU", () => {
   assert.equal(DEFAULT_STUDENT_ID_PREFIX, "ETU");
@@ -20,6 +20,18 @@ test("resolveStudentIdPrefix renvoie le defaut si null/undefined/vide", () => {
 
 test("resolveStudentIdPrefix renvoie le prefixe personnalise trim", () => {
   assert.equal(resolveStudentIdPrefix("  UNIV-DKR  "), "UNIV-DKR");
+});
+
+test("resolveStudentIdPrefixForCenter refuse le vide pour universite", async () => {
+  const { resolveStudentIdPrefixForCenter, isUniversityCenter, assertMatriculeForOfficialDocument } =
+    await import("./student-matricule.ts");
+  assert.equal(isUniversityCenter("universite"), true);
+  assert.equal(isUniversityCenter("ecole"), false);
+  assert.equal(resolveStudentIdPrefixForCenter("UADB", "universite"), "UADB");
+  assert.throws(() => resolveStudentIdPrefixForCenter("", "universite"));
+  assert.equal(resolveStudentIdPrefixForCenter("", "ecole"), "ETU");
+  assert.equal(assertMatriculeForOfficialDocument("UADB-2026-0001"), "UADB-2026-0001");
+  assert.throws(() => assertMatriculeForOfficialDocument(""));
 });
 
 test("formatMatricule compose prefixe-annee-seq avec padding 4 chiffres", () => {

@@ -14,7 +14,7 @@ import {
   resolveStudentCountryCode,
   type StudentCountryRef,
 } from "@/app/data/studentLocalisation";
-import { passageDecisionLabel } from "@/app/utils/cursus-passage";
+import { passageDecisionLabel, defaultAcademicYear, normalizeAcademicYear } from "@/app/utils/cursus-passage";
 import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 import { downloadAttestationReussitePdf } from "@/app/utils/centerPdfExport";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -84,6 +84,8 @@ type Props = {
     academic_year?: string | null;
     passage_decision?: string | null;
     passage_reason?: string | null;
+    semestre_id?: string | null;
+    semestre_ordre?: number | null;
     groupe_id?: string | null;
     groupe_nom: string | null;
     enrolled_at: string | null;
@@ -184,9 +186,12 @@ export default function StudentIdentityTab({
   const [placementError, setPlacementError] = useState("");
   const [filieres, setFilieres] = useState<{ id: string; name: string; type: string | null }[]>([]);
   const [niveaux, setNiveaux] = useState<{ id: string; annee: number | null }[]>([]);
-  const [groupes, setGroupes] = useState<{ id: string; nom: string }[]>([]);
+  const [semestres, setSemestres] = useState<{ id: string; niveau_id: string; ordre: number }[]>([]);
+  const [groupes, setGroupes] = useState<{ id: string; nom: string; semestre_id?: string | null }[]>([]);
   const [placeFiliereId, setPlaceFiliereId] = useState("");
   const [placeNiveauId, setPlaceNiveauId] = useState("");
+  const [placeSemestreId, setPlaceSemestreId] = useState("");
+  const [placeAcademicYear, setPlaceAcademicYear] = useState(defaultAcademicYear());
   const [placeGroupeId, setPlaceGroupeId] = useState("");
   const [placeLoadingOpts, setPlaceLoadingOpts] = useState(false);
 
@@ -314,6 +319,9 @@ export default function StudentIdentityTab({
 
   const selectedPlaceFiliere = filieres.find((f) => f.id === placeFiliereId);
   const needsNiveau = selectedPlaceFiliere?.type === "cursus";
+  const univCursus = isUniversite && needsNiveau;
+  const placeSemestresForNiveau = semestres.filter((s) => s.niveau_id === placeNiveauId);
+  const placeAcademicYearNorm = normalizeAcademicYear(placeAcademicYear);
 
   const loadPlacementOptions = useCallback(async (filiereId: string, niveauId: string | null) => {
     setPlaceLoadingOpts(true);
@@ -332,6 +340,7 @@ export default function StudentIdentityTab({
 
       if (!filiereId) {
         setNiveaux([]);
+        setSemestres([]);
         setGroupes([]);
         return;
       }
@@ -341,16 +350,29 @@ export default function StudentIdentityTab({
         .select("id, annee")
         .eq("filiere_id", filiereId)
         .order("annee");
-      setNiveaux((nivRows || []).map((n) => ({ id: n.id, annee: n.annee })));
+      const nextNiveaux = (nivRows || []).map((n) => ({ id: n.id, annee: n.annee }));
+      setNiveaux(nextNiveaux);
 
-      let grpQuery = supabase.from("groupes").select("id, nom");
+      const niveauIds = nextNiveaux.map((n) => n.id);
+      if (niveauIds.length > 0) {
+        const { data: semRows } = await supabase
+          .from("semestres")
+          .select("id, niveau_id, ordre")
+          .in("niveau_id", niveauIds)
+          .order("ordre");
+        setSemestres((semRows || []).map((s) => ({ id: s.id, niveau_id: s.niveau_id, ordre: s.ordre })));
+      } else {
+        setSemestres([]);
+      }
+
+      let grpQuery = supabase.from("groupes").select("id, nom, semestre_id");
       if (niveauId) {
         grpQuery = grpQuery.or(`filiere_id.eq.${filiereId},niveau_id.eq.${niveauId}`);
       } else {
         grpQuery = grpQuery.eq("filiere_id", filiereId);
       }
       const { data: grpRows } = await grpQuery.order("nom");
-      setGroupes((grpRows || []).map((g) => ({ id: g.id, nom: g.nom })));
+      setGroupes((grpRows || []).map((g) => ({ id: g.id, nom: g.nom, semestre_id: g.semestre_id ?? null })));
     } finally {
       setPlaceLoadingOpts(false);
     }
@@ -364,6 +386,8 @@ export default function StudentIdentityTab({
     const gId = enrollmentInfo.groupe_id || "";
     setPlaceFiliereId(fId);
     setPlaceNiveauId(nId);
+    setPlaceSemestreId(enrollmentInfo.semestre_id || "");
+    setPlaceAcademicYear(enrollmentInfo.academic_year || defaultAcademicYear());
     setPlaceGroupeId(gId);
     setEditingPlacement(true);
     await loadPlacementOptions(fId, nId || null);
@@ -381,10 +405,24 @@ export default function StudentIdentityTab({
           .eq("filiere_id", placeFiliereId)
           .order("annee");
         if (cancelled) return;
-        setNiveaux((nivRows || []).map((n) => ({ id: n.id, annee: n.annee })));
+        const nextNiveaux = (nivRows || []).map((n) => ({ id: n.id, annee: n.annee }));
+        setNiveaux(nextNiveaux);
+
+        const niveauIds = nextNiveaux.map((n) => n.id);
+        if (niveauIds.length > 0) {
+          const { data: semRows } = await supabase
+            .from("semestres")
+            .select("id, niveau_id, ordre")
+            .in("niveau_id", niveauIds)
+            .order("ordre");
+          if (cancelled) return;
+          setSemestres((semRows || []).map((s) => ({ id: s.id, niveau_id: s.niveau_id, ordre: s.ordre })));
+        } else {
+          setSemestres([]);
+        }
 
         const niveauId = placeNiveauId || null;
-        let grpQuery = supabase.from("groupes").select("id, nom");
+        let grpQuery = supabase.from("groupes").select("id, nom, semestre_id");
         if (niveauId) {
           grpQuery = grpQuery.or(`filiere_id.eq.${placeFiliereId},niveau_id.eq.${niveauId}`);
         } else {
@@ -392,10 +430,18 @@ export default function StudentIdentityTab({
         }
         const { data: grpRows } = await grpQuery.order("nom");
         if (cancelled) return;
-        const nextGroupes = (grpRows || []).map((g) => ({ id: g.id, nom: g.nom }));
+        const nextGroupes = (grpRows || []).map((g) => ({
+          id: g.id,
+          nom: g.nom,
+          semestre_id: g.semestre_id ?? null,
+        }));
         setGroupes(nextGroupes);
         if (placeGroupeId && !nextGroupes.some((g) => g.id === placeGroupeId)) {
           setPlaceGroupeId("");
+        }
+        if (placeSemestreId && niveauId) {
+          const sems = (await supabase.from("semestres").select("id").eq("niveau_id", niveauId)).data || [];
+          if (!sems.some((s) => s.id === placeSemestreId)) setPlaceSemestreId("");
         }
       } finally {
         if (!cancelled) setPlaceLoadingOpts(false);
@@ -415,6 +461,18 @@ export default function StudentIdentityTab({
       setPlacementError(t("centre", "identityChooseLevel"));
       return;
     }
+    if (univCursus && placeSemestresForNiveau.length > 0 && !placeSemestreId) {
+      setPlacementError(t("centre", "identityChooseSemester"));
+      return;
+    }
+    if (univCursus && !placeAcademicYearNorm) {
+      setPlacementError(t("centre", "academicYearInvalid"));
+      return;
+    }
+    if (univCursus && !placeGroupeId) {
+      setPlacementError(t("centre", "identityChoosePromotion"));
+      return;
+    }
     setPlacementSaving(true);
     setPlacementError("");
     try {
@@ -430,6 +488,8 @@ export default function StudentIdentityTab({
           enrollment_id: enrollmentId,
           filiere_id: placeFiliereId,
           niveau_id: placeNiveauId || null,
+          semestre_id: placeSemestreId || null,
+          academic_year: placeAcademicYearNorm || placeAcademicYear.trim() || null,
           groupe_id: placeGroupeId || null,
         }),
       });
@@ -589,6 +649,7 @@ export default function StudentIdentityTab({
                     onChange={(v) => {
                       setPlaceFiliereId(v);
                       setPlaceNiveauId("");
+                      setPlaceSemestreId("");
                       setPlaceGroupeId("");
                     }}
                     placeholder={t("centre", "identityChoose")}
@@ -606,6 +667,7 @@ export default function StudentIdentityTab({
                       value={placeNiveauId}
                       onChange={(v) => {
                         setPlaceNiveauId(v);
+                        setPlaceSemestreId("");
                         setPlaceGroupeId("");
                       }}
                       placeholder={t("centre", "identityChoose")}
@@ -619,6 +681,44 @@ export default function StudentIdentityTab({
                     />
                   </div>
                 )}
+                {placeSemestresForNiveau.length > 0 && (
+                  <div>
+                    <label className={FIELD_LABEL}>
+                      {t("centre", "lmdSemestreFilterLabel")}
+                      {univCursus ? " *" : ""}
+                    </label>
+                    <CenterSelect
+                      size="lg"
+                      value={placeSemestreId}
+                      onChange={(v) => {
+                        setPlaceSemestreId(v);
+                        setPlaceGroupeId("");
+                      }}
+                      placeholder={t("centre", "identityChoose")}
+                      options={[
+                        { value: "", label: t("centre", "identityChoose") },
+                        ...placeSemestresForNiveau.map((s) => ({
+                          value: s.id,
+                          label: t("centre", "lmdSemestreLabel", { number: String(s.ordre) }),
+                        })),
+                      ]}
+                    />
+                  </div>
+                )}
+                {needsNiveau && (
+                  <div>
+                    <label className={FIELD_LABEL}>
+                      {t("centre", "identityAcademicYear")}
+                      {univCursus ? " *" : ""}
+                    </label>
+                    <input
+                      value={placeAcademicYear}
+                      onChange={(e) => setPlaceAcademicYear(e.target.value)}
+                      placeholder="2025-2026"
+                      className={FIELD_INPUT}
+                    />
+                  </div>
+                )}
                 <div>
                   <label className={FIELD_LABEL}>{isUniversite ? t("centre", "univPromotion") : t("centre", "identityClass")}</label>
                   <CenterSelect
@@ -629,7 +729,9 @@ export default function StudentIdentityTab({
                     placeholder={isUniversite ? t("centre", "univNoPromotion") : t("centre", "identityNoneDefine")}
                     options={[
                       { value: "", label: isUniversite ? t("centre", "univNoPromotion") : t("centre", "identityNoneDefine") },
-                      ...groupes.map((g) => ({ value: g.id, label: g.nom })),
+                      ...groupes
+                        .filter((g) => !placeSemestreId || !g.semestre_id || g.semestre_id === placeSemestreId)
+                        .map((g) => ({ value: g.id, label: g.nom })),
                     ]}
                   />
                 </div>
@@ -670,16 +772,24 @@ export default function StudentIdentityTab({
                     <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{t("centre", "identityYear", { year: enrollmentInfo.niveau_annee })}</p>
                   </div>
                 )}
+                {enrollmentInfo.semestre_ordre != null && (
+                  <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
+                    <p className="text-xs font-semibold text-neutral-400">{t("centre", "lmdSemestreFilterLabel")}</p>
+                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>
+                      {t("centre", "lmdSemestreLabel", { number: String(enrollmentInfo.semestre_ordre) })}
+                    </p>
+                  </div>
+                )}
                 {!enrollmentInfo.niveau_annee && enrollmentInfo.duration_label && (
                   <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
                     <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityDuration")}</p>
                     <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.duration_label}</p>
                   </div>
                 )}
-                {enrollmentInfo.academic_year && (
+                {(enrollmentInfo.academic_year || isUniversite) && (
                   <div className="bg-white rounded-lg p-3 border border-black/[0.06]">
                     <p className="text-xs font-semibold text-neutral-400">{t("centre", "identityAcademicYear")}</p>
-                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.academic_year}</p>
+                    <p className="font-semibold mt-0.5" style={{ color: BLUE }}>{enrollmentInfo.academic_year || "—"}</p>
                   </div>
                 )}
                 {enrollmentInfo.passage_decision && (

@@ -67,6 +67,8 @@ export default function StudentConvocationsPage() {
         instructions: row.instructions,
         config: { legalName: centerName || undefined, title: locale === "en" ? "Examination summons" : "Convocation d'examen" },
       });
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : (locale === "en" ? "Unable to print." : "Impression impossible."));
     } finally {
       setDownloadingId(null);
     }

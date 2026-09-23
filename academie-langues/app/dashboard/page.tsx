@@ -652,12 +652,35 @@ export default function Dashboard() {
           setGrades(entries.slice(0, 5));
         }
       } else {
-        const { data: gradeRows } = await supabase
-          .from("grades")
-          .select("id, score, max_score, title, created_at, enrollment_id, filiere_matiere_id")
-          .gte("created_at", weekIso)
-          .order("created_at", { ascending: false })
-          .limit(20);
+        let gradeRows: {
+          id: string;
+          score: number;
+          max_score: number;
+          title: string | null;
+          created_at: string;
+          enrollment_id: string;
+          filiere_matiere_id: string;
+          status?: string | null;
+        }[] | null = null;
+        {
+          const withStatus = await supabase
+            .from("grades")
+            .select("id, score, max_score, title, created_at, enrollment_id, filiere_matiere_id, status")
+            .gte("created_at", weekIso)
+            .order("created_at", { ascending: false })
+            .limit(20);
+          if (withStatus.error && /status/i.test(withStatus.error.message || "")) {
+            const fallback = await supabase
+              .from("grades")
+              .select("id, score, max_score, title, created_at, enrollment_id, filiere_matiere_id")
+              .gte("created_at", weekIso)
+              .order("created_at", { ascending: false })
+              .limit(20);
+            gradeRows = (fallback.data || []).map((g) => ({ ...g, status: null }));
+          } else {
+            gradeRows = withStatus.data;
+          }
+        }
         if (gradeRows && gradeRows.length > 0) {
           const fmIds = [...new Set(gradeRows.map((g) => g.filiere_matiere_id).filter(Boolean))];
           let matiereNames = new Map<string, string>();
@@ -672,14 +695,19 @@ export default function Dashboard() {
               if (name) matiereNames.set(row.id, name);
             }
           }
+          const { normalizeGradeStatus } = await import("@/app/utils/gradeStatus");
           setGrades(
-            gradeRows.slice(0, 5).map((g) => ({
-              id: g.id,
-              subject: g.title || matiereNames.get(g.filiere_matiere_id) || t("dashboard", "gradeFallback"),
-              score: Number(g.score) || 0,
-              max: Number(g.max_score) || 20,
-              date: g.created_at,
-            })),
+            gradeRows.slice(0, 5).map((g) => {
+              const provisional = normalizeGradeStatus((g as { status?: string }).status) === "provisional";
+              const base = g.title || matiereNames.get(g.filiere_matiere_id) || t("dashboard", "gradeFallback");
+              return {
+                id: g.id,
+                subject: provisional ? `${base} (${t("dashboard", "gradeProvisional") || "provisoire"})` : base,
+                score: Number(g.score) || 0,
+                max: Number(g.max_score) || 20,
+                date: g.created_at,
+              };
+            }),
           );
         } else {
           setGrades([]);

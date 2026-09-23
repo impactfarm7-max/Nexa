@@ -402,6 +402,10 @@ export default function EntrepriseSettingsPage() {
       alert(t("centre", "companyMissingRequiredFields"));
       return;
     }
+    if (centerType === "universite" && !studentIdPrefix.trim()) {
+      alert(t("centre", "matriculePrefixRequiredUniv"));
+      return;
+    }
     setErrors({});
     setSaving(true);
 
@@ -680,29 +684,52 @@ export default function EntrepriseSettingsPage() {
 
       {/* ===================== MATRICULES ÉTUDIANTS ===================== */}
       <Section icon={Hash} title={t("centre", "matriculeSectionTitle")}
-        description={t("centre", "matriculeSectionDescription")}>
-        <div className="flex gap-2">
-          <button type="button" onClick={() => setStudentIdPrefix("")} disabled={isLocked}
-            className={`flex-1 h-11 rounded-xl border text-sm font-bold transition ${
-              !studentIdPrefix.trim() ? "border-[#11224E] bg-[#11224E]/5 text-[#11224E]" : "border-neutral-200 text-neutral-500"
-            }`}>
-            {t("centre", "matriculeModeGenerated")}
-          </button>
-          <button type="button" onClick={() => setStudentIdPrefix(studentIdPrefix || "ETU")} disabled={isLocked}
-            className={`flex-1 h-11 rounded-xl border text-sm font-bold transition ${
-              studentIdPrefix.trim() ? "border-[#11224E] bg-[#11224E]/5 text-[#11224E]" : "border-neutral-200 text-neutral-500"
-            }`}>
-            {t("centre", "matriculeModeCustom")}
-          </button>
-        </div>
-        {studentIdPrefix.trim() !== "" && (
-          <Field label={t("centre", "matriculePrefixLabel")} value={studentIdPrefix}
-            onChange={setStudentIdPrefix} placeholder={t("centre", "matriculePrefixPlaceholder")} disabled={isLocked} />
+        description={
+          centerType === "universite"
+            ? t("centre", "matriculeSectionDescriptionUniv")
+            : t("centre", "matriculeSectionDescription")
+        }>
+        {centerType === "universite" ? (
+          <>
+            <Field
+              label={`${t("centre", "matriculePrefixLabel")} *`}
+              value={studentIdPrefix}
+              onChange={setStudentIdPrefix}
+              placeholder={t("centre", "matriculePrefixPlaceholderUniv")}
+              disabled={isLocked}
+            />
+            {!studentIdPrefix.trim() && (
+              <p className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                {t("centre", "matriculePrefixRequiredUniv")}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => setStudentIdPrefix("")} disabled={isLocked}
+                className={`flex-1 h-11 rounded-xl border text-sm font-bold transition ${
+                  !studentIdPrefix.trim() ? "border-[#11224E] bg-[#11224E]/5 text-[#11224E]" : "border-neutral-200 text-neutral-500"
+                }`}>
+                {t("centre", "matriculeModeGenerated")}
+              </button>
+              <button type="button" onClick={() => setStudentIdPrefix(studentIdPrefix || "ETU")} disabled={isLocked}
+                className={`flex-1 h-11 rounded-xl border text-sm font-bold transition ${
+                  studentIdPrefix.trim() ? "border-[#11224E] bg-[#11224E]/5 text-[#11224E]" : "border-neutral-200 text-neutral-500"
+                }`}>
+                {t("centre", "matriculeModeCustom")}
+              </button>
+            </div>
+            {studentIdPrefix.trim() !== "" && (
+              <Field label={t("centre", "matriculePrefixLabel")} value={studentIdPrefix}
+                onChange={setStudentIdPrefix} placeholder={t("centre", "matriculePrefixPlaceholder")} disabled={isLocked} />
+            )}
+          </>
         )}
         <p className="text-xs text-neutral-500 font-medium">
           {t("centre", "matriculePreviewLabel")} :{" "}
           <span className="font-bold text-[#11224E]">
-            {(studentIdPrefix.trim() || "ETU")}-{new Date().getFullYear()}-0001
+            {(studentIdPrefix.trim() || (centerType === "universite" ? "…" : "ETU"))}-{new Date().getFullYear()}-0001
           </span>
         </p>
       </Section>

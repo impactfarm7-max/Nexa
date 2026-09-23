@@ -72,11 +72,25 @@ export async function loadLmdProgress(db: SupabaseClient, enrollmentId: string, 
   const grades: LmdGrade[] = [];
   if (ids.length && ues.length) {
     for (let offset = 0; ; offset += 500) {
-      const page = await db.from("grades").select("enrollment_id, filiere_matiere_id, score, max_score, title")
+      const page = await db.from("grades").select("enrollment_id, filiere_matiere_id, score, max_score, title, status")
         .in("enrollment_id", ids).in("filiere_matiere_id", ues.map(ue => ue.id))
         .order("created_at", { ascending: false }).order("id").range(offset, offset + 499);
+      if (page.error && (["42703", "PGRST204"].includes(page.error.code || "") || /status/i.test(page.error.message || ""))) {
+        const fb = await db.from("grades").select("enrollment_id, filiere_matiere_id, score, max_score, title")
+          .in("enrollment_id", ids).in("filiere_matiere_id", ues.map(ue => ue.id))
+          .order("created_at", { ascending: false }).order("id").range(offset, offset + 499);
+        if (fb.error) throw fb.error;
+        grades.push(...((fb.data || []) as LmdGrade[]).map((g) => ({ ...g, status: "validated" as const })));
+        if (!fb.data || fb.data.length < 500) break;
+        continue;
+      }
       if (page.error) throw page.error;
-      grades.push(...(page.data || []));
+      const { isOfficialGrade } = await import("@/app/utils/gradeStatus");
+      for (const g of page.data || []) {
+        if (isOfficialGrade((g as { status?: string }).status)) {
+          grades.push(g as LmdGrade);
+        }
+      }
       if (!page.data || page.data.length < 500) break;
     }
   }

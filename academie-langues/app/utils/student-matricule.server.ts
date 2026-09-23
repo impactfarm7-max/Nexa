@@ -1,30 +1,18 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  formatMatricule,
+  parseMatriculeForPrefix,
+} from "@/app/utils/student-matricule";
 
-export const DEFAULT_STUDENT_ID_PREFIX = "ETU";
-
-export function resolveStudentIdPrefix(rawPrefix: string | null | undefined): string {
-  return rawPrefix?.trim() || DEFAULT_STUDENT_ID_PREFIX;
-}
-
-export function formatMatricule(prefix: string, year: number, seq: number): string {
-  return `${prefix}-${year}-${String(seq).padStart(4, "0")}`;
-}
-
-/**
- * Si `matricule` correspond exactement au format {prefix}-{annee}-{seq},
- * renvoie l'annee et le seq extraits. Sinon null (format inconnu — on ne
- * devine rien, voir design "Hors scope").
- */
-export function parseMatriculeForPrefix(
-  matricule: string,
-  prefix: string,
-): { year: number; seq: number } | null {
-  const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const pattern = new RegExp(`^${escapedPrefix}-(\\d{4})-(\\d{4})$`);
-  const match = pattern.exec(matricule.trim());
-  if (!match) return null;
-  return { year: Number(match[1]), seq: Number(match[2]) };
-}
+export {
+  DEFAULT_STUDENT_ID_PREFIX,
+  isUniversityCenter,
+  resolveStudentIdPrefix,
+  resolveStudentIdPrefixForCenter,
+  formatMatricule,
+  parseMatriculeForPrefix,
+  assertMatriculeForOfficialDocument,
+} from "@/app/utils/student-matricule";
 
 /** Génère le prochain matricule pour ce centre/année (incrémentation atomique côté DB). */
 export async function generateMatricule(

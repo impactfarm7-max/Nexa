@@ -15,6 +15,7 @@ import {
 import {
   defaultAcademicYear,
   isCursusFeeMode,
+  normalizeAcademicYear,
   resolveCursusTuition,
   type CursusFeeMode,
 } from "@/app/utils/cursus-passage";
@@ -27,7 +28,7 @@ import { BLUE, ORANGE, CenterSelect } from "@/app/centre/center-page-ui";
 const MAX_ROWS = 150;
 const TEMPLATE_HEADERS = [
   "prenom", "nom", "email", "telephone", "programme", "campus", "niveau",
-  "classe", "genre", "date_naissance", "pays", "region", "duree_mois", "coupon",
+  "semestre", "classe", "genre", "date_naissance", "pays", "region", "duree_mois", "coupon",
   "annee_scolaire", "tuteur_nom", "tuteur_lien", "tuteur_tel", "matricule",
 ];
 
@@ -49,7 +50,8 @@ type NiveauOption = {
   tuition_fee: number | null;
   payment_plan?: unknown;
 };
-type GroupeOption = { id: string; nom: string; filiere_id: string | null; niveau_id: string | null };
+type GroupeOption = { id: string; nom: string; filiere_id: string | null; niveau_id: string | null; semestre_id: string | null };
+type SemestreOption = { id: string; niveau_id: string; ordre: number };
 type CampusOption = { id: string; name: string };
 type FiliereCampus = { filiere_id: string; campus: CampusOption };
 
@@ -62,6 +64,7 @@ type ParsedRow = {
   programme: string;
   campus: string;
   niveau: string;
+  semestre: string;
   classe: string;
   genre: string;
   birthDate: string;
@@ -170,7 +173,8 @@ function unwrapCampus(raw: unknown): CampusOption | null {
 function downloadTemplate() {
   const example = [
     "Jean", "DUPONT", "jean.dupont@example.com", "690000000",
-    "", "", "1", "", "Homme", "2005-03-12", "CM", "", "", "", "", "", "", "", "",
+    "", "", "1", "1", "", "Homme", "2005-03-12", "CM", "", "", "",
+    defaultAcademicYear(), "", "", "", "",
   ];
   const csv = [TEMPLATE_HEADERS.join(";"), example.join(";")].join("\n");
   const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -195,8 +199,10 @@ export default function ImportStudentsCsvModal({
   const feedback = useActionFeedback();
   const [filieres, setFilieres] = useState<FiliereOption[]>([]);
   const [niveaux, setNiveaux] = useState<NiveauOption[]>([]);
+  const [semestres, setSemestres] = useState<SemestreOption[]>([]);
   const [groupes, setGroupes] = useState<GroupeOption[]>([]);
   const [filiereCampuses, setFiliereCampuses] = useState<FiliereCampus[]>([]);
+  const [isUniversite, setIsUniversite] = useState(false);
   const [defaultFiliereId, setDefaultFiliereId] = useState("");
   const [defaultCampusId, setDefaultCampusId] = useState("");
   const [defaultNiveauId, setDefaultNiveauId] = useState("");
@@ -233,11 +239,15 @@ export default function ImportStudentsCsvModal({
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("filieres")
-        .select("id, name, type, default_tuition_fee, pricing_mode, cursus_fee_mode, duree_valeur, duree_unite, payment_plan")
-        .eq("center_id", centerId)
-        .eq("status", "published");
+      const [{ data }, { data: centerRow }] = await Promise.all([
+        supabase
+          .from("filieres")
+          .select("id, name, type, default_tuition_fee, pricing_mode, cursus_fee_mode, duree_valeur, duree_unite, payment_plan")
+          .eq("center_id", centerId)
+          .eq("status", "published"),
+        supabase.from("centers").select("center_type").eq("id", centerId).maybeSingle(),
+      ]);
+      setIsUniversite(centerRow?.center_type === "universite");
       const list: FiliereOption[] = (data || []).map((f: FiliereOption) => ({
         ...f,
         pricing_mode: isShortPricingMode(f.pricing_mode) ? f.pricing_mode : null,
@@ -246,6 +256,7 @@ export default function ImportStudentsCsvModal({
       setFilieres(list);
       if (list.length === 0) {
         setNiveaux([]);
+        setSemestres([]);
         setGroupes([]);
         setFiliereCampuses([]);
         return;
@@ -253,13 +264,38 @@ export default function ImportStudentsCsvModal({
       const ids = list.map((f) => f.id);
       const [{ data: nivs }, { data: grps }, { data: linked }] = await Promise.all([
         supabase.from("niveaux").select("id, filiere_id, annee, tuition_fee, payment_plan").in("filiere_id", ids).order("annee"),
-        supabase.from("groupes").select("id, nom, niveau_id, filiere_id").in("filiere_id", ids),
+        supabase.from("groupes").select("id, nom, niveau_id, filiere_id, semestre_id").in("filiere_id", ids),
         supabase.from("filiere_campus").select("filiere_id, campuses(id, name)").in("filiere_id", ids),
       ]);
       setNiveaux(
-        ((nivs || []) as NiveauOption[]).filter((n) => n.annee != null),
+        (nivs || []).map((n) => ({
+          id: n.id,
+          filiere_id: n.filiere_id,
+          annee: n.annee,
+          tuition_fee: n.tuition_fee,
+          payment_plan: n.payment_plan,
+        })),
       );
-      setGroupes((grps || []) as GroupeOption[]);
+      const niveauIds = (nivs || []).map((n) => n.id);
+      if (niveauIds.length > 0) {
+        const { data: semRows } = await supabase
+          .from("semestres")
+          .select("id, niveau_id, ordre")
+          .in("niveau_id", niveauIds)
+          .order("ordre");
+        setSemestres((semRows || []).map((s) => ({ id: s.id, niveau_id: s.niveau_id, ordre: s.ordre })));
+      } else {
+        setSemestres([]);
+      }
+      setGroupes(
+        (grps || []).map((g) => ({
+          id: g.id,
+          nom: g.nom,
+          niveau_id: g.niveau_id,
+          filiere_id: g.filiere_id,
+          semestre_id: g.semestre_id ?? null,
+        })),
+      );
       setFiliereCampuses(
         ((linked || []) as { filiere_id: string; campuses?: unknown }[])
           .map((lc) => {
@@ -305,9 +341,37 @@ export default function ImportStudentsCsvModal({
       const yearNum = row.niveau ? (Number(row.niveau.replace(/\D/g, "")) || Number(row.niveau)) : NaN;
       const hasCsvLevel = years.some((n) => n.annee === yearNum || String(n.annee) === row.niveau.trim());
       if (!hasDefaultLevel && !hasCsvLevel) return t("centre", "createStudentLevelRequired");
+
+      if (isUniversite) {
+        const yearRaw = row.academicYear.trim() || defaultAcademicYear();
+        if (!normalizeAcademicYear(yearRaw)) return t("centre", "academicYearInvalid");
+
+        const niveauHit = years.find((n) => n.annee === yearNum || String(n.annee) === row.niveau.trim())
+          || (hasDefaultLevel ? years.find((n) => n.id === defaultNiveauId) : null);
+        if (niveauHit) {
+          const semsForNiv = semestres.filter((s) => s.niveau_id === niveauHit.id);
+          if (semsForNiv.length > 0) {
+            const semOrdre = row.semestre ? (Number(row.semestre.replace(/\D/g, "")) || Number(row.semestre)) : NaN;
+            const hasCsvSem = semsForNiv.some((s) => s.ordre === semOrdre || String(s.ordre) === row.semestre.trim());
+            const groupesForFiliere = groupes.filter((g) => g.filiere_id === filiere.id);
+            const classeHit = row.classe
+              ? groupesForFiliere.find((g) => g.nom.toLowerCase() === row.classe.toLowerCase())
+              : (filiere.id === defaultFiliereId && defaultGroupeId
+                ? groupesForFiliere.find((g) => g.id === defaultGroupeId)
+                : null);
+            const hasSemFromClasse = Boolean(classeHit?.semestre_id);
+            if (!hasCsvSem && !hasSemFromClasse) return t("centre", "identityChooseSemester");
+          }
+        }
+
+        const hasDefaultClasse = filiere.id === defaultFiliereId && defaultGroupeId;
+        const hasCsvClasse = row.classe
+          && groupes.some((g) => g.filiere_id === filiere.id && g.nom.toLowerCase() === row.classe.toLowerCase());
+        if (!hasDefaultClasse && !hasCsvClasse) return t("centre", "identityChoosePromotion");
+      }
     }
     return "";
-  }, [t, defaultFiliereId, defaultNiveauId, matchFiliere, niveaux]);
+  }, [t, defaultFiliereId, defaultNiveauId, defaultGroupeId, matchFiliere, niveaux, semestres, groupes, isUniversite]);
 
   const revalidate = useCallback((list: ParsedRow[]) => {
     const emails = new Map<string, number>();
@@ -352,6 +416,7 @@ export default function ImportStudentsCsvModal({
       programme: cell(headers, raw, "programme", "filiere", "program", "filiere_name"),
       campus: cell(headers, raw, "campus"),
       niveau: cell(headers, raw, "niveau", "level", "annee"),
+      semestre: cell(headers, raw, "semestre", "semester"),
       classe: cell(headers, raw, "classe", "groupe", "classroom", "salle"),
       genre: mapGenre(cell(headers, raw, "genre", "gender", "sexe")),
       birthDate: cell(headers, raw, "date_naissance", "birth_date", "naissance", "dob"),
@@ -429,6 +494,28 @@ export default function ImportStudentsCsvModal({
           if (hit) groupeId = hit.id;
         }
 
+        let semestreId: string | null = null;
+        if (filiere.type === "cursus" && niveauId) {
+          const semsForNiv = semestres.filter((s) => s.niveau_id === niveauId);
+          if (row.semestre) {
+            const ordre = Number(row.semestre.replace(/\D/g, "")) || Number(row.semestre);
+            const hit = semsForNiv.find((s) => s.ordre === ordre || String(s.ordre) === row.semestre.trim());
+            if (hit) semestreId = hit.id;
+          }
+          if (!semestreId && groupeId) {
+            const grp = groupesForFiliere.find((g) => g.id === groupeId);
+            if (grp?.semestre_id && semsForNiv.some((s) => s.id === grp.semestre_id)) {
+              semestreId = grp.semestre_id;
+            }
+          }
+          if (isUniversite && semsForNiv.length > 0 && !semestreId) {
+            throw new Error(t("centre", "identityChooseSemester"));
+          }
+          if (isUniversite && !groupeId) {
+            throw new Error(t("centre", "identityChoosePromotion"));
+          }
+        }
+
         const extras = sumPaymentPlanFees(filiere.payment_plan);
         let tuition = Number(filiere.default_tuition_fee) || 0;
         const country = resolveCountry(row.pays);
@@ -443,6 +530,7 @@ export default function ImportStudentsCsvModal({
           phone,
           filiere_id: filiere.id,
           niveau_id: niveauId,
+          semestre_id: semestreId,
           groupe_id: groupeId,
           campus_id: campusId,
           tuition_fee: tuition,
@@ -494,7 +582,9 @@ export default function ImportStudentsCsvModal({
               : extras,
           });
           body.tuition_fee = tuition;
-          body.academic_year = row.academicYear || defaultAcademicYear();
+          const yearNorm = normalizeAcademicYear(row.academicYear || defaultAcademicYear());
+          if (isUniversite && !yearNorm) throw new Error(t("centre", "academicYearInvalid"));
+          body.academic_year = yearNorm || defaultAcademicYear();
         }
 
         if (row.coupon) body.coupon_code = row.coupon.toUpperCase();

@@ -22,6 +22,7 @@ import {
 } from "@/app/utils/short-pricing";
 import {
   isCursusFeeMode,
+  normalizeAcademicYear,
   resolveCursusTuition,
 } from "@/app/utils/cursus-passage";
 import { isPluriannualCenter, normalizeCenterType } from "@/app/data/center-types";
@@ -35,8 +36,10 @@ import { getPublicSiteUrl } from "@/app/utils/public-site-url";
 import { generateSecureTemporaryPassword } from "@/app/utils/secure-password";
 import {
   resolveStudentIdPrefix,
+  resolveStudentIdPrefixForCenter,
   generateMatricule,
   syncImportedMatriculeCounter,
+  isUniversityCenter,
 } from "@/app/utils/student-matricule.server";
 
 const supabaseAdmin = createClient(
@@ -163,6 +166,7 @@ export async function POST(req: NextRequest) {
       filiere_id, niveau_id, groupe_id, campus_id, tuition_fee,
     } = body;
     const semestre_id = typeof body.semestre_id === "string" && body.semestre_id ? body.semestre_id : null;
+    let resolvedSemestreId = semestre_id;
     const normalizedEmail = String(body.email || "").trim().toLowerCase();
 
     if (!prenom || !nom || !normalizedEmail || !filiere_id) {
@@ -263,10 +267,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const academicYear =
+    const academicYearRaw =
       isCursusFiliere && typeof body.academic_year === "string" && body.academic_year.trim()
         ? body.academic_year.trim()
         : null;
+    const academicYear = academicYearRaw ? normalizeAcademicYear(academicYearRaw) : null;
+    if (academicYearRaw && !academicYear) {
+      return NextResponse.json(
+        { error: "Année scolaire invalide (format attendu : 2025-2026).", code: "ACADEMIC_YEAR_INVALID" },
+        { status: 400 },
+      );
+    }
 
     const couponCode =
       typeof body.coupon_code === "string" ? body.coupon_code.trim() : "";
@@ -340,7 +351,21 @@ export async function POST(req: NextRequest) {
         .eq("id", callerCenterId)
         .maybeSingle();
       centerTypeRaw = centerRow?.center_type ?? null;
-      centerStudentIdPrefix = resolveStudentIdPrefix(centerRow?.student_id_prefix ?? null);
+      try {
+        centerStudentIdPrefix = resolveStudentIdPrefixForCenter(
+          centerRow?.student_id_prefix ?? null,
+          centerTypeRaw,
+        );
+      } catch {
+        return NextResponse.json(
+          {
+            error:
+              "Préfixe de matricule institutionnel obligatoire. Configurez-le dans Paramètres → Identité (université).",
+            code: "MATRICULE_PREFIX_REQUIRED",
+          },
+          { status: 400 },
+        );
+      }
       centerOfferKey = resolveEffectiveNexaOfferKey(centerRow);
       centerQuotaOverrides =
         centerRow?.quota_overrides && typeof centerRow.quota_overrides === "object"
@@ -364,6 +389,88 @@ export async function POST(req: NextRequest) {
     const isPluri = Boolean(callerCenterId) && isPluriannualCenter(centerTypeRaw);
     const centerType = normalizeCenterType(centerTypeRaw);
     const emailLocale = centerTypeRaw === "tcf_canada" ? "fr" : (body.locale === "en" ? "en" : "fr");
+
+    // Université + cursus : parcours académique complet (après chargement center_type)
+    if (isUniversityCenter(centerTypeRaw) && isCursusFiliere) {
+      if (!niveau_id) {
+        return NextResponse.json(
+          { error: "Niveau obligatoire pour une inscription universitaire.", code: "NIVEAU_REQUIRED" },
+          { status: 400 },
+        );
+      }
+      if (!academicYear) {
+        return NextResponse.json(
+          { error: "Année scolaire obligatoire (ex. 2025-2026).", code: "ACADEMIC_YEAR_REQUIRED" },
+          { status: 400 },
+        );
+      }
+      if (!groupe_id) {
+        return NextResponse.json(
+          { error: "Promotion obligatoire pour une inscription universitaire.", code: "GROUPE_REQUIRED" },
+          { status: 400 },
+        );
+      }
+
+      const { data: grpRow } = await supabaseAdmin
+        .from("groupes")
+        .select("id, filiere_id, niveau_id, semestre_id")
+        .eq("id", groupe_id)
+        .maybeSingle();
+      if (!grpRow) {
+        return NextResponse.json({ error: "Promotion introuvable.", code: "GROUPE_INVALID" }, { status: 400 });
+      }
+      const okByFiliere = grpRow.filiere_id === filiere_id;
+      const okByNiveau = grpRow.niveau_id === niveau_id;
+      if (!okByFiliere && !okByNiveau) {
+        return NextResponse.json(
+          { error: "Promotion hors de ce programme / niveau.", code: "GROUPE_INVALID" },
+          { status: 400 },
+        );
+      }
+
+      // Inférer le semestre depuis la promo si non fourni
+      if (!resolvedSemestreId && grpRow.semestre_id) {
+        const { data: semFromGroupe } = await supabaseAdmin
+          .from("semestres")
+          .select("id, niveau_id")
+          .eq("id", grpRow.semestre_id)
+          .maybeSingle();
+        if (semFromGroupe && semFromGroupe.niveau_id === niveau_id) {
+          resolvedSemestreId = semFromGroupe.id;
+        }
+      }
+
+      const { data: semForNiveau } = await supabaseAdmin
+        .from("semestres")
+        .select("id")
+        .eq("niveau_id", niveau_id)
+        .limit(1);
+      if ((semForNiveau || []).length > 0 && !resolvedSemestreId) {
+        return NextResponse.json(
+          { error: "Semestre obligatoire pour cette inscription.", code: "SEMESTRE_REQUIRED" },
+          { status: 400 },
+        );
+      }
+      if (resolvedSemestreId) {
+        const { data: semRow } = await supabaseAdmin
+          .from("semestres")
+          .select("id, niveau_id")
+          .eq("id", resolvedSemestreId)
+          .maybeSingle();
+        if (!semRow || semRow.niveau_id !== niveau_id) {
+          return NextResponse.json(
+            { error: "Semestre invalide pour ce niveau.", code: "SEMESTRE_INVALID" },
+            { status: 400 },
+          );
+        }
+        if (grpRow.semestre_id && grpRow.semestre_id !== resolvedSemestreId) {
+          return NextResponse.json(
+            { error: "La promotion n'appartient pas à ce semestre.", code: "GROUPE_SEMESTRE_MISMATCH" },
+            { status: 400 },
+          );
+        }
+      }
+    }
 
     // Centres libres (generic) : genre + date de naissance obligatoires — sans toucher TCF / courte
     const genreRaw = typeof body.genre === "string" ? body.genre.trim() : "";
@@ -514,6 +621,12 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+    if (isUniversityCenter(centerTypeRaw) && !matricule) {
+      return NextResponse.json(
+        { error: "Matricule institutionnel obligatoire pour les étudiants universitaires.", code: "MATRICULE_REQUIRED" },
+        { status: 400 },
+      );
+    }
 
     // ---- 6. Renseigner le profil ----
     // Le trigger on_auth_user_created peut pré-créer la ligne avec un tag_status
@@ -589,7 +702,7 @@ export async function POST(req: NextRequest) {
     }
 
     const enrollmentPatch: Record<string, unknown> = { status: "active" };
-    if (semestre_id) enrollmentPatch.semestre_id = semestre_id;
+    if (resolvedSemestreId) enrollmentPatch.semestre_id = resolvedSemestreId;
     if (isShortFiliere) {
       if (shortCatalogTotal != null) enrollmentPatch.catalog_tuition_fee = shortCatalogTotal;
       if (shortDurationValue != null) enrollmentPatch.duration_value = shortDurationValue;

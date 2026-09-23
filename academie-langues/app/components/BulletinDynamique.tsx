@@ -19,6 +19,7 @@ import {
 import { useI18n } from "@/app/i18n/I18nProvider";
 import { computeCreditsStatus, resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 import { evaluateLmdUe } from "@/app/utils/lmd-results";
+import { isOfficialGrade, normalizeGradeStatus } from "@/app/utils/gradeStatus";
 
 const BLUE = "#11224E";
 const ORANGE = "#eb670e";
@@ -38,6 +39,7 @@ type RawGrade = {
   score: number;
   max_score: number | null;
   title: string | null;
+  status: "provisional" | "validated";
 };
 
 type MatiereRow = {
@@ -75,6 +77,9 @@ export default function BulletinDynamique({
   const [studentName, setStudentName] = useState("");
   const [studentClasse, setStudentClasse] = useState("");
   const [studentMatricule, setStudentMatricule] = useState("");
+  const [studentId, setStudentId] = useState<string | null>(null);
+  const [assigningMatricule, setAssigningMatricule] = useState(false);
+  const [isUniversity, setIsUniversity] = useState(false);
   const [periods, setPeriods] = useState<PeriodCol[]>([]);
   const [matieres, setMatieres] = useState<MatiereRow[]>([]);
   const [rawGrades, setRawGrades] = useState<RawGrade[]>([]);
@@ -105,6 +110,7 @@ export default function BulletinDynamique({
       const nom = (enr as any)?.profiles?.nom || "";
       setStudentName(`${prenom} ${nom}`.trim());
       setStudentMatricule((enr as any)?.profiles?.matricule || "");
+      setStudentId((enr as any)?.student_id || null);
       setStudentClasse((enr as any)?.groupes?.nom || "");
 
       if (!centerId) { setLoading(false); return; }
@@ -112,11 +118,12 @@ export default function BulletinDynamique({
       const [exportConfig, { data: sigRows }, { data: centerRow }] = await Promise.all([
         fetchDocumentExportConfig(supabase, centerId),
         supabase.from("bulletin_signatures").select("id, name, title, label").eq("center_id", centerId).order("display_order"),
-        supabase.from("centers").select("lmd_validation_threshold_pct").eq("id", centerId).maybeSingle(),
+        supabase.from("centers").select("lmd_validation_threshold_pct, center_type").eq("id", centerId).maybeSingle(),
       ]);
       setDocConfig(exportConfig);
       setSignatures(filterSignatures(sigRows || [], exportConfig.signatureIds, locale));
       setLmdThresholdPct(centerRow?.lmd_validation_threshold_pct ?? null);
+      setIsUniversity(centerRow?.center_type === "universite");
 
       const { data: periodData } = await supabase.rpc("get_center_periods", { p_center_id: centerId });
       const activePeriods: PeriodCol[] = (periodData || [])
@@ -167,11 +174,20 @@ export default function BulletinDynamique({
       let loadedRaw: RawGrade[] = [];
       if (matiereList.length > 0) {
         const fmIds = matiereList.map((m) => m.filiere_matiere_id);
-        const { data: gradeRows } = await supabase
+        const withStatus = await supabase
           .from("grades")
-          .select("filiere_matiere_id, period_id, score, max_score, title")
+          .select("filiere_matiere_id, period_id, score, max_score, title, status")
           .eq("enrollment_id", enrollmentId)
           .in("filiere_matiere_id", fmIds);
+        let gradeRows = withStatus.data as any[] | null;
+        if (withStatus.error && (["42703", "PGRST204"].includes(withStatus.error.code || "") || /status/i.test(withStatus.error.message || ""))) {
+          const fb = await supabase
+            .from("grades")
+            .select("filiere_matiere_id, period_id, score, max_score, title")
+            .eq("enrollment_id", enrollmentId)
+            .in("filiere_matiere_id", fmIds);
+          gradeRows = (fb.data || []).map((g) => ({ ...g, status: "validated" }));
+        }
 
         loadedRaw = (gradeRows || []).map((g: any) => ({
           filiere_matiere_id: g.filiere_matiere_id,
@@ -179,6 +195,7 @@ export default function BulletinDynamique({
           score: Number(g.score),
           max_score: g.max_score != null ? Number(g.max_score) : null,
           title: g.title ?? null,
+          status: normalizeGradeStatus(g.status),
         }));
         setRawGrades(loadedRaw);
 
@@ -308,10 +325,12 @@ export default function BulletinDynamique({
   const tableRows = useMemo(() => {
     return matieres.map((m) => {
       const grades = gradesForMatiereInFilter(m.filiere_matiere_id);
+      const officialGrades = grades.filter((g) => isOfficialGrade(g.status));
       const principal = grades.filter((g) => isPrincipalGrade(g.title));
       const supl = grades.filter((g) => !isPrincipalGrade(g.title));
+      const hasProvisional = grades.some((g) => !isOfficialGrade(g.status));
       const lmdStatus = m.credits != null
-        ? evaluateLmdUe(grades, m.max_score, m.grade_weights, resolveLmdValidationThreshold(lmdThresholdPct))
+        ? evaluateLmdUe(officialGrades, m.max_score, m.grade_weights, resolveLmdValidationThreshold(lmdThresholdPct))
         : null;
       const finale = lmdStatus ? lmdStatus.finalScore : matiereOverall(m);
       const finale20 =
@@ -328,6 +347,7 @@ export default function BulletinDynamique({
         observation: observationLabel(finale20),
         credits: m.credits,
         lmdValidated: lmdStatus?.validated ?? false,
+        hasProvisional,
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- matiereOverall / filter dérivés
@@ -359,6 +379,30 @@ export default function BulletinDynamique({
       ? `${new Date().getFullYear() - 1}-${new Date().getFullYear()}`
       : null);
 
+  const assignMatricule = async () => {
+    if (!studentId || assigningMatricule) return;
+    setAssigningMatricule(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error(t("centre", "passageSessionExpired"));
+      const res = await fetch("/api/centre/next-matricule", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ student_id: studentId }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || t("centre", "matriculePrintBlocked"));
+      if (json.matricule) setStudentMatricule(json.matricule);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : t("centre", "matriculePrintBlocked"));
+    } finally {
+      setAssigningMatricule(false);
+    }
+  };
+
   const handleDownloadPdf = async () => {
     setPdfBusy(true);
     try {
@@ -368,6 +412,8 @@ export default function BulletinDynamique({
 
       await downloadBulletinNotesPdf({
         studentName,
+        studentMatricule: studentMatricule || null,
+        requireMatricule: isUniversity,
         enrollmentLabel: labelParts.join(" · "),
         niveauLabel: niveauAnnee != null ? `${t("centre", "bulletinLevel")} ${niveauAnnee}` : null,
         classeLabel: studentClasse || null,
@@ -383,6 +429,8 @@ export default function BulletinDynamique({
         signatures,
         locale,
       });
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : t("centre", "matriculePrintBlocked"));
     } finally {
       setPdfBusy(false);
     }
@@ -492,11 +540,27 @@ export default function BulletinDynamique({
           <div>
             <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{t("centre", "bulletinLearner")}</p>
             <p className="font-extrabold text-sm tracking-tight" style={{ color: BLUE }}>{studentName}</p>
-            {studentMatricule && (
+            {studentMatricule ? (
               <p className="text-[11px] text-neutral-500 font-semibold mt-0.5">
                 {t("centre", "bulletinMatricule")} : {studentMatricule}
               </p>
-            )}
+            ) : isUniversity ? (
+              <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                <p className="text-[11px] text-amber-700 font-semibold">
+                  {t("centre", "matriculeMissingAssign")}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void assignMatricule()}
+                  disabled={assigningMatricule || !studentId}
+                  className="h-7 px-2.5 rounded-md text-[10px] font-bold text-white disabled:opacity-50"
+                  style={{ backgroundColor: ORANGE }}
+                >
+                  {assigningMatricule ? <Loader2 size={12} className="animate-spin inline" /> : null}
+                  {t("centre", "matriculeAssignBtn")}
+                </button>
+              </div>
+            ) : null}
             <p className="text-xs text-neutral-500 font-medium mt-1">
               {enrollmentLabel}
               {niveauAnnee != null ? ` — ${t("centre", "bulletinLevel")} ${niveauAnnee}` : ""}
@@ -531,12 +595,18 @@ export default function BulletinDynamique({
                 <tr key={r.id} className={idx % 2 === 0 ? "bg-white" : "bg-neutral-50/80"}>
                   <td className="p-2.5 border border-neutral-200 font-bold align-top" style={{ color: BLUE }}>
                     {r.matiereName}
+                    {r.hasProvisional && (
+                      <span className="ml-1.5 inline-flex align-middle text-[9px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                        {t("centre", "notesProvisionalBadge")}
+                      </span>
+                    )}
                     <span className="block text-[10px] font-semibold text-neutral-400 normal-case mt-0.5">
                       {r.coeffLabel}
                     </span>
                     {r.credits != null && (
                       <span className={`block text-[10px] font-bold normal-case mt-0.5 ${r.lmdValidated ? "text-emerald-600" : "text-neutral-400"}`}>
                         {r.credits} cr. — {r.lmdValidated ? t("centre", "lmdValidatedBadge") : t("centre", "lmdNotValidatedBadge")}
+                        {r.hasProvisional ? ` · ${t("centre", "notesProvisionalBadge")}` : ""}
                       </span>
                     )}
                   </td>

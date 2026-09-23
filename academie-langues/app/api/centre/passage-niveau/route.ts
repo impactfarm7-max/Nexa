@@ -229,10 +229,25 @@ export async function POST(req: NextRequest) {
       .eq("filiere_id", source.filiere_id)
       .eq("niveau_id", source.niveau_id);
 
-    const { data: gradeRows } = await supabaseAdmin
+    const gradeSelect = await supabaseAdmin
       .from("grades")
-      .select("filiere_matiere_id, score, max_score, title")
+      .select("filiere_matiere_id, score, max_score, title, status")
       .eq("enrollment_id", enrollmentId);
+    let gradeRows = gradeSelect.data;
+    if (gradeSelect.error && (["42703", "PGRST204"].includes(gradeSelect.error.code || "") || /status/i.test(gradeSelect.error.message || ""))) {
+      const fb = await supabaseAdmin
+        .from("grades")
+        .select("filiere_matiere_id, score, max_score, title")
+        .eq("enrollment_id", enrollmentId);
+      gradeRows = (fb.data || []).map((g) => ({ ...g, status: "validated" }));
+    } else if (gradeSelect.error) {
+      throw gradeSelect.error;
+    }
+
+    const { isOfficialGrade } = await import("@/app/utils/gradeStatus");
+    const officialGrades = (gradeRows || []).filter((g) =>
+      isOfficialGrade((g as { status?: string | null }).status),
+    );
 
     const moyenne = computeMoyenneGenerale(
       (fmRows || []).map((m) => ({
@@ -241,7 +256,7 @@ export async function POST(req: NextRequest) {
         max_score: Number(m.max_score) > 0 ? Number(m.max_score) : 20,
         grade_weights: parseGradeWeights((m as { grade_weights?: unknown }).grade_weights),
       })),
-      (gradeRows || []).map((g) => ({
+      officialGrades.map((g) => ({
         filiere_matiere_id: g.filiere_matiere_id,
         score: Number(g.score) || 0,
         max_score: g.max_score,
@@ -543,10 +558,23 @@ export async function GET(req: NextRequest) {
     .eq("filiere_id", source.filiere_id)
     .eq("niveau_id", source.niveau_id);
 
-  const { data: gradeRows } = await supabaseAdmin
+  const gradeSelect = await supabaseAdmin
     .from("grades")
-    .select("filiere_matiere_id, score, max_score, title")
+    .select("filiere_matiere_id, score, max_score, title, status")
     .eq("enrollment_id", enrollmentId);
+  let gradeRows = gradeSelect.data;
+  if (gradeSelect.error && (["42703", "PGRST204"].includes(gradeSelect.error.code || "") || /status/i.test(gradeSelect.error.message || ""))) {
+    const fb = await supabaseAdmin
+      .from("grades")
+      .select("filiere_matiere_id, score, max_score, title")
+      .eq("enrollment_id", enrollmentId);
+    gradeRows = (fb.data || []).map((g) => ({ ...g, status: "validated" }));
+  }
+
+  const { isOfficialGrade } = await import("@/app/utils/gradeStatus");
+  const officialGrades = (gradeRows || []).filter((g) =>
+    isOfficialGrade((g as { status?: string | null }).status),
+  );
 
   const moyenne = computeMoyenneGenerale(
     (fmRows || []).map((m) => ({
@@ -555,7 +583,7 @@ export async function GET(req: NextRequest) {
       max_score: Number(m.max_score) > 0 ? Number(m.max_score) : 20,
       grade_weights: parseGradeWeights((m as { grade_weights?: unknown }).grade_weights),
     })),
-    (gradeRows || []).map((g) => ({
+    officialGrades.map((g) => ({
       filiere_matiere_id: g.filiere_matiere_id,
       score: Number(g.score) || 0,
       max_score: g.max_score,

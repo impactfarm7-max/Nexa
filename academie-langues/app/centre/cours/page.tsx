@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { BookOpen, Calendar, ClipboardCheck, FileText, ArrowRight, Video } from "lucide-react";
+import { BookOpen, Calendar, ClipboardCheck, FileText, ArrowRight, Video, Gauge } from "lucide-react";
 import {
   BLUE,
   CenterPageLayout,
@@ -57,6 +57,14 @@ export default function CentreHubDashboard() {
   ];
   const adminModules: ModuleCardProps[] = [
     { title: t("centre", "hubSchedule"), description: t("centre", "hubScheduleDescription"), href: "/centre/cours/planning", icon: <Calendar /> },
+    ...(isUniversite
+      ? [{
+          title: t("centre", "chargeTitle"),
+          description: t("centre", "chargeIntro"),
+          href: "/centre/cours/charge",
+          icon: <Gauge />,
+        }]
+      : []),
   ];
   return (
     <CenterPageLayout header={<CenterPageHeader title={t("centre", "hubTitle")} />}>

@@ -362,6 +362,7 @@ export default function CenterStudentProfil() {
         locale: locale === "en" ? "en" : "fr",
         studentName: lmdDocs.studentName,
         studentMatricule: lmdDocs.matricule,
+        requireMatricule: true,
         programName: lmdDocs.programName,
         scopeLabel: lmdScopeLabel(),
         acquiredCredits,
@@ -371,6 +372,8 @@ export default function CenterStudentProfil() {
         signatures: lmdDocs.releveSignatures,
         stampUrl: lmdDocs.stampUrl,
       });
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : (locale === "en" ? "Unable to print." : "Impression impossible."));
     } finally {
       setDownloadingDoc(null);
     }
@@ -390,6 +393,7 @@ export default function CenterStudentProfil() {
         locale: locale === "en" ? "en" : "fr",
         studentName: lmdDocs.studentName,
         studentMatricule: lmdDocs.matricule,
+        requireMatricule: true,
         programName: lmdDocs.programName,
         niveauLabel: annee != null ? `${locale === "en" ? "Level" : "Niveau"} ${annee}` : null,
         semestreLabel: sem?.ordre != null ? `${locale === "en" ? "Semester" : "Semestre"} ${sem.ordre}` : null,
@@ -397,6 +401,8 @@ export default function CenterStudentProfil() {
         signatures: lmdDocs.attestationSignatures,
         stampUrl: lmdDocs.stampUrl,
       });
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : (locale === "en" ? "Unable to print." : "Impression impossible."));
     } finally {
       setDownloadingDoc(null);
     }
