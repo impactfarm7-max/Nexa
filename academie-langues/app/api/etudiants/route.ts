@@ -43,6 +43,7 @@ import {
 } from "@/app/utils/student-matricule.server";
 import {
   isGroupeValidForPlacement,
+  listSiblingActiveForImportClose,
   pickEnrollmentForImportUpsert,
 } from "@/app/utils/studentsImportUpsert";
 
@@ -707,6 +708,15 @@ export async function POST(req: NextRequest) {
       let createdEnrollment = false;
 
       if (!enrollmentId) {
+        // Nouvelle année / nouvelle fiche : clôturer les autres actives/drafts même filière
+        const siblingsToClose = listSiblingActiveForImportClose(inCenter, filiere_id);
+        for (const sib of siblingsToClose) {
+          await supabaseAdmin
+            .from("enrollments")
+            .update({ status: "completed" })
+            .eq("id", sib.id);
+        }
+
         const { data: newEnrId, error: enrollErr } = await supabaseAdmin.rpc("enroll_student", {
           p_student_id: studentId,
           p_filiere_id: filiere_id,

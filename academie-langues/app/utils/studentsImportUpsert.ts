@@ -77,6 +77,19 @@ export function pickEnrollmentForImportUpsert(
   return { target, refuseReadonly: false };
 }
 
+/** Actives/drafts même filière à clôturer avant création d'une nouvelle fiche (ex. nouvelle année). */
+export function listSiblingActiveForImportClose(
+  enrollments: ImportUpsertEnrollment[],
+  filiereId: string,
+): ImportUpsertEnrollment[] {
+  return enrollments.filter(
+    (e) =>
+      e.filiere_id === filiereId
+      && (e.status === "active" || e.status === "draft")
+      && !isAcademicStatusReadonly(e.academic_status),
+  );
+}
+
 /** Promo valide : même filière, et niveau cohérent si la promo a un niveau. */
 export function isGroupeValidForPlacement(opts: {
   groupeFiliereId: string | null | undefined;

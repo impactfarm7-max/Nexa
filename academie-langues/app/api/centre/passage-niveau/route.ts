@@ -245,6 +245,15 @@ export async function POST(req: NextRequest) {
         "ALREADY_DECIDED",
       );
     }
+    if (source.status !== "active" && source.status !== "draft") {
+      return jsonErr(
+        locale,
+        409,
+        "Seule une inscription active (ou brouillon) peut recevoir une décision de passage.",
+        "Only an active (or draft) enrollment can receive a progression decision.",
+        "ENROLLMENT_NOT_ACTIVE",
+      );
+    }
     if (!source.niveau_id || !niveau) {
       return jsonErr(locale, 400, "Niveau manquant sur cette inscription.", "Level missing on this enrollment.", "MISSING_LEVEL");
     }
@@ -319,9 +328,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Clôturer la source
+    // Clôturer la source (ajourne : reste active pour permettre le rattrapage)
     const closePayload: Record<string, unknown> = {
-      status: "completed",
+      status: decision === "ajourne" ? "active" : "completed",
       passage_decision: decision,
       passage_decided_at: new Date().toISOString(),
       passage_decided_by: ctx!.user.id,
@@ -654,13 +663,16 @@ async function juryListForGroupe(
     }
 
     let provisionalCount = 0;
+    let provisionalOk = true;
     try {
       provisionalCount = await countProvisionalGrades(enr.id);
     } catch {
-      provisionalCount = 0;
+      provisionalOk = false;
+      provisionalCount = -1;
     }
 
     const academicReadonly = isAcademicStatusReadonly(enr.academic_status);
+    const statusOk = enr.status === "active" || enr.status === "draft";
     rows.push({
       enrollment_id: enr.id,
       student_name: `${profile?.prenom || ""} ${profile?.nom || ""}`.trim(),
@@ -677,12 +689,12 @@ async function juryListForGroupe(
       moyenne,
       suggestion,
       lmd,
-      provisional_grades_count: provisionalCount,
+      provisional_grades_count: Math.max(0, provisionalCount),
       can_decide:
         !enr.passage_decision
-        && enr.status !== "cancelled"
-        && enr.status !== "completed"
+        && statusOk
         && !academicReadonly
+        && provisionalOk
         && provisionalCount === 0,
     });
   }
@@ -894,7 +906,7 @@ export async function GET(req: NextRequest) {
     provisional_grades_count: provisionalGradesCount,
     can_decide:
       !source.passage_decision
-      && source.status !== "cancelled"
+      && (source.status === "active" || source.status === "draft")
       && !isAcademicStatusReadonly(source.academic_status)
       && provisionalGradesCount === 0,
     can_reopen_ajourne: source.passage_decision === "ajourne" && !isAcademicStatusReadonly(source.academic_status),

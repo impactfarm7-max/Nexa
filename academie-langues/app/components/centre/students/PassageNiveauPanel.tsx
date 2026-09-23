@@ -294,8 +294,8 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
             {preview.passage_decision === "ajourne" && preview.lmd && (preview.lmd.debtCount > 0 || preview.lmd.level.failedCount > 0) && (
               <p className="text-sm font-medium text-amber-900">
                 {locale === "en"
-                  ? "Next step: record retake (Rattrapage) grades on failed UE in the LMD section below, then cancel deferral if needed."
-                  : "Suite : saisissez les notes de rattrapage sur les UE en échec dans la section LMD ci-dessous, puis annulez l'ajournement si besoin."}
+                  ? "Next step: enter retake (Rattrapage) grades on failed UE in the LMD section below, then cancel deferral when ready."
+                  : "Suite : saisissez les notes de rattrapage sur les UE en échec (section LMD ci-dessous), puis annulez l'ajournement quand c'est prêt."}
               </p>
             )}
           </div>

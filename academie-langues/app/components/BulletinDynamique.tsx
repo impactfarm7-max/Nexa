@@ -329,13 +329,30 @@ export default function BulletinDynamique({
     return matieres.map((m) => {
       const grades = gradesForMatiereInFilter(m.filiere_matiere_id);
       const officialGrades = grades.filter((g) => isOfficialGrade(g.status));
-      const principal = grades.filter((g) => isPrincipalGrade(g.title));
-      const supl = grades.filter((g) => !isPrincipalGrade(g.title));
+      const principal = officialGrades.filter((g) => isPrincipalGrade(g.title));
+      const supl = officialGrades.filter((g) => !isPrincipalGrade(g.title));
       const hasProvisional = grades.some((g) => !isOfficialGrade(g.status));
       const lmdStatus = m.credits != null
         ? evaluateLmdUe(officialGrades, m.max_score, m.grade_weights, resolveLmdValidationThreshold(lmdThresholdPct))
         : null;
-      const finale = lmdStatus ? lmdStatus.finalScore : matiereOverall(m);
+      const finale = lmdStatus
+        ? lmdStatus.finalScore
+        : (() => {
+            if (leafPeriodsForAvg.length > 0) {
+              const byPeriod = weightedMean(
+                leafPeriodsForAvg.map((p) => ({
+                  value: (() => {
+                    const periodOfficial = officialGrades.filter((g) => g.period_id === p.id);
+                    if (!periodOfficial.length) return null;
+                    return averageGradesOnScale(periodOfficial, m.max_score, m.grade_weights);
+                  })(),
+                  weight: p.coefficient,
+                })),
+              );
+              if (byPeriod !== null) return byPeriod;
+            }
+            return averageGradesOnScale(officialGrades, m.max_score, m.grade_weights);
+          })();
       const finale20 =
         finale === null ? null : normalizeScore(finale, m.max_score, 20);
 

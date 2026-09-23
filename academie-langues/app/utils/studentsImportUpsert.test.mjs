@@ -15,6 +15,7 @@ function moduleUrl(name) {
 const {
   pickEnrollmentForImportUpsert,
   isGroupeValidForPlacement,
+  listSiblingActiveForImportClose,
 } = await import(moduleUrl("studentsImportUpsert"));
 
 test("pickEnrollment préfère active même filière", () => {
@@ -75,6 +76,20 @@ test("pickEnrollment crée nouvelle fiche si année différente", () => {
   );
   assert.equal(target, null);
   assert.equal(refuseReadonly, false);
+});
+
+test("listSiblingActiveForImportClose liste les actives même filière à clôturer", () => {
+  const siblings = listSiblingActiveForImportClose(
+    [
+      { id: "a", status: "active", filiere_id: "f1", academic_status: "inscrit" },
+      { id: "b", status: "draft", filiere_id: "f1", academic_status: "inscrit" },
+      { id: "c", status: "completed", filiere_id: "f1", academic_status: "inscrit" },
+      { id: "d", status: "active", filiere_id: "f2", academic_status: "inscrit" },
+      { id: "e", status: "active", filiere_id: "f1", academic_status: "diplome" },
+    ],
+    "f1",
+  );
+  assert.deepEqual(siblings.map((s) => s.id).sort(), ["a", "b"]);
 });
 
 test("pickEnrollment matche année scolaire", () => {
