@@ -148,19 +148,30 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true, updated: 0, status: action === "validate_session" ? "validated" : "provisional" });
       }
 
-      const { data: enrStatusRows } = await supabaseAdmin
+      const { data: enrStatusRows, error: enrStatusErr } = await supabaseAdmin
         .from("enrollments")
         .select("id, academic_status")
         .in("id", enrollmentIds);
-      const writableIds = (enrStatusRows || [])
-        .filter((e) => !isAcademicStatusReadonly(e.academic_status))
-        .map((e) => e.id);
-      // Fallback if column missing: treat all as writable
-      const sessionEnrollmentIds =
-        enrStatusRows && enrStatusRows.length
-          ? writableIds
-          : enrollmentIds;
+
+      let sessionEnrollmentIds = enrollmentIds;
+      if (enrStatusErr && /academic_status/i.test(enrStatusErr.message || "")) {
+        // Colonne absente → tout writable
+        sessionEnrollmentIds = enrollmentIds;
+      } else if (enrStatusErr) {
+        return fail(enrStatusErr.message, 500);
+      } else {
+        sessionEnrollmentIds = (enrStatusRows || [])
+          .filter((e) => !isAcademicStatusReadonly(e.academic_status))
+          .map((e) => e.id);
+      }
       if (!sessionEnrollmentIds.length) {
+        // Des inscriptions existent mais toutes en lecture seule
+        if (enrollmentIds.length > 0) {
+          return fail(
+            "Tous les apprenants de cette session sont en lecture seule (suspendu / diplômé / transféré).",
+            403,
+          );
+        }
         return NextResponse.json({ ok: true, updated: 0, status: action === "validate_session" ? "validated" : "provisional" });
       }
 

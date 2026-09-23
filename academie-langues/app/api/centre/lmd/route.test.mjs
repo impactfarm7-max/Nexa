@@ -24,7 +24,7 @@ const imports = {
       },
       rpc: async (name, args) => { f().calls.push({ rpc: name, args }); return f().rpcResult || { data: { revision: 1 }, error: null }; }
     };`),
-  "@/app/utils/lmd-progress.server": url('export const loadLmdProgress = async () => globalThis.__lmdApiTest.progress;'),
+  "@/app/utils/lmd-progress.server": url('export const loadLmdProgress = async () => globalThis.__lmdApiTest.progress; export const loadOptionalUeInscriptions = async () => ({ optionalUes: [], selectedUeIds: [] });'),
   "@/app/utils/lmd-credits": url('export const resolveLmdValidationThreshold = value => value ?? 50;'),
   "@/app/utils/lmd-academic": url(compile(new URL('../../../utils/lmd-academic.ts', import.meta.url))),
 };

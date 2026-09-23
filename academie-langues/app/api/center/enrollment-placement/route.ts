@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getCenterStaffContext, supabaseAdmin } from "@/app/utils/center-auth-server";
 import { finalizeStudentClassroom } from "@/app/utils/studentClassroom.server";
 import { normalizeAcademicYear } from "@/app/utils/cursus-passage";
+import {
+  isGroupeValidForPlacement,
+} from "@/app/utils/studentsImportUpsert";
 import { isUniversityCenter } from "@/app/utils/student-matricule";
 import {
   isAcademicStatus,
@@ -55,11 +58,25 @@ export async function POST(req: Request) {
     );
   }
 
-  const { data: enrollment, error: enrErr } = await supabaseAdmin
+  const withStatus = await supabaseAdmin
     .from("enrollments")
     .select("id, student_id, filiere_id, niveau_id, groupe_id, semestre_id, academic_year, academic_status, status, filieres(center_id, type)")
     .eq("id", enrollmentId)
     .maybeSingle();
+
+  let enrollment = withStatus.data;
+  let enrErr = withStatus.error;
+  if (enrErr && /academic_status/i.test(enrErr.message || "")) {
+    const fb = await supabaseAdmin
+      .from("enrollments")
+      .select("id, student_id, filiere_id, niveau_id, groupe_id, semestre_id, academic_year, status, filieres(center_id, type)")
+      .eq("id", enrollmentId)
+      .maybeSingle();
+    enrollment = fb.data
+      ? ({ ...fb.data, academic_status: null } as typeof enrollment)
+      : null;
+    enrErr = fb.error;
+  }
 
   if (enrErr || !enrollment) {
     return NextResponse.json({ error: "Inscription introuvable." }, { status: 404 });
@@ -68,6 +85,25 @@ export async function POST(req: Request) {
   const enrFiliere = enrollment.filieres as { center_id?: string; type?: string } | null;
   if (enrFiliere?.center_id && enrFiliere.center_id !== ctx!.centerId) {
     return NextResponse.json({ error: "Inscription hors de votre centre." }, { status: 403 });
+  }
+
+  const existingAcademicStatus = normalizeAcademicStatus(enrollment.academic_status);
+  const unlockRequested =
+    body.academic_status !== undefined
+    && isAcademicStatus(body.academic_status)
+    && !isAcademicStatusReadonly(body.academic_status);
+
+  if (
+    isAcademicStatusReadonly(existingAcademicStatus)
+    && !unlockRequested
+  ) {
+    return NextResponse.json(
+      {
+        error: "Inscription en lecture seule (suspendu / diplômé / transféré).",
+        code: "ACADEMIC_READONLY",
+      },
+      { status: 403 },
+    );
   }
 
   const { data: targetFiliere, error: filErr } = await supabaseAdmin
@@ -117,9 +153,14 @@ export async function POST(req: Request) {
     if (!grp) {
       return NextResponse.json({ error: "Classe introuvable." }, { status: 400 });
     }
-    const okByFiliere = grp.filiere_id === filiereId;
-    const okByNiveau = Boolean(niveauId && grp.niveau_id === niveauId);
-    if (!okByFiliere && !okByNiveau) {
+    if (
+      !isGroupeValidForPlacement({
+        groupeFiliereId: grp.filiere_id,
+        groupeNiveauId: grp.niveau_id,
+        filiereId,
+        niveauId,
+      })
+    ) {
       return NextResponse.json({ error: "Classe hors de ce programme / niveau." }, { status: 400 });
     }
     groupeRow = grp;
@@ -181,6 +222,9 @@ export async function POST(req: Request) {
     if (body.semestre_id === undefined) {
       resolvedSemestreId = (enrollment.semestre_id as string | null) || null;
     }
+  } else if (body.semestre_id === undefined) {
+    // Univ : préserver le semestre stocké si non envoyé (évite wipe quand niveau sans semestres)
+    resolvedSemestreId = (enrollment.semestre_id as string | null) || null;
   }
 
   const existingYear = normalizeAcademicYear(enrollment.academic_year) || (enrollment.academic_year as string | null);
@@ -229,8 +273,11 @@ export async function POST(req: Request) {
   if (isUnivCursus || academicYear) {
     updatePayload.academic_year = finalAcademicYear ?? null;
   }
-  if (isUnivCursus || body.academic_status !== undefined) {
+  if (isUnivCursus) {
     updatePayload.academic_status = resolvedAcademicStatus;
+  } else if (body.academic_status !== undefined) {
+    // Hors univ : forcer null (ne pas stocker de statut académique)
+    updatePayload.academic_status = null;
   }
 
   const { error: updErr } = await supabaseAdmin

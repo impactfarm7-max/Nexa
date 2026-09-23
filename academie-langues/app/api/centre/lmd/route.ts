@@ -162,10 +162,14 @@ export async function POST(req: Request) {
       throw error;
     }
     if (diploma) {
-      await db
+      const { error: statusErr } = await db
         .from("enrollments")
         .update({ academic_status: "diplome" })
         .eq("id", source.id);
+      if (statusErr && !/academic_status/i.test(statusErr.message || "")) {
+        console.error("[lmd] academic_status diplome:", statusErr.message);
+        return fail("Diplôme enregistré mais statut académique non mis à jour.", 500);
+      }
     }
     return NextResponse.json({ success: true, record });
   } catch (e) {

@@ -55,11 +55,15 @@ export function downloadGradesImportTemplate(opts: {
   const sheet = XLSX.utils.aoa_to_sheet([
     headers,
     ...rows,
-    [],
-    [`Barème max: ${opts.bareme}`, "Notes importées en provisoire — valider la session ensuite."],
   ]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, sheet, "Notes");
+  const help = XLSX.utils.aoa_to_sheet([
+    ["Aide"],
+    [`Bareme max: ${opts.bareme}`],
+    ["Notes importees en provisoire — valider la session ensuite."],
+  ]);
+  XLSX.utils.book_append_sheet(wb, help, "Aide");
   XLSX.writeFile(wb, opts.fileName || "modele-import-notes.xlsx");
 }
 
@@ -109,7 +113,8 @@ export async function parseGradesImportFile(
     const nom = nomKey ? String(line[nomKey] ?? "").trim() : "";
     const prenom = prenomKey ? String(line[prenomKey] ?? "").trim() : "";
     const noteRaw = String(line[noteKey] ?? "").trim().replace(",", ".");
-    if (!matricule && !nom && !prenom && !noteRaw) return;
+    // Ignorer lignes d'aide / pied de page sans identité
+    if (!matricule && !nom && !prenom) return;
 
     let note: number | null = null;
     let error: string | undefined;

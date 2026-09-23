@@ -41,6 +41,10 @@ import {
   syncImportedMatriculeCounter,
   isUniversityCenter,
 } from "@/app/utils/student-matricule.server";
+import {
+  isGroupeValidForPlacement,
+  pickEnrollmentForImportUpsert,
+} from "@/app/utils/studentsImportUpsert";
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -344,6 +348,48 @@ export async function POST(req: NextRequest) {
     let centerQuotaOverrides: Record<string, unknown> | null = null;
     let centerOfferKey: NexaOfferKey = "decouverte";
     let centerStudentIdPrefix: string = resolveStudentIdPrefix(null);
+    const upsertByMatricule = body.upsert_by_matricule === true;
+    const importedMatriculeEarly =
+      typeof body.matricule === "string" ? body.matricule.trim() : "";
+    let existingStudentForUpsert: {
+      id: string;
+      email: string | null;
+      phone: string | null;
+      prenom: string | null;
+      nom: string | null;
+    } | null = null;
+
+    if (callerCenterId && upsertByMatricule && importedMatriculeEarly) {
+      const { data: exactMat } = await supabaseAdmin
+        .from("profiles")
+        .select("id, email, phone, prenom, nom, role, center_id, matricule")
+        .eq("center_id", callerCenterId)
+        .eq("matricule", importedMatriculeEarly)
+        .eq("role", "student")
+        .maybeSingle();
+      let existingByMat = exactMat;
+      if (!existingByMat) {
+        const { data: looseMats } = await supabaseAdmin
+          .from("profiles")
+          .select("id, email, phone, prenom, nom, role, center_id, matricule")
+          .eq("center_id", callerCenterId)
+          .eq("role", "student")
+          .ilike("matricule", importedMatriculeEarly);
+        existingByMat = (looseMats || []).find(
+          (p) => String(p.matricule || "").toLowerCase() === importedMatriculeEarly.toLowerCase(),
+        ) || null;
+      }
+      if (existingByMat?.id) {
+        existingStudentForUpsert = {
+          id: existingByMat.id,
+          email: existingByMat.email ?? null,
+          phone: existingByMat.phone ?? null,
+          prenom: existingByMat.prenom ?? null,
+          nom: existingByMat.nom ?? null,
+        };
+      }
+    }
+
     if (callerCenterId) {
       const { data: centerRow } = await supabaseAdmin
         .from("centers")
@@ -371,18 +417,21 @@ export async function POST(req: NextRequest) {
         centerRow?.quota_overrides && typeof centerRow.quota_overrides === "object"
           ? (centerRow.quota_overrides as Record<string, unknown>)
           : null;
-      const seatCheck = await assertCenterHasStudentSeat(callerCenterId, supabaseAdmin);
-      if (!seatCheck.ok) {
-        return NextResponse.json(
-          {
-            error: `Quota utilisateurs atteint pour l'offre ${seatCheck.offerName} (${seatCheck.occupied}/${seatCheck.max}). Contactez votre responsable pour passer à une offre supérieure.`,
-            code: "SEAT_LIMIT_REACHED",
-            occupied: seatCheck.occupied,
-            max: seatCheck.max,
-            offerName: seatCheck.offerName,
-          },
-          { status: 403 },
-        );
+      // Mise à jour par matricule : pas de consommation de siège
+      if (!existingStudentForUpsert) {
+        const seatCheck = await assertCenterHasStudentSeat(callerCenterId, supabaseAdmin);
+        if (!seatCheck.ok) {
+          return NextResponse.json(
+            {
+              error: `Quota utilisateurs atteint pour l'offre ${seatCheck.offerName} (${seatCheck.occupied}/${seatCheck.max}). Contactez votre responsable pour passer à une offre supérieure.`,
+              code: "SEAT_LIMIT_REACHED",
+              occupied: seatCheck.occupied,
+              max: seatCheck.max,
+              offerName: seatCheck.offerName,
+            },
+            { status: 403 },
+          );
+        }
       }
     }
 
@@ -419,9 +468,14 @@ export async function POST(req: NextRequest) {
       if (!grpRow) {
         return NextResponse.json({ error: "Promotion introuvable.", code: "GROUPE_INVALID" }, { status: 400 });
       }
-      const okByFiliere = grpRow.filiere_id === filiere_id;
-      const okByNiveau = grpRow.niveau_id === niveau_id;
-      if (!okByFiliere && !okByNiveau) {
+      if (
+        !isGroupeValidForPlacement({
+          groupeFiliereId: grpRow.filiere_id,
+          groupeNiveauId: grpRow.niveau_id,
+          filiereId: filiere_id,
+          niveauId: niveau_id,
+        })
+      ) {
         return NextResponse.json(
           { error: "Promotion hors de ce programme / niveau.", code: "GROUPE_INVALID" },
           { status: 400 },
@@ -473,11 +527,12 @@ export async function POST(req: NextRequest) {
     }
 
     // Centres libres (generic) : genre + date de naissance obligatoires — sans toucher TCF / courte
+    // En mise à jour par matricule, ces champs restent optionnels.
     const genreRaw = typeof body.genre === "string" ? body.genre.trim() : "";
     const birthDateRaw = typeof body.birth_date === "string" ? body.birth_date.trim() : "";
     const genreOk = genreRaw === "Homme" || genreRaw === "Femme" || genreRaw === "Autre";
     const birthOk = /^\d{4}-\d{2}-\d{2}$/.test(birthDateRaw);
-    if (isPluri) {
+    if (isPluri && !existingStudentForUpsert) {
       if (!genreOk) {
         return NextResponse.json({ error: "Genre requis (Homme, Femme ou Autre)." }, { status: 400 });
       }
@@ -553,6 +608,205 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ---- 4c. Upsert import : matricule connu → mise à jour (pas de nouveau compte) ----
+    if (existingStudentForUpsert) {
+      const existingEmail = String(existingStudentForUpsert.email || "").trim().toLowerCase();
+      if (existingEmail && existingEmail !== normalizedEmail) {
+        return NextResponse.json(
+          {
+            error: `Le matricule "${importedMatriculeEarly}" est déjà lié à ${existingEmail}.`,
+            code: "MATRICULE_EMAIL_MISMATCH",
+          },
+          { status: 409 },
+        );
+      }
+
+      const studentId = existingStudentForUpsert.id;
+      const profilePatch: Record<string, unknown> = {
+        prenom,
+        nom,
+      };
+      if (phone !== undefined) profilePatch.phone = phone || null;
+      if (genreOk) profilePatch.genre = genreRaw;
+      if (birthOk) profilePatch.birth_date = birthDateRaw;
+
+      const { error: profUpdErr } = await supabaseAdmin
+        .from("profiles")
+        .update(profilePatch)
+        .eq("id", studentId)
+        .eq("center_id", callerCenterId!);
+      if (profUpdErr) {
+        return NextResponse.json({ error: "Échec mise à jour profil : " + profUpdErr.message }, { status: 500 });
+      }
+
+      type EnrRow = {
+        id: string;
+        status: string | null;
+        filiere_id: string | null;
+        groupe_id: string | null;
+        passage_decision?: string | null;
+        academic_status?: string | null;
+        academic_year?: string | null;
+        filieres?: { center_id?: string } | { center_id?: string }[] | null;
+      };
+
+      let enrollments: EnrRow[] | null = null;
+      {
+        const withStatus = await supabaseAdmin
+          .from("enrollments")
+          .select("id, status, filiere_id, groupe_id, passage_decision, academic_status, academic_year, filieres(center_id)")
+          .eq("student_id", studentId)
+          .order("enrolled_at", { ascending: false });
+        if (withStatus.error && /academic_status/i.test(withStatus.error.message || "")) {
+          const fb = await supabaseAdmin
+            .from("enrollments")
+            .select("id, status, filiere_id, groupe_id, passage_decision, academic_year, filieres(center_id)")
+            .eq("student_id", studentId)
+            .order("enrolled_at", { ascending: false });
+          if (fb.error) {
+            return NextResponse.json(
+              { error: "Impossible de charger les inscriptions : " + fb.error.message },
+              { status: 500 },
+            );
+          }
+          enrollments = (fb.data || []).map((e) => ({ ...e, academic_status: null }));
+        } else if (withStatus.error) {
+          return NextResponse.json(
+            { error: "Impossible de charger les inscriptions : " + withStatus.error.message },
+            { status: 500 },
+          );
+        } else {
+          enrollments = (withStatus.data || []) as EnrRow[];
+        }
+      }
+
+      const inCenter = (enrollments || []).filter((e) => {
+        const fil = e.filieres;
+        const cid = Array.isArray(fil) ? fil[0]?.center_id : fil?.center_id;
+        return cid === callerCenterId;
+      });
+
+      const { target, refuseReadonly } = pickEnrollmentForImportUpsert(
+        inCenter,
+        filiere_id,
+        academicYear,
+      );
+
+      if (refuseReadonly) {
+        return NextResponse.json(
+          {
+            error: "Inscription en lecture seule (suspendu / diplômé / transféré).",
+            code: "ACADEMIC_READONLY",
+          },
+          { status: 403 },
+        );
+      }
+
+      let enrollmentId: string | null = target?.id ?? null;
+      const oldGroupeId = target?.groupe_id ?? null;
+      let createdEnrollment = false;
+
+      if (!enrollmentId) {
+        const { data: newEnrId, error: enrollErr } = await supabaseAdmin.rpc("enroll_student", {
+          p_student_id: studentId,
+          p_filiere_id: filiere_id,
+          p_niveau_id: resolvedNiveauId,
+          p_groupe_id: resolvedGroupeId,
+          p_tuition_fee: resolvedTuition,
+          p_creator: auth.userId,
+          p_campus_id: resolvedCampusId,
+        });
+        if (enrollErr || !newEnrId) {
+          return NextResponse.json(
+            { error: "Échec de l'inscription : " + (enrollErr?.message || "inconnu") },
+            { status: 500 },
+          );
+        }
+        enrollmentId = newEnrId as string;
+        createdEnrollment = true;
+      }
+
+      const enrollmentPatch: Record<string, unknown> = {
+        filiere_id,
+        niveau_id: resolvedNiveauId,
+        groupe_id: resolvedGroupeId,
+        campus_id: resolvedCampusId,
+        tuition_fee: resolvedTuition,
+        status: "active",
+      };
+      // Ne jamais écraser un semestre existant avec null lors d'un upsert partiel
+      if (resolvedSemestreId) {
+        enrollmentPatch.semestre_id = resolvedSemestreId;
+      } else if (body.semestre_id !== undefined && !isCursusFiliere) {
+        enrollmentPatch.semestre_id = null;
+      }
+      if (isShortFiliere) {
+        if (shortCatalogTotal != null) enrollmentPatch.catalog_tuition_fee = shortCatalogTotal;
+        if (shortDurationValue != null) enrollmentPatch.duration_value = shortDurationValue;
+        if (shortDurationUnit) enrollmentPatch.duration_unit = shortDurationUnit;
+        if (shortDurationMonths != null) enrollmentPatch.duration_months = shortDurationMonths;
+      }
+      if (isCursusFiliere && academicYear) {
+        enrollmentPatch.academic_year = academicYear;
+      }
+      if (isUniversityCenter(centerTypeRaw) && isCursusFiliere) {
+        // Nouvelle fiche ou statut absent → inscrit ; ne pas écraser redoublant
+        if (createdEnrollment || !target?.academic_status) {
+          enrollmentPatch.academic_status = "inscrit";
+        }
+      }
+
+      const { error: enrUpdErr } = await supabaseAdmin
+        .from("enrollments")
+        .update(enrollmentPatch)
+        .eq("id", enrollmentId);
+      if (enrUpdErr) {
+        if (/academic_status/i.test(enrUpdErr.message || "")) {
+          delete enrollmentPatch.academic_status;
+          const { error: retryErr } = await supabaseAdmin
+            .from("enrollments")
+            .update(enrollmentPatch)
+            .eq("id", enrollmentId);
+          if (retryErr) {
+            return NextResponse.json({ error: "Échec mise à jour inscription : " + retryErr.message }, { status: 500 });
+          }
+        } else {
+          return NextResponse.json({ error: "Échec mise à jour inscription : " + enrUpdErr.message }, { status: 500 });
+        }
+      }
+
+      if (resolvedGroupeId && callerCenterId && resolvedGroupeId !== oldGroupeId) {
+        if (oldGroupeId) {
+          const { data: oldRoom } = await supabaseAdmin
+            .from("community_rooms")
+            .select("id")
+            .eq("groupe_id", oldGroupeId)
+            .eq("type", "classroom")
+            .maybeSingle();
+          if (oldRoom?.id) {
+            await supabaseAdmin
+              .from("community_room_members")
+              .delete()
+              .eq("room_id", oldRoom.id)
+              .eq("user_id", studentId);
+          }
+        }
+        await finalizeStudentClassroom(supabaseAdmin, {
+          studentId,
+          centerId: callerCenterId,
+          groupeId: resolvedGroupeId,
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        updated: true,
+        studentId,
+        enrollmentId,
+        emailSent: false,
+      });
+    }
+
     // ---- 5. Créer le compte auth ----
     const password = generatePassword();
     const { data: newUser, error: createErr } = await supabaseAdmin.auth.admin.createUser({
@@ -607,7 +861,7 @@ export async function POST(req: NextRequest) {
       : getNexaB2bProfileQuotas(centerQuotaOverrides, 1, centerOfferKey);
 
     // ---- 5b. Résoudre le matricule ----
-    const importedMatricule = typeof body.matricule === "string" ? body.matricule.trim() : "";
+    const importedMatricule = importedMatriculeEarly;
     let matricule: string | null = null;
     if (callerCenterId) {
       if (importedMatricule) {

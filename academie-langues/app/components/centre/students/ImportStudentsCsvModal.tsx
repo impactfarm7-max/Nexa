@@ -24,13 +24,14 @@ import { ACTION_TONE } from "@/app/utils/action-tones";
 import { ActionConfirmModal } from "@/app/components/centre/ActionConfirmModal";
 import { useActionFeedback } from "@/app/components/ActionFeedback";
 import { BLUE, ORANGE, CenterSelect } from "@/app/centre/center-page-ui";
+import {
+  STUDENTS_IMPORT_MAX_ROWS,
+  downloadStudentsImportCsvTemplate,
+  downloadStudentsImportExcelTemplate,
+  parseStudentsImportFile,
+} from "@/app/utils/studentsImport";
 
-const MAX_ROWS = 150;
-const TEMPLATE_HEADERS = [
-  "prenom", "nom", "email", "telephone", "programme", "campus", "niveau",
-  "semestre", "classe", "genre", "date_naissance", "pays", "region", "duree_mois", "coupon",
-  "annee_scolaire", "tuteur_nom", "tuteur_lien", "tuteur_tel", "matricule",
-];
+const MAX_ROWS = STUDENTS_IMPORT_MAX_ROWS;
 
 type FiliereOption = {
   id: string;
@@ -68,6 +69,7 @@ type ParsedRow = {
   classe: string;
   genre: string;
   birthDate: string;
+  birthDateInvalid?: boolean;
   pays: string;
   region: string;
   dureeMois: string;
@@ -84,72 +86,12 @@ type ImportResult = {
   line: number;
   email: string;
   ok: boolean;
+  updated?: boolean;
   error?: string;
   code?: string;
   emailSent?: boolean;
   temporaryPassword?: string;
 };
-
-function normalizeHeader(raw: string) {
-  return raw
-    .replace(/^\uFEFF/, "")
-    .trim()
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[\s-]+/g, "_");
-}
-
-function parseCsvText(text: string): { headers: string[]; rows: string[][] } {
-  const cleaned = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const lines = cleaned.split("\n").filter((l) => l.trim());
-  if (lines.length === 0) return { headers: [], rows: [] };
-  const semi = lines[0].split(";").length;
-  const comma = lines[0].split(",").length;
-  const delim = semi >= comma ? ";" : ",";
-
-  const parseLine = (line: string) => {
-    const cells: string[] = [];
-    let cur = "";
-    let inQ = false;
-    for (let i = 0; i < line.length; i++) {
-      const c = line[i];
-      if (c === '"') {
-        if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
-        else inQ = !inQ;
-      } else if (c === delim && !inQ) {
-        cells.push(cur.trim());
-        cur = "";
-      } else {
-        cur += c;
-      }
-    }
-    cells.push(cur.trim());
-    return cells;
-  };
-
-  return {
-    headers: parseLine(lines[0]).map(normalizeHeader),
-    rows: lines.slice(1).map(parseLine),
-  };
-}
-
-function cell(headers: string[], row: string[], ...aliases: string[]) {
-  for (const alias of aliases) {
-    const i = headers.indexOf(alias);
-    if (i >= 0 && row[i]) return String(row[i]).trim();
-  }
-  return "";
-}
-
-function mapGenre(raw: string) {
-  const v = raw.trim().toLowerCase();
-  if (!v) return "";
-  if (["homme", "h", "m", "male", "masculin", "garcon", "boy", "man"].includes(v)) return "Homme";
-  if (["femme", "f", "female", "feminin", "fille", "girl", "woman"].includes(v)) return "Femme";
-  if (["autre", "other", "a"].includes(v)) return "Autre";
-  return raw.trim();
-}
 
 function resolveCountry(raw: string) {
   const v = raw.trim();
@@ -168,22 +110,6 @@ function unwrapCampus(raw: unknown): CampusOption | null {
   if (!c || typeof c !== "object") return null;
   const row = c as { id?: string; name?: string };
   return row.id && row.name ? { id: row.id, name: row.name } : null;
-}
-
-function downloadTemplate() {
-  const example = [
-    "Jean", "DUPONT", "jean.dupont@example.com", "690000000",
-    "", "", "1", "1", "", "Homme", "2005-03-12", "CM", "", "", "",
-    defaultAcademicYear(), "", "", "", "",
-  ];
-  const csv = [TEMPLATE_HEADERS.join(";"), example.join(";")].join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "modele-import-apprenants.csv";
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 export default function ImportStudentsCsvModal({
@@ -326,10 +252,17 @@ export default function ImportStudentsCsvModal({
     return selectedFiliere || null;
   }, [filieres, selectedFiliere]);
 
-  const rowError = useCallback((row: Omit<ParsedRow, "error">, emails: Map<string, number>) => {
+  const rowError = useCallback((row: Omit<ParsedRow, "error">, emails: Map<string, number>, matricules: Map<string, number>) => {
     if (!row.prenom || !row.nom || !row.email) return t("centre", "studentsCsvMissingIdentity");
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email)) return t("centre", "studentsCsvInvalidEmail");
     if ((emails.get(row.email) || 0) > 1) return t("centre", "studentsCsvDuplicateEmail");
+    const matKey = row.matricule.trim().toLowerCase();
+    if (matKey && (matricules.get(matKey) || 0) > 1) return t("centre", "studentsImportDuplicateMatricule");
+    if (row.birthDateInvalid) {
+      return locale === "en"
+        ? "Ambiguous or invalid birth date (use YYYY-MM-DD)."
+        : "Date de naissance ambiguë ou invalide (utilisez AAAA-MM-JJ).";
+    }
     if (!row.programme && !defaultFiliereId) return t("centre", "studentsCsvMissingProgram");
     if (row.programme && !matchFiliere(row.programme)) {
       return t("centre", "studentsCsvUnknownProgram", { name: row.programme });
@@ -371,16 +304,19 @@ export default function ImportStudentsCsvModal({
       }
     }
     return "";
-  }, [t, defaultFiliereId, defaultNiveauId, defaultGroupeId, matchFiliere, niveaux, semestres, groupes, isUniversite]);
+  }, [t, locale, defaultFiliereId, defaultNiveauId, defaultGroupeId, matchFiliere, niveaux, semestres, groupes, isUniversite]);
 
   const revalidate = useCallback((list: ParsedRow[]) => {
     const emails = new Map<string, number>();
+    const matricules = new Map<string, number>();
     for (const r of list) {
       if (r.email) emails.set(r.email, (emails.get(r.email) || 0) + 1);
+      const m = r.matricule.trim().toLowerCase();
+      if (m) matricules.set(m, (matricules.get(m) || 0) + 1);
     }
     return list.map((r) => {
       const { error: _ignored, ...rest } = r;
-      const error = rowError(rest, emails);
+      const error = rowError(rest, emails, matricules);
       return { ...rest, error: error || undefined };
     });
   }, [rowError]);
@@ -396,41 +332,21 @@ export default function ImportStudentsCsvModal({
     setParseError("");
     setResults(null);
     setFileName(file.name);
-    const text = await file.text();
-    const { headers, rows: rawRows } = parseCsvText(text);
-    if (headers.length === 0 || rawRows.length === 0) {
+    const parsed = await parseStudentsImportFile(file, { maxRows: MAX_ROWS });
+    if (parsed.error === "empty" || (!parsed.rows.length && !parsed.error)) {
       setRows([]);
       setParseError(t("centre", "studentsCsvEmpty"));
       return;
     }
-    if (rawRows.length > MAX_ROWS) {
-      setParseError(t("centre", "studentsCsvTooMany", { max: MAX_ROWS }));
+    if (parsed.error && parsed.error !== "empty") {
+      setRows([]);
+      setParseError(t("centre", "studentsImportUnreadable"));
+      return;
     }
-    const sliced = rawRows.slice(0, MAX_ROWS);
-    const parsed: ParsedRow[] = sliced.map((raw, idx) => ({
-      line: idx + 2,
-      prenom: cell(headers, raw, "prenom", "first_name", "firstname", "prenoms"),
-      nom: cell(headers, raw, "nom", "last_name", "lastname", "name"),
-      email: cell(headers, raw, "email", "e_mail", "mail").toLowerCase(),
-      phone: cell(headers, raw, "telephone", "phone", "tel", "mobile"),
-      programme: cell(headers, raw, "programme", "filiere", "program", "filiere_name"),
-      campus: cell(headers, raw, "campus"),
-      niveau: cell(headers, raw, "niveau", "level", "annee"),
-      semestre: cell(headers, raw, "semestre", "semester"),
-      classe: cell(headers, raw, "classe", "groupe", "classroom", "salle"),
-      genre: mapGenre(cell(headers, raw, "genre", "gender", "sexe")),
-      birthDate: cell(headers, raw, "date_naissance", "birth_date", "naissance", "dob"),
-      pays: cell(headers, raw, "pays", "country", "country_code"),
-      region: cell(headers, raw, "region"),
-      dureeMois: cell(headers, raw, "duree_mois", "duration_months", "mois"),
-      coupon: cell(headers, raw, "coupon", "coupon_code", "code_coupon"),
-      academicYear: cell(headers, raw, "annee_scolaire", "academic_year"),
-      guardianName: cell(headers, raw, "tuteur_nom", "guardian_name"),
-      guardianRelation: cell(headers, raw, "tuteur_lien", "guardian_relation"),
-      guardianPhone: cell(headers, raw, "tuteur_tel", "guardian_phone", "tuteur_telephone"),
-      matricule: cell(headers, raw, "matricule", "student_id", "registration_number"),
-    }));
-    setRows(revalidate(parsed));
+    if (parsed.truncated) {
+      setParseError(t("centre", "studentsCsvTooMany", { max: String(MAX_ROWS) }));
+    }
+    setRows(revalidate(parsed.rows.map((r) => ({ ...r, error: undefined }))));
   };
 
   const runImport = async () => {
@@ -589,6 +505,7 @@ export default function ImportStudentsCsvModal({
 
         if (row.coupon) body.coupon_code = row.coupon.toUpperCase();
         if (row.matricule) body.matricule = row.matricule;
+        body.upsert_by_matricule = true;
 
         const res = await fetch("/api/etudiants", {
           method: "POST",
@@ -641,6 +558,7 @@ export default function ImportStudentsCsvModal({
           line: row.line,
           email: row.email,
           ok: true,
+          updated: Boolean(data.updated),
           emailSent: data.emailSent,
           temporaryPassword: data.temporaryPassword,
         });
@@ -663,6 +581,8 @@ export default function ImportStudentsCsvModal({
     setResults(out);
     setImporting(false);
     const okCount = out.filter((r) => r.ok).length;
+    const updatedCount = out.filter((r) => r.ok && r.updated).length;
+    const createdCount = out.filter((r) => r.ok && !r.updated).length;
     const failCount = out.length - okCount;
     if (okCount === 0) {
       feedback.show({
@@ -674,13 +594,20 @@ export default function ImportStudentsCsvModal({
       feedback.show({
         status: "error",
         title: t("centre", "studentsCsvPartial"),
-        message: t("centre", "studentsCsvPartialHelp", { ok: okCount, fail: failCount }),
+        message: t("centre", "studentsImportPartialHelp", {
+          created: String(createdCount),
+          updated: String(updatedCount),
+          fail: String(failCount),
+        }),
       });
     } else {
       feedback.show({
         status: "success",
         title: t("centre", "studentsCsvDone"),
-        message: t("centre", "studentsCsvCreatedCount", { count: okCount }),
+        message: t("centre", "studentsImportDoneHelp", {
+          created: String(createdCount),
+          updated: String(updatedCount),
+        }),
       });
     }
   };
@@ -707,8 +634,8 @@ export default function ImportStudentsCsvModal({
       >
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>{t("centre", "studentsCsvTitle")}</h3>
-            <p className="text-sm text-neutral-500 mt-1 font-medium">{t("centre", "studentsCsvHelp")}</p>
+            <h3 className="text-lg font-extrabold tracking-tight" style={{ color: BLUE }}>{t("centre", "studentsImportTitle")}</h3>
+            <p className="text-sm text-neutral-500 mt-1 font-medium">{t("centre", "studentsImportHelp")}</p>
           </div>
           <button type="button" onClick={onClose} className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700" aria-label={t("centre", "bulletinClose")}>
             <X size={18} />
@@ -716,14 +643,17 @@ export default function ImportStudentsCsvModal({
         </div>
 
         <div className="flex flex-wrap gap-2 mb-4">
-          <button type="button" onClick={downloadTemplate} className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 inline-flex items-center gap-1.5 hover:bg-black/[0.03]">
-            <Download size={14} /> {t("centre", "studentsCsvTemplate")}
+          <button type="button" onClick={() => downloadStudentsImportExcelTemplate()} className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 inline-flex items-center gap-1.5 hover:bg-black/[0.03]">
+            <Download size={14} /> {t("centre", "studentsImportTemplateExcel")}
+          </button>
+          <button type="button" onClick={() => downloadStudentsImportCsvTemplate()} className="h-9 px-3 rounded-lg border border-black/[0.08] bg-white text-xs font-semibold text-neutral-700 inline-flex items-center gap-1.5 hover:bg-black/[0.03]">
+            <FileSpreadsheet size={14} /> {t("centre", "studentsCsvTemplate")}
           </button>
           <label className="h-9 px-3 rounded-lg text-xs font-semibold text-white inline-flex items-center gap-1.5 cursor-pointer" style={{ backgroundColor: BLUE }}>
             <Upload size={14} /> {t("centre", "studentsCsvChooseFile")}
             <input
               type="file"
-              accept=".csv,text/csv"
+              accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               className="hidden"
               onChange={(e) => {
                 const file = e.target.files?.[0];
@@ -888,7 +818,12 @@ export default function ImportStudentsCsvModal({
                       <td className="px-3 py-2">
                         {r.ok ? (
                           <span className={`inline-flex items-center gap-1 ${ACTION_TONE.positiveText}`}>
-                            <CheckCircle2 size={12} /> {r.emailSent ? t("centre", "createStudentAccessSent") : t("centre", "studentsCsvCreated")}
+                            <CheckCircle2 size={12} />{" "}
+                            {r.updated
+                              ? t("centre", "studentsImportUpdated")
+                              : r.emailSent
+                                ? t("centre", "createStudentAccessSent")
+                                : t("centre", "studentsImportCreated")}
                           </span>
                         ) : (
                           <span className={`inline-flex items-start gap-1 ${ACTION_TONE.negativeText}`}>
@@ -935,7 +870,7 @@ export default function ImportStudentsCsvModal({
       {confirmOpen && (
         <ActionConfirmModal
           title={t("centre", "studentsCsvTitle")}
-          message={t("centre", "studentsCsvConfirm", { count: validRows.length })}
+          message={t("centre", "studentsImportConfirm", { count: String(validRows.length) })}
           confirmLabel={t("centre", "studentsCsvImport", { count: validRows.length })}
           cancelLabel={t("centre", "identityCancel")}
           tone="positive"

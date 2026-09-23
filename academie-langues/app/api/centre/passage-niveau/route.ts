@@ -441,7 +441,7 @@ export async function POST(req: NextRequest) {
     const academicYear =
       academicYearOverride || nextAcademicYear(source.academic_year);
 
-    await supabaseAdmin
+    const { error: activateErr } = await supabaseAdmin
       .from("enrollments")
       .update({
         status: "active",
@@ -452,6 +452,28 @@ export async function POST(req: NextRequest) {
         academic_status: academicStatusAfterPassage(decision) || "inscrit",
       })
       .eq("id", newEnrollmentId);
+
+    if (activateErr) {
+      // Rollback : supprimer la nouvelle fiche et réouvrir la source
+      await supabaseAdmin.from("enrollments").delete().eq("id", newEnrollmentId);
+      await supabaseAdmin
+        .from("enrollments")
+        .update({
+          status: source.status || "active",
+          passage_decision: null,
+          passage_reason: null,
+          passage_decided_at: null,
+          passage_decided_by: null,
+        })
+        .eq("id", enrollmentId);
+      return jsonErr(
+        locale,
+        500,
+        "Échec de la finalisation de la nouvelle inscription : " + activateErr.message,
+        "Failed to finalize the new enrollment: " + activateErr.message,
+        "ENROLL_ACTIVATE_FAILED",
+      );
+    }
 
     const planSource =
       feeMode === "uniforme" ? filiere.payment_plan : targetNiveau?.payment_plan;
