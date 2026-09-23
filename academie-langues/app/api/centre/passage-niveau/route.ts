@@ -22,8 +22,24 @@ import { parseGradeWeights } from "@/app/utils/gradesCalc";
 import { loadLmdProgress } from "@/app/utils/lmd-progress.server";
 import { resolveLmdValidationThreshold } from "@/app/utils/lmd-credits";
 import { academicStatusAfterPassage, isAcademicStatusReadonly } from "@/app/utils/academic-status";
+import { normalizeGradeStatus } from "@/app/utils/gradeStatus";
 
 type PassageLocale = "fr" | "en";
+
+async function countProvisionalGrades(enrollmentId: string): Promise<number> {
+  const { data, error } = await supabaseAdmin
+    .from("grades")
+    .select("id, status")
+    .eq("enrollment_id", enrollmentId);
+  if (error) {
+    // Colonne status absente → traiter comme tout validé (compat)
+    if (["42703", "PGRST204"].includes(error.code || "") || /status/i.test(error.message || "")) {
+      return 0;
+    }
+    throw error;
+  }
+  return (data || []).filter((g) => normalizeGradeStatus(g.status) === "provisional").length;
+}
 
 function reqLocale(req: Request): PassageLocale {
   return req.headers.get("x-nexa-locale") === "en" ? "en" : "fr";
@@ -231,6 +247,17 @@ export async function POST(req: NextRequest) {
     }
     if (!source.niveau_id || !niveau) {
       return jsonErr(locale, 400, "Niveau manquant sur cette inscription.", "Level missing on this enrollment.", "MISSING_LEVEL");
+    }
+
+    const provisionalCount = await countProvisionalGrades(enrollmentId);
+    if (provisionalCount > 0) {
+      return jsonErr(
+        locale,
+        409,
+        `Impossible de décider le passage : ${provisionalCount} note(s) encore provisoire(s). Validez la session dans Examens → Notes.`,
+        `Cannot decide progression: ${provisionalCount} grade(s) still provisional. Validate the session in Exams → Grades.`,
+        "GRADES_PROVISIONAL",
+      );
     }
 
     // Moyenne informative (ne bloque pas la décision manager)
@@ -515,15 +542,182 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/** GET — aperçu moyenne / seuil / suggestion pour une inscription. */
+async function juryListForGroupe(
+  _req: NextRequest,
+  ctx: NonNullable<Awaited<ReturnType<typeof getCenterStaffContext>>["ctx"]>,
+  locale: PassageLocale,
+  groupeId: string,
+) {
+  const { data: groupe, error: gErr } = await supabaseAdmin
+    .from("groupes")
+    .select("id, nom, filiere_id, niveau_id, semestre_id, filieres!inner(center_id, type, name)")
+    .eq("id", groupeId)
+    .maybeSingle();
+  if (gErr || !groupe) {
+    return jsonErr(locale, 404, "Promotion introuvable.", "Class not found.", "GROUPE_NOT_FOUND");
+  }
+  const filiere = groupe.filieres as unknown as { center_id: string; type: string; name: string };
+  if (filiere.center_id !== ctx.centerId) {
+    return jsonErr(locale, 403, "Hors de votre centre.", "Outside your center.", "FORBIDDEN");
+  }
+  if (filiere.type !== "cursus") {
+    return jsonErr(locale, 400, "Pas un cursus.", "Not a multi-year program.", "NOT_CURSUS");
+  }
+
+  const { data: enrollments, error: eErr } = await supabaseAdmin
+    .from("enrollments")
+    .select(`
+      id, status, academic_year, academic_status, passage_decision, passage_reason, niveau_id, filiere_id, student_id,
+      profiles:student_id(prenom, nom, matricule),
+      niveaux(id, annee, seuil_passage, nom)
+    `)
+    .eq("groupe_id", groupeId)
+    .in("status", ["active", "draft", "completed"]);
+  if (eErr) {
+    return jsonErr(locale, 500, eErr.message, eErr.message);
+  }
+
+  let thresholdPct = 50;
+  if (ctx.centerType === "universite") {
+    const { data: center } = await supabaseAdmin
+      .from("centers")
+      .select("lmd_validation_threshold_pct")
+      .eq("id", ctx.centerId)
+      .maybeSingle();
+    thresholdPct = resolveLmdValidationThreshold(center?.lmd_validation_threshold_pct);
+  }
+
+  const rows = [];
+  for (const enr of enrollments || []) {
+    const profile = enr.profiles as unknown as { prenom?: string; nom?: string; matricule?: string | null } | null;
+    const niveau = enr.niveaux as unknown as {
+      id: string;
+      annee: number | null;
+      seuil_passage: number | null;
+      nom: string | null;
+    } | null;
+
+    let moyenne: number | null = null;
+    let suggestion: "admis" | "redouble" | "ajourne" | null = null;
+    let lmd: { acquiredCredits: number; totalCredits: number; failedCount: number; debtCount: number } | null = null;
+
+    try {
+      if (ctx.centerType === "universite") {
+        const progress = await loadLmdProgress(supabaseAdmin, enr.id, thresholdPct);
+        if (progress) {
+          suggestion = progress.suggestion;
+          lmd = {
+            acquiredCredits: progress.level.acquiredCredits,
+            totalCredits: progress.level.totalCredits,
+            failedCount: progress.level.failedCount,
+            debtCount: progress.debts.length,
+          };
+        }
+      } else {
+        const { data: fmRows } = await supabaseAdmin
+          .from("filiere_matieres")
+          .select("id, coefficient, max_score, grade_weights")
+          .eq("filiere_id", enr.filiere_id)
+          .eq("niveau_id", enr.niveau_id);
+        const gradeSelect = await supabaseAdmin
+          .from("grades")
+          .select("filiere_matiere_id, score, max_score, title, status")
+          .eq("enrollment_id", enr.id);
+        let gradeRows = gradeSelect.data;
+        if (gradeSelect.error && (["42703", "PGRST204"].includes(gradeSelect.error.code || "") || /status/i.test(gradeSelect.error.message || ""))) {
+          const fb = await supabaseAdmin
+            .from("grades")
+            .select("filiere_matiere_id, score, max_score, title")
+            .eq("enrollment_id", enr.id);
+          gradeRows = (fb.data || []).map((g) => ({ ...g, status: "validated" }));
+        }
+        const { isOfficialGrade } = await import("@/app/utils/gradeStatus");
+        const official = (gradeRows || []).filter((g) => isOfficialGrade((g as { status?: string | null }).status));
+        moyenne = computeMoyenneGenerale(
+          (fmRows || []).map((m) => ({
+            id: m.id,
+            coefficient: Number(m.coefficient) > 0 ? Number(m.coefficient) : 1,
+            max_score: Number(m.max_score) > 0 ? Number(m.max_score) : 20,
+            grade_weights: parseGradeWeights((m as { grade_weights?: unknown }).grade_weights),
+          })),
+          official.map((g) => ({
+            filiere_matiere_id: g.filiere_matiere_id,
+            score: Number(g.score) || 0,
+            max_score: g.max_score,
+            title: (g as { title?: string | null }).title,
+          })),
+        );
+        suggestion = suggestPassage(moyenne, niveau?.seuil_passage);
+      }
+    } catch {
+      // leave nulls
+    }
+
+    let provisionalCount = 0;
+    try {
+      provisionalCount = await countProvisionalGrades(enr.id);
+    } catch {
+      provisionalCount = 0;
+    }
+
+    const academicReadonly = isAcademicStatusReadonly(enr.academic_status);
+    rows.push({
+      enrollment_id: enr.id,
+      student_name: `${profile?.prenom || ""} ${profile?.nom || ""}`.trim(),
+      matricule: profile?.matricule || null,
+      status: enr.status,
+      academic_status: enr.academic_status ?? null,
+      academic_readonly: academicReadonly,
+      passage_decision: enr.passage_decision,
+      passage_reason: enr.passage_reason ?? null,
+      academic_year: enr.academic_year,
+      proposed_academic_year: nextAcademicYear(enr.academic_year),
+      niveau_annee: niveau?.annee ?? null,
+      seuil_passage: niveau?.seuil_passage ?? null,
+      moyenne,
+      suggestion,
+      lmd,
+      provisional_grades_count: provisionalCount,
+      can_decide:
+        !enr.passage_decision
+        && enr.status !== "cancelled"
+        && enr.status !== "completed"
+        && !academicReadonly
+        && provisionalCount === 0,
+    });
+  }
+
+  rows.sort((a, b) => a.student_name.localeCompare(b.student_name, locale === "en" ? "en" : "fr"));
+
+  return NextResponse.json({
+    groupe: {
+      id: groupe.id,
+      nom: groupe.nom,
+      filiere_id: groupe.filiere_id,
+      filiere_name: filiere.name,
+      niveau_id: groupe.niveau_id,
+      semestre_id: groupe.semestre_id,
+    },
+    rows,
+  });
+}
+
+/** GET — aperçu moyenne / seuil / suggestion pour une inscription, ou liste jury par promo. */
 export async function GET(req: NextRequest) {
   const { ctx, error } = await getCenterStaffContext(req);
   if (error) return error;
   const locale = reqLocale(req);
 
-  const enrollmentId = new URL(req.url).searchParams.get("enrollment_id");
+  const url = new URL(req.url);
+  const groupeId = url.searchParams.get("groupe_id")?.trim() || "";
+  const enrollmentId = url.searchParams.get("enrollment_id")?.trim() || "";
+
+  if (groupeId) {
+    return juryListForGroupe(req, ctx!, locale, groupeId);
+  }
+
   if (!enrollmentId) {
-    return jsonErr(locale, 400, "enrollment_id requis.", "enrollment_id is required.", "MISSING_ENROLLMENT_ID");
+    return jsonErr(locale, 400, "enrollment_id ou groupe_id requis.", "enrollment_id or groupe_id is required.", "MISSING_ID");
   }
 
   type PassageSource = {
@@ -662,6 +856,8 @@ export async function GET(req: NextRequest) {
   }
   const suggestion = lmdProgress ? lmdProgress.suggestion : suggestPassage(moyenne, niveau?.seuil_passage);
 
+  const provisionalGradesCount = await countProvisionalGrades(enrollmentId);
+
   let hasNextNiveau = false;
   let nextNiveauId: string | null = null;
   if (niveau?.annee != null) {
@@ -695,7 +891,12 @@ export async function GET(req: NextRequest) {
     has_next_niveau: hasNextNiveau,
     academic_status: source.academic_status ?? null,
     academic_readonly: isAcademicStatusReadonly(source.academic_status),
-    can_decide: !source.passage_decision && source.status !== "cancelled" && !isAcademicStatusReadonly(source.academic_status),
+    provisional_grades_count: provisionalGradesCount,
+    can_decide:
+      !source.passage_decision
+      && source.status !== "cancelled"
+      && !isAcademicStatusReadonly(source.academic_status)
+      && provisionalGradesCount === 0,
     can_reopen_ajourne: source.passage_decision === "ajourne" && !isAcademicStatusReadonly(source.academic_status),
   });
 }

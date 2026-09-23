@@ -27,10 +27,11 @@ type Preview = {
   niveau_annee: number | null;
   seuil_passage: number | null;
   moyenne: number | null;
-  suggestion: "admis" | "redouble" | null;
+  suggestion: "admis" | "redouble" | "ajourne" | null;
   has_next_niveau: boolean;
   can_decide: boolean;
   can_reopen_ajourne: boolean;
+  provisional_grades_count?: number;
   lmd?: { level: { totalCredits: number; acquiredCredits: number; pendingCount: number; failedCount: number }; debtCount: number; complete: boolean } | null;
   progression_semesters?: { admis: { id: string; nom: string | null; ordre: number }[]; redouble: { id: string; nom: string | null; ordre: number }[] } | null;
 };
@@ -243,25 +244,59 @@ export default function PassageNiveauPanel({ enrollmentId, onDone }: Props) {
           </div>
         </div>}
 
-        {preview.suggestion && preview.can_decide && (
+        {preview.suggestion && (
           <p className="text-sm font-medium text-neutral-600">
             {t("centre", "passageSuggestion")}{" "}
             <span
               className="font-bold"
-              style={{ color: preview.suggestion === "admis" ? "#059669" : ORANGE }}
+              style={{
+                color:
+                  preview.suggestion === "admis"
+                    ? "#059669"
+                    : preview.suggestion === "ajourne"
+                      ? BLUE
+                      : ORANGE,
+              }}
             >
-              {preview.suggestion === "admis" ? t("centre", "studentsPassed") : t("centre", "studentsRepeats")}
+              {preview.suggestion === "admis"
+                ? t("centre", "studentsPassed")
+                : preview.suggestion === "ajourne"
+                  ? t("centre", "passageDefer")
+                  : t("centre", "studentsRepeats")}
             </span>
           </p>
         )}
 
+        {(preview.provisional_grades_count ?? 0) > 0 && !preview.passage_decision && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900">
+            {locale === "en"
+              ? `${preview.provisional_grades_count} provisional grade(s). Validate the session in Exams → Grades before deciding progression.`
+              : `${preview.provisional_grades_count} note(s) provisoire(s). Validez la session dans Examens → Notes avant de décider le passage.`}
+          </div>
+        )}
+
         {preview.passage_decision && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 space-y-1">
-            <p className="text-sm font-semibold text-emerald-900">
+          <div className={`rounded-xl border px-4 py-3 space-y-2 ${
+            preview.passage_decision === "ajourne"
+              ? "border-amber-200 bg-amber-50"
+              : "border-emerald-200 bg-emerald-50"
+          }`}>
+            <p className={`text-sm font-semibold ${
+              preview.passage_decision === "ajourne" ? "text-amber-900" : "text-emerald-900"
+            }`}>
               {t("centre", "passageDecision")} {passageDecisionLabel(preview.passage_decision, locale)}
             </p>
             {preview.passage_reason && (
-              <p className="text-sm font-medium text-emerald-800">{t("centre", "passageReason")} {preview.passage_reason}</p>
+              <p className={`text-sm font-medium ${
+                preview.passage_decision === "ajourne" ? "text-amber-800" : "text-emerald-800"
+              }`}>{t("centre", "passageReason")} {preview.passage_reason}</p>
+            )}
+            {preview.passage_decision === "ajourne" && preview.lmd && (preview.lmd.debtCount > 0 || preview.lmd.level.failedCount > 0) && (
+              <p className="text-sm font-medium text-amber-900">
+                {locale === "en"
+                  ? "Next step: record retake (Rattrapage) grades on failed UE in the LMD section below, then cancel deferral if needed."
+                  : "Suite : saisissez les notes de rattrapage sur les UE en échec dans la section LMD ci-dessous, puis annulez l'ajournement si besoin."}
+              </p>
             )}
           </div>
         )}

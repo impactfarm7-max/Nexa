@@ -60,9 +60,12 @@ test("unassessed UE has a null transcript score", () => {
   const row = result.results.find(r => r.id === "u1");
   assert.equal(row.finalScore, null);
 });
-test("UE without configured credits are not silently omitted from graduation checks", () => {
-  const result = computeLmdProgress([{ ...ue, credits: 0, creditsConfigured: false }], [grade(16)], 50, "n1", []);
-  assert.equal(result.complete, false);
-  assert.equal(result.unconfiguredCount, 1);
-  assert.equal(result.suggestion, null);
+test("failed UE on level suggests ajourne (rattrapage path), not redouble", () => {
+  const result = computeLmdProgress([ue], [grade(8)], 50, "n1", []);
+  assert.equal(result.level.failedCount, 1);
+  assert.equal(result.suggestion, "ajourne");
+});
+test("all level UE validated suggests admis", () => {
+  const result = computeLmdProgress([ue], [grade(12)], 50, "n1", []);
+  assert.equal(result.suggestion, "admis");
 });

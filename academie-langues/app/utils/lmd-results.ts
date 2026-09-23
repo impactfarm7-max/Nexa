@@ -56,6 +56,10 @@ export function computeLmdProgress(ues: LmdUe[], grades: LmdGrade[], thresholdPc
   });
   const levelRows = results.filter(ue => ue.niveau_id === currentNiveauId);
   const level = sum(levelRows);
-  const suggestion = !levelRows.length || level.pendingCount > 0 || level.unconfiguredCount > 0 ? null : level.failedCount ? "redouble" as const : "admis" as const;
+  const suggestion = !levelRows.length || level.pendingCount > 0 || level.unconfiguredCount > 0
+    ? null
+    : level.failedCount
+      ? "ajourne" as const
+      : "admis" as const;
   return { ...sum(results), level, suggestion, results, debts: results.filter(ue => ue.debt), complete: results.length > 0 && results.every(ue => ue.validated && ue.creditsConfigured !== false) };
 }

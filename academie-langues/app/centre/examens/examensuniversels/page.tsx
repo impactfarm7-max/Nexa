@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { BookOpen, ArrowRight, Lock, Calendar, Trophy, History } from "lucide-react";
+import { BookOpen, ArrowRight, Lock, Calendar, Trophy, History, Scale } from "lucide-react";
 import Link from "next/link";
 import CenterPageLoading from "@/app/components/CenterPageLoading";
 import { supabase } from "@/app/utils/supabase";
@@ -89,7 +89,7 @@ function HubCard({
 }
 
 export default function ExamensHubPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [loading, setLoading] = useState(true);
   const [centerType, setCenterType] = useState<string | null>(null);
 
@@ -160,6 +160,16 @@ export default function ExamensHubPage() {
                 description={t("centre", "examensGradebookDesc")}
                 href="/centre/examens/notes"
                 icon={<BookOpen className="h-6 w-6" style={{ color: BLUE }} />}
+              />
+              <HubCard
+                title={locale === "en" ? "Progression jury" : "Jury de passage"}
+                description={
+                  locale === "en"
+                    ? "Admit, repeat or defer a whole class after grade validation."
+                    : "Admettre, redoubler ou ajourner une promo après validation des notes."
+                }
+                href="/centre/examens/jury"
+                icon={<Scale className="h-6 w-6" style={{ color: BLUE }} />}
               />
               <HubCard
                 title={t("centre", "notesJournalTitle")}
