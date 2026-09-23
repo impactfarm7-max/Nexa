@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  FileText, Receipt, Award, Loader2, CheckCircle2,
+  FileText, Receipt, Award, ClipboardList, Loader2, CheckCircle2,
   ChevronRight, MapPin, Check, PenLine, Lock,
 } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
@@ -45,6 +45,7 @@ export default function DocumentsSettingsPage() {
     { key: DEFAULT_DOC_KEY, label: t("centre", "documentsType"), icon: FileText, defaultTitle: t("centre", "documentsOfficial"), available: true },
     { key: "facture", label: t("centre", "documentsInvoiceReceipt"), icon: Receipt, defaultTitle: t("centre", "documentsPaymentReceipt"), available: true },
     { key: "attestation", label: t("centre", "documentsCertificate"), icon: Award, defaultTitle: t("centre", "documentsCertificate"), available: true },
+    { key: "convocation", label: t("centre", "documentsConvocation"), icon: ClipboardList, defaultTitle: t("centre", "documentsConvocationTitle"), available: true },
   ], [t]);
   const [centerId, setCenterId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

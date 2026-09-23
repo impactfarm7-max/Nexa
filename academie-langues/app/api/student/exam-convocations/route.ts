@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/app/utils/auth-server";
 import { supabaseAdmin } from "@/app/utils/center-auth-server";
+import { fetchDocumentExportConfig, filterSignatures } from "@/app/utils/documentConfig";
 
 const fail = (error: string, status = 400) => NextResponse.json({ error }, { status });
 
@@ -63,11 +64,34 @@ export async function GET(req: Request) {
       })
       .filter(Boolean);
 
+    const [docConfig, { data: sigRows }, { data: branding }] = await Promise.all([
+      fetchDocumentExportConfig(supabaseAdmin, profile.center_id, { documentType: "convocation" }),
+      supabaseAdmin
+        .from("bulletin_signatures")
+        .select("id, name, title, signature_url")
+        .eq("center_id", profile.center_id)
+        .order("display_order"),
+      supabaseAdmin.from("center_branding").select("stamp_url").eq("center_id", profile.center_id).maybeSingle(),
+    ]);
+
+    // Fallback title if centre n'a pas encore configuré le type convocation
+    if (!docConfig.title || docConfig.title === "Document officiel") {
+      docConfig.title = "Convocation d'examen";
+    }
+    if (!docConfig.legalName) {
+      docConfig.legalName = center.name;
+    }
+
+    const signatures = filterSignatures(sigRows || [], docConfig.signatureIds);
+
     return NextResponse.json({
       convocations: rows,
       studentName: `${profile.prenom || ""} ${profile.nom || ""}`.trim(),
       matricule: profile.matricule,
       centerName: center.name,
+      docConfig,
+      signatures,
+      stampUrl: branding?.stamp_url || null,
     });
   } catch (e) {
     console.error("[student/exam-convocations]", e);

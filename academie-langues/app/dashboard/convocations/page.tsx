@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Calendar, Download, Loader2, MapPin, BookOpen } from "lucide-react";
 import { supabase } from "@/app/utils/supabase";
 import { downloadConvocationExamenPdf } from "@/app/utils/centerPdfExport";
+import type { DocumentExportConfig } from "@/app/utils/documentConfig";
 import { BRAND } from "@/app/utils/brand";
 import { useI18n } from "@/app/i18n/I18nProvider";
 
@@ -17,13 +18,17 @@ type Row = {
   instructions: string | null;
 };
 
+type Sig = { id: string; label: string; signatureUrl?: string | null };
+
 export default function StudentConvocationsPage() {
   const { locale } = useI18n();
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<Row[]>([]);
   const [studentName, setStudentName] = useState("");
   const [matricule, setMatricule] = useState<string | null>(null);
-  const [centerName, setCenterName] = useState<string | null>(null);
+  const [docConfig, setDocConfig] = useState<Partial<DocumentExportConfig> | null>(null);
+  const [signatures, setSignatures] = useState<Sig[]>([]);
+  const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
@@ -45,9 +50,15 @@ export default function StudentConvocationsPage() {
     setRows(json.convocations || []);
     setStudentName(json.studentName || "");
     setMatricule(json.matricule || null);
-    setCenterName(json.centerName || null);
+    const cfg = (json.docConfig || {}) as Partial<DocumentExportConfig>;
+    if (locale === "en" && (!cfg.title || cfg.title === "Convocation d'examen" || cfg.title === "Document officiel")) {
+      cfg.title = "Examination summons";
+    }
+    setDocConfig(cfg);
+    setSignatures(json.signatures || []);
+    setStampUrl(json.stampUrl || null);
     setLoading(false);
-  }, []);
+  }, [locale]);
 
   useEffect(() => {
     void load();
@@ -60,12 +71,15 @@ export default function StudentConvocationsPage() {
         locale: locale === "en" ? "en" : "fr",
         studentName,
         studentMatricule: matricule,
+        requireMatricule: true,
         epreuveLabel: row.epreuveLabel,
         scheduledAt: row.scheduledAt,
         durationMinutes: row.durationMinutes,
         roomName: row.roomName,
         instructions: row.instructions,
-        config: { legalName: centerName || undefined, title: locale === "en" ? "Examination summons" : "Convocation d'examen" },
+        config: docConfig || undefined,
+        signatures,
+        stampUrl,
       });
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : (locale === "en" ? "Unable to print." : "Impression impossible."));

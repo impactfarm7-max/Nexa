@@ -1411,15 +1411,20 @@ export default function GradeBookPage() {
         : null;
       const centerId = profile?.center_id;
       let config = undefined as Awaited<ReturnType<typeof fetchDocumentExportConfig>> | undefined;
-      let signatures: { id: string; label: string }[] = [];
+      let signatures: { id: string; label: string; signatureUrl?: string | null }[] = [];
+      let stampUrl: string | null = null;
       if (centerId) {
-        config = await fetchDocumentExportConfig(supabase, centerId);
-        const { data: sigRows } = await supabase
-          .from("bulletin_signatures")
-          .select("id, name, title, label")
-          .eq("center_id", centerId)
-          .order("display_order");
+        config = await fetchDocumentExportConfig(supabase, centerId, { documentType: "bulletin" });
+        const [{ data: sigRows }, { data: branding }] = await Promise.all([
+          supabase
+            .from("bulletin_signatures")
+            .select("id, name, title, signature_url")
+            .eq("center_id", centerId)
+            .order("display_order"),
+          supabase.from("center_branding").select("stamp_url").eq("center_id", centerId).maybeSingle(),
+        ]);
         signatures = filterSignatures(sigRows || [], config.signatureIds);
+        stampUrl = branding?.stamp_url || null;
       }
 
       const ranked = [...studentRows]
@@ -1469,6 +1474,7 @@ export default function GradeBookPage() {
         }),
         config,
         signatures,
+        stampUrl,
         locale,
       });
     } catch (e: unknown) {

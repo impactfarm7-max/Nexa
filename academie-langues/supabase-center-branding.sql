@@ -27,7 +27,7 @@ comment on column public.center_branding.default_document_type is
   'Clé UI pour les exports PDF (document = type par défaut, stocké en base sous bulletin dans document_titles).';
 
 -- Ne pas renommer document_titles.bulletin → document : la contrainte CHECK
--- document_titles_document_type_check n''accepte que bulletin, facture, attestation.
+-- document_titles_document_type_check accepte bulletin, facture, attestation, convocation.
 -- L''app mappe « document » (UI) vers « bulletin » (base) via legacyDocKey().
 
 update public.center_branding

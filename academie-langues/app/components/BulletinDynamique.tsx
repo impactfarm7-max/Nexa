@@ -73,7 +73,8 @@ export default function BulletinDynamique({
   const { locale, t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [docConfig, setDocConfig] = useState<DocumentExportConfig | null>(null);
-  const [signatures, setSignatures] = useState<{ id: string; label: string }[]>([]);
+  const [signatures, setSignatures] = useState<{ id: string; label: string; signatureUrl?: string | null }[]>([]);
+  const [stampUrl, setStampUrl] = useState<string | null>(null);
   const [studentName, setStudentName] = useState("");
   const [studentClasse, setStudentClasse] = useState("");
   const [studentMatricule, setStudentMatricule] = useState("");
@@ -115,13 +116,15 @@ export default function BulletinDynamique({
 
       if (!centerId) { setLoading(false); return; }
 
-      const [exportConfig, { data: sigRows }, { data: centerRow }] = await Promise.all([
-        fetchDocumentExportConfig(supabase, centerId),
-        supabase.from("bulletin_signatures").select("id, name, title, label").eq("center_id", centerId).order("display_order"),
+      const [exportConfig, { data: sigRows }, { data: centerRow }, { data: branding }] = await Promise.all([
+        fetchDocumentExportConfig(supabase, centerId, { documentType: "bulletin" }),
+        supabase.from("bulletin_signatures").select("id, name, title, signature_url").eq("center_id", centerId).order("display_order"),
         supabase.from("centers").select("lmd_validation_threshold_pct, center_type").eq("id", centerId).maybeSingle(),
+        supabase.from("center_branding").select("stamp_url").eq("center_id", centerId).maybeSingle(),
       ]);
       setDocConfig(exportConfig);
       setSignatures(filterSignatures(sigRows || [], exportConfig.signatureIds, locale));
+      setStampUrl(branding?.stamp_url || null);
       setLmdThresholdPct(centerRow?.lmd_validation_threshold_pct ?? null);
       setIsUniversity(centerRow?.center_type === "universite");
 
@@ -427,6 +430,7 @@ export default function BulletinDynamique({
         })),
         config: docConfig || undefined,
         signatures,
+        stampUrl,
         locale,
       });
     } catch (e: unknown) {
