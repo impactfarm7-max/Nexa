@@ -22,7 +22,7 @@ const securityHeaders = [
     value: [
       "base-uri 'self'",
       "object-src 'none'",
-      "frame-ancestors 'none'",
+      "frame-ancestors *",
       "form-action 'self'",
       "upgrade-insecure-requests",
     ].join("; "),
