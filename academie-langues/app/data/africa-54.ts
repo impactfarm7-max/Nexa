@@ -71,6 +71,7 @@ const SUBDIVISION_KIND_BY_CODE: Record<string, SubdivisionKind> = {
   MU: "district",
   SC: "district",
   KM: "zone",
+  CA: "province",
 };
 
 export function getSubdivisionKind(countryCode?: string | null): SubdivisionKind {

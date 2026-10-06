@@ -24,10 +24,14 @@ import {
   type TcfPlanKey,
 } from "@/app/data/tcfOffers";
 import {
+  AFRICA_54,
   getSubdivisionKind,
   subdivisionLabelKey,
   subdivisionPlaceholderKey,
 } from "@/app/data/africa-54";
+import { INTERNATIONAL_COUNTRIES } from "@/app/data/international-countries";
+
+const ALL_COUNTRIES = [...AFRICA_54, ...INTERNATIONAL_COUNTRIES];
 import MarketingChrome from "@/app/components/landing/MarketingChrome";
 import { checkPasswordStrength, isPasswordStrong } from "@/app/utils/password-policy";
 import { useI18n } from "@/app/i18n/I18nProvider";
@@ -141,64 +145,6 @@ const PROGRAMS: {
   },
 ];
 
-// ─── 54 pays africains ────────────────────────────────────────────────────────
-const AFRICA_54 = [
-  { code: "DZ", name: "Algérie",             flag: "🇩🇿", dial: "+213", regions: ["Alger", "Oran", "Constantine", "Annaba", "Sétif", "Blida", "Batna", "Tlemcen", "Tizi Ouzou"] },
-  { code: "AO", name: "Angola",              flag: "🇦🇴", dial: "+244", regions: ["Luanda", "Benguela", "Huíla", "Huambo", "Cabinda"] },
-  { code: "BJ", name: "Bénin",               flag: "🇧🇯", dial: "+229", regions: ["Cotonou", "Porto-Novo", "Parakou", "Abomey-Calavi", "Natitingou"] },
-  { code: "BW", name: "Botswana",            flag: "🇧🇼", dial: "+267", regions: ["Gaborone", "Francistown", "Maun", "Kasane"] },
-  { code: "BF", name: "Burkina Faso",        flag: "🇧🇫", dial: "+226", regions: ["Ouagadougou", "Bobo-Dioulasso", "Koudougou", "Banfora", "Ouahigouya"] },
-  { code: "BI", name: "Burundi",             flag: "🇧🇮", dial: "+257", regions: ["Bujumbura", "Gitega", "Ngozi", "Rumonge"] },
-  { code: "CV", name: "Cabo Verde",          flag: "🇨🇻", dial: "+238", regions: ["Praia", "Mindelo", "Santa Maria"] },
-  { code: "CM", name: "Cameroun",            flag: "🇨🇲", dial: "+237", regions: ["Centre", "Littoral", "Ouest", "Sud-Ouest", "Nord-Ouest", "Nord", "Extrême-Nord", "Adamaoua", "Est", "Sud"] },
-  { code: "CF", name: "Centrafrique",        flag: "🇨🇫", dial: "+236", regions: ["Bangui", "Bimbo", "Mbaïki", "Berberati"] },
-  { code: "KM", name: "Comores",             flag: "🇰🇲", dial: "+269", regions: ["Moroni", "Mutsamudu", "Fomboni"] },
-  { code: "CG", name: "Congo",               flag: "🇨🇬", dial: "+242", regions: ["Brazzaville", "Pointe-Noire", "Dolisie", "Nkayi"] },
-  { code: "CD", name: "RD Congo",            flag: "🇨🇩", dial: "+243", regions: ["Kinshasa", "Lubumbashi", "Mbuji-Mayi", "Kananga", "Kisangani", "Bukavu", "Goma"] },
-  { code: "CI", name: "Côte d'Ivoire",       flag: "🇨🇮", dial: "+225", regions: ["Abidjan", "Yamoussoukro", "Bouaké", "Daloa", "San Pédro", "Man", "Korhogo"] },
-  { code: "DJ", name: "Djibouti",            flag: "🇩🇯", dial: "+253", regions: ["Djibouti", "Arta", "Dikhil", "Obock"] },
-  { code: "EG", name: "Égypte",              flag: "🇪🇬", dial: "+20",  regions: ["Le Caire", "Alexandrie", "Gizeh", "Louxor", "Assouan", "Port-Saïd"] },
-  { code: "GQ", name: "Guinée Équatoriale",  flag: "🇬🇶", dial: "+240", regions: ["Malabo", "Bata", "Mongomo"] },
-  { code: "ER", name: "Érythrée",            flag: "🇪🇷", dial: "+291", regions: ["Asmara", "Keren", "Massawa"] },
-  { code: "SZ", name: "Eswatini",            flag: "🇸🇿", dial: "+268", regions: ["Mbabane", "Manzini", "Lobamba"] },
-  { code: "ET", name: "Éthiopie",            flag: "🇪🇹", dial: "+251", regions: ["Addis-Abeba", "Dire Dawa", "Mekele", "Bahir Dar", "Hawassa", "Gondar"] },
-  { code: "GA", name: "Gabon",               flag: "🇬🇦", dial: "+241", regions: ["Libreville", "Port-Gentil", "Franceville", "Oyem", "Lambaréné"] },
-  { code: "GM", name: "Gambie",              flag: "🇬🇲", dial: "+220", regions: ["Banjul", "Serekunda", "Brikama"] },
-  { code: "GH", name: "Ghana",               flag: "🇬🇭", dial: "+233", regions: ["Accra", "Kumasi", "Tamale", "Sekondi-Takoradi", "Cape Coast"] },
-  { code: "GN", name: "Guinée",              flag: "🇬🇳", dial: "+224", regions: ["Conakry", "Labé", "Kankan", "Kindia", "N'Zérékoré"] },
-  { code: "GW", name: "Guinée-Bissau",       flag: "🇬🇼", dial: "+245", regions: ["Bissau", "Bafatá", "Gabú"] },
-  { code: "KE", name: "Kenya",               flag: "🇰🇪", dial: "+254", regions: ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Eldoret"] },
-  { code: "LS", name: "Lesotho",             flag: "🇱🇸", dial: "+266", regions: ["Maseru", "Teyateyaneng", "Mafeteng"] },
-  { code: "LR", name: "Libéria",             flag: "🇱🇷", dial: "+231", regions: ["Monrovia", "Gbarnga", "Kakata"] },
-  { code: "LY", name: "Libye",               flag: "🇱🇾", dial: "+218", regions: ["Tripoli", "Benghazi", "Misrata", "Sebha"] },
-  { code: "MG", name: "Madagascar",          flag: "🇲🇬", dial: "+261", regions: ["Antananarivo", "Toamasina", "Antsirabe", "Fianarantsoa", "Mahajanga"] },
-  { code: "MW", name: "Malawi",              flag: "🇲🇼", dial: "+265", regions: ["Lilongwe", "Blantyre", "Mzuzu", "Zomba"] },
-  { code: "ML", name: "Mali",                flag: "🇲🇱", dial: "+223", regions: ["Bamako", "Sikasso", "Mopti", "Ségou", "Koutiala", "Kayes"] },
-  { code: "MR", name: "Mauritanie",          flag: "🇲🇷", dial: "+222", regions: ["Nouakchott", "Nouadhibou", "Rosso"] },
-  { code: "MU", name: "Maurice",             flag: "🇲🇺", dial: "+230", regions: ["Port-Louis", "Beau-Bassin", "Vacoas-Phoenix"] },
-  { code: "MA", name: "Maroc",               flag: "🇲🇦", dial: "+212", regions: ["Casablanca", "Rabat", "Fès", "Marrakech", "Tanger", "Agadir", "Meknès", "Oujda"] },
-  { code: "MZ", name: "Mozambique",          flag: "🇲🇿", dial: "+258", regions: ["Maputo", "Matola", "Beira", "Nampula"] },
-  { code: "NA", name: "Namibie",             flag: "🇳🇦", dial: "+264", regions: ["Windhoek", "Rundu", "Walvis Bay", "Swakopmund"] },
-  { code: "NE", name: "Niger",               flag: "🇳🇪", dial: "+227", regions: ["Niamey", "Zinder", "Maradi", "Tahoua", "Agadez"] },
-  { code: "NG", name: "Nigeria",             flag: "🇳🇬", dial: "+234", regions: ["Lagos", "Abuja", "Kano", "Ibadan", "Port Harcourt", "Kaduna", "Enugu"] },
-  { code: "RW", name: "Rwanda",              flag: "🇷🇼", dial: "+250", regions: ["Kigali", "Butare", "Gisenyi", "Ruhengeri"] },
-  { code: "ST", name: "Sao Tomé-et-Príncipe",flag: "🇸🇹", dial: "+239", regions: ["São Tomé", "Trindade"] },
-  { code: "SN", name: "Sénégal",             flag: "🇸🇳", dial: "+221", regions: ["Dakar", "Thiès", "Touba", "Ziguinchor", "Saint-Louis", "Kaolack"] },
-  { code: "SC", name: "Seychelles",          flag: "🇸🇨", dial: "+248", regions: ["Victoria", "Anse Royale"] },
-  { code: "SL", name: "Sierra Leone",        flag: "🇸🇱", dial: "+232", regions: ["Freetown", "Bo", "Kenema", "Makeni"] },
-  { code: "SO", name: "Somalie",             flag: "🇸🇴", dial: "+252", regions: ["Mogadiscio", "Hargeisa", "Kismaayo"] },
-  { code: "ZA", name: "Afrique du Sud",      flag: "🇿🇦", dial: "+27",  regions: ["Johannesburg", "Cape Town", "Durban", "Pretoria", "Port Elizabeth"] },
-  { code: "SS", name: "Soudan du Sud",       flag: "🇸🇸", dial: "+211", regions: ["Djouba", "Wau", "Malakal"] },
-  { code: "SD", name: "Soudan",              flag: "🇸🇩", dial: "+249", regions: ["Khartoum", "Omdurman", "Port-Soudan"] },
-  { code: "TZ", name: "Tanzanie",            flag: "🇹🇿", dial: "+255", regions: ["Dodoma", "Dar es Salaam", "Mwanza", "Arusha", "Zanzibar"] },
-  { code: "TD", name: "Tchad",               flag: "🇹🇩", dial: "+235", regions: ["N'Djamena", "Moundou", "Sarh", "Abéché"] },
-  { code: "TG", name: "Togo",                flag: "🇹🇬", dial: "+228", regions: ["Lomé", "Sokodé", "Kara", "Kpalimé", "Atakpamé"] },
-  { code: "TN", name: "Tunisie",             flag: "🇹🇳", dial: "+216", regions: ["Tunis", "Sfax", "Sousse", "Bizerte", "Gabès"] },
-  { code: "UG", name: "Ouganda",             flag: "🇺🇬", dial: "+256", regions: ["Kampala", "Gulu", "Lira", "Mbarara"] },
-  { code: "ZM", name: "Zambie",              flag: "🇿🇲", dial: "+260", regions: ["Lusaka", "Kitwe", "Ndola", "Livingstone"] },
-  { code: "ZW", name: "Zimbabwe",            flag: "🇿🇼", dial: "+263", regions: ["Harare", "Bulawayo", "Mutare", "Gweru"] },
-];
-
 const OWNER_ROLES: { value: string; labelKey: string }[] = [
   { value: "PDG", labelKey: "ouvrirCentreRolePdg" },
   { value: "Directeur Général", labelKey: "ouvrirCentreRoleDg" },
@@ -241,7 +187,7 @@ export default function CreerCentrePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const selectedCountry = AFRICA_54.find(c => c.code === country);
+  const selectedCountry = ALL_COUNTRIES.find(c => c.code === country);
   const subdivisionKind = getSubdivisionKind(country);
   const subdivisionLabel = t("marketing", subdivisionLabelKey(subdivisionKind));
   const subdivisionPlaceholder = t("marketing", subdivisionPlaceholderKey(subdivisionKind));
@@ -249,7 +195,7 @@ export default function CreerCentrePage() {
   const handleCountryChange = (code: string) => {
     setCountry(code);
     setRegion("");
-    const c = AFRICA_54.find(x => x.code === code);
+    const c = ALL_COUNTRIES.find(x => x.code === code);
     if (c) setPhone(c.dial + " ");
   };
 
@@ -640,9 +586,16 @@ export default function CreerCentrePage() {
                       className="input-nexa appearance-none pr-10 cursor-pointer"
                     >
                       <option value="">{t("marketing", "ouvrirCentreFieldCountryPlaceholder")}</option>
-                      {AFRICA_54.map(c => (
-                        <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
-                      ))}
+                      <optgroup label={locale === "en" ? "Africa" : "Afrique"}>
+                        {AFRICA_54.map(c => (
+                          <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label={locale === "en" ? "Europe & North America" : "Europe & Amérique du Nord"}>
+                        {INTERNATIONAL_COUNTRIES.map(c => (
+                          <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+                        ))}
+                      </optgroup>
                     </select>
                     <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
                   </div>
@@ -896,7 +849,7 @@ export default function CreerCentrePage() {
                 <div>
                   <p className="text-sm font-black" style={{ color: BLUE }}>{centerName}</p>
                   <p className="text-[10px] text-neutral-400 font-medium">
-                    {city}{country ? ` · ${AFRICA_54.find(c => c.code === country)?.name}` : ""} ·{" "}
+                    {city}{country ? ` · ${ALL_COUNTRIES.find(c => c.code === country)?.name}` : ""} ·{" "}
                     {localizedCenterTypeLabel(centerType)}
                   </p>
                 </div>
