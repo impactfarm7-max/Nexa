@@ -1,7 +1,7 @@
 "use client";
 
 import { Building2, Eye, EyeOff, Globe, Lock, Mail, MapPin, ArrowRight } from "lucide-react";
-import type { SignupCountry } from "../data/signup-countries";
+import { SIGNUP_CITIES, type SignupCountry } from "../data/signup-countries";
 import type { useI18n } from "@/app/i18n/I18nProvider";
 
 type TFunc = ReturnType<typeof useI18n>["t"];
@@ -160,9 +160,16 @@ export default function SignupForm({
           required
           placeholder={t("auth", "loginCityPlaceholder")}
           className={fieldInput}
+          list="signup-city-suggestions"
+          autoComplete="address-level2"
           value={ville}
           onChange={(e) => setVille(e.target.value)}
         />
+        <datalist id="signup-city-suggestions">
+          {(SIGNUP_CITIES[selectedCountry?.code ?? countryCode] ?? []).map((city) => (
+            <option key={city} value={city} />
+          ))}
+        </datalist>
       </div>
 
       <input
