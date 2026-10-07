@@ -29,11 +29,13 @@ export async function sendCenterActivatedEmail(input: {
   periodMonths?: number | null;
   renewalAt?: string | null;
   locale?: "fr" | "en";
+  renewed?: boolean;
 }) {
   const to = input.to?.trim();
   if (!to) return { sent: false, skipped: true as const };
 
   const locale = input.locale ?? "fr";
+  const renewed = input.renewed === true;
   const offer = nexaOfferLabel(input.offerKey, locale);
   const amount = formatAmount(input.amount);
   const renewal = formatDate(input.renewalAt, locale);
@@ -42,15 +44,21 @@ export async function sendCenterActivatedEmail(input: {
 
   const subject =
     locale === "en"
-      ? `Your center “${input.centerName}” is now active on Nexa`
-      : `Votre centre « ${input.centerName} » est activé sur Nexa`;
+      ? renewed
+        ? `Your Nexa subscription for “${input.centerName}” has been renewed`
+        : `Your center “${input.centerName}” is now active on Nexa`
+      : renewed
+        ? `L’abonnement Nexa de « ${input.centerName} » est renouvelé`
+        : `Votre centre « ${input.centerName} » est activé sur Nexa`;
 
   const text =
     locale === "en"
       ? [
           `Hello,`,
           ``,
-          `Your center “${input.centerName}” has been activated on Nexa.`,
+          renewed
+            ? `The Nexa subscription for your center “${input.centerName}” has been renewed. Access is restored.`
+            : `Your center “${input.centerName}” has been activated on Nexa.`,
           `Plan: ${offer}`,
           amount ? `Amount: ${amount} / month` : null,
           `Billing period: ${period} month(s)`,
@@ -65,7 +73,9 @@ export async function sendCenterActivatedEmail(input: {
       : [
           `Bonjour,`,
           ``,
-          `Votre centre « ${input.centerName} » a été activé sur Nexa.`,
+          renewed
+            ? `L’abonnement Nexa de votre centre « ${input.centerName} » a été renouvelé. L’accès est rétabli.`
+            : `Votre centre « ${input.centerName} » a été activé sur Nexa.`,
           `Offre : ${offer}`,
           amount ? `Montant : ${amount} / mois` : null,
           `Période : ${period} mois`,

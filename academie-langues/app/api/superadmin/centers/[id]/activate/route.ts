@@ -88,6 +88,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     renewal_at: addMonths(now, periodMonths).toISOString(),
     subscription_period_months: periodMonths,
     trial_ends_at: null,
+    pause_reason: null,
     updated_at: now.toISOString(),
   };
 
@@ -125,6 +126,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       center_id: id,
       centerName: center.name,
       previousStatus: previousCenter.status,
+      renewal: body?.renewal === true,
       previousOffer: previousCenter.nexa_offer ?? previousCenter.plan_type,
       nexa_offer: center.nexa_offer,
       plan_type: center.plan_type,
@@ -144,6 +146,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     amount: center.subscription_amount,
     periodMonths: center.subscription_period_months,
     renewalAt: center.renewal_at,
+    renewed: body?.renewal === true,
   });
 
   return NextResponse.json({ center, emailSent: Boolean(emailResult.sent) });

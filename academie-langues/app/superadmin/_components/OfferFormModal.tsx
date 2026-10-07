@@ -214,11 +214,40 @@ export function OfferFormModal({
   onSuccess,
 }: {
   center: OfferModalCenter;
-  mode: "activate" | "change";
+  mode: "activate" | "change" | "renew";
   onClose: () => void;
   onSuccess: () => void;
 }) {
   const { t, locale } = useI18n();
+  const keepsCurrentValues = mode === "change" || mode === "renew";
+  const usesActivateRoute = mode === "activate" || mode === "renew";
+  const labels =
+    mode === "renew"
+      ? {
+          title: "centresModalRenewTitle",
+          submit: "centresActionRenew",
+          confirmTitle: "centresConfirmRenewTitle",
+          confirmMessage: "centresConfirmRenewMessage",
+          success: "centresRenewSuccess",
+          successMsg: "centresRenewSuccessMsg",
+        } as const
+      : mode === "activate"
+        ? {
+            title: "centresModalActivateTitle",
+            submit: "centresActionActivate",
+            confirmTitle: "centresConfirmActivateTitle",
+            confirmMessage: "centresConfirmActivateMessage",
+            success: "centresActivateSuccess",
+            successMsg: "centresActivateSuccessMsg",
+          } as const
+        : {
+            title: "centresModalChangeOfferTitle",
+            submit: "centresModalConfirmChange",
+            confirmTitle: "centresModalChangeOfferTitle",
+            confirmMessage: "centresConfirmChangeOfferMessage",
+            success: "centresChangeOfferSuccess",
+            successMsg: "centresChangeOfferSuccessMsg",
+          } as const;
   const feedback = useActionFeedback();
   const router = useRouter();
   const isTcf = center.center_type === "tcf_canada";
@@ -253,7 +282,7 @@ export function OfferFormModal({
       setAmount(center.subscription_amount != null ? formatMoneyInput(String(center.subscription_amount)) : "");
     } else {
       const cfg = offer !== "custom" ? NEXA_OFFERS[offer as Exclude<NexaOfferKey, "custom">] : null;
-      if (center.subscription_amount != null && mode === "change" && normalizeNexaOffer(center.nexa_offer) === offer) {
+      if (center.subscription_amount != null && keepsCurrentValues && normalizeNexaOffer(center.nexa_offer) === offer) {
         setAmount(formatMoneyInput(String(center.subscription_amount)));
       } else if (cfg) {
         setAmount(formatMoneyInput(String(cfg.monthlyFeeMin)));
@@ -284,12 +313,12 @@ export function OfferFormModal({
       ? normalizeTcfPlan(center.plan_type) === tcfPlan
       : normalizeNexaOffer(center.nexa_offer) === offer;
 
-    if (mode === "change" && sameSelection && existingOverrideMaxStudents != null) {
+    if (keepsCurrentValues && sameSelection && existingOverrideMaxStudents != null) {
       setCenterQuotas((prev) => ({ ...prev, maxStudents: numOrEmpty(existingOverrideMaxStudents) }));
     } else {
       setCenterQuotas((prev) => ({ ...prev, maxStudents: numOrEmpty(tierMaxStudents) }));
     }
-  }, [offer, tcfPlan, isTcf, center.subscription_amount, center.nexa_offer, center.plan_type, center.quota_overrides, mode]);
+  }, [offer, tcfPlan, isTcf, center.subscription_amount, center.nexa_offer, center.plan_type, center.quota_overrides, keepsCurrentValues]);
 
   const offerLabel = isTcf
     ? (en ? TCF_OFFERS[tcfPlan].nameEn : TCF_OFFERS[tcfPlan].nameFr)
@@ -348,10 +377,10 @@ export function OfferFormModal({
 
     const result = await feedback.run(
       async () => {
-        if (mode === "activate") {
+        if (usesActivateRoute) {
           await superadminFetch(`/api/superadmin/centers/${center.id}/activate`, {
             method: "POST",
-            body: JSON.stringify(body),
+            body: JSON.stringify({ ...body, renewal: mode === "renew" }),
           });
         } else {
           await superadminFetch(`/api/superadmin/centers/${center.id}`, {
@@ -362,15 +391,8 @@ export function OfferFormModal({
         onSuccess();
       },
       {
-        successTitle: t(
-          "superadmin",
-          mode === "activate" ? "centresActivateSuccess" : "centresChangeOfferSuccess",
-        ),
-        successMessage: t(
-          "superadmin",
-          mode === "activate" ? "centresActivateSuccessMsg" : "centresChangeOfferSuccessMsg",
-          { name: center.name, offer: offerLabel },
-        ),
+        successTitle: t("superadmin", labels.success),
+        successMessage: t("superadmin", labels.successMsg, { name: center.name, offer: offerLabel }),
         errorTitle: t("superadmin", "requestsActionImpossible"),
       },
     );
@@ -404,9 +426,7 @@ export function OfferFormModal({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-orange-400/80">
-              {mode === "activate"
-                ? t("superadmin", "centresModalActivateTitle")
-                : t("superadmin", "centresModalChangeOfferTitle")}
+              {t("superadmin", labels.title)}
             </p>
             <h2 className="mt-1 text-lg font-black text-white">{center.name}</h2>
             <p className="mt-1 text-xs text-slate-500">
@@ -621,30 +641,21 @@ export function OfferFormModal({
             onClick={() => setConfirmOpen(true)}
             className="flex items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-2.5 text-sm font-black text-white hover:opacity-90"
           >
-            {mode === "activate"
-              ? t("superadmin", "centresActionActivate")
-              : t("superadmin", "centresModalConfirmChange")}
+            {t("superadmin", labels.submit)}
           </button>
         </div>
       </div>
 
       {confirmOpen && (
         <ConfirmDialog
-          title={
-            mode === "activate"
-              ? t("superadmin", "centresConfirmActivateTitle")
-              : t("superadmin", "centresModalChangeOfferTitle")
-          }
-          message={t(
-            "superadmin",
-            mode === "activate" ? "centresConfirmActivateMessage" : "centresConfirmChangeOfferMessage",
-            { name: center.name, offer: offerLabel, amount: amountLabel, period: String(period) },
-          )}
-          confirmLabel={
-            mode === "activate"
-              ? t("superadmin", "centresActionActivate")
-              : t("superadmin", "centresModalConfirmChange")
-          }
+          title={t("superadmin", labels.confirmTitle)}
+          message={t("superadmin", labels.confirmMessage, {
+            name: center.name,
+            offer: offerLabel,
+            amount: amountLabel,
+            period: String(period),
+          })}
+          confirmLabel={t("superadmin", labels.submit)}
           cancelLabel={t("superadmin", "centresConfirmCancel")}
           variant="primary"
           onConfirm={() => void execute()}

@@ -178,6 +178,7 @@ export function CenterDetailPanel({
   onChangeOffer,
   onPause,
   onResume,
+  onRenew,
   onRevoke,
   onReject,
   actionBusy,
@@ -189,6 +190,7 @@ export function CenterDetailPanel({
   onChangeOffer: () => void;
   onPause: () => void;
   onResume: () => void;
+  onRenew: () => void;
   onRevoke: () => void;
   onReject: () => void;
   actionBusy: boolean;
@@ -353,8 +355,8 @@ export function CenterDetailPanel({
       break;
     case "subscription_expired":
       actions.push(
-        <button key="resume" type="button" disabled={actionBusy} onClick={onResume} className={`${btnBase} border-emerald-500/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25`}>
-          {t("superadmin", "centresActionResume")}
+        <button key="renew" type="button" disabled={actionBusy} onClick={onRenew} className={`${btnBase} border-emerald-500/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25`}>
+          {t("superadmin", "centresActionRenew")}
         </button>,
         <button key="revoke" type="button" disabled={actionBusy} onClick={onRevoke} className={`${btnBase} border-red-500/30 text-red-300 hover:bg-red-500/10`}>
           {t("superadmin", "centresActionRevoke")}

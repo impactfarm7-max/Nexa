@@ -87,7 +87,7 @@ function SuperadminCentresPageContent() {
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
-  const [offerModal, setOfferModal] = useState<{ center: CenterRow; mode: "activate" | "change" } | null>(null);
+  const [offerModal, setOfferModal] = useState<{ center: CenterRow; mode: "activate" | "change" | "renew" } | null>(null);
   const [pauseModal, setPauseModal] = useState<CenterRow | null>(null);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
   const [detailRefreshKey, setDetailRefreshKey] = useState(0);
@@ -435,6 +435,9 @@ function SuperadminCentresPageContent() {
             }}
             onResume={() => {
               if (selectedRow) setConfirm({ type: "resume", center: selectedRow });
+            }}
+            onRenew={() => {
+              if (selectedRow) setOfferModal({ center: selectedRow, mode: "renew" });
             }}
             onRevoke={() => {
               if (selectedRow) setConfirm({ type: "revoke", center: selectedRow });
