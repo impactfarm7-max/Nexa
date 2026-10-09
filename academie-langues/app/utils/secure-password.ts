@@ -1,13 +1,7 @@
 import crypto from "crypto";
 
-const PASSWORD_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
-
-/** Génère un secret temporaire avec un CSPRNG, sans caractères ambigus. */
-export function generateSecureTemporaryPassword(length = 14): string {
-  const size = Math.max(12, Math.min(64, Math.trunc(length)));
-  let password = "";
-  for (let index = 0; index < size; index += 1) {
-    password += PASSWORD_ALPHABET[crypto.randomInt(0, PASSWORD_ALPHABET.length)];
-  }
-  return password;
+/** Génère un mot de passe temporaire au format Nexa + 4 chiffres aléatoires (ex: Nexa0427). */
+export function generateSecureTemporaryPassword(): string {
+  const digits = crypto.randomInt(0, 10000).toString().padStart(4, "0");
+  return `Nexa${digits}`;
 }

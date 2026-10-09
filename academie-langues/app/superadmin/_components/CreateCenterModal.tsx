@@ -7,27 +7,12 @@ import { checkPasswordStrength } from "@/app/utils/password-policy";
 
 type CenterTypeChoice = "generic" | "tcf_canada" | "ecole" | "universite" | "entreprise";
 
-function secureRandomChars(alphabet: string, length: number): string {
-  const bytes = new Uint32Array(length);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
-}
-
+/** Mot de passe temporaire au format Nexa + 4 chiffres aléatoires (ex: Nexa0427). */
 function generatePassword(): string {
-  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  const lower = "abcdefghjkmnpqrstuvwxyz";
-  const digits = "23456789";
-  const symbols = "!@#$%&*";
-  // Une garantie de chaque classe requise par la politique, puis complète avec
-  // un alphabet mixte tiré via un CSPRNG (pas Math.random — c'est un vrai identifiant).
-  const guaranteed = secureRandomChars(upper, 2) + secureRandomChars(lower, 2) + secureRandomChars(digits, 2);
-  const rest = secureRandomChars(upper + lower + digits + symbols, 8);
-  const combined = (guaranteed + rest).split("");
-  for (let i = combined.length - 1; i > 0; i--) {
-    const j = Math.floor((crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) * (i + 1));
-    [combined[i], combined[j]] = [combined[j], combined[i]];
-  }
-  return combined.join("");
+  const bytes = new Uint32Array(1);
+  crypto.getRandomValues(bytes);
+  const digits = (bytes[0] % 10000).toString().padStart(4, "0");
+  return `Nexa${digits}`;
 }
 
 export function CreateCenterModal({
